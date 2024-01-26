@@ -1,0 +1,1206 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 60;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		161135DF2B3F66DA003C20F6 /* WhisperAXWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 161135DE2B3F66DA003C20F6 /* WhisperAXWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		161136102B3F6C68003C20F6 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1611360F2B3F6C68003C20F6 /* WhisperKit */; };
+		1677AFC22B57618A008C61C0 /* WhisperAXApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1677AFAB2B57618A008C61C0 /* WhisperAXApp.swift */; };
+		1677AFC42B57618A008C61C0 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1677AFAE2B57618A008C61C0 /* Preview Assets.xcassets */; };
+		1677AFC82B57618A008C61C0 /* WhisperAXExampleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1677AFB32B57618A008C61C0 /* WhisperAXExampleView.swift */; };
+		1677AFC92B57618A008C61C0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1677AFB42B57618A008C61C0 /* Assets.xcassets */; };
+		1677AFCA2B57618A008C61C0 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1677AFB62B57618A008C61C0 /* Preview Assets.xcassets */; };
+		1677AFD32B5762BC008C61C0 /* WhisperAXWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1677AFB72B57618A008C61C0 /* WhisperAXWatchApp.swift */; };
+		1677AFD42B57632E008C61C0 /* WhisperAXExampleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1677AFB32B57618A008C61C0 /* WhisperAXExampleView.swift */; };
+		1677AFD92B5763B7008C61C0 /* WhisperAXUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1677AFBA2B57618A008C61C0 /* WhisperAXUITests.swift */; };
+		1677AFDA2B5763BA008C61C0 /* WhisperAXUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1677AFB92B57618A008C61C0 /* WhisperAXUITestsLaunchTests.swift */; };
+		1677AFDC2B5763C0008C61C0 /* WhisperAXTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1677AFBC2B57618A008C61C0 /* WhisperAXTests.swift */; };
+		1677AFDD2B5763C7008C61C0 /* WhisperAX_Watch_AppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1677AFBE2B57618A008C61C0 /* WhisperAX_Watch_AppTests.swift */; };
+		1677AFDE2B5763CB008C61C0 /* WhisperAX_Watch_AppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1677AFA62B57618A008C61C0 /* WhisperAX_Watch_AppUITests.swift */; };
+		1677AFDF2B5763CE008C61C0 /* WhisperAX_Watch_AppUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1677AFA72B57618A008C61C0 /* WhisperAX_Watch_AppUITestsLaunchTests.swift */; };
+		1677AFE12B57678E008C61C0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1677AFE02B57678E008C61C0 /* Assets.xcassets */; };
+		1677AFE62B57704E008C61C0 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1677AFE52B57704E008C61C0 /* ContentView.swift */; };
+		16D581092B4F7E4E000C0AB0 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = 16D581082B4F7E4E000C0AB0 /* MarkdownUI */; };
+		16EA36CF2B59E550006CA7CF /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 16EA36CE2B59E550006CA7CF /* WhisperKit */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		161135E02B3F66DA003C20F6 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 167B34562B05431E0076F261 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 161135DD2B3F66DA003C20F6;
+			remoteInfo = "Basic Watch App";
+		};
+		161135F12B3F66DC003C20F6 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 167B34562B05431E0076F261 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 161135DD2B3F66DA003C20F6;
+			remoteInfo = "Basic Watch App";
+		};
+		161135FB2B3F66DC003C20F6 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 167B34562B05431E0076F261 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 161135DD2B3F66DA003C20F6;
+			remoteInfo = "Basic Watch App";
+		};
+		167B34722B05431F0076F261 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 167B34562B05431E0076F261 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 167B345D2B05431E0076F261;
+			remoteInfo = BasicExample;
+		};
+		167B347C2B05431F0076F261 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 167B34562B05431E0076F261 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 167B345D2B05431E0076F261;
+			remoteInfo = BasicExample;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		161136052B3F66DC003C20F6 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				161135DF2B3F66DA003C20F6 /* WhisperAXWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		161135D92B3F66DA003C20F6 /* WhisperAXWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WhisperAXWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		161135DE2B3F66DA003C20F6 /* WhisperAXWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WhisperAXWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		161135F02B3F66DC003C20F6 /* WhisperAXWatchAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WhisperAXWatchAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		161135FA2B3F66DC003C20F6 /* WhisperAXWatchAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WhisperAXWatchAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		1677AFA62B57618A008C61C0 /* WhisperAX_Watch_AppUITests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WhisperAX_Watch_AppUITests.swift; sourceTree = "<group>"; };
+		1677AFA72B57618A008C61C0 /* WhisperAX_Watch_AppUITestsLaunchTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WhisperAX_Watch_AppUITestsLaunchTests.swift; sourceTree = "<group>"; };
+		1677AFA92B57618A008C61C0 /* WhisperAX.entitlements */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; path = WhisperAX.entitlements; sourceTree = "<group>"; };
+		1677AFAB2B57618A008C61C0 /* WhisperAXApp.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WhisperAXApp.swift; sourceTree = "<group>"; };
+		1677AFAE2B57618A008C61C0 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		1677AFB32B57618A008C61C0 /* WhisperAXExampleView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WhisperAXExampleView.swift; sourceTree = "<group>"; };
+		1677AFB42B57618A008C61C0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		1677AFB62B57618A008C61C0 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		1677AFB72B57618A008C61C0 /* WhisperAXWatchApp.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WhisperAXWatchApp.swift; sourceTree = "<group>"; };
+		1677AFB92B57618A008C61C0 /* WhisperAXUITestsLaunchTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WhisperAXUITestsLaunchTests.swift; sourceTree = "<group>"; };
+		1677AFBA2B57618A008C61C0 /* WhisperAXUITests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WhisperAXUITests.swift; sourceTree = "<group>"; };
+		1677AFBC2B57618A008C61C0 /* WhisperAXTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WhisperAXTests.swift; sourceTree = "<group>"; };
+		1677AFBE2B57618A008C61C0 /* WhisperAX_Watch_AppTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WhisperAX_Watch_AppTests.swift; sourceTree = "<group>"; };
+		1677AFE02B57678E008C61C0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		1677AFE52B57704E008C61C0 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		167B345E2B05431E0076F261 /* WhisperAX.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WhisperAX.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		167B34712B05431F0076F261 /* WhisperAXTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WhisperAXTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		167B347B2B05431F0076F261 /* WhisperAXUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WhisperAXUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		169755022B58A17000C57DDC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		161135DB2B3F66DA003C20F6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				161136102B3F6C68003C20F6 /* WhisperKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		161135ED2B3F66DC003C20F6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		161135F72B3F66DC003C20F6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		167B345B2B05431E0076F261 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				16EA36CF2B59E550006CA7CF /* WhisperKit in Frameworks */,
+				16D581092B4F7E4E000C0AB0 /* MarkdownUI in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		167B346E2B05431F0076F261 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		167B34782B05431F0076F261 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1677AFA52B57618A008C61C0 /* WhisperAXWatchAppUITests */ = {
+			isa = PBXGroup;
+			children = (
+				1677AFA62B57618A008C61C0 /* WhisperAX_Watch_AppUITests.swift */,
+				1677AFA72B57618A008C61C0 /* WhisperAX_Watch_AppUITestsLaunchTests.swift */,
+			);
+			path = WhisperAXWatchAppUITests;
+			sourceTree = "<group>";
+		};
+		1677AFA82B57618A008C61C0 /* WhisperAX */ = {
+			isa = PBXGroup;
+			children = (
+				1677AFAB2B57618A008C61C0 /* WhisperAXApp.swift */,
+				1677AFE42B5769E5008C61C0 /* Views */,
+				1677AFD72B576375008C61C0 /* Resources */,
+				1677AFAD2B57618A008C61C0 /* Preview Content */,
+			);
+			path = WhisperAX;
+			sourceTree = "<group>";
+		};
+		1677AFAD2B57618A008C61C0 /* Preview Content */ = {
+			isa = PBXGroup;
+			children = (
+				1677AFAE2B57618A008C61C0 /* Preview Assets.xcassets */,
+			);
+			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		1677AFB22B57618A008C61C0 /* WhisperAXWatchApp */ = {
+			isa = PBXGroup;
+			children = (
+				1677AFB72B57618A008C61C0 /* WhisperAXWatchApp.swift */,
+				1677AFB32B57618A008C61C0 /* WhisperAXExampleView.swift */,
+				1677AFB42B57618A008C61C0 /* Assets.xcassets */,
+				1677AFB52B57618A008C61C0 /* Preview Content */,
+			);
+			path = WhisperAXWatchApp;
+			sourceTree = "<group>";
+		};
+		1677AFB52B57618A008C61C0 /* Preview Content */ = {
+			isa = PBXGroup;
+			children = (
+				1677AFB62B57618A008C61C0 /* Preview Assets.xcassets */,
+			);
+			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		1677AFB82B57618A008C61C0 /* WhisperAXUITests */ = {
+			isa = PBXGroup;
+			children = (
+				1677AFBA2B57618A008C61C0 /* WhisperAXUITests.swift */,
+				1677AFB92B57618A008C61C0 /* WhisperAXUITestsLaunchTests.swift */,
+			);
+			path = WhisperAXUITests;
+			sourceTree = "<group>";
+		};
+		1677AFBB2B57618A008C61C0 /* WhisperAXTests */ = {
+			isa = PBXGroup;
+			children = (
+				1677AFBC2B57618A008C61C0 /* WhisperAXTests.swift */,
+			);
+			path = WhisperAXTests;
+			sourceTree = "<group>";
+		};
+		1677AFBD2B57618A008C61C0 /* WhisperAXWatchAppTests */ = {
+			isa = PBXGroup;
+			children = (
+				1677AFBE2B57618A008C61C0 /* WhisperAX_Watch_AppTests.swift */,
+			);
+			path = WhisperAXWatchAppTests;
+			sourceTree = "<group>";
+		};
+		1677AFD72B576375008C61C0 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				1677AFE02B57678E008C61C0 /* Assets.xcassets */,
+				169755022B58A17000C57DDC /* Info.plist */,
+				1677AFA92B57618A008C61C0 /* WhisperAX.entitlements */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		1677AFE42B5769E5008C61C0 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				1677AFE52B57704E008C61C0 /* ContentView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		167B34552B05431E0076F261 = {
+			isa = PBXGroup;
+			children = (
+				1677AFA82B57618A008C61C0 /* WhisperAX */,
+				1677AFBB2B57618A008C61C0 /* WhisperAXTests */,
+				1677AFB82B57618A008C61C0 /* WhisperAXUITests */,
+				1677AFB22B57618A008C61C0 /* WhisperAXWatchApp */,
+				1677AFBD2B57618A008C61C0 /* WhisperAXWatchAppTests */,
+				1677AFA52B57618A008C61C0 /* WhisperAXWatchAppUITests */,
+				167B345F2B05431E0076F261 /* Products */,
+				16D581072B4F7E4E000C0AB0 /* Frameworks */,
+			);
+			sourceTree = "<group>";
+		};
+		167B345F2B05431E0076F261 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				167B345E2B05431E0076F261 /* WhisperAX.app */,
+				167B34712B05431F0076F261 /* WhisperAXTests.xctest */,
+				167B347B2B05431F0076F261 /* WhisperAXUITests.xctest */,
+				161135D92B3F66DA003C20F6 /* WhisperAXWatch.app */,
+				161135DE2B3F66DA003C20F6 /* WhisperAXWatch.app */,
+				161135F02B3F66DC003C20F6 /* WhisperAXWatchAppTests.xctest */,
+				161135FA2B3F66DC003C20F6 /* WhisperAXWatchAppUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		16D581072B4F7E4E000C0AB0 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		161135D82B3F66DA003C20F6 /* WhisperAXWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 161136062B3F66DC003C20F6 /* Build configuration list for PBXNativeTarget "WhisperAXWatch" */;
+			buildPhases = (
+				161135D72B3F66DA003C20F6 /* Resources */,
+				161136052B3F66DC003C20F6 /* Embed Watch Content */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				161135E12B3F66DA003C20F6 /* PBXTargetDependency */,
+			);
+			name = WhisperAXWatch;
+			productName = Basic;
+			productReference = 161135D92B3F66DA003C20F6 /* WhisperAXWatch.app */;
+			productType = "com.apple.product-type.application.watchapp2-container";
+		};
+		161135DD2B3F66DA003C20F6 /* WhisperAXWatchApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 161136022B3F66DC003C20F6 /* Build configuration list for PBXNativeTarget "WhisperAXWatchApp" */;
+			buildPhases = (
+				161135DA2B3F66DA003C20F6 /* Sources */,
+				161135DB2B3F66DA003C20F6 /* Frameworks */,
+				161135DC2B3F66DA003C20F6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = WhisperAXWatchApp;
+			packageProductDependencies = (
+				1611360F2B3F6C68003C20F6 /* WhisperKit */,
+			);
+			productName = "Basic Watch App";
+			productReference = 161135DE2B3F66DA003C20F6 /* WhisperAXWatch.app */;
+			productType = "com.apple.product-type.application";
+		};
+		161135EF2B3F66DC003C20F6 /* WhisperAXWatchAppTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 161136092B3F66DC003C20F6 /* Build configuration list for PBXNativeTarget "WhisperAXWatchAppTests" */;
+			buildPhases = (
+				161135EC2B3F66DC003C20F6 /* Sources */,
+				161135ED2B3F66DC003C20F6 /* Frameworks */,
+				161135EE2B3F66DC003C20F6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				161135F22B3F66DC003C20F6 /* PBXTargetDependency */,
+			);
+			name = WhisperAXWatchAppTests;
+			productName = "Basic Watch AppTests";
+			productReference = 161135F02B3F66DC003C20F6 /* WhisperAXWatchAppTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		161135F92B3F66DC003C20F6 /* WhisperAXWatchAppUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1611360C2B3F66DC003C20F6 /* Build configuration list for PBXNativeTarget "WhisperAXWatchAppUITests" */;
+			buildPhases = (
+				161135F62B3F66DC003C20F6 /* Sources */,
+				161135F72B3F66DC003C20F6 /* Frameworks */,
+				161135F82B3F66DC003C20F6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				161135FC2B3F66DC003C20F6 /* PBXTargetDependency */,
+			);
+			name = WhisperAXWatchAppUITests;
+			productName = "Basic Watch AppUITests";
+			productReference = 161135FA2B3F66DC003C20F6 /* WhisperAXWatchAppUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		167B345D2B05431E0076F261 /* WhisperAX */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 167B34852B05431F0076F261 /* Build configuration list for PBXNativeTarget "WhisperAX" */;
+			buildPhases = (
+				167B345A2B05431E0076F261 /* Sources */,
+				167B345B2B05431E0076F261 /* Frameworks */,
+				167B345C2B05431E0076F261 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = WhisperAX;
+			packageProductDependencies = (
+				16D581082B4F7E4E000C0AB0 /* MarkdownUI */,
+				16EA36CE2B59E550006CA7CF /* WhisperKit */,
+			);
+			productName = BasicExample;
+			productReference = 167B345E2B05431E0076F261 /* WhisperAX.app */;
+			productType = "com.apple.product-type.application";
+		};
+		167B34702B05431F0076F261 /* WhisperAXTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 167B34882B05431F0076F261 /* Build configuration list for PBXNativeTarget "WhisperAXTests" */;
+			buildPhases = (
+				167B346D2B05431F0076F261 /* Sources */,
+				167B346E2B05431F0076F261 /* Frameworks */,
+				167B346F2B05431F0076F261 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				167B34732B05431F0076F261 /* PBXTargetDependency */,
+			);
+			name = WhisperAXTests;
+			productName = BasicExampleTests;
+			productReference = 167B34712B05431F0076F261 /* WhisperAXTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		167B347A2B05431F0076F261 /* WhisperAXUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 167B348B2B05431F0076F261 /* Build configuration list for PBXNativeTarget "WhisperAXUITests" */;
+			buildPhases = (
+				167B34772B05431F0076F261 /* Sources */,
+				167B34782B05431F0076F261 /* Frameworks */,
+				167B34792B05431F0076F261 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				167B347D2B05431F0076F261 /* PBXTargetDependency */,
+			);
+			name = WhisperAXUITests;
+			productName = BasicExampleUITests;
+			productReference = 167B347B2B05431F0076F261 /* WhisperAXUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		167B34562B05431E0076F261 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1510;
+				LastUpgradeCheck = 1520;
+				TargetAttributes = {
+					161135D82B3F66DA003C20F6 = {
+						CreatedOnToolsVersion = 15.1;
+					};
+					161135DD2B3F66DA003C20F6 = {
+						CreatedOnToolsVersion = 15.1;
+					};
+					161135EF2B3F66DC003C20F6 = {
+						CreatedOnToolsVersion = 15.1;
+						TestTargetID = 161135DD2B3F66DA003C20F6;
+					};
+					161135F92B3F66DC003C20F6 = {
+						CreatedOnToolsVersion = 15.1;
+						TestTargetID = 161135DD2B3F66DA003C20F6;
+					};
+					167B345D2B05431E0076F261 = {
+						CreatedOnToolsVersion = 15.0.1;
+					};
+					167B34702B05431F0076F261 = {
+						CreatedOnToolsVersion = 15.0.1;
+						TestTargetID = 167B345D2B05431E0076F261;
+					};
+					167B347A2B05431F0076F261 = {
+						CreatedOnToolsVersion = 15.0.1;
+						TestTargetID = 167B345D2B05431E0076F261;
+					};
+				};
+			};
+			buildConfigurationList = 167B34592B05431E0076F261 /* Build configuration list for PBXProject "WhisperAX" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 167B34552B05431E0076F261;
+			packageReferences = (
+				161135D62B3F66A6003C20F6 /* XCLocalSwiftPackageReference "../.." */,
+				16D581062B4F7DCE000C0AB0 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
+			);
+			productRefGroup = 167B345F2B05431E0076F261 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				167B345D2B05431E0076F261 /* WhisperAX */,
+				167B34702B05431F0076F261 /* WhisperAXTests */,
+				167B347A2B05431F0076F261 /* WhisperAXUITests */,
+				161135D82B3F66DA003C20F6 /* WhisperAXWatch */,
+				161135DD2B3F66DA003C20F6 /* WhisperAXWatchApp */,
+				161135EF2B3F66DC003C20F6 /* WhisperAXWatchAppTests */,
+				161135F92B3F66DC003C20F6 /* WhisperAXWatchAppUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		161135D72B3F66DA003C20F6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		161135DC2B3F66DA003C20F6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		161135EE2B3F66DC003C20F6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		161135F82B3F66DC003C20F6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		167B345C2B05431E0076F261 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1677AFC42B57618A008C61C0 /* Preview Assets.xcassets in Resources */,
+				1677AFCA2B57618A008C61C0 /* Preview Assets.xcassets in Resources */,
+				1677AFC92B57618A008C61C0 /* Assets.xcassets in Resources */,
+				1677AFE12B57678E008C61C0 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		167B346F2B05431F0076F261 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		167B34792B05431F0076F261 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		161135DA2B3F66DA003C20F6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1677AFD42B57632E008C61C0 /* WhisperAXExampleView.swift in Sources */,
+				1677AFD32B5762BC008C61C0 /* WhisperAXWatchApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		161135EC2B3F66DC003C20F6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1677AFDD2B5763C7008C61C0 /* WhisperAX_Watch_AppTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		161135F62B3F66DC003C20F6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1677AFDF2B5763CE008C61C0 /* WhisperAX_Watch_AppUITestsLaunchTests.swift in Sources */,
+				1677AFDE2B5763CB008C61C0 /* WhisperAX_Watch_AppUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		167B345A2B05431E0076F261 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1677AFE62B57704E008C61C0 /* ContentView.swift in Sources */,
+				1677AFC22B57618A008C61C0 /* WhisperAXApp.swift in Sources */,
+				1677AFC82B57618A008C61C0 /* WhisperAXExampleView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		167B346D2B05431F0076F261 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1677AFDA2B5763BA008C61C0 /* WhisperAXUITestsLaunchTests.swift in Sources */,
+				1677AFDC2B5763C0008C61C0 /* WhisperAXTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		167B34772B05431F0076F261 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1677AFD92B5763B7008C61C0 /* WhisperAXUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		161135E12B3F66DA003C20F6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 161135DD2B3F66DA003C20F6 /* WhisperAXWatchApp */;
+			targetProxy = 161135E02B3F66DA003C20F6 /* PBXContainerItemProxy */;
+		};
+		161135F22B3F66DC003C20F6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 161135DD2B3F66DA003C20F6 /* WhisperAXWatchApp */;
+			targetProxy = 161135F12B3F66DC003C20F6 /* PBXContainerItemProxy */;
+		};
+		161135FC2B3F66DC003C20F6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 161135DD2B3F66DA003C20F6 /* WhisperAXWatchApp */;
+			targetProxy = 161135FB2B3F66DC003C20F6 /* PBXContainerItemProxy */;
+		};
+		167B34732B05431F0076F261 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 167B345D2B05431E0076F261 /* WhisperAX */;
+			targetProxy = 167B34722B05431F0076F261 /* PBXContainerItemProxy */;
+		};
+		167B347D2B05431F0076F261 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 167B345D2B05431E0076F261 /* WhisperAX */;
+			targetProxy = 167B347C2B05431F0076F261 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		161136032B3F66DC003C20F6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"WhisperAXWatchApp/Preview Content\"";
+				DEVELOPMENT_TEAM = JSGZDY54HP;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKWatchOnly = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.argmax.whisperkit.WhisperAXWatch.watchkitapp;
+				PRODUCT_NAME = WhisperAXWatch;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Debug;
+		};
+		161136042B3F66DC003C20F6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"WhisperAXWatchApp/Preview Content\"";
+				DEVELOPMENT_TEAM = JSGZDY54HP;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKWatchOnly = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.argmax.whisperkit.WhisperAXWatch.watchkitapp;
+				PRODUCT_NAME = WhisperAXWatch;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 10.0;
+			};
+			name = Release;
+		};
+		161136072B3F66DC003C20F6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = JSGZDY54HP;
+				INFOPLIST_KEY_CFBundleDisplayName = Basic;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.argmaxinc.swift-whisper-kit.Basic";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		161136082B3F66DC003C20F6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = JSGZDY54HP;
+				INFOPLIST_KEY_CFBundleDisplayName = Basic;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.argmaxinc.swift-whisper-kit.Basic";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		1611360A2B3F66DC003C20F6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = JSGZDY54HP;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.argmaxinc.swift-whisper-kit.Basic-Watch-AppTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Basic Watch App.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Basic Watch App";
+				WATCHOS_DEPLOYMENT_TARGET = 10.2;
+			};
+			name = Debug;
+		};
+		1611360B2B3F66DC003C20F6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = JSGZDY54HP;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.argmaxinc.swift-whisper-kit.Basic-Watch-AppTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Basic Watch App.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Basic Watch App";
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 10.2;
+			};
+			name = Release;
+		};
+		1611360D2B3F66DC003C20F6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = JSGZDY54HP;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.argmaxinc.swift-whisper-kit.Basic-Watch-AppUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_TARGET_NAME = "Basic Watch App";
+				WATCHOS_DEPLOYMENT_TARGET = 10.2;
+			};
+			name = Debug;
+		};
+		1611360E2B3F66DC003C20F6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = JSGZDY54HP;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.argmaxinc.swift-whisper-kit.Basic-Watch-AppUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_TARGET_NAME = "Basic Watch App";
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 10.2;
+			};
+			name = Release;
+		};
+		167B34832B05431F0076F261 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		167B34842B05431F0076F261 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		167B34862B05431F0076F261 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = WhisperAX/Resources/WhisperAX.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_ASSET_PATHS = "\"WhisperAX/Preview Content\"";
+				DEVELOPMENT_TEAM = PP83DTRKSA;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = WhisperAX/Resources/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Required to record audio from the microphone.";
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.argmax.whisperkit.WhisperAX;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		167B34872B05431F0076F261 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = WhisperAX/Resources/WhisperAX.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_ASSET_PATHS = "\"WhisperAX/Preview Content\"";
+				DEVELOPMENT_TEAM = PP83DTRKSA;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = WhisperAX/Resources/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Required to record audio from the microphone.";
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.argmax.whisperkit.WhisperAX;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		167B34892B05431F0076F261 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = JSGZDY54HP;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.argmax.whisperkit.WhisperAXTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WhisperAX.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/WhisperAX";
+			};
+			name = Debug;
+		};
+		167B348A2B05431F0076F261 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = JSGZDY54HP;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.argmax.whisperkit.WhisperAXTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WhisperAX.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/WhisperAX";
+			};
+			name = Release;
+		};
+		167B348C2B05431F0076F261 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = JSGZDY54HP;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.argmax.whisperkit.WhisperAXUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = WhisperAX;
+			};
+			name = Debug;
+		};
+		167B348D2B05431F0076F261 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = JSGZDY54HP;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.argmax.whisperkit.WhisperAXUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = WhisperAX;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		161136022B3F66DC003C20F6 /* Build configuration list for PBXNativeTarget "WhisperAXWatchApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				161136032B3F66DC003C20F6 /* Debug */,
+				161136042B3F66DC003C20F6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		161136062B3F66DC003C20F6 /* Build configuration list for PBXNativeTarget "WhisperAXWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				161136072B3F66DC003C20F6 /* Debug */,
+				161136082B3F66DC003C20F6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		161136092B3F66DC003C20F6 /* Build configuration list for PBXNativeTarget "WhisperAXWatchAppTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1611360A2B3F66DC003C20F6 /* Debug */,
+				1611360B2B3F66DC003C20F6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1611360C2B3F66DC003C20F6 /* Build configuration list for PBXNativeTarget "WhisperAXWatchAppUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1611360D2B3F66DC003C20F6 /* Debug */,
+				1611360E2B3F66DC003C20F6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		167B34592B05431E0076F261 /* Build configuration list for PBXProject "WhisperAX" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				167B34832B05431F0076F261 /* Debug */,
+				167B34842B05431F0076F261 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		167B34852B05431F0076F261 /* Build configuration list for PBXNativeTarget "WhisperAX" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				167B34862B05431F0076F261 /* Debug */,
+				167B34872B05431F0076F261 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		167B34882B05431F0076F261 /* Build configuration list for PBXNativeTarget "WhisperAXTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				167B34892B05431F0076F261 /* Debug */,
+				167B348A2B05431F0076F261 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		167B348B2B05431F0076F261 /* Build configuration list for PBXNativeTarget "WhisperAXUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				167B348C2B05431F0076F261 /* Debug */,
+				167B348D2B05431F0076F261 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		161135D62B3F66A6003C20F6 /* XCLocalSwiftPackageReference "../.." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../..;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		16D581062B4F7DCE000C0AB0 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.3.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1611360F2B3F6C68003C20F6 /* WhisperKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = WhisperKit;
+		};
+		16D581082B4F7E4E000C0AB0 /* MarkdownUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 16D581062B4F7DCE000C0AB0 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
+			productName = MarkdownUI;
+		};
+		16EA36CE2B59E550006CA7CF /* WhisperKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = WhisperKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 167B34562B05431E0076F261 /* Project object */;
+}

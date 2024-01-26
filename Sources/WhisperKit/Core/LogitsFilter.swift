@@ -1,0 +1,66 @@
+//  For licensing see accompanying LICENSE.md file.
+//  Copyright © 2024 Argmax, Inc. All rights reserved.
+
+import CoreML
+import Foundation
+import Tokenizers
+
+public protocol LogitsFiltering {
+    func filterLogits(_ logits: MLMultiArray, withTokens tokens: [Int]) -> MLMultiArray
+}
+
+@available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
+public class SuppressTokensFilter: LogitsFiltering {
+    let suppressTokens: [Int]
+
+    public init(suppressTokens: [Int]) {
+        self.suppressTokens = suppressTokens
+        // TODO: implement
+        fatalError("Not implemented: \(#function)")
+    }
+
+    public func filterLogits(_ logits: MLMultiArray, withTokens tokens: [Int]) -> MLMultiArray {
+        // TODO: implement
+        return logits
+    }
+}
+
+@available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
+public class SuppressBlankFilter: LogitsFiltering {
+    let tokenizer: Tokenizer
+    let sampleBegin: Int
+
+    public init(tokenizer: Tokenizer, sampleBegin: Int) {
+        self.tokenizer = tokenizer
+        self.sampleBegin = sampleBegin
+        // TODO: implement
+        fatalError("Not implemented: \(#function)")
+    }
+
+    public func filterLogits(_ logits: MLMultiArray, withTokens tokens: [Int]) -> MLMultiArray {
+        if tokens.count == sampleBegin {
+            if let blankToken = tokenizer.convertTokenToId(" ") {
+                Logging.debug(blankToken)
+            }
+            // TODO: implement
+        }
+        return logits
+    }
+}
+
+@available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
+public class TimestampRulesFilter: LogitsFiltering {
+    let tokenizer: Tokenizer
+    let sampleBegin: Int
+    let maxInitialTimestamp: Int?
+
+    public init(tokenizer: Tokenizer, sampleBegin: Int) {
+        // TODO: implement
+        fatalError("Not implemented: \(#function)")
+    }
+
+    public func filterLogits(_ logits: MLMultiArray, withTokens tokens: [Int]) -> MLMultiArray {
+        // TODO: implement
+        return logits
+    }
+}

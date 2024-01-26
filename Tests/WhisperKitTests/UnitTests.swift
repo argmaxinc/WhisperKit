@@ -1,0 +1,545 @@
+//  For licensing see accompanying LICENSE.md file.
+//  Copyright © 2024 Argmax, Inc. All rights reserved.
+
+import XCTest
+import CoreML
+@testable import WhisperKit
+import Tokenizers
+import AVFoundation
+
+@available(macOS 14, iOS 17, *)
+final class UnitTests: XCTestCase {
+
+    func testInit() async {
+        let whisperKit = try? await WhisperKit(prewarm: false, load: false)
+        XCTAssertNotNil(whisperKit)
+    }
+
+    // MARK: - Model Loading Tests
+
+    func testInitTiny() async {
+        let modelPath = tinyModelPath()
+        let whisperKit = try? await WhisperKit(modelFolder: modelPath, logLevel: .error)
+        XCTAssertNotNil(whisperKit)
+    }
+
+    func testInitLarge() async {
+        let modelPath = largev3ModelPath()
+        let whisperKit = try? await WhisperKit(modelFolder: modelPath, logLevel: .error)
+        XCTAssertNotNil(whisperKit)
+    }
+
+    // MARK: - Audio Tests
+
+    func testAudioFileLoading() {
+        guard let audioFilePath = Bundle.module.path(forResource: "jfk", ofType: "wav") else {
+            XCTFail("Audio file not found")
+            return
+        }
+        let audioBuffer = AudioProcessor.loadAudio(fromPath: audioFilePath)
+        XCTAssertNotNil(audioBuffer, "Failed to load audio file at path: \(audioFilePath)")
+        XCTAssertEqual(audioBuffer!.format.sampleRate, 16000)
+        XCTAssertEqual(audioBuffer!.format.channelCount, 1)
+    }
+
+    func testAudioPad() {
+        let audioSamples = [Float](repeating: 0.0, count: 1000)
+        let paddedSamples = AudioProcessor.padOrTrimAudio(fromArray: audioSamples, startAt: 0, toLength: 1600)
+        XCTAssertNotNil(paddedSamples, "Failed to pad audio samples")
+        XCTAssertEqual(paddedSamples?.count, 1600, "Padded or trimmed samples count is not as expected")
+    }
+
+    func testAudioTrim() {
+        let audioSamples = [Float](repeating: 0.0, count: 2000)
+        let paddedSamples = AudioProcessor.padOrTrimAudio(fromArray: audioSamples, startAt: 0, toLength: 1600)
+        XCTAssertNotNil(paddedSamples, "Failed to trim audio samples")
+        XCTAssertEqual(paddedSamples?.count, 1600, "Padded or trimmed samples count is not as expected")
+    }
+
+    func testAudioResample() {
+        guard let audioFileURL = Bundle.module.url(forResource: "jfk", withExtension: "wav") else {
+            XCTFail("Audio file not found")
+            return
+        }
+        let audioFile = try? AVAudioFile(forReading: audioFileURL)
+
+        let targetSampleRate = 44100.0
+        let targetChannelCount: AVAudioChannelCount = 2
+        let resampledAudio = AudioProcessor.resampleAudio(fromFile: audioFile!, toSampleRate: targetSampleRate, channelCount: 2)
+        XCTAssertNotNil(resampledAudio, "Failed to resample audio")
+        XCTAssertEqual(resampledAudio?.format.sampleRate, targetSampleRate, "Resampled audio sample rate is not as expected")
+        XCTAssertEqual(resampledAudio?.format.channelCount, targetChannelCount, "Resampled audio channels is not as expected")
+    }
+
+    func testAudioEnergy() {
+        let samples = [Float](repeating: 0.0, count: 16000)
+        let silence = samples.map { _ in Float(0.0) }
+        let energy = AudioProcessor.calculateEnergy(of: silence).avg
+        XCTAssertEqual(energy, 0.0, "Audio energy is not silent")
+
+        let loudNoise = samples.map { _ in Float.random(in: -1...1) }
+        let energyLoud = AudioProcessor.calculateEnergy(of: loudNoise).avg
+        XCTAssertGreaterThan(energyLoud, energy, "Audio energy is not loud")
+
+        let veryLoudNoise = samples.map { _ in Float.random(in: -10...10) }
+        let energyVeryLoud = AudioProcessor.calculateEnergy(of: veryLoudNoise).avg
+        XCTAssertGreaterThan(energyVeryLoud, energyLoud, "Audio energy is not very loud")
+    }
+
+    // MARK: - Feature Extractor Tests
+
+    func testLogmelOutput() async {
+        let audioSamples = [Float](repeating: 0.0, count: 16000)
+        guard let paddedSamples = AudioProcessor.padOrTrimAudio(fromArray: audioSamples, startAt: 0, toLength: 480000) else {
+            XCTFail("Failed to pad audio samples")
+            return
+        }
+        var featureExtractor = FeatureExtractor()
+        let modelPath = URL(filePath: tinyModelPath()).appending(path: "MelSpectrogram.mlmodelc")
+        try? await featureExtractor.loadModel(at: modelPath, computeUnits: .all)
+        guard let melSpectrogram = try? await featureExtractor.logMelSpectrogram(fromAudio: paddedSamples) else {
+            XCTFail("Failed to produce Mel spectrogram from audio samples")
+            return
+        }
+        let expectedShape: [NSNumber] = [1, 80, 1, 3000]
+        XCTAssertNotNil(melSpectrogram, "Failed to produce Mel spectrogram from audio samples")
+        XCTAssertEqual(melSpectrogram.shape, expectedShape, "Mel spectrogram shape is not as expected")
+    }
+
+    func testCompressionRatioIntArray() {
+        let uniqueArray = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        let uniqueRatio = compressionRatio(of: uniqueArray)
+        let repeatedArray = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        let repeatedRatio = compressionRatio(of: repeatedArray)
+        let repeatedLongArray = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        let repeatedLongRatio = compressionRatio(of: repeatedLongArray)
+
+        XCTAssertLessThan(uniqueRatio, repeatedRatio)
+        XCTAssertLessThan(repeatedRatio, repeatedLongRatio)
+    }
+    
+    func testCompressionRatioString() {
+        let uniqueString = "This is a unique string"
+        let uniqueRatio = compressionRatio(of: uniqueString)
+        let repeatedString = String(repeating: "Repeated text string", count: 5)
+        let repeatedRatio = compressionRatio(of: repeatedString)
+        let repeatedLongString = String(repeating: "Longer repeated text string", count: 10)
+        let repeatedLongRatio = compressionRatio(of: repeatedLongString)
+
+        XCTAssertLessThan(uniqueRatio, repeatedRatio)
+        XCTAssertLessThan(repeatedRatio, repeatedLongRatio)
+    }
+
+    // MARK: Encoder Tests
+
+    func testEncoderOutput() async {
+
+        var audioEncoder = AudioEncoder()
+        let modelPath = URL(filePath: tinyModelPath()).appending(path: "AudioEncoder.mlmodelc")
+        try? await audioEncoder.loadModel(at: modelPath, computeUnits: .all)
+
+        let encoderInput = try! MLMultiArray(shape: [1, 80, 1, 3000], dataType: .float16)
+        let expectedShape: [NSNumber] = [1, 384, 1, 1500]
+
+        let encoderOutput = try? await audioEncoder.encodeFeatures(encoderInput)
+        XCTAssertNotNil(encoderOutput, "Failed to encode features")
+        XCTAssertEqual(encoderOutput?.shape, expectedShape, "Encoder output shape is not as expected")
+    }
+
+    // MARK: Decoder Tests
+
+    func testDecoderOutput() async {
+        var textDecoder = TextDecoder()
+        let decodingOptions = DecodingOptions()
+        let modelPath = URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        try? await textDecoder.loadModel(at: modelPath, computeUnits: .all)
+        textDecoder.tokenizer = try? await loadTokenizer(for: .tiny)
+
+        let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.endToken, decodingOptions: decodingOptions)
+        
+        let encoderInput = try! MLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16)
+        let decoderInputs = textDecoder.prepareDecoderInputs(withPrompt: [textDecoder.tokenizer!.startOfTranscriptToken])
+        let expectedShape: Int = 1
+
+        let decoderOutput = try! await textDecoder.decodeText(from: encoderInput, using: decoderInputs, sampler: tokenSampler, options: decodingOptions)
+        XCTAssertNotNil(decoderOutput, "Failed to decode text")
+        XCTAssertEqual(decoderOutput.count, expectedShape, "Decoder output shape is not as expected")
+    }
+
+    // MARK: - Tokenizer Tests
+
+    func testDecoderTokenizer() async {
+        // This token index does not change with v3
+        let tokenText = "<|startoftranscript|>"
+
+        let textDecoder = TextDecoder()
+        textDecoder.tokenizer = try? await loadTokenizer(for: .tiny)
+        let encodedToken = textDecoder.tokenizer!.convertTokenToId(tokenText)!
+        let decodedToken = textDecoder.tokenizer!.decode(tokens: [encodedToken])
+
+        textDecoder.tokenizer = try? await loadTokenizer(for: .largev3)
+        let encodedTokenLarge = textDecoder.tokenizer!.convertTokenToId(tokenText)!
+        let decodedTokenLarge = textDecoder.tokenizer?.decode(tokens: [encodedTokenLarge])
+
+        // Test successful tokenizing
+        XCTAssertNotNil(decodedToken)
+        XCTAssertNotNil(decodedTokenLarge)
+        XCTAssertEqual(tokenText, decodedToken)
+        XCTAssertEqual(tokenText, decodedTokenLarge)
+        XCTAssertEqual(decodedToken, decodedTokenLarge)
+
+        // Test non shifted tokens are equal
+        XCTAssertEqual(encodedToken, encodedTokenLarge)
+
+        // This token index changes with v3
+        let tokenTextShifted = "<|0.00|>"
+
+        textDecoder.tokenizer = try? await loadTokenizer(for: .tiny)
+        let encodedTokenShifted = textDecoder.tokenizer!.convertTokenToId(tokenTextShifted)!
+        let decodedTokenShifted = textDecoder.tokenizer?.decode(tokens: [encodedTokenShifted])
+
+        textDecoder.tokenizer = try? await loadTokenizer(for: .largev3)
+        let encodedTokenLargeShifted = textDecoder.tokenizer!.convertTokenToId(tokenTextShifted)!
+        let decodedTokenLargeShifted = textDecoder.tokenizer?.decode(tokens: [encodedTokenLargeShifted])
+
+        // Test success tokenizing
+        XCTAssertNotNil(decodedTokenShifted)
+        XCTAssertNotNil(decodedTokenLargeShifted)
+        XCTAssertEqual(tokenTextShifted, decodedTokenShifted)
+        XCTAssertEqual(tokenTextShifted, decodedTokenLargeShifted)
+
+        // Test shifted tokens are not equal
+        XCTAssertNotEqual(encodedTokenShifted, encodedTokenLargeShifted)
+    }
+
+    func testTokenizerOutput() async {
+        let tokenInputs = [50364, 400, 370, 452, 7177, 6280, 1029, 406, 437, 428, 1941, 393, 360, 337, 291, 1029, 437, 291, 393, 360, 337, 428, 1941, 13, 50889]
+
+        let tokenizer = try? await loadTokenizer(for: .largev3)
+
+        let decodedText = tokenizer!.decode(tokens: tokenInputs)
+
+        XCTAssertNotNil(decodedText)
+        XCTAssertEqual(decodedText, "<|notimestamps|> And so my fellow Americans ask not what your country can do for you ask what you can do for your country.<|10.48|>")
+    }
+
+    func testWindowing() async {
+        let whisperKit = try? await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+
+        guard let audioFilePath = Bundle.module.path(forResource: "jfk", ofType: "wav") else {
+            XCTFail("Audio file not found")
+            return
+        }
+        guard let audioBuffer = AudioProcessor.loadAudio(fromPath: audioFilePath) else {
+            XCTFail("Failed to load audio buffer")
+            return
+        }
+
+        let audioSamples = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
+        let silence = [Float](repeating: 0.0, count: 30 * 16000)
+        let multiWindowSamples = audioSamples + silence + audioSamples
+
+        let options = DecodingOptions(usePrefillPrompt: true, withoutTimestamps: false)
+
+        let result = try? await whisperKit!.transcribe(audioArray: multiWindowSamples, decodeOptions: options)
+        XCTAssertEqual(result?.segments.count, 2, "Expected 2 segments")
+
+        // Compare last timestamp to the length of the audio
+        guard let endTimestamp = result?.segments.last!.end else {
+            XCTFail("Failed to get end time")
+            return
+        }
+        XCTAssertEqual(endTimestamp, Float(multiWindowSamples.count / 16000), accuracy: 1.0, "Expected last timestamp to be near the length of the audio")
+    }
+
+    // MARK: - Options Tests
+
+    func testSampleLength() async {
+        let desiredDecodingLoops = 5
+        let targetTokenCount = 7 // Account for the first token and the end of transcript token, which dont require decoding loops
+
+        let options = [
+            DecodingOptions(sampleLength: desiredDecodingLoops, usePrefillPrompt: false, skipSpecialTokens: false),
+            DecodingOptions(sampleLength: desiredDecodingLoops, usePrefillPrompt: true, skipSpecialTokens: false),
+            DecodingOptions(sampleLength: desiredDecodingLoops, usePrefillPrompt: false, skipSpecialTokens: true),
+            DecodingOptions(sampleLength: desiredDecodingLoops, usePrefillPrompt: true, skipSpecialTokens: true),
+        ]
+
+        for option in options {
+            guard let result = try? await transcribe(with: .tiny, options: option) else {
+                XCTFail("Failed to transcribe")
+                return
+            }
+            XCTAssertEqual(result.segments.first?.tokens.count, targetTokenCount)
+        }
+    }
+
+    // Multilingual Tests
+    // NOTE: These are purely for consistency checks and do not reflect the ground truth translations
+    func testTranslateSpanish() async {
+        let targetLanguage = "es"
+        let options = DecodingOptions(task: .translate, language: targetLanguage, temperatureFallbackCount: 0)
+
+        guard let result = try? await transcribe(with: .tiny, options: options, audioFile: "es_test_clip.wav") else {
+            XCTFail("Failed to transcribe")
+            return
+        }
+
+        XCTAssertEqual(result.text.split(separator: " ").prefix(2).joined(separator: " "), "This is")
+    }
+
+    func testTranscribeSpanish() async {
+        let sourceLanguage = "es"
+        let options = DecodingOptions(task: .transcribe, language: sourceLanguage, temperatureFallbackCount: 0)
+
+        guard let result = try? await transcribe(with: .tiny, options: options, audioFile: "es_test_clip.wav") else {
+            XCTFail("Failed to transcribe")
+            return
+        }
+        XCTAssertEqual(result.text.split(separator: " ").prefix(4).joined(separator: " "), "Esta es una grabación")
+    }
+
+    func testTranslateJapanese() async {
+        let targetLanguage = "ja"
+        let options = DecodingOptions(task: .translate, language: targetLanguage, temperatureFallbackCount: 0)
+
+        guard let result = try? await transcribe(with: .tiny, options: options, audioFile: "ja_test_clip.wav") else {
+            XCTFail("Failed to transcribe")
+            return
+        }
+
+        XCTAssertEqual(result.text.split(separator: " ").first, "Tokyo")
+    }
+
+    func testTranscribeJapanese() async {
+        let sourceLanguage = "ja"
+        let options = DecodingOptions(task: .transcribe, language: sourceLanguage, temperatureFallbackCount: 0)
+
+        guard let result = try? await transcribe(with: .tiny, options: options, audioFile: "ja_test_clip.wav") else {
+            XCTFail("Failed to transcribe")
+            return
+        }
+        XCTAssertEqual(result.text.prefix(4), "東京は晴")
+    }
+
+    func testNoTimestamps() async {
+        let options = DecodingOptions(withoutTimestamps: true)
+
+        guard let result = try? await transcribe(with: .tiny, options: options) else {
+            XCTFail("Failed to transcribe")
+            return
+        }
+
+        XCTAssertEqual(result.segments.first?.text.normalized, "<|startoftranscript|><|en|><|transcribe|><|notimestamps|> And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.<|endoftext|>".normalized)
+    }
+
+    func testSkipSpecialTokens() async {
+        let options = DecodingOptions(skipSpecialTokens: true, withoutTimestamps: true)
+
+        guard let result = try? await transcribe(with: .tiny, options: options) else {
+            XCTFail("Failed to transcribe")
+            return
+        }
+
+        XCTAssertEqual(result.segments.first?.text.normalized, " And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.".normalized)
+    }
+
+    func testPrefill() async {
+        let options = DecodingOptions(usePrefillPrompt: true)
+
+        do {
+            let result = try await transcribe(with: .tiny, options: options)
+            XCTAssertNotNil(result?.text)
+        } catch {
+            XCTFail("Failed to transcribe \(error.localizedDescription)")
+        }
+    }
+
+    func testNoPrefill() async {
+        let options = DecodingOptions(usePrefillPrompt: false)
+
+        guard let result = try? await transcribe(with: .tiny, options: options) else {
+            XCTFail("Failed to transcribe")
+            return
+        }
+        XCTAssertNotNil(result.text)
+    }
+
+    func testSilence() async {
+        let whisperKit = try? await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+
+        let audioSamples = [Float](repeating: 0.0, count: 30 * 16000)
+
+        let options = DecodingOptions(usePrefillPrompt: false, skipSpecialTokens: false)
+
+        guard let result = try? await whisperKit!.transcribe(audioArray: audioSamples, decodeOptions: options) else {
+            XCTFail("Failed to transcribe")
+            return
+        }
+        XCTAssertTrue(result.segments.first!.tokens.contains(whisperKit!.tokenizer!.noSpeechToken))
+    }
+
+    func testTemperatureIncrement() async {
+        let whisperKit = try? await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+
+        // Generate random audio samples
+        let audioSamples = (0..<(30 * 16000)).map { _ in Float.random(in: -0.5...0.5) }
+
+        // Define options with temperature increment settings
+        let initialTemperature: Float = 0
+        let temperatureIncrement: Float = 0.1
+        let fallbackCount: Int = 1
+        let options = DecodingOptions(
+            temperature: initialTemperature,
+            temperatureIncrementOnFallback: temperatureIncrement,
+            temperatureFallbackCount: fallbackCount,
+            logProbThreshold: 0
+        )
+
+        // Perform transcription
+        guard let result = try? await whisperKit!.transcribe(audioArray: audioSamples, decodeOptions: options) else {
+            XCTFail("Failed to transcribe")
+            return
+        }
+
+        let expectedTemperature = initialTemperature + temperatureIncrement * Float(fallbackCount)
+        XCTAssertEqual(result.segments.first!.temperature, expectedTemperature, "Temperature was not incremented correctly after fallbacks")
+    }
+
+    func testTopK() async {
+        var options = DecodingOptions(temperature: 0.5, topK: 10000)
+
+        guard let result10000 = try? await transcribe(with: .tiny, options: options) else {
+            XCTFail("Failed to transcribe")
+            return
+        }
+
+        options = DecodingOptions(temperature: 0.5)
+
+        guard let result5 = try? await transcribe(with: .tiny, options: options) else {
+            XCTFail("Failed to transcribe")
+            return
+        }
+
+        XCTAssertLessThan(Float(result5.timings!.decodingSampling), Float(result10000.timings!.decodingSampling), "topK=5 should be faster than topK=10000")
+    }
+
+    func testSeekClips() async {
+        var options = DecodingOptions(clipTimestamps: [0])
+
+        guard let resultFull = try? await transcribe(with: .tiny, options: options) else {
+            XCTFail("Failed to transcribe")
+            return
+        }
+
+        let seekTime: Float = 3.0
+        options = DecodingOptions(clipTimestamps: [seekTime])
+
+        guard let resultSeek = try? await transcribe(with: .tiny, options: options) else {
+            XCTFail("Failed to transcribe")
+            return
+        }
+
+        XCTAssertNotEqual(resultFull.text, resultSeek.text)
+        XCTAssertTrue(resultFull.text.normalized.contains(resultSeek.text.normalized), "Seeking should be a subset of the full clip")
+        XCTAssertFalse(resultSeek.text.normalized.contains(resultFull.text.normalized), "Seeking should be a subset of the full clip")
+        XCTAssertEqual(resultSeek.segments.first?.start, seekTime, "Seek segment should have the input start time")
+        XCTAssertNotEqual(resultFull.segments.first?.start, resultSeek.segments.first?.start, "Segments should have the different start times")
+        XCTAssertEqual(resultFull.segments.first?.end, resultSeek.segments.first?.end, "Segments should have the same end time")
+    }
+}
+
+// MARK: Helpers
+
+@available(macOS 14, iOS 17, *)
+func transcribe(with variant: ModelVariant, options: DecodingOptions, audioFile: String = "jfk.wav") async throws -> TranscriptionResult? {
+    var modelPath = tinyModelPath()
+    switch variant {
+        case .largev3:
+            modelPath = largev3ModelPath()
+        default:
+            modelPath = tinyModelPath()
+    }
+    let whisperKit = try await WhisperKit(modelFolder: modelPath, verbose: true, logLevel: .debug)
+
+    let audioComponents = audioFile.components(separatedBy: ".")
+    guard let audioFileURL = Bundle.module.path(forResource: audioComponents.first, ofType: audioComponents.last) else {
+        return nil
+    }
+
+    let result = try await whisperKit.transcribe(audioPath: audioFileURL, decodeOptions: options)
+    return result
+}
+
+func tinyModelPath() -> String {
+    let modelDir = "whisperkit-coreml/openai_whisper-tiny"
+    guard let modelPath = Bundle.module.urls(forResourcesWithExtension: "mlmodelc", subdirectory: modelDir)?.first?.deletingLastPathComponent().absoluteString else {
+        print("Failed to load model, ensure \"Models/\(modelDir)\" exists via Makefile command: `make download-models`")
+        return ""
+    }
+    return modelPath
+}
+
+func largev3ModelPath() -> String {
+    let modelDir = "whisperkit-coreml/openai_whisper-large-v3" // use faster to compile model for tests
+    guard let modelPath = Bundle.module.urls(forResourcesWithExtension: "mlmodelc", subdirectory: modelDir)?.first?.deletingLastPathComponent().absoluteString else {
+        print("Failed to load model, ensure \"Models/\(modelDir)\" exists via Makefile command: `make download-models`")
+        return ""
+    }
+    return modelPath
+}
+
+func allModelPaths() -> [String] {
+    let fileManager = FileManager.default
+    var modelPaths: [String] = []
+    let directory = "whisperkit-coreml"
+
+    do {
+        let resourceKeys: [URLResourceKey] = [.isDirectoryKey]
+        guard let baseurl = Bundle.module.resourceURL?.appendingPathComponent(directory) else {
+            print("Base URL for directory \(directory) not found.")
+            return []
+        }
+
+        let directoryContents = try fileManager.contentsOfDirectory(at: baseurl, includingPropertiesForKeys: resourceKeys, options: .skipsHiddenFiles)
+
+        for folderURL in directoryContents {
+            let resourceValues = try folderURL.resourceValues(forKeys: Set(resourceKeys))
+            if resourceValues.isDirectory == true {
+                // Check if the directory name contains the quantization pattern
+                // Only test large quantized models
+                let dirName = folderURL.lastPathComponent
+                if !(dirName.contains("q") && !dirName.contains("large")) {
+                    modelPaths.append(folderURL.absoluteString)
+                }
+            }
+        }
+    } catch {
+        print(error.localizedDescription)
+    }
+
+    return modelPaths
+}
+
+extension String {
+    var normalized: String {
+        // Trim whitespace and newlines
+        let trimmedString = self.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Convert to lowercase
+        let lowercaseString = trimmedString.lowercased()
+
+        // Remove punctuation
+        let noPunctuationString = lowercaseString.components(separatedBy: .punctuationCharacters).joined()
+
+        // Replace multiple spaces with a single space
+        let singleSpacedString = noPunctuationString.replacingOccurrences(of: " +", with: " ", options: .regularExpression)
+
+        return singleSpacedString
+    }
+}
+
+
+
+
+
