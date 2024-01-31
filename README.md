@@ -57,7 +57,7 @@ WhisperKit automatically downloads the recommended model for the device if not s
 let pipe = try? await WhisperKit(model: "large-v3")
 ```
 
-For a list of available models, see our [HuggingFace repo](https://huggingface.co/models/argmaxinc/whisperkit-coreml).
+For a list of available models, see our [HuggingFace repo](https://huggingface.co/argmaxinc/whisperkit-coreml).
 
 ### Generating Models
 
@@ -76,7 +76,11 @@ git clone https://github.com/argmaxinc/whisperkit.git
 cd whisperkit
 ```
 
-Then, setup the enviornment and download the models (**Note**: this will download all available models to your local folder, if you only want to download a specific model, see our [HuggingFace repo](https://huggingface.co/models/argmaxinc/whisperkit-coreml)):
+Then, setup the environment and download the models.
+
+**Note**:
+1. this will download all available models to your local folder, if you only want to download a specific model, see our [HuggingFace repo](https://huggingface.co/argmaxinc/whisperkit-coreml))
+2. before running `download-models`, make sure [git-lfs](https://git-lfs.com) is installed
 
 ```bash
 make setup

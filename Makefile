@@ -34,7 +34,8 @@ download-models:
 		cd $(MODEL_REPO_DIR) && git reset --hard origin/main; \
 	else \
 		echo "Repository not found, cloning..."; \
-		git clone git@hf.co:$(MODEL_REPO) $(MODEL_REPO_DIR); \
+		$(eval HF_USERNAME := $(shell huggingface-cli whoami | head -n 1)) \
+		git clone https://$(HF_USERNAME):$(HF_TOKEN)@hf.co/$(MODEL_REPO) $(MODEL_REPO_DIR); \
 	fi
 
 
