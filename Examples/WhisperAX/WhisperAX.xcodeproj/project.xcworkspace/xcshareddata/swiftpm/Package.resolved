@@ -32,7 +32,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/huggingface/swift-transformers.git",
       "state" : {
-        "branch" : "main",
+        "branch" : "5e4031e",
         "revision" : "5e4031ee16afd10d208c1aee9b49f4def6ca5264"
       }
     }
