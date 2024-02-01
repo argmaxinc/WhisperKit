@@ -31,6 +31,8 @@ public class GreedyTokenSampler: TokenSampling {
     public func update(tokens: [Int], logits: MLMultiArray, logProbs: [Float]) -> SamplingResult {
         var softmaxOutput: BNNSNDArrayDescriptor?
         var argmaxOutput: BNNSNDArrayDescriptor?
+        var softmaxInput: BNNSNDArrayDescriptor?
+        var softmaxInputNeedsDeallocate = false
 
         var nextToken: Int?
 
@@ -46,7 +48,7 @@ public class GreedyTokenSampler: TokenSampling {
                 shape: .vector(logits.count, stride: 1)
             )!
 
-            var softmaxInput = logitsDescriptor
+            softmaxInput = logitsDescriptor
 
             // Scale logits by temperature if > 0
             if temperature != 0.0 {
@@ -63,6 +65,7 @@ public class GreedyTokenSampler: TokenSampling {
                 )
 
                 softmaxInput = scaledLogits
+                softmaxInputNeedsDeallocate = true
             }
 
             // Always softmax once
@@ -73,7 +76,7 @@ public class GreedyTokenSampler: TokenSampling {
 
             try BNNS.applyActivation(
                 activation: BNNS.ActivationFunction.softmax,
-                input: softmaxInput,
+                input: softmaxInput!,
                 output: softmaxOutput!,
                 batchSize: 1
             )
@@ -147,6 +150,9 @@ public class GreedyTokenSampler: TokenSampling {
         // Deallocations
         softmaxOutput?.deallocate()
         argmaxOutput?.deallocate()
+        if softmaxInputNeedsDeallocate {
+            softmaxInput?.deallocate()
+        }
 
         return SamplingResult(tokens: nextTokens, logProbs: nextLogprobs, completed: completed)
     }
