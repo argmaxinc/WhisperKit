@@ -52,6 +52,9 @@ struct WhisperKitCLI: AsyncParsableCommand {
     @Flag(help: "Skip special tokens in the output")
     var skipSpecialTokens: Bool = false
 
+    @Argument(help: "Supress given tokens in the output")
+    var supressTokens: [Int] = []
+
     @Flag(help: "Force no timestamps when decoding")
     var withoutTimestamps: Bool = false
 
@@ -99,6 +102,7 @@ struct WhisperKitCLI: AsyncParsableCommand {
             usePrefillCache: usePrefillCache,
             skipSpecialTokens: skipSpecialTokens,
             withoutTimestamps: withoutTimestamps,
+            supressTokens: supressTokens,
             compressionRatioThreshold: compressionRatioThreshold,
             logProbThreshold: logprobThreshold,
             noSpeechThreshold: noSpeechThreshold

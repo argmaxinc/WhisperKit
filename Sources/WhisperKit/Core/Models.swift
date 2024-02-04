@@ -228,7 +228,7 @@ public struct DecodingOptions {
                 withoutTimestamps: Bool = false,
                 clipTimestamps: [Float] = [],
                 suppressBlank: Bool = false,
-                supressTokens: [Int]? = nil,
+                supressTokens: [Int] = [],
                 compressionRatioThreshold: Float? = 2.4,
                 logProbThreshold: Float? = -1.0,
                 noSpeechThreshold: Float? = 0.6)
@@ -247,7 +247,7 @@ public struct DecodingOptions {
         self.withoutTimestamps = withoutTimestamps
         self.clipTimestamps = clipTimestamps
         self.suppressBlank = suppressBlank
-        self.supressTokens = supressTokens ?? [] // nonSpeechTokens() // TODO: implement these as default
+        self.supressTokens = supressTokens
         self.compressionRatioThreshold = compressionRatioThreshold
         self.logProbThreshold = logProbThreshold
         self.noSpeechThreshold = noSpeechThreshold

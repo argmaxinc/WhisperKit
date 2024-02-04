@@ -447,9 +447,61 @@ final class UnitTests: XCTestCase {
         XCTAssertNotEqual(resultFull.segments.first?.start, resultSeek.segments.first?.start, "Segments should have the different start times")
         XCTAssertEqual(resultFull.segments.first?.end, resultSeek.segments.first?.end, "Segments should have the same end time")
     }
+
+    // TokensFilter
+
+    func testSuppressTokensFilter() throws {
+        let tokensFilter1 = SuppressTokensFilter(suppressTokens: [])
+        let logits1 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+        let result1 = tokensFilter1.filterLogits(logits1, withTokens: [])
+        XCTAssertEqual(result1.data(for: 2), [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+
+        let tokensFilter2 = SuppressTokensFilter(suppressTokens: [0])
+        let logits2 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+        let result2 = tokensFilter2.filterLogits(logits2, withTokens: [])
+        XCTAssertEqual(result2.data(for: 2), [-.infinity, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+
+        let tokensFilter3 = SuppressTokensFilter(suppressTokens: [0, 2, 5, 6])
+        let logits3 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+        let result3 = tokensFilter3.filterLogits(logits3, withTokens: [])
+        XCTAssertEqual(result3.data(for: 2), [-.infinity, 0.2, -.infinity, 0.4, 0.5, -.infinity, -.infinity])
+    }
 }
 
 // MARK: Helpers
+
+extension MLMultiArray {
+    /// Create `MLMultiArray` of shape [1, 1, arr.count] and fill up the last
+    /// dimension with with values from arr.
+    static func logits(_ arr: [FloatType]) throws -> MLMultiArray {
+        let logits = try MLMultiArray(shape: [1, 1, arr.count] as [NSNumber], dataType: .float16)
+        let ptr = UnsafeMutablePointer<FloatType>(OpaquePointer(logits.dataPointer))
+        for (index, value) in arr.enumerated() {
+            var linearOffset = 0
+            for (dimension, stride) in zip([0, 0, index] as [NSNumber], logits.strides) {
+                linearOffset += dimension.intValue * stride.intValue
+            }
+            ptr[linearOffset] = value
+        }
+        return logits
+    }
+
+    /// Get the data from `MLMultiArray` for given dimension
+    func data(for dimension: Int) -> [FloatType] {
+        let count = shape[dimension].intValue
+        let indexes = stride(from: 0, to: count, by: 1).map { [0, 0, $0 as NSNumber] }
+        var result = [FloatType]()
+        let ptr = UnsafeMutablePointer<FloatType>(OpaquePointer(dataPointer))
+        for index in indexes {
+            var linearOffset = 0
+            for (dimension, stride) in zip(index as [NSNumber], strides) {
+                linearOffset += dimension.intValue * stride.intValue
+            }
+            result.append(ptr[linearOffset])
+        }
+        return result
+    }
+}
 
 @available(macOS 14, iOS 17, *)
 func transcribe(with variant: ModelVariant, options: DecodingOptions, audioFile: String = "jfk.wav") async throws -> TranscriptionResult? {
