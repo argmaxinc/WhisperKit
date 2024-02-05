@@ -1,4 +1,4 @@
-.PHONY: setup download-models build build-cli test 
+.PHONY: setup setup-huggingface-cli setup-model-repo download-models download-model build build-cli test 
 
 PIP_COMMAND := pip3
 PYTHON_COMMAND := python3
@@ -8,11 +8,25 @@ MODEL_REPO := argmaxinc/whisperkit-coreml
 MODEL_REPO_DIR := ./Models/whisperkit-coreml
 BASE_COMPILED_DIR := ./Models
 
+
 setup:
 	@echo "Setting up environment..."
 	@which $(PIP_COMMAND)
 	@which $(PYTHON_COMMAND)
 	@$(PIP_COMMAND) install -U huggingface_hub
+	@echo "Checking for Homebrew..."
+	@which brew > /dev/null || (echo "Error: Homebrew is not installed. Install it form here https://brew.sh and try again" && exit 1)
+	@echo "Homebrew is installed."
+	@echo "Checking for git-lfs..."
+	@which git-lfs > /dev/null || (echo "Installing git-lfs..." && brew install git-lfs)
+	@echo "git-lfs is installed."
+	@echo "Checking for xcpretty..."
+	@which xcpretty > /dev/null || (echo "Installing xcpretty..." && gem install xcpretty)
+	@echo "xcpretty is installed."
+	@echo "Done 🚀"
+
+
+setup-huggingface-cli:
 	@if huggingface-cli whoami; then \
 		echo "Already logged in to Hugging Face."; \
 	else \
@@ -26,26 +40,45 @@ setup:
 		fi; \
 	fi
 
-download-models:
-	@echo "Downloading compressed models..."
+
+setup-model-repo:
+	@echo "Setting up repository..."
 	@mkdir -p $(BASE_COMPILED_DIR)
 	@if [ -d "$(MODEL_REPO_DIR)/.git" ]; then \
-		echo "Repository exists, pulling latest changes..."; \
-		cd $(MODEL_REPO_DIR) && git reset --hard origin/main; \
+		echo "Repository exists, resetting..."; \
+		cd $(MODEL_REPO_DIR) && git fetch --all && git reset --hard origin/main && git clean -fdx; \
 	else \
-		echo "Repository not found, cloning..."; \
-		$(eval HF_USERNAME := $(shell huggingface-cli whoami | head -n 1)) \
-		git clone https://$(HF_USERNAME):$(HF_TOKEN)@hf.co/$(MODEL_REPO) $(MODEL_REPO_DIR); \
+		echo "Repository not found, initializing..."; \
+		GIT_LFS_SKIP_SMUDGE=1 git clone https://hf.co/$(MODEL_REPO) $(MODEL_REPO_DIR); \
 	fi
 
+# Download all models
+download-models: setup-model-repo
+	@echo "Downloading all models..."
+	@cd $(MODEL_REPO_DIR) && \
+	git lfs pull
+
+# Download a specific model
+download-model:
+	@if [ -z "$(MODEL)" ]; then \
+		echo "Error: MODEL is not set. Usage: make download-model MODEL=base"; \
+		exit 1; \
+	fi
+	@echo "Downloading model $(MODEL)..."
+	@$(MAKE) setup-model-repo
+	@echo "Fetching model $(MODEL)..."
+	@cd $(MODEL_REPO_DIR) && \
+	git lfs pull --include="openai_whisper-$(MODEL)/*"
 
 build:
 	@echo "Building WhisperKit..."
 	@swift build -v
 
+
 build-cli:
 	@echo "Building WhisperKit CLI..."
 	@swift build -c release --product transcribe
+
 
 test:
 	@echo "Running tests..."
