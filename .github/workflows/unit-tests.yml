@@ -1,0 +1,43 @@
+name: Unit Tests
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  cache-models:
+    runs-on: macos-14
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup environment
+      run: make setup
+    - name: Cache Models
+      uses: actions/cache@v4
+      with:
+        path: Models
+        key: ${{ runner.os }}-models
+    - name: Download and cache models
+      run: make download-model MODEL=tiny
+
+  build-and-test:
+    runs-on: macos-14
+    needs: cache-models
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup environment
+      run: make setup
+    - name: Cache Models
+      uses: actions/cache@v4
+      with:
+        path: Models
+        key: ${{ runner.os }}-models
+    - name: Build
+      run: xcodebuild build-for-testing -scheme whisperkit-Package -destination 'platform=macOS'
+    - name: Run tests
+      run: |
+        xcodebuild test-without-building -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -showdestinations
+        xcodebuild test-without-building -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -destination "platform=macOS,arch=arm64" | xcpretty
