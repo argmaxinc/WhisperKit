@@ -5,6 +5,10 @@
   <img src="https://github.com/argmaxinc/WhisperKit/assets/1981179/6ac3360b-2f5c-4392-a71a-05c5dda71093" alt="WhisperKit" width="20%" />
 </a>
 
+<a href="https://github.com/argmaxinc/WhisperKit#gh-dark-mode-only">
+  <img src="https://github.com/argmaxinc/WhisperKit/assets/1981179/a682ce21-80e0-4a98-a99f-836663538a4f" alt="WhisperKit" width="20%" />
+</a>
+
 # WhisperKit
 
 [![Unit Tests](https://github.com/argmaxinc/whisperkit/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/argmaxinc/whisperkit/actions/workflows/unit-tests.yml)
