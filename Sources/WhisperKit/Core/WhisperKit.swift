@@ -141,7 +141,7 @@ public class WhisperKit {
             return (modelInfo + additionalInfo).trimmingFromEnd(character: "/", upto: 1)
         }
 
-        // Custom sorting order
+        // Sorting order based on enum
         let sizeOrder = ModelVariant.allCases.map { $0.description }
 
         let sortedModels = availableModels.sorted { firstModel, secondModel in

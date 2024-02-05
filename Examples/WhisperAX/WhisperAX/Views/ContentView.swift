@@ -157,10 +157,10 @@ struct ContentView: View {
 #if os(macOS)
             selectedCategoryId = menu.first(where: { $0.name == selectedTab })?.id
 #endif
-
             fetchModels()
         }
     }
+
 
     // MARK: - Transcription
 
@@ -169,7 +169,7 @@ struct ContentView: View {
             ScrollView(.horizontal) {
                 HStack(spacing: 1) {
                     let startIndex = max(bufferEnergy.count - 300, 0)
-                    ForEach(Array(bufferEnergy.enumerated())[startIndex...], id: \.offset) { index, energy in
+                    ForEach(Array(bufferEnergy.enumerated())[startIndex...], id: \.element) { index, energy in
                         ZStack {
                             RoundedRectangle(cornerRadius: 2)
                                 .frame(width: 2, height: CGFloat(energy) * 24)
@@ -660,7 +660,12 @@ struct ContentView: View {
         }
 
         localModels = WhisperKit.formatModelFiles(localModels)
-        availableModels = localModels
+        for model in localModels {
+            if !availableModels.contains(model),
+               !disabledModels.contains(model){
+                availableModels.append(model)
+            }
+        }
 
         print("Found locally: \(localModels)")
         print("Previously selected model: \(selectedModel)")

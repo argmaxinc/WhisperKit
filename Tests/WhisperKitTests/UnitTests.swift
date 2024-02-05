@@ -15,16 +15,10 @@ final class UnitTests: XCTestCase {
         XCTAssertNotNil(whisperKit)
     }
 
-    // MARK: - Model Loading Tests
+    // MARK: - Model Loading Test
 
     func testInitTiny() async {
         let modelPath = tinyModelPath()
-        let whisperKit = try? await WhisperKit(modelFolder: modelPath, logLevel: .error)
-        XCTAssertNotNil(whisperKit)
-    }
-
-    func testInitLarge() async {
-        let modelPath = largev3ModelPath()
         let whisperKit = try? await WhisperKit(modelFolder: modelPath, logLevel: .error)
         XCTAssertNotNil(whisperKit)
     }
@@ -161,7 +155,12 @@ final class UnitTests: XCTestCase {
         let decoderInputs = textDecoder.prepareDecoderInputs(withPrompt: [textDecoder.tokenizer!.startOfTranscriptToken])
         let expectedShape: Int = 1
 
-        let decoderOutput = try! await textDecoder.decodeText(from: encoderInput, using: decoderInputs, sampler: tokenSampler, options: decodingOptions)
+        guard let inputs = decoderInputs else {
+            XCTFail("Failed to prepare decoder inputs")
+            return
+        }
+
+        let decoderOutput = try! await textDecoder.decodeText(from: encoderInput, using: inputs, sampler: tokenSampler, options: decodingOptions)
         XCTAssertNotNil(decoderOutput, "Failed to decode text")
         XCTAssertEqual(decoderOutput.count, expectedShape, "Decoder output shape is not as expected")
     }

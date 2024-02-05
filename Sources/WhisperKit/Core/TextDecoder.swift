@@ -45,7 +45,7 @@ public protocol TextDecoding {
 
 @available(macOS 14, iOS 17, tvOS 14, watchOS 10, *)
 public extension TextDecoding {
-    func prepareDecoderInputs(withPrompt initialPrompt: [Int]) -> DecodingInputs {
+    func prepareDecoderInputs(withPrompt initialPrompt: [Int]) -> DecodingInputs? {
         let tokenShape = [NSNumber(value: 1), NSNumber(value: initialPrompt.count)]
 
         // Initialize MLMultiArray for tokens
@@ -59,11 +59,13 @@ public extension TextDecoding {
         }
 
         guard let kvCacheEmbedDim = self.kvCacheEmbedDim else {
-            fatalError("Unable to determine kvCacheEmbedDim")
+            Logging.error("Unable to determine kvCacheEmbedDim")
+            return nil
         }
 
         guard let kvCacheMaxSequenceLength = self.kvCacheMaxSequenceLength else {
-            fatalError("Unable to determine kvCacheMaxSequenceLength")
+            Logging.error("Unable to determine kvCacheMaxSequenceLength")
+            return nil
         }
 
         // Initialize each MLMultiArray

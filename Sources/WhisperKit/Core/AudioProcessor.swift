@@ -40,7 +40,7 @@ public protocol AudioProcessing {
     var relativeEnergyWindow: Int { get set }
 
     /// Starts recording audio from the specified input device, resetting the previous state
-    func startRecordingLive(from inputDevice: AVCaptureDevice?, callback: (([Float]) -> Void)?) throws
+    func startRecordingLive(callback: (([Float]) -> Void)?) throws
 
     /// Pause recording
     func pauseRecording()
@@ -53,7 +53,7 @@ public protocol AudioProcessing {
 public extension AudioProcessing {
     // Use default recording device
     func startRecordingLive(callback: (([Float]) -> Void)?) throws {
-        try startRecordingLive(from: nil, callback: callback)
+        try startRecordingLive(callback: callback)
     }
 
     static func padOrTrimAudio(fromArray audioArray: [Float], startAt startIndex: Int = 0, toLength frameLength: Int = 480_000, saveSegment: Bool = false) -> MLMultiArray? {
@@ -382,14 +382,11 @@ public extension AudioProcessor {
         }
     }
 
-    func startRecordingLive(from inputDevice: AVCaptureDevice? = nil, callback: (([Float]) -> Void)? = nil) throws {
+    func startRecordingLive(callback: (([Float]) -> Void)? = nil) throws {
         audioSamples = []
         audioEnergy = []
 
-        if inputDevice != nil {
-            // TODO: implement selecting input device
-            Logging.debug("Input device selection not yet supported")
-        }
+        // TODO: implement selecting input device
 
         audioEngine = try setupEngine()
 

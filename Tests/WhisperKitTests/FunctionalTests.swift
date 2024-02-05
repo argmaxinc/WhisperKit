@@ -7,6 +7,12 @@ import XCTest
 
 @available(macOS 14, iOS 17, *)
 final class FunctionalTests: XCTestCase {
+    func testInitLarge() async {
+        let modelPath = largev3ModelPath()
+        let whisperKit = try? await WhisperKit(modelFolder: modelPath, logLevel: .error)
+        XCTAssertNotNil(whisperKit)
+    }
+
     func testOutputAll() async throws {
         let modelPaths = allModelPaths()
 

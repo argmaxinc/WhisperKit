@@ -49,7 +49,7 @@ setup-model-repo:
 		cd $(MODEL_REPO_DIR) && git fetch --all && git reset --hard origin/main && git clean -fdx; \
 	else \
 		echo "Repository not found, initializing..."; \
-		GIT_LFS_SKIP_SMUDGE=1 git clone https://hf.co/$(MODEL_REPO) $(MODEL_REPO_DIR); \
+		GIT_LFS_SKIP_SMUDGE=1 git clone https://huggingface.co/$(MODEL_REPO) $(MODEL_REPO_DIR); \
 	fi
 
 # Download all models
