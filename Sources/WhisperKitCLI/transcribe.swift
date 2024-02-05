@@ -55,6 +55,9 @@ struct WhisperKitCLI: AsyncParsableCommand {
     @Flag(help: "Force no timestamps when decoding")
     var withoutTimestamps: Bool = false
 
+    @Argument(help: "Supress given tokens in the output")
+    var supressTokens: [Int] = []
+
     @Option(help: "Gzip compression ratio threshold for decoding failure")
     var compressionRatioThreshold: Float?
 
@@ -106,6 +109,7 @@ struct WhisperKitCLI: AsyncParsableCommand {
             usePrefillCache: usePrefillCache,
             skipSpecialTokens: skipSpecialTokens,
             withoutTimestamps: withoutTimestamps,
+            supressTokens: supressTokens,
             compressionRatioThreshold: compressionRatioThreshold,
             logProbThreshold: logprobThreshold,
             noSpeechThreshold: noSpeechThreshold

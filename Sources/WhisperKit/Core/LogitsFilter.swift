@@ -12,15 +12,19 @@ public protocol LogitsFiltering {
 @available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
 public class SuppressTokensFilter: LogitsFiltering {
     let suppressTokens: [Int]
+    private let tokenIndexes: [[NSNumber]]
 
     public init(suppressTokens: [Int]) {
         self.suppressTokens = suppressTokens
-        // TODO: implement
-        fatalError("Not implemented: \(#function)")
+        self.tokenIndexes = suppressTokens.map { [0, 0, $0 as NSNumber] }
     }
 
     public func filterLogits(_ logits: MLMultiArray, withTokens tokens: [Int]) -> MLMultiArray {
-        // TODO: implement
+        let pointer = UnsafeMutablePointer<FloatType>(OpaquePointer(logits.dataPointer))
+        for index in tokenIndexes {
+            let linearOffset = logits.linearOffset(for: index)
+            pointer[linearOffset] = -FloatType.infinity
+        }
         return logits
     }
 }

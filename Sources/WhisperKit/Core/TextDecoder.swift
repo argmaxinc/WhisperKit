@@ -333,7 +333,6 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
         }
 
         if !options.supressTokens.isEmpty {
-            // TODO: implement
             logitsFilters.append(SuppressTokensFilter(suppressTokens: options.supressTokens))
         }
 
