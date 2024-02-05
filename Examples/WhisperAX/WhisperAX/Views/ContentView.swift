@@ -1,9 +1,5 @@
-//
-//  ContentView.swift
-//  WhisperAX
-//
-//  Created by Zach Nagengast on 1/16/24.
-//
+//  For licensing see accompanying LICENSE.md file.
+//  Copyright © 2024 Argmax, Inc. All rights reserved.
 
 import SwiftUI
 import WhisperKit
