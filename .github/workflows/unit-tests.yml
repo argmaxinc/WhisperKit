@@ -39,5 +39,6 @@ jobs:
       run: xcodebuild build-for-testing -scheme whisperkit-Package -destination 'platform=macOS'
     - name: Run tests
       run: |
+        set -o pipefail
         xcodebuild test-without-building -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -showdestinations
         xcodebuild test-without-building -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -destination "platform=macOS,arch=arm64" | xcpretty

@@ -153,14 +153,65 @@ public func modelSupport(for deviceName: String) -> (default: String, disabled: 
          let model where model.hasPrefix("iPhone16"): // A17
         return ("base", ["large-v3_turbo", "large-v3", "large-v2_turbo", "large-v2"])
 
-    // TODO: Disable turbo variants for M1
-    case let model where model.hasPrefix("arm64"): // Mac
-        return ("base", [""])
-
-    // Catch-all for unhandled models or macs
+    // Fall through to macOS checks
     default:
-        return ("base", [""])
+        break
     }
+
+#if os(macOS)
+    if deviceName.hasPrefix("arm64") {
+        if Process.processor.contains("Apple M1") {
+            // Disable turbo variants for M1
+            return ("base", ["large-v3_turbo", "large-v3_turbo_1049MB", "large-v3_turbo_1307MB", "large-v2_turbo", "large-v2_turbo_1116MB", "large-v2_turbo_1430MB"])
+        } else {
+            // Enable all variants for M2 or M3, none disabled
+            return ("base", [])
+        }
+    }
+#endif
+    
+    // Unhandled device to base variant
+    return ("base", [""])
+}
+
+#if os(macOS)
+// From: https://stackoverflow.com/a/71726663
+extension Process {
+    static func stringFromTerminal(command: String) -> String {
+        let task = Process()
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.launchPath = "/bin/bash"
+        task.arguments = ["-c", "sysctl -n " + command]
+        task.launch()
+        return String(bytes: pipe.fileHandleForReading.availableData, encoding: .utf8) ?? ""
+    }
+    static let processor = stringFromTerminal(command: "machdep.cpu.brand_string")
+    static let cores = stringFromTerminal(command: "machdep.cpu.core_count")
+    static let threads = stringFromTerminal(command: "machdep.cpu.thread_count")
+    static let vendor = stringFromTerminal(command: "machdep.cpu.vendor")
+    static let family = stringFromTerminal(command: "machdep.cpu.family")
+}
+#endif
+
+public func resolveAbsolutePath(_ inputPath: String) -> String {
+    let fileManager = FileManager.default
+
+    // Expanding tilde if present
+    let pathWithTildeExpanded = NSString(string: inputPath).expandingTildeInPath
+
+    // If the path is already absolute, return it
+    if pathWithTildeExpanded.hasPrefix("/") {
+        return pathWithTildeExpanded
+    }
+
+    // Resolving relative path based on the current working directory
+    if let cwd = fileManager.currentDirectoryPath as String? {
+        let resolvedPath = URL(fileURLWithPath: cwd).appendingPathComponent(pathWithTildeExpanded).path
+        return resolvedPath
+    }
+
+    return inputPath
 }
 
 func loadTokenizer(for pretrained: ModelVariant) async throws -> Tokenizer {

@@ -11,10 +11,10 @@ import WhisperKit
 @main
 struct WhisperKitCLI: AsyncParsableCommand {
     @Option(help: "Path to audio file")
-    var audioPath: String = "./Tests/WhisperKitTests/Resources/jfk.wav"
+    var audioPath: String = "Tests/WhisperKitTests/Resources/jfk.wav"
 
     @Option(help: "Path of model files")
-    var modelPath: String = "./Models/whisperkit-coreml/openai_whisper-tiny"
+    var modelPath: String = "Models/whisperkit-coreml/openai_whisper-tiny"
 
     @Option(help: "Compute units for audio encoder model with {all,cpuOnly,cpuAndGPU,cpuAndNeuralEngine,random}")
     var audioEncoderComputeUnits: ComputeUnits = .cpuAndNeuralEngine
@@ -71,9 +71,16 @@ struct WhisperKitCLI: AsyncParsableCommand {
     var reportPath: String = "."
 
     func transcribe(audioPath: String, modelPath: String) async throws {
-        guard FileManager.default.fileExists(atPath: modelPath) else {
-            fatalError("Resource path does not exist \(modelPath)")
+        let resolvedModelPath = resolveAbsolutePath(modelPath)
+        guard FileManager.default.fileExists(atPath: resolvedModelPath) else {
+            fatalError("Model path does not exist \(resolvedModelPath)")
         }
+
+        let resolvedAudioPath = resolveAbsolutePath(audioPath)
+        guard FileManager.default.fileExists(atPath: resolvedAudioPath) else {
+            fatalError("Resource path does not exist \(resolvedAudioPath)")
+        }
+
 
         let computeOptions = ModelComputeOptions(
             audioEncoderCompute: audioEncoderComputeUnits.asMLComputeUnits,
@@ -104,7 +111,7 @@ struct WhisperKitCLI: AsyncParsableCommand {
             noSpeechThreshold: noSpeechThreshold
         )
 
-        let transcribeResult = try await whisperKit.transcribe(audioPath: audioPath, decodeOptions: options)
+        let transcribeResult = try await whisperKit.transcribe(audioPath: resolvedAudioPath, decodeOptions: options)
 
         let transcription = transcribeResult?.text ?? "Transcription failed"
 
