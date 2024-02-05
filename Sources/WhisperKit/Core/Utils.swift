@@ -13,6 +13,20 @@ import Tokenizers
 
 // MARK: - Helpers
 
+extension MLMultiArray {
+    /// Calculate the linear offset by summing the products of each dimension’s
+    /// index with the dimension’s stride
+    ///
+    /// More info here: https://developer.apple.com/documentation/coreml/mlmultiarray/2879231-subscript
+    func linearOffset(for index: [NSNumber]) -> Int {
+        var linearOffset = 0
+        for (dimension, stride) in zip(index, strides) {
+            linearOffset += dimension.intValue * stride.intValue
+        }
+        return linearOffset
+    }
+}
+
 func initMLMultiArray(shape: [NSNumber], dataType: MLMultiArrayDataType, initialValue: Any) -> MLMultiArray {
     let multiArray = try! MLMultiArray(shape: shape, dataType: dataType)
 

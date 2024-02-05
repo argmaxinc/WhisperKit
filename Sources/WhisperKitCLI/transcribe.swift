@@ -52,11 +52,11 @@ struct WhisperKitCLI: AsyncParsableCommand {
     @Flag(help: "Skip special tokens in the output")
     var skipSpecialTokens: Bool = false
 
-    @Argument(help: "Supress given tokens in the output")
-    var supressTokens: [Int] = []
-
     @Flag(help: "Force no timestamps when decoding")
     var withoutTimestamps: Bool = false
+
+    @Argument(help: "Supress given tokens in the output")
+    var supressTokens: [Int] = []
 
     @Option(help: "Gzip compression ratio threshold for decoding failure")
     var compressionRatioThreshold: Float?

@@ -448,7 +448,7 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(resultFull.segments.first?.end, resultSeek.segments.first?.end, "Segments should have the same end time")
     }
 
-    // TokensFilter
+    // MARK: - LogitsFilter Tests
 
     func testSuppressTokensFilter() throws {
         let tokensFilter1 = SuppressTokensFilter(suppressTokens: [])
@@ -477,10 +477,7 @@ extension MLMultiArray {
         let logits = try MLMultiArray(shape: [1, 1, arr.count] as [NSNumber], dataType: .float16)
         let ptr = UnsafeMutablePointer<FloatType>(OpaquePointer(logits.dataPointer))
         for (index, value) in arr.enumerated() {
-            var linearOffset = 0
-            for (dimension, stride) in zip([0, 0, index] as [NSNumber], logits.strides) {
-                linearOffset += dimension.intValue * stride.intValue
-            }
+            let linearOffset = logits.linearOffset(for: [0, 0, index as NSNumber])
             ptr[linearOffset] = value
         }
         return logits
@@ -493,10 +490,7 @@ extension MLMultiArray {
         var result = [FloatType]()
         let ptr = UnsafeMutablePointer<FloatType>(OpaquePointer(dataPointer))
         for index in indexes {
-            var linearOffset = 0
-            for (dimension, stride) in zip(index as [NSNumber], strides) {
-                linearOffset += dimension.intValue * stride.intValue
-            }
+            let linearOffset = linearOffset(for: index as [NSNumber])
             result.append(ptr[linearOffset])
         }
         return result

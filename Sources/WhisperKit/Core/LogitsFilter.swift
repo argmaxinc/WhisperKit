@@ -22,10 +22,7 @@ public class SuppressTokensFilter: LogitsFiltering {
     public func filterLogits(_ logits: MLMultiArray, withTokens tokens: [Int]) -> MLMultiArray {
         let pointer = UnsafeMutablePointer<FloatType>(OpaquePointer(logits.dataPointer))
         for index in tokenIndexes {
-            var linearOffset = 0
-            for (dimension, stride) in zip(index, logits.strides) {
-                linearOffset += dimension.intValue * stride.intValue
-            }
+            let linearOffset = logits.linearOffset(for: index)
             pointer[linearOffset] = -FloatType.infinity
         }
         return logits
