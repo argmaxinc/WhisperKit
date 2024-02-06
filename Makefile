@@ -20,9 +20,6 @@ setup:
 	@echo "Checking for git-lfs..."
 	@which git-lfs > /dev/null || (echo "Installing git-lfs..." && brew install git-lfs)
 	@echo "git-lfs is installed."
-	@echo "Checking for xcpretty..."
-	@which xcpretty > /dev/null || (echo "Installing xcpretty..." && gem install xcpretty)
-	@echo "xcpretty is installed."
 	@echo "Done 🚀"
 
 
