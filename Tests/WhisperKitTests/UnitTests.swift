@@ -465,6 +465,33 @@ final class UnitTests: XCTestCase {
         let result3 = tokensFilter3.filterLogits(logits3, withTokens: [])
         XCTAssertEqual(result3.data(for: 2), [-.infinity, 0.2, -.infinity, 0.4, 0.5, -.infinity, -.infinity])
     }
+
+    func testSuppressBlankFilter() throws {
+        let tokensFilter1 = SuppressBlankFilter(suppressBlankTokens: [], sampleBegin: 0)
+        let logits1 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+        let result1 = tokensFilter1.filterLogits(logits1, withTokens: [])
+        XCTAssertEqual(result1.data(for: 2), [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+
+        let tokensFilter2 = SuppressBlankFilter(suppressBlankTokens: [0], sampleBegin: 0)
+        let logits2 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+        let result2 = tokensFilter2.filterLogits(logits2, withTokens: [])
+        XCTAssertEqual(result2.data(for: 2), [-.infinity, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+
+        let tokensFilter3 = SuppressBlankFilter(suppressBlankTokens: [0, 2, 6], sampleBegin: 0)
+        let logits3 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+        let result3 = tokensFilter3.filterLogits(logits3, withTokens: [])
+        XCTAssertEqual(result3.data(for: 2), [-.infinity, 0.2, -.infinity, 0.4, 0.5, 0.6, -.infinity])
+
+        let tokensFilter4 = SuppressBlankFilter(suppressBlankTokens: [0, 2, 6], sampleBegin: 3)
+        let logits4 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+        let result4 = tokensFilter4.filterLogits(logits4, withTokens: [1, 2, 3])
+        XCTAssertEqual(result4.data(for: 2), [-.infinity, 0.2, -.infinity, 0.4, 0.5, 0.6, -.infinity])
+
+        let tokensFilter5 = SuppressBlankFilter(suppressBlankTokens: [0, 2, 6], sampleBegin: 5)
+        let logits5 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+        let result5 = tokensFilter5.filterLogits(logits5, withTokens: [1, 2, 3])
+        XCTAssertEqual(result5.data(for: 2), [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+    }
 }
 
 // MARK: Helpers

@@ -525,7 +525,7 @@ public class WhisperKit {
 
                 // add them to the `allSegments` list
                 allSegments.append(contentsOf: currentSegments)
-                let allCurrentTokens = currentSegments.reduce([]) { $0 + $1.tokens }
+                let allCurrentTokens = currentSegments.flatMap { $0.tokens }
                 allTokens.append(contentsOf: allCurrentTokens)
 
                 timings.decodingWindowing += Date().timeIntervalSince(windowingStart)

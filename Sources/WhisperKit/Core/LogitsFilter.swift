@@ -12,42 +12,36 @@ public protocol LogitsFiltering {
 @available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
 public class SuppressTokensFilter: LogitsFiltering {
     let suppressTokens: [Int]
-    private let tokenIndexes: [[NSNumber]]
+    private let suppressTokenIndexes: [[NSNumber]]
 
     public init(suppressTokens: [Int]) {
         self.suppressTokens = suppressTokens
-        self.tokenIndexes = suppressTokens.map { [0, 0, $0 as NSNumber] }
+        self.suppressTokenIndexes = suppressTokens.map { [0, 0, $0 as NSNumber] }
     }
 
     public func filterLogits(_ logits: MLMultiArray, withTokens tokens: [Int]) -> MLMultiArray {
-        let pointer = UnsafeMutablePointer<FloatType>(OpaquePointer(logits.dataPointer))
-        for index in tokenIndexes {
-            let linearOffset = logits.linearOffset(for: index)
-            pointer[linearOffset] = -FloatType.infinity
-        }
+        logits.fill(indexes: suppressTokenIndexes, with: -FloatType.infinity)
         return logits
     }
 }
 
 @available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
 public class SuppressBlankFilter: LogitsFiltering {
-    let tokenizer: Tokenizer
+    let suppressBlankTokens: [Int]
     let sampleBegin: Int
+    private let suppressTokenIndexes: [[NSNumber]]
 
-    public init(tokenizer: Tokenizer, sampleBegin: Int) {
-        self.tokenizer = tokenizer
+    public init(suppressBlankTokens: [Int], sampleBegin: Int) {
+        self.suppressBlankTokens = suppressBlankTokens
         self.sampleBegin = sampleBegin
-        // TODO: implement
-        fatalError("Not implemented: \(#function)")
+        self.suppressTokenIndexes = suppressBlankTokens.map { [0, 0, $0 as NSNumber] }
     }
 
     public func filterLogits(_ logits: MLMultiArray, withTokens tokens: [Int]) -> MLMultiArray {
-        if tokens.count == sampleBegin {
-            if let blankToken = tokenizer.convertTokenToId(" ") {
-                Logging.debug(blankToken)
-            }
-            // TODO: implement
+        guard tokens.count == sampleBegin else {
+            return logits
         }
+        logits.fill(indexes: suppressTokenIndexes, with: -FloatType.infinity)
         return logits
     }
 }

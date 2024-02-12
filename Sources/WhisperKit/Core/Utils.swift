@@ -25,6 +25,14 @@ extension MLMultiArray {
         }
         return linearOffset
     }
+
+    func fill<Value>(indexes: [[NSNumber]], with value: Value) {
+        let pointer = UnsafeMutablePointer<Value>(OpaquePointer(dataPointer))
+        for index in indexes {
+            let linearOffset = linearOffset(for: index)
+            pointer[linearOffset] = value
+        }
+    }
 }
 
 func initMLMultiArray(shape: [NSNumber], dataType: MLMultiArrayDataType, initialValue: Any) -> MLMultiArray {
