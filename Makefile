@@ -1,4 +1,4 @@
-.PHONY: setup setup-huggingface-cli setup-model-repo download-models download-model build build-cli test 
+.PHONY: setup setup-huggingface-cli setup-model-repo download-models download-model build build-cli test clean-package-caches
 
 PIP_COMMAND := pip3
 PYTHON_COMMAND := python3
@@ -20,9 +20,6 @@ setup:
 	@echo "Checking for git-lfs..."
 	@which git-lfs > /dev/null || (echo "Installing git-lfs..." && brew install git-lfs)
 	@echo "git-lfs is installed."
-	@echo "Checking for xcpretty..."
-	@which xcpretty > /dev/null || (echo "Installing xcpretty..." && gem install xcpretty)
-	@echo "xcpretty is installed."
 	@echo "Done 🚀"
 
 
@@ -46,10 +43,12 @@ setup-model-repo:
 	@mkdir -p $(BASE_COMPILED_DIR)
 	@if [ -d "$(MODEL_REPO_DIR)/.git" ]; then \
 		echo "Repository exists, resetting..."; \
+		export GIT_LFS_SKIP_SMUDGE=1; \
 		cd $(MODEL_REPO_DIR) && git fetch --all && git reset --hard origin/main && git clean -fdx; \
 	else \
 		echo "Repository not found, initializing..."; \
-		GIT_LFS_SKIP_SMUDGE=1 git clone https://huggingface.co/$(MODEL_REPO) $(MODEL_REPO_DIR); \
+		export GIT_LFS_SKIP_SMUDGE=1; \
+		git clone https://huggingface.co/$(MODEL_REPO) $(MODEL_REPO_DIR); \
 	fi
 
 # Download all models
@@ -83,3 +82,7 @@ build-cli:
 test:
 	@echo "Running tests..."
 	@swift test -v
+
+clean-package-caches:
+	@trash ~/Library/Caches/org.swift.swiftpm/repositories
+	@trash ~/Library/Developer/Xcode/DerivedData

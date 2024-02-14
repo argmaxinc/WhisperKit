@@ -8,37 +8,46 @@ on:
   workflow_dispatch:
 
 jobs:
-  cache-models:
-    runs-on: macos-14
-
-    steps:
-    - uses: actions/checkout@v4
-    - name: Setup environment
-      run: make setup
-    - name: Cache Models
-      uses: actions/cache@v4
-      with:
-        path: Models
-        key: ${{ runner.os }}-models
-    - name: Download and cache models
-      run: make download-model MODEL=tiny
-
   build-and-test:
     runs-on: macos-14
-    needs: cache-models
     steps:
     - uses: actions/checkout@v4
+    - uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: '15.2'
     - name: Setup environment
       run: make setup
-    - name: Cache Models
+    - name: Setup Cache
+      id: model-cache
       uses: actions/cache@v4
       with:
         path: Models
         key: ${{ runner.os }}-models
-    - name: Build
-      run: xcodebuild clean build-for-testing -scheme whisperkit-Package -destination 'platform=macOS' | xcpretty
-    - name: Run tests
+    - name: Download Models
+      if: steps.model-cache.outputs.cache-hit != 'true'
+      run: make download-model MODEL=tiny
+    - name: Install and discover destinations
+      run: |
+        xcodebuild -downloadAllPlatforms
+        echo "Destinations for testing:"
+        xcodebuild test-without-building -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -showdestinations
+    - name: Build and Test - macOS 
       run: |
         set -o pipefail
-        xcodebuild test-without-building -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -showdestinations
-        xcodebuild test-without-building -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -destination "platform=macOS,arch=arm64" | xcpretty
+        xcodebuild clean build-for-testing -scheme whisperkit-Package -destination generic/platform=macOS | xcpretty
+        xcodebuild test -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -destination "platform=macOS,arch=arm64" | xcpretty
+    - name: Build and Test - iOS
+      run: |
+        set -o pipefail
+        xcodebuild clean build-for-testing -scheme whisperkit-Package -destination generic/platform=iOS | xcpretty
+        xcodebuild test -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -destination "platform=iOS Simulator,OS=17.2,name=iPhone 15" | xcpretty
+    - name: Build and Test - watchOS
+      run: |
+        set -o pipefail
+        xcodebuild clean build-for-testing -scheme whisperkit-Package -destination generic/platform=watchOS | xcpretty
+        xcodebuild test -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -destination "platform=watchOS Simulator,OS=10.2,name=Apple Watch Ultra 2 (49mm)" | xcpretty
+    - name: Build and Test - visionOS
+      run: |
+        set -o pipefail
+        xcodebuild clean build-for-testing -scheme whisperkit-Package -destination generic/platform=visionOS | xcpretty
+        xcodebuild test -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -destination "platform=visionOS Simulator,name=Apple Vision Pro" | xcpretty

@@ -7,7 +7,7 @@ import Foundation
 
 import WhisperKit
 
-@available(macOS 14, iOS 17, *)
+@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
 @main
 struct WhisperKitCLI: AsyncParsableCommand {
     @Option(help: "Path to audio file")
@@ -83,7 +83,6 @@ struct WhisperKitCLI: AsyncParsableCommand {
         guard FileManager.default.fileExists(atPath: resolvedAudioPath) else {
             fatalError("Resource path does not exist \(resolvedAudioPath)")
         }
-
 
         let computeOptions = ModelComputeOptions(
             audioEncoderCompute: audioEncoderComputeUnits.asMLComputeUnits,

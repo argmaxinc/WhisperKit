@@ -132,7 +132,7 @@ public extension AudioProcessing {
     }
 }
 
-@available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
+@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
 public class AudioProcessor: NSObject, AudioProcessing {
     public var audioEngine: AVAudioEngine?
     public var audioSamples: ContiguousArray<Float> = []
@@ -270,7 +270,7 @@ public class AudioProcessor: NSObject, AudioProcessing {
         // Calculate the maximum sample value of the signal
         vDSP_maxmgv(signal, 1, &maxEnergy, vDSP_Length(signal.count))
 
-        // Calculate the minumum sample value of the signal
+        // Calculate the minimum sample value of the signal
         vDSP_minmgv(signal, 1, &minEnergy, vDSP_Length(signal.count))
 
         return (rmsEnergy, maxEnergy, minEnergy)
@@ -309,7 +309,7 @@ public class AudioProcessor: NSObject, AudioProcessing {
 
 // MARK: - Streaming
 
-@available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
+@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
 public extension AudioProcessor {
     /// We have a new buffer, process and store it.
     /// Note: Assumes audio is 16khz mono
@@ -354,7 +354,7 @@ public extension AudioProcessor {
         }
 
         let bufferSize = AVAudioFrameCount(minBufferLength) // 100ms - 400ms supported
-        inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: inputFormat) { [weak self] (buffer: AVAudioPCMBuffer, when: AVAudioTime) in
+        inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: inputFormat) { [weak self] (buffer: AVAudioPCMBuffer, _: AVAudioTime) in
             guard let self = self else { return }
             var buffer = buffer
             if !buffer.format.sampleRate.isEqual(to: Double(WhisperKit.sampleRate)) {
