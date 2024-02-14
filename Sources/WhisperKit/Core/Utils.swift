@@ -14,22 +14,26 @@ import Tokenizers
 // MARK: - Helpers
 
 extension MLMultiArray {
-    /// Calculate the linear offset by summing the products of each dimension’s
-    /// index with the dimension’s stride
-    ///
-    /// More info here: https://developer.apple.com/documentation/coreml/mlmultiarray/2879231-subscript
-    func linearOffset(for index: [NSNumber]) -> Int {
+    /// Calculate the linear offset by summing the products of each dimension’s index with the dimension’s stride.
+    /// More info [here](https://developer.apple.com/documentation/coreml/mlmultiarray/2879231-subscript)
+    /// - Parameters:
+    ///  - index: The index of the element
+    ///  - strides: The precomputed strides of the multi-array, if not provided, it will be computed. It's a performance optimization to avoid recomputing the strides every time when accessing the multi-array with multiple indexes.
+    @inline(__always)
+    func linearOffset(for index: [NSNumber], strides strideInts: [Int]? = nil) -> Int {
         var linearOffset = 0
-        for (dimension, stride) in zip(index, strides) {
-            linearOffset += dimension.intValue * stride.intValue
+        let strideInts = strideInts ?? strides.map { $0.intValue }
+        for (dimension, stride) in zip(index, strideInts) {
+            linearOffset += dimension.intValue * stride
         }
         return linearOffset
     }
 
     func fill<Value>(indexes: [[NSNumber]], with value: Value) {
         let pointer = UnsafeMutablePointer<Value>(OpaquePointer(dataPointer))
+        let strideInts = strides.map { $0.intValue }
         for index in indexes {
-            let linearOffset = linearOffset(for: index)
+            let linearOffset = linearOffset(for: index, strides: strideInts)
             pointer[linearOffset] = value
         }
     }

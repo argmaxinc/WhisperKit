@@ -447,6 +447,19 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(resultFull.segments.first?.end, resultSeek.segments.first?.end, "Segments should have the same end time")
     }
 
+    // MARK: - Utils Tests
+
+    func testFillIndexesWithValue() throws {
+        let logits = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+        logits.fill(indexes: [], with: -FloatType.infinity)
+        XCTAssertEqual(logits.data(for: 2), [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+
+        let logits2 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+        let indexes2: [[NSNumber]] = [[0, 0, 0], [0, 0, 1], [0, 0, 5]]
+        logits2.fill(indexes: indexes2, with: -FloatType.infinity)
+        XCTAssertEqual(logits2.data(for: 2), [-.infinity, -.infinity, 0.3, 0.4, 0.5, -.infinity, 0.7])
+    }
+
     // MARK: - LogitsFilter Tests
 
     func testSuppressTokensFilter() throws {
