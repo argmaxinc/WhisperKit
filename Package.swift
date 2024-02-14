@@ -5,7 +5,12 @@ import PackageDescription
 
 let package = Package(
     name: "whisperkit",
-    platforms: [.iOS(.v16), .macOS(.v13)],
+    platforms: [
+        .iOS(.v17),
+        .macOS(.v14),
+        .watchOS(.v10),
+        .visionOS(.v1)
+    ],
     products: [
         .library(
             name: "WhisperKit",
@@ -16,8 +21,8 @@ let package = Package(
             targets: ["WhisperKitCLI"])
     ],
     dependencies: [
-        .package(url: "https://github.com/huggingface/swift-transformers.git", "0.1.1"..<"0.2.0"),
-        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.2.0"),
+        .package(url: "https://github.com/huggingface/swift-transformers.git", revision: "564442fba36b0b694d730a62d0593e5f54043b55"),
+        .package(url: "https://github.com/apple/swift-argument-parser.git", exact: "1.3.0"),
     ],
     targets: [
         .target(

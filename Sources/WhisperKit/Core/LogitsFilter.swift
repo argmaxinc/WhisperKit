@@ -9,7 +9,7 @@ public protocol LogitsFiltering {
     func filterLogits(_ logits: MLMultiArray, withTokens tokens: [Int]) -> MLMultiArray
 }
 
-@available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
+@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
 public class SuppressTokensFilter: LogitsFiltering {
     let suppressTokens: [Int]
     private let tokenIndexes: [[NSNumber]]
@@ -29,7 +29,7 @@ public class SuppressTokensFilter: LogitsFiltering {
     }
 }
 
-@available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
+@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
 public class SuppressBlankFilter: LogitsFiltering {
     let tokenizer: Tokenizer
     let sampleBegin: Int
@@ -52,7 +52,7 @@ public class SuppressBlankFilter: LogitsFiltering {
     }
 }
 
-@available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
+@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
 public class TimestampRulesFilter: LogitsFiltering {
     let tokenizer: Tokenizer
     let sampleBegin: Int

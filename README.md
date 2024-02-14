@@ -132,7 +132,7 @@ Our goal is to make WhisperKit better and better over time and we'd love your he
 
 ## License
 
-WhisperKit is released under the MIT License. See [LICENSE.md](LICENSE.md) for more details.
+WhisperKit is released under the MIT License. See [LICENSE](LICENSE) for more details.
 
 ## Citation
 

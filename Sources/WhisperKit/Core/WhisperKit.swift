@@ -9,13 +9,13 @@ import Hub
 import TensorUtils
 import Tokenizers
 
-@available(macOS 14, iOS 17, tvOS 14, watchOS 10, *)
+@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
 public class WhisperKit {
     // Models
     public var modelVariant: ModelVariant = .tiny
     public var modelState: ModelState = .unloaded
     public var modelCompute: ModelComputeOptions
-    public var modelFolder: URL
+    public var modelFolder: URL?
     public var tokenizer: Tokenizer?
 
     // Protocols
@@ -43,8 +43,8 @@ public class WhisperKit {
 
     public init(
         model: String? = nil,
-        modelFolder: String? = nil,
         modelRepo: String? = nil,
+        modelFolder: String? = nil,
         computeOptions: ModelComputeOptions? = nil,
         audioProcessor: (any AudioProcessing)? = nil,
         featureExtractor: (any FeatureExtracting)? = nil,
@@ -55,43 +55,27 @@ public class WhisperKit {
         verbose: Bool = true,
         logLevel: Logging.LogLevel = .info,
         prewarm: Bool? = nil,
-        load: Bool? = nil
+        load: Bool? = nil,
+        download: Bool = true
     ) async throws {
         self.modelCompute = computeOptions ?? ModelComputeOptions()
-
         self.audioProcessor = audioProcessor ?? AudioProcessor()
         self.featureExtractor = featureExtractor ?? FeatureExtractor()
         self.audioEncoder = audioEncoder ?? AudioEncoder()
         self.textDecoder = textDecoder ?? TextDecoder()
         self.logitsFilters = logitsFilters ?? []
         self.segmentSeeker = segmentSeeker ?? SegmentSeeker()
-        let modelVariant = model ?? WhisperKit.recommendedModels().default
         Logging.shared.logLevel = verbose ? logLevel : .none
-
         currentTimings = TranscriptionTimings()
 
-        // If modelFolder string is passed, load based on that
-        if let folder = modelFolder {
-            self.modelFolder = URL(filePath: folder)
-        } else {
-            // Otherwise, load model from hub
-            let repo = modelRepo ?? "argmaxinc/whisperkit-coreml"
-            if let hubModelFolder = try await Self.load(variant: modelVariant, from: repo) {
-                self.modelFolder = hubModelFolder
-            } else {
-                // If model can't be found
-                self.modelFolder = URL(filePath: "openai_whisperkit-base")
-                return
-            }
-        }
+        try await setupModels(model: model, modelRepo: modelRepo, modelFolder: modelFolder, download: download)
 
-        if prewarm ?? false {
+        if let prewarm = prewarm, prewarm {
             Logging.info("Prewarming models...")
             try await prewarmModels()
         }
 
-        // If load is not passed, load based on whether a model is passed
-        // Otherwise we assume the user will call loadModels() themselves
+        // If load is not passed in, load based on whether a modelFolder is passed
         if load ?? (modelFolder != nil) {
             Logging.info("Loading models...")
             try await loadModels()
@@ -101,6 +85,15 @@ public class WhisperKit {
     // MARK: - Model Loading
 
     public static func recommendedModels() -> (default: String, disabled: [String]) {
+        let deviceName = Self.deviceName()
+        Logging.debug("Running on \(deviceName)")
+
+        let defaultModel = modelSupport(for: deviceName).default
+        let disabledModels = modelSupport(for: deviceName).disabled
+        return (defaultModel, disabledModels)
+    }
+
+    public static func deviceName() -> String {
         var utsname = utsname()
         uname(&utsname)
         let deviceName = withUnsafePointer(to: &utsname.machine) {
@@ -108,10 +101,7 @@ public class WhisperKit {
                 String(cString: $0)
             }
         }
-
-        let defaultModel = modelSupport(for: deviceName).default
-        let disabledModels = modelSupport(for: deviceName).disabled
-        return (defaultModel, disabledModels)
+        return deviceName
     }
 
     public static func fetchAvailableModels(from repo: String = "argmaxinc/whisperkit-coreml") async throws -> [String] {
@@ -162,7 +152,7 @@ public class WhisperKit {
         return sortedModels
     }
 
-    public static func load(variant: String, from repo: String = "argmaxinc/whisperkit-coreml", progressCallback: ((Progress) -> Void)? = nil) async throws -> URL? {
+    public static func download(variant: String, from repo: String = "argmaxinc/whisperkit-coreml", progressCallback: ((Progress) -> Void)? = nil) async throws -> URL? {
         let hubApi = HubApi()
         let repo = Hub.Repo(id: repo, type: .models)
         do {
@@ -180,6 +170,29 @@ public class WhisperKit {
         return nil
     }
 
+    /// Sets up the model folder either from a local path or by downloading from a repository.
+    public func setupModels(model: String?, modelRepo: String?, modelFolder: String?, download: Bool) async throws {
+        // Determine the model variant to use
+        let modelVariant = model ?? WhisperKit.recommendedModels().default
+
+        // If a local model folder is provided, use it; otherwise, download the model
+        if let folder = modelFolder {
+            self.modelFolder = URL(fileURLWithPath: folder)
+        } else if download {
+            let repo = modelRepo ?? "argmaxinc/whisperkit-coreml"
+            do {
+                let hubModelFolder = try await Self.download(variant: modelVariant, from: repo)
+                self.modelFolder = hubModelFolder!
+            } catch {
+                // Handle errors related to model downloading
+                throw WhisperError.modelsUnavailable("""
+                Model not found. Please check the model or repo name and try again.
+                Error: \(error)
+                """)
+            }
+        }
+    }
+
     public func prewarmModels() async throws {
         try await loadModels(prewarmMode: true)
     }
@@ -189,7 +202,9 @@ public class WhisperKit {
 
         let modelLoadStart = CFAbsoluteTimeGetCurrent()
 
-        let path = modelFolder
+        guard let path = modelFolder else {
+            throw WhisperError.modelsUnavailable("Model folder is not set.")
+        }
 
         Logging.debug("Loading models from \(path.path) with prewarmMode: \(prewarmMode)")
 
@@ -200,7 +215,7 @@ public class WhisperKit {
 
         try [logmelUrl, encoderUrl, decoderUrl].forEach {
             if !FileManager.default.fileExists(atPath: $0.path) {
-                throw WhisperError.modelsUnavailable()
+                throw WhisperError.modelsUnavailable("Model file not found at \($0.path)")
             }
         }
 

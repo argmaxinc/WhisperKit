@@ -156,7 +156,8 @@ func detectVariant(logitsDim: Int, encoderDim: Int) -> ModelVariant {
 public func modelSupport(for deviceName: String) -> (default: String, disabled: [String]) {
     switch deviceName {
     case let model where model.hasPrefix("iPhone11"), // A12
-         let model where model.hasPrefix("iPhone12"): // A13
+         let model where model.hasPrefix("iPhone12"), // A13
+         let model where model.hasPrefix("Watch7"): // Series 9 and Ultra 2
         return ("base", ["small", "small.en", "large-v3_turbo", "large-v3", "large-v3_turbo_1307MB", "large-v3_turbo_1049MB", "large-v2", "large-v2_turbo", "large-v2_turbo_1116MB", "large-v2_turbo_1430MB", "large-v2_1161MB", "large-v2_1400MB", "large-v3_1053MB", "large-v2_1382MB"])
 
     case let model where model.hasPrefix("iPhone13"): // A14
@@ -172,40 +173,41 @@ public func modelSupport(for deviceName: String) -> (default: String, disabled: 
         break
     }
 
-#if os(macOS)
-    if deviceName.hasPrefix("arm64") {
-        if Process.processor.contains("Apple M1") {
-            // Disable turbo variants for M1
-            return ("base", ["large-v3_turbo", "large-v3_turbo_1049MB", "large-v3_turbo_1307MB", "large-v2_turbo", "large-v2_turbo_1116MB", "large-v2_turbo_1430MB"])
-        } else {
-            // Enable all variants for M2 or M3, none disabled
-            return ("base", [])
+    #if os(macOS)
+        if deviceName.hasPrefix("arm64") {
+            if Process.processor.contains("Apple M1") {
+                // Disable turbo variants for M1
+                return ("base", ["large-v3_turbo", "large-v3_turbo_1049MB", "large-v3_turbo_1307MB", "large-v2_turbo", "large-v2_turbo_1116MB", "large-v2_turbo_1430MB"])
+            } else {
+                // Enable all variants for M2 or M3, none disabled
+                return ("base", [])
+            }
         }
-    }
-#endif
-    
-    // Unhandled device to base variant
+    #endif
+
+    // Unhandled device, default to base variant
     return ("base", [""])
 }
 
 #if os(macOS)
-// From: https://stackoverflow.com/a/71726663
-extension Process {
-    static func stringFromTerminal(command: String) -> String {
-        let task = Process()
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.launchPath = "/bin/bash"
-        task.arguments = ["-c", "sysctl -n " + command]
-        task.launch()
-        return String(bytes: pipe.fileHandleForReading.availableData, encoding: .utf8) ?? ""
+    // From: https://stackoverflow.com/a/71726663
+    extension Process {
+        static func stringFromTerminal(command: String) -> String {
+            let task = Process()
+            let pipe = Pipe()
+            task.standardOutput = pipe
+            task.launchPath = "/bin/bash"
+            task.arguments = ["-c", "sysctl -n " + command]
+            task.launch()
+            return String(bytes: pipe.fileHandleForReading.availableData, encoding: .utf8) ?? ""
+        }
+
+        static let processor = stringFromTerminal(command: "machdep.cpu.brand_string")
+        static let cores = stringFromTerminal(command: "machdep.cpu.core_count")
+        static let threads = stringFromTerminal(command: "machdep.cpu.thread_count")
+        static let vendor = stringFromTerminal(command: "machdep.cpu.vendor")
+        static let family = stringFromTerminal(command: "machdep.cpu.family")
     }
-    static let processor = stringFromTerminal(command: "machdep.cpu.brand_string")
-    static let cores = stringFromTerminal(command: "machdep.cpu.core_count")
-    static let threads = stringFromTerminal(command: "machdep.cpu.thread_count")
-    static let vendor = stringFromTerminal(command: "machdep.cpu.vendor")
-    static let family = stringFromTerminal(command: "machdep.cpu.family")
-}
 #endif
 
 public func resolveAbsolutePath(_ inputPath: String) -> String {
@@ -278,7 +280,6 @@ func saveBuffer(_ buffer: AVAudioPCMBuffer, to url: URL) throws {
     let audioFile = try AVAudioFile(forWriting: url, settings: buffer.format.settings)
     try audioFile.write(from: buffer)
 }
-
 
 func rescale(value: Float, min: Float, max: Float) -> Float {
     return (value - min) / (max - min)

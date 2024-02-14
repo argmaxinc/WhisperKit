@@ -14,7 +14,7 @@ public protocol AudioEncoding {
     func encodeFeatures(_ features: MLMultiArray) async throws -> MLMultiArray?
 }
 
-@available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
+@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
 public class AudioEncoder: AudioEncoding, WhisperMLModel {
     public var model: MLModel?
 

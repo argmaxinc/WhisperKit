@@ -4,12 +4,12 @@
 import Foundation
 import Tokenizers
 
-@available(macOS 14, iOS 17, tvOS 14, watchOS 10, *)
+@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
 public protocol SegmentSeeking {
     func findSeekPointAndSegments(decodingResult: DecodingResult, options: DecodingOptions, allSegmentsCount: Int, currentSeek seek: Int, segmentSize: Int, sampleRate: Int, timeToken: Int, specialToken: Int, tokenizer: Tokenizer) -> (Int, [TranscriptionSegment]?)
 }
 
-@available(macOS 14, iOS 17, tvOS 14, watchOS 10, *)
+@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
 public class SegmentSeeker: SegmentSeeking {
     public init() {}
 
