@@ -21,7 +21,7 @@ let package = Package(
             targets: ["WhisperKitCLI"])
     ],
     dependencies: [
-        .package(url: "https://github.com/huggingface/swift-transformers.git", revision: "564442fba36b0b694d730a62d0593e5f54043b55"),
+        .package(url: "https://github.com/huggingface/swift-transformers.git", exact: "0.1.2"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", exact: "1.3.0"),
     ],
     targets: [
