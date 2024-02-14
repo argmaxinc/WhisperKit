@@ -771,6 +771,7 @@ public class TextDecoderCachePrefillOutput: MLFeatureProvider {
 // MARK: Tokenizer
 
 public extension Tokenizer {
+    var whitespaceToken: Int { convertTokenToId(" ") ?? Self.defaultWhitespaceToken }
     var specialTokenBegin: Int { convertTokenToId("<|endoftext|>") ?? Self.defaultSpecialTokenBegin }
     var endToken: Int { convertTokenToId("<|endoftext|>") ?? Self.defaultEndToken }
     var startOfTranscriptToken: Int { convertTokenToId("<|startoftranscript|>") ?? Self.defaultStartOfTranscriptToken }
@@ -782,6 +783,7 @@ public extension Tokenizer {
     var timeTokenBegin: Int { convertTokenToId("<|0.00|>") ?? Self.defaultTimeTokenBegin }
 
     // Default values for each token, using base vocab
+    internal static var defaultWhitespaceToken: Int { 50257 }
     internal static var defaultSpecialTokenBegin: Int { 50257 }
     internal static var defaultEndToken: Int { 50257 }
     internal static var defaultStartOfTranscriptToken: Int { 50258 }

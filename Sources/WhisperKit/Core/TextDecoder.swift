@@ -328,8 +328,12 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
 
         var logitsFilters: [any LogitsFiltering] = []
         if options.suppressBlank {
-            // TODO: implement
-            logitsFilters.append(SuppressBlankFilter(tokenizer: tokenizer, sampleBegin: prefilledIndex))
+            logitsFilters.append(
+                SuppressBlankFilter(
+                    suppressBlankTokens: [tokenizer.whitespaceToken, tokenizer.endToken],
+                    sampleBegin: prefilledIndex
+                )
+            )
         }
 
         if !options.supressTokens.isEmpty {
