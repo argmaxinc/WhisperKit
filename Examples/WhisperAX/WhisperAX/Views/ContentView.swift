@@ -720,7 +720,7 @@ struct ContentView: View {
             var folder: URL?
 
             // Check if the model is available locally
-            if localModels.contains(model) {
+            if localModels.contains(model) && !redownload {
                 // Get local model folder URL from localModels
                 // TODO: Make this configurable in the UI
                 folder = URL(fileURLWithPath: localModelPath).appendingPathComponent("openai_whisper-\(model)")
