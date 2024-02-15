@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Inc."
+  given-names: "Argma"
+title: "WhisperKit"
+version: v0.2.1
+date-released: 2024-02-14
+url: "https://github.com/argmaxinc/WhisperKit"
