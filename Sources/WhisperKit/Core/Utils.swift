@@ -29,6 +29,16 @@ extension MLMultiArray {
         return linearOffset
     }
 
+    /// NOTE: must have [1, 1, n] shape
+    func fillLastDimension<S: Sequence, Value>(indexes: S, with value: Value) where S.Element == Int {
+        let pointer = UnsafeMutablePointer<Value>(OpaquePointer(dataPointer))
+        let strideInts = strides.map { $0.intValue }
+        for index in indexes {
+            let linearOffset = linearOffset(for: [0, 0, index as NSNumber], strides: strideInts)
+            pointer[linearOffset] = value
+        }
+    }
+
     func fill<Value>(indexes: [[NSNumber]], with value: Value) {
         let pointer = UnsafeMutablePointer<Value>(OpaquePointer(dataPointer))
         let strideInts = strides.map { $0.intValue }

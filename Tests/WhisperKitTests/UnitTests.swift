@@ -506,13 +506,21 @@ final class UnitTests: XCTestCase {
 
     func testFillIndexesWithValue() throws {
         let logits = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
-        logits.fill(indexes: [], with: -FloatType.infinity)
+        logits.fill(indexes: [] as [[NSNumber]], with: -FloatType.infinity)
         XCTAssertEqual(logits.data(for: 2), [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
 
         let logits2 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
         let indexes2: [[NSNumber]] = [[0, 0, 0], [0, 0, 1], [0, 0, 5]]
         logits2.fill(indexes: indexes2, with: -FloatType.infinity)
         XCTAssertEqual(logits2.data(for: 2), [-.infinity, -.infinity, 0.3, 0.4, 0.5, -.infinity, 0.7])
+
+        let logits3 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+        logits3.fillLastDimension(indexes: 0..<1, with: -FloatType.infinity)
+        XCTAssertEqual(logits3.data(for: 2), [-.infinity, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+
+        let logits4 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+        logits4.fillLastDimension(indexes: 2..<5, with: -FloatType.infinity)
+        XCTAssertEqual(logits4.data(for: 2), [0.1, 0.2, -.infinity, -.infinity, -.infinity, 0.6, 0.7])
     }
 
     // MARK: - LogitsFilter Tests
@@ -559,6 +567,30 @@ final class UnitTests: XCTestCase {
         let logits5 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
         let result5 = tokensFilter5.filterLogits(logits5, withTokens: [1, 2, 3])
         XCTAssertEqual(result5.data(for: 2), [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+    }
+
+    func testTimestampRulesFilter() throws {
+        let tokensFilter1 = TimestampRulesFilter(
+            noTimestampsToken: 2,
+            timeTokenBegin: 4,
+            endToken: 3,
+            sampleBegin: 2,
+            maxInitialTimestampIndex: nil
+        )
+        let logits1 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2])
+        let result1 = tokensFilter1.filterLogits(logits1, withTokens: [])
+        XCTAssertEqual(result1.data(for: 2), [1.1, 5.2, -.infinity, 0.4, 0.2, 0.1, 0.2])
+
+        let tokensFilter2 = TimestampRulesFilter(
+            noTimestampsToken: 2,
+            timeTokenBegin: 4,
+            endToken: 3,
+            sampleBegin: 2,
+            maxInitialTimestampIndex: nil
+        )
+        let logits2 = try MLMultiArray.logits([1.1, 0.2, 0.3, 0.4, 0.2, 0.1, 0.2])
+        let result2 = tokensFilter2.filterLogits(logits2, withTokens: [])
+        XCTAssertEqual(result2.data(for: 2), [-.infinity, -.infinity, -.infinity, -.infinity, 0.2, 0.1, 0.2])
     }
 
     // MARK: - Word Timestamp Tests

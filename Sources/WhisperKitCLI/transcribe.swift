@@ -58,6 +58,9 @@ struct WhisperKitCLI: AsyncParsableCommand {
     @Flag(help: "Add timestamps for each word in the output")
     var wordTimestamps: Bool = false
 
+    @Option(help: "Maximal initial timestamp")
+    var maxInitialTimestamp: Float = 1.0
+
     @Argument(help: "Supress given tokens in the output")
     var supressTokens: [Int] = []
 
@@ -117,6 +120,7 @@ struct WhisperKitCLI: AsyncParsableCommand {
             skipSpecialTokens: skipSpecialTokens,
             withoutTimestamps: withoutTimestamps,
             wordTimestamps: wordTimestamps,
+            maxInitialTimestamp: maxInitialTimestamp,
             supressTokens: supressTokens,
             compressionRatioThreshold: compressionRatioThreshold,
             logProbThreshold: logprobThreshold,
