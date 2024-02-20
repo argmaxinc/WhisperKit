@@ -665,26 +665,6 @@ struct WhisperAXWatchView: View {
             }
         }
     }
-
-//    func requestMicrophoneIfNeeded() async -> Bool {
-//        let microphoneStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-//
-//        switch microphoneStatus {
-//            case .notDetermined:
-//                return await withCheckedContinuation { continuation in
-//                    AVCaptureDevice.requestAccess(for: .audio) { granted in
-//                        continuation.resume(returning: granted)
-//                    }
-//                }
-//            case .restricted, .denied:
-//                print("Microphone access denied")
-//                return false
-//            case .authorized:
-//                return true
-//            @unknown default:
-//                fatalError("Unknown authorization status")
-//        }
-//    }
 }
 
 #Preview {

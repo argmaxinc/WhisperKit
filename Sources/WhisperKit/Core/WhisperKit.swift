@@ -9,8 +9,13 @@ import Hub
 import TensorUtils
 import Tokenizers
 
+public protocol Transcriber {
+    func transcribe(audioPath: String, decodeOptions: DecodingOptions?, callback: TranscriptionCallback) async throws -> TranscriptionResult?
+    func transcribe(audioArray: [Float], decodeOptions: DecodingOptions?, callback: TranscriptionCallback) async throws -> TranscriptionResult?
+}
+
 @available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
-public class WhisperKit {
+public class WhisperKit: Transcriber {
     // Models
     public var modelVariant: ModelVariant = .tiny
     public var modelState: ModelState = .unloaded

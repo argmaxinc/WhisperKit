@@ -10,8 +10,9 @@ import WhisperKit
 @available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
 @main
 struct WhisperKitCLI: AsyncParsableCommand {
+    
     @Option(help: "Path to audio file")
-    var audioPath: String = "Tests/WhisperKitTests/Resources/jfk.wav"
+    var audioPath: String?
 
     @Option(help: "Path of model files")
     var modelPath: String = "Models/whisperkit-coreml/openai_whisper-tiny"
@@ -153,14 +154,69 @@ struct WhisperKitCLI: AsyncParsableCommand {
         }
     }
 
-    func run() async throws {
-        let audioURL = URL(fileURLWithPath: audioPath)
+    func transcribeStream(modelPath: String) async throws {
+        let computeOptions = ModelComputeOptions(
+            audioEncoderCompute: audioEncoderComputeUnits.asMLComputeUnits,
+            textDecoderCompute: textDecoderComputeUnits.asMLComputeUnits
+        )
 
-        if verbose {
-            print("Transcribing audio at \(audioURL)")
+        let whisperKit = try await WhisperKit(
+            modelFolder: modelPath,
+            computeOptions: computeOptions,
+            verbose: verbose,
+            logLevel: .debug
+        )
+
+        let decodingOptions = DecodingOptions(
+            verbose: verbose,
+            task: .transcribe,
+            language: language,
+            temperature: temperature,
+            temperatureIncrementOnFallback: temperatureIncrementOnFallback,
+            temperatureFallbackCount: 3, // limit fallbacks for realtime
+            sampleLength: 224, // reduced sample length for realtime
+            topK: bestOf,
+            usePrefillPrompt: usePrefillPrompt,
+            usePrefillCache: usePrefillCache,
+            skipSpecialTokens: skipSpecialTokens,
+            withoutTimestamps: withoutTimestamps,
+            clipTimestamps: [],
+            suppressBlank: false,
+            supressTokens: supressTokens,
+            compressionRatioThreshold: compressionRatioThreshold ?? 2.4,
+            logProbThreshold: logprobThreshold ?? -1.0,
+            noSpeechThreshold: noSpeechThreshold ?? 0.6
+        )
+
+        let audioStreamer = AudioWarper(
+            audioProcessor: whisperKit.audioProcessor,
+            transcriber: whisperKit,
+            decodingOptions: decodingOptions
+        ) { state in
+            print("---")
+            for segment in state.confirmedSegments {
+                print("Confirmed segment: \(segment.text)")
+            }
+            for segment in state.unconfirmedSegments {
+                print("Unconfirmed segment: \(segment.text)")
+            }
+            print("Current text: \(state.currentText)")
+            
         }
+        try await audioStreamer.startRecording()
+    }
 
-        try await transcribe(audioPath: audioPath, modelPath: modelPath)
+    mutating func run() async throws {
+        if let audioPath {
+            let audioURL = URL(fileURLWithPath: audioPath)
+            if verbose {
+                print("Transcribing audio at \(audioURL)")
+            }
+            try await transcribe(audioPath: audioPath, modelPath: modelPath)
+        } else {
+            print("Transcribing audio stream, press Ctrl+C to stop.")
+            try await transcribeStream(modelPath: modelPath)
+        }
     }
 }
 
