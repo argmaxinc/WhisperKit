@@ -152,8 +152,8 @@ public class WhisperKit {
         return sortedModels
     }
 
-    public static func download(variant: String, from repo: String = "argmaxinc/whisperkit-coreml", progressCallback: ((Progress) -> Void)? = nil) async throws -> URL? {
-        let hubApi = HubApi()
+    public static func download(variant: String, downloadBase: URL? = nil, from repo: String = "argmaxinc/whisperkit-coreml", progressCallback: ((Progress) -> Void)? = nil) async throws -> URL? {
+        let hubApi = HubApi(downloadBase: downloadBase)
         let repo = Hub.Repo(id: repo, type: .models)
         do {
             let modelFolder = try await hubApi.snapshot(from: repo, matching: ["*\(variant.description)/*"]) { progress in
@@ -177,7 +177,7 @@ public class WhisperKit {
 
         // If a local model folder is provided, use it; otherwise, download the model
         if let folder = modelFolder {
-            self.modelFolder = URL(fileURLWithPath: folder)
+            self.modelFolder = URL(fileURLWithPath: folder) 
         } else if download {
             let repo = modelRepo ?? "argmaxinc/whisperkit-coreml"
             do {
