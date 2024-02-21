@@ -177,7 +177,7 @@ public class WhisperKit {
 
         // If a local model folder is provided, use it; otherwise, download the model
         if let folder = modelFolder {
-            self.modelFolder = URL(fileURLWithPath: folder) 
+            self.modelFolder = URL(fileURLWithPath: folder)
         } else if download {
             let repo = modelRepo ?? "argmaxinc/whisperkit-coreml"
             do {
