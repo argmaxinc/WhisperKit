@@ -852,7 +852,7 @@ struct ContentView: View {
     func startRecording(_ loop: Bool) {
         if let audioProcessor = whisperKit?.audioProcessor {
             Task(priority: .userInitiated) {
-                guard await AudioProcessor.requestMicrophoneIfNeeded() else {
+                guard await AudioProcessor.requestRecordPermission() else {
                     print("Microphone access was not granted.")
                     return
                 }

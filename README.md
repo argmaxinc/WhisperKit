@@ -127,7 +127,7 @@ swift run transcribe --model-path "Models/whisperkit-coreml/openai_whisper-large
 Which should print a transcription of the audio file. If you would like to stream the audio directly from a microphone, use:
 
 ```bash
-swift run transcribe --model-path "Models/whisperkit-coreml/openai_whisper-large-v3"
+swift run transcribe --model-path "Models/whisperkit-coreml/openai_whisper-large-v3" --stream
 ```
 
 ## Contributing & Roadmap

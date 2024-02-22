@@ -12,7 +12,7 @@ import WhisperKit
 struct WhisperKitCLI: AsyncParsableCommand {
     
     @Option(help: "Path to audio file")
-    var audioPath: String?
+    var audioPath: String = "Tests/WhisperKitTests/Resources/jfk.wav"
 
     @Option(help: "Path of model files")
     var modelPath: String = "Models/whisperkit-coreml/openai_whisper-tiny"
@@ -73,6 +73,9 @@ struct WhisperKitCLI: AsyncParsableCommand {
 
     @Option(help: "Directory to save the report")
     var reportPath: String = "."
+
+    @Flag(help: "Process audio directly from the microphone")
+    var stream: Bool = false
 
     func transcribe(audioPath: String, modelPath: String) async throws {
         let resolvedModelPath = resolveAbsolutePath(modelPath)
@@ -188,7 +191,7 @@ struct WhisperKitCLI: AsyncParsableCommand {
             noSpeechThreshold: noSpeechThreshold ?? 0.6
         )
 
-        let audioStreamer = AudioWarper(
+        let audioStreamTranscriber = AudioStreamTranscriber(
             audioProcessor: whisperKit.audioProcessor,
             transcriber: whisperKit,
             decodingOptions: decodingOptions
@@ -203,19 +206,19 @@ struct WhisperKitCLI: AsyncParsableCommand {
             print("Current text: \(state.currentText)")
             
         }
-        try await audioStreamer.startRecording()
+        try await audioStreamTranscriber.startStreamTranscription()
     }
 
     mutating func run() async throws {
-        if let audioPath {
+        if stream {
+            print("Transcribing audio stream, press Ctrl+C to stop.")
+            try await transcribeStream(modelPath: modelPath)
+        } else {
             let audioURL = URL(fileURLWithPath: audioPath)
             if verbose {
                 print("Transcribing audio at \(audioURL)")
             }
             try await transcribe(audioPath: audioPath, modelPath: modelPath)
-        } else {
-            print("Transcribing audio stream, press Ctrl+C to stop.")
-            try await transcribeStream(modelPath: modelPath)
         }
     }
 }

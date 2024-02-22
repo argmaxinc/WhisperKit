@@ -3,7 +3,7 @@
 
 import Foundation
 
-extension AudioWarper {
+extension AudioStreamTranscriber {
     public struct State {
         public var isRecording: Bool = false
         public var currentFallbacks: Int = 0
@@ -18,13 +18,13 @@ extension AudioWarper {
 }
 
 /// Responsible for streaming audio from the microphone, processing it, and transcribing it in real-time.
-public actor AudioWarper {
-    private var state: AudioWarper.State = .init() {
+public actor AudioStreamTranscriber {
+    private var state: AudioStreamTranscriber.State = .init() {
         didSet {
             stateChangeCallback?(state)
         }
     }
-    private let stateChangeCallback: ((AudioWarper.State) -> Void)?
+    private let stateChangeCallback: ((AudioStreamTranscriber.State) -> Void)?
 
     private let requiredSegmentsForConfirmation: Int
     private let useVAD: Bool
@@ -42,7 +42,7 @@ public actor AudioWarper {
         silenceThreshold: Float = 0.3,
         compressionCheckWindow: Int = 20,
         useVAD: Bool = true,
-        stateChangeCallback: ((AudioWarper.State) -> Void)?
+        stateChangeCallback: ((AudioStreamTranscriber.State) -> Void)?
     ) {
         self.audioProcessor = audioProcessor
         self.transcriber = transcriber
@@ -54,10 +54,10 @@ public actor AudioWarper {
         self.stateChangeCallback = stateChangeCallback
     }
 
-    public func startRecording() async throws {
+    public func startStreamTranscription() async throws {
         guard !state.isRecording else { return }
-        guard await AudioProcessor.requestMicrophoneIfNeeded() else {
-            print("Microphone access was not granted.")
+        guard await AudioProcessor.requestRecordPermission() else {
+            Logging.error("Microphone access was not granted.")
             return
         }
         state.isRecording = true
@@ -67,11 +67,13 @@ public actor AudioWarper {
             }
         }
         await realtimeLoop()
+        Logging.info("Realtime transcription has started")
     }
 
-    public func stopRecording() {
+    public func stopStreamTranscription() {
         state.isRecording = false
         audioProcessor.stopRecording()
+        Logging.info("Realtime transcription has ended")
     }
 
     private func realtimeLoop() async {
@@ -79,7 +81,7 @@ public actor AudioWarper {
             do {
                 try await transcribeCurrentBuffer()
             } catch {
-                print("Error: \(error.localizedDescription)")
+                Logging.error("Error: \(error.localizedDescription)")
                 break
             }
         }
@@ -95,7 +97,7 @@ public actor AudioWarper {
             if fallbacks == state.currentFallbacks {
                 state.unconfirmedText.append(state.currentText)
             } else {
-                print("Fallback occured: \(fallbacks)")
+                Logging.info("Fallback occured: \(fallbacks)")
             }
         }
         state.currentText = progress.text
@@ -115,8 +117,7 @@ public actor AudioWarper {
             if state.currentText == "" {
                 state.currentText = "Waiting for speech..."
             }
-            try await Task.sleep(nanoseconds: 100_000_000) // sleep for 100ms for next buffer
-            return
+            return try await Task.sleep(nanoseconds: 100_000_000) // sleep for 100ms for next buffer
         }
 
         if useVAD {
@@ -139,13 +140,13 @@ public actor AudioWarper {
             let voiceDetected = nextBufferEnergies.prefix(numberOfValuesToCheck).contains { $0 > Float(silenceThreshold) }
 
             // Only run the transcribe if the next buffer has voice
-            guard voiceDetected else {
+            if !voiceDetected {
+                Logging.debug("No voice detected, skipping transcribe")
                 if state.currentText == "" {
                     state.currentText = "Waiting for speech..."
                 }
                 // Sleep for 100ms and check the next buffer
-                try await Task.sleep(nanoseconds: 100_000_000)
-                return
+                return try await Task.sleep(nanoseconds: 100_000_000)
             }
         }
 
@@ -195,7 +196,7 @@ public actor AudioWarper {
             Task { [weak self] in
                 await self?.onProgressCallback(progress)
             }
-            return Self.shouldStopEarly(progress: progress, options: options, compressionCheckWindow: checkWindow)
+            return AudioStreamTranscriber.shouldStopEarly(progress: progress, options: options, compressionCheckWindow: checkWindow)
         }
     }
 
