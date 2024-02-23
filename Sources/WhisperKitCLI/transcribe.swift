@@ -93,12 +93,14 @@ struct WhisperKitCLI: AsyncParsableCommand {
             textDecoderCompute: textDecoderComputeUnits.asMLComputeUnits
         )
 
+        print("Initializing models...")
         let whisperKit = try await WhisperKit(
             modelFolder: modelPath,
             computeOptions: computeOptions,
             verbose: verbose,
             logLevel: .debug
         )
+        print("Models initialized")
 
         let options = DecodingOptions(
             verbose: verbose,
@@ -163,12 +165,14 @@ struct WhisperKitCLI: AsyncParsableCommand {
             textDecoderCompute: textDecoderComputeUnits.asMLComputeUnits
         )
 
+        print("Initializing models...")
         let whisperKit = try await WhisperKit(
             modelFolder: modelPath,
             computeOptions: computeOptions,
             verbose: verbose,
             logLevel: .debug
         )
+        print("Models initialized")
 
         let decodingOptions = DecodingOptions(
             verbose: verbose,
@@ -211,12 +215,12 @@ struct WhisperKitCLI: AsyncParsableCommand {
             }
             print("Current text: \(newState.currentText)")
         }
+        print("Transcribing audio stream, press Ctrl+C to stop.")
         try await audioStreamTranscriber.startStreamTranscription()
     }
 
     mutating func run() async throws {
         if stream {
-            print("Transcribing audio stream, press Ctrl+C to stop.")
             try await transcribeStream(modelPath: modelPath)
         } else {
             let audioURL = URL(fileURLWithPath: audioPath)
