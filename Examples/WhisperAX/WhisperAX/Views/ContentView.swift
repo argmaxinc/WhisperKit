@@ -681,26 +681,6 @@ struct ContentView: View {
         }
     }
 
-    func requestMicrophoneIfNeeded() async -> Bool {
-        let microphoneStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-
-        switch microphoneStatus {
-        case .notDetermined:
-            return await withCheckedContinuation { continuation in
-                AVCaptureDevice.requestAccess(for: .audio) { granted in
-                    continuation.resume(returning: granted)
-                }
-            }
-        case .restricted, .denied:
-            print("Microphone access denied")
-            return false
-        case .authorized:
-            return true
-        @unknown default:
-            fatalError("Unknown authorization status")
-        }
-    }
-
     func loadModel(_ model: String, redownload: Bool = false) {
         print("Selected Model: \(UserDefaults.standard.string(forKey: "selectedModel") ?? "nil")")
 
@@ -872,7 +852,7 @@ struct ContentView: View {
     func startRecording(_ loop: Bool) {
         if let audioProcessor = whisperKit?.audioProcessor {
             Task(priority: .userInitiated) {
-                guard await requestMicrophoneIfNeeded() else {
+                guard await AudioProcessor.requestRecordPermission() else {
                     print("Microphone access was not granted.")
                     return
                 }

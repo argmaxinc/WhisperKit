@@ -10,6 +10,7 @@ import WhisperKit
 @available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
 @main
 struct WhisperKitCLI: AsyncParsableCommand {
+    
     @Option(help: "Path to audio file")
     var audioPath: String = "Tests/WhisperKitTests/Resources/jfk.wav"
 
@@ -73,6 +74,9 @@ struct WhisperKitCLI: AsyncParsableCommand {
     @Option(help: "Directory to save the report")
     var reportPath: String = "."
 
+    @Flag(help: "Process audio directly from the microphone")
+    var stream: Bool = false
+
     func transcribe(audioPath: String, modelPath: String) async throws {
         let resolvedModelPath = resolveAbsolutePath(modelPath)
         guard FileManager.default.fileExists(atPath: resolvedModelPath) else {
@@ -89,12 +93,14 @@ struct WhisperKitCLI: AsyncParsableCommand {
             textDecoderCompute: textDecoderComputeUnits.asMLComputeUnits
         )
 
+        print("Initializing models...")
         let whisperKit = try await WhisperKit(
             modelFolder: modelPath,
             computeOptions: computeOptions,
             verbose: verbose,
             logLevel: .debug
         )
+        print("Models initialized")
 
         let options = DecodingOptions(
             verbose: verbose,
@@ -153,14 +159,76 @@ struct WhisperKitCLI: AsyncParsableCommand {
         }
     }
 
-    func run() async throws {
-        let audioURL = URL(fileURLWithPath: audioPath)
+    func transcribeStream(modelPath: String) async throws {
+        let computeOptions = ModelComputeOptions(
+            audioEncoderCompute: audioEncoderComputeUnits.asMLComputeUnits,
+            textDecoderCompute: textDecoderComputeUnits.asMLComputeUnits
+        )
 
-        if verbose {
-            print("Transcribing audio at \(audioURL)")
+        print("Initializing models...")
+        let whisperKit = try await WhisperKit(
+            modelFolder: modelPath,
+            computeOptions: computeOptions,
+            verbose: verbose,
+            logLevel: .debug
+        )
+        print("Models initialized")
+
+        let decodingOptions = DecodingOptions(
+            verbose: verbose,
+            task: .transcribe,
+            language: language,
+            temperature: temperature,
+            temperatureIncrementOnFallback: temperatureIncrementOnFallback,
+            temperatureFallbackCount: 3, // limit fallbacks for realtime
+            sampleLength: 224, // reduced sample length for realtime
+            topK: bestOf,
+            usePrefillPrompt: usePrefillPrompt,
+            usePrefillCache: usePrefillCache,
+            skipSpecialTokens: skipSpecialTokens,
+            withoutTimestamps: withoutTimestamps,
+            clipTimestamps: [],
+            suppressBlank: false,
+            supressTokens: supressTokens,
+            compressionRatioThreshold: compressionRatioThreshold ?? 2.4,
+            logProbThreshold: logprobThreshold ?? -1.0,
+            noSpeechThreshold: noSpeechThreshold ?? 0.6
+        )
+
+        let audioStreamTranscriber = AudioStreamTranscriber(
+            audioProcessor: whisperKit.audioProcessor,
+            transcriber: whisperKit,
+            decodingOptions: decodingOptions
+        ) { oldState, newState in
+            guard oldState.currentText != newState.currentText ||
+                oldState.unconfirmedSegments != newState.unconfirmedSegments ||
+                oldState.confirmedSegments != newState.confirmedSegments else {
+                return
+            }
+            // TODO: Print only net new text without any repeats
+            print("---")
+            for segment in newState.confirmedSegments {
+                print("Confirmed segment: \(segment.text)")
+            }
+            for segment in newState.unconfirmedSegments {
+                print("Unconfirmed segment: \(segment.text)")
+            }
+            print("Current text: \(newState.currentText)")
         }
+        print("Transcribing audio stream, press Ctrl+C to stop.")
+        try await audioStreamTranscriber.startStreamTranscription()
+    }
 
-        try await transcribe(audioPath: audioPath, modelPath: modelPath)
+    mutating func run() async throws {
+        if stream {
+            try await transcribeStream(modelPath: modelPath)
+        } else {
+            let audioURL = URL(fileURLWithPath: audioPath)
+            if verbose {
+                print("Transcribing audio at \(audioURL)")
+            }
+            try await transcribe(audioPath: audioPath, modelPath: modelPath)
+        }
     }
 }
 

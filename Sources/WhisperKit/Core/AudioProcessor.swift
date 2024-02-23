@@ -302,6 +302,10 @@ public class AudioProcessor: NSObject, AudioProcessing {
         return convertedArray
     }
 
+    public static func requestRecordPermission() async -> Bool {
+        await AVAudioApplication.requestRecordPermission()
+    }
+
     deinit {
         stopRecording()
     }
