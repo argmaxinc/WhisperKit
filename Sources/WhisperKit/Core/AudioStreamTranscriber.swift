@@ -17,14 +17,16 @@ extension AudioStreamTranscriber {
     }
 }
 
+public typealias AudioStreamTranscriberCallback = (AudioStreamTranscriber.State, AudioStreamTranscriber.State) -> Void
+
 /// Responsible for streaming audio from the microphone, processing it, and transcribing it in real-time.
 public actor AudioStreamTranscriber {
     private var state: AudioStreamTranscriber.State = .init() {
         didSet {
-            stateChangeCallback?(state)
+            stateChangeCallback?(oldValue, state)
         }
     }
-    private let stateChangeCallback: ((AudioStreamTranscriber.State) -> Void)?
+    private let stateChangeCallback: AudioStreamTranscriberCallback?
 
     private let requiredSegmentsForConfirmation: Int
     private let useVAD: Bool
@@ -42,7 +44,7 @@ public actor AudioStreamTranscriber {
         silenceThreshold: Float = 0.3,
         compressionCheckWindow: Int = 20,
         useVAD: Bool = true,
-        stateChangeCallback: ((AudioStreamTranscriber.State) -> Void)?
+        stateChangeCallback: AudioStreamTranscriberCallback?
     ) {
         self.audioProcessor = audioProcessor
         self.transcriber = transcriber

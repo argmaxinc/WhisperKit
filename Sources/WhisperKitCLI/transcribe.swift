@@ -195,16 +195,20 @@ struct WhisperKitCLI: AsyncParsableCommand {
             audioProcessor: whisperKit.audioProcessor,
             transcriber: whisperKit,
             decodingOptions: decodingOptions
-        ) { state in
+        ) { oldState, newState in
+            guard oldState.currentText != newState.currentText ||
+                oldState.unconfirmedSegments != newState.unconfirmedSegments ||
+                oldState.confirmedSegments != newState.confirmedSegments else {
+                return
+            }
             print("---")
-            for segment in state.confirmedSegments {
+            for segment in newState.confirmedSegments {
                 print("Confirmed segment: \(segment.text)")
             }
-            for segment in state.unconfirmedSegments {
+            for segment in newState.unconfirmedSegments {
                 print("Unconfirmed segment: \(segment.text)")
             }
-            print("Current text: \(state.currentText)")
-            
+            print("Current text: \(newState.currentText)")
         }
         try await audioStreamTranscriber.startStreamTranscription()
     }
