@@ -201,6 +201,7 @@ struct WhisperKitCLI: AsyncParsableCommand {
                 oldState.confirmedSegments != newState.confirmedSegments else {
                 return
             }
+            // TODO: Print only net new text without any repeats
             print("---")
             for segment in newState.confirmedSegments {
                 print("Confirmed segment: \(segment.text)")
