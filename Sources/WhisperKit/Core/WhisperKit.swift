@@ -163,7 +163,9 @@ public class WhisperKit: Transcriber {
         do {
             let modelFolder = try await hubApi.snapshot(from: repo, matching: ["*\(variant.description)/*"]) { progress in
                 Logging.debug(progress)
-                progressCallback?(progress)
+                if let callback = progressCallback {
+                    callback(progress)
+                }
             }
 
             let modelFolderName = modelFolder.appending(path: "openai_whisper-\(variant)")
