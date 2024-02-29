@@ -147,10 +147,6 @@ struct ContentView: View {
             })
         }
         .onAppear {
-            Task {
-                whisperKit = try await WhisperKit(verbose: true, logLevel: .debug)
-            }
-
             #if os(macOS)
             selectedCategoryId = menu.first(where: { $0.name == selectedTab })?.id
             #endif
@@ -709,6 +705,12 @@ struct ContentView: View {
                     }
                 })
             }
+            
+            await MainActor.run {
+                loadingProgressValue = specializationProgressRatio
+                modelState = .downloaded
+            }
+
 
             if let modelFolder = folder {
                 whisperKit.modelFolder = modelFolder
