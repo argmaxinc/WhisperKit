@@ -123,7 +123,7 @@ final class UnitTests: XCTestCase {
         XCTAssertLessThan(repeatedRatio, repeatedLongRatio)
     }
 
-    // MARK: Encoder Tests
+    // MARK: - Encoder Tests
 
     func testEncoderOutput() async {
         var audioEncoder = AudioEncoder()
@@ -138,7 +138,7 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(encoderOutput?.shape, expectedShape, "Encoder output shape is not as expected")
     }
 
-    // MARK: Decoder Tests
+    // MARK: - Decoder Tests
 
     func testDecoderOutput() async {
         var textDecoder = TextDecoder()
@@ -255,6 +255,40 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(endTimestamp, Float(multiWindowSamples.count / 16000), accuracy: 1.0, "Expected last timestamp to be near the length of the audio")
     }
 
+    func testSplitToWordTokens() async {
+        let tokenizer = try? await loadTokenizer(for: .tiny)
+
+        // Hello, world! This is a test.
+        let tokenIds = [15947, 11, 1002, 0, 639, 307, 257, 220, 31636, 13]
+        let originalWords = tokenIds.map { tokenizer!.convertIdToToken($0) }
+
+        let (words, wordTokens) = tokenizer!.splitToWordTokens(tokenIds: tokenIds)
+
+        let expectedWords = ["Hello", ",", " world", "!", " This", " is", " a", " test", "."]
+        let expectedWordTokens = [[15947], [11], [1002], [0], [639], [307], [257], [220, 31636], [13]]
+
+        XCTAssertNotEqual(originalWords, words, "Should not directly convert into tokens from ids")
+        XCTAssertEqual(words, expectedWords, "Words did not match expected output.")
+        XCTAssertEqual(wordTokens, expectedWordTokens, "Word tokens did not match expected output.")
+    }
+
+    func testSplitToWordTokensJapanese() async {
+        let tokenizer = try? await loadTokenizer(for: .tiny)
+
+        // こんにちは、世界！これはテストです。
+        let tokenIds = [38088, 1231, 24486, 171, 120, 223, 25212, 22985, 40498, 4767, 1543]
+        let originalWords = tokenIds.map { tokenizer!.convertIdToToken($0) }
+
+        let (words, wordTokens) = tokenizer!.splitToWordTokens(tokenIds: tokenIds)
+
+        let expectedWords = ["こんにちは", "、", "世界", "これは", "テ", "スト"]
+        let expectedWordTokens = [[38088], [1231], [24486], [25212], [22985], [40498]]
+
+        XCTAssertNotEqual(originalWords, words, "Should not directly convert into tokens from ids")
+        XCTAssertEqual(words, expectedWords, "Words did not match expected output in Unicode split.")
+        XCTAssertEqual(wordTokens, expectedWordTokens, "Word tokens did not match expected output in Unicode split.")
+    }
+
     // MARK: - Options Tests
 
     func testSampleLength() async {
@@ -277,8 +311,8 @@ final class UnitTests: XCTestCase {
         }
     }
 
-    // Multilingual Tests
-    // NOTE: These are purely for consistency checks and do not reflect the ground truth translations
+    /// Multilingual Tests
+    /// NOTE: These are purely for consistency checks and do not reflect the ground truth translations
     func testTranslateSpanish() async {
         let targetLanguage = "es"
         let options = DecodingOptions(task: .translate, language: targetLanguage, temperatureFallbackCount: 0)
@@ -509,6 +543,142 @@ final class UnitTests: XCTestCase {
         let result5 = tokensFilter5.filterLogits(logits5, withTokens: [1, 2, 3])
         XCTAssertEqual(result5.data(for: 2), [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
     }
+
+    // MARK: - Word Timestamp Tests
+
+    func testDynamicTimeWarpingSimpleMatrix() {
+        let matrix = [
+            [1.0, 1.0, 1.0],
+            [5.0, 2.0, 1.0],
+            [1.0, 5.0, 2.0],
+        ]
+
+        let numRows = matrix.count
+        let numColumns = matrix[0].count
+        let mlMatrix = try! MLMultiArray(shape: [numRows, numColumns] as [NSNumber], dataType: .double)
+        let ptr = UnsafeMutablePointer<Double>(OpaquePointer(mlMatrix.dataPointer))
+        for (i, row) in matrix.enumerated() {
+            for (j, value) in row.enumerated() {
+                let linearOffset = mlMatrix.linearOffset(for: [i, j] as [NSNumber])
+                ptr[linearOffset] = value
+            }
+        }
+
+        let segmentSeeker = SegmentSeeker()
+        do {
+            let result = try segmentSeeker.dynamicTimeWarping(withMatrix: mlMatrix)
+            let expected = (
+                textIndices: [0, 1, 1, 2, 2],
+                timeIndices: [0, 0, 1, 1, 2]
+            )
+            XCTAssertEqual(result.textIndices, expected.textIndices, "dynamicTimeWarping function did not return the expected path.")
+            XCTAssertEqual(result.timeIndices, expected.timeIndices, "dynamicTimeWarping function did not return the expected path.")
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    func testDynamicTimeWarpingLargeMatrix() {
+        // Create a large matrix with non-linear characteristics
+        let numberOfRows: NSNumber = 448
+        let numberOfColumns: NSNumber = 1500
+
+        // Populate the matrix with some non-linear data
+        let matrix = try! MLMultiArray(shape: [numberOfRows, numberOfColumns], dataType: .float16)
+        for i in 0..<numberOfRows.intValue {
+            for j in 0..<numberOfColumns.intValue {
+                matrix[i * numberOfColumns.intValue + j] = NSNumber(value: Double.random(in: 0...1))
+            }
+        }
+
+        let segmentSeeker = SegmentSeeker()
+        do {
+            let result = try segmentSeeker.dynamicTimeWarping(withMatrix: matrix)
+            // Validate the output dimensions
+            XCTAssertFalse(result.textIndices.isEmpty, "Result should not be empty.")
+            XCTAssertFalse(result.timeIndices.isEmpty, "Result should not be empty.")
+
+            // Validate start and end points
+            XCTAssertEqual(result.textIndices.first, 0, "Path should start at (0, 0).")
+            XCTAssertEqual(result.timeIndices.first, 0, "Path should start at (0, 0).")
+            XCTAssertEqual(result.textIndices.last, numberOfRows.intValue - 1, "Path should end at (N-1, M-1).")
+            XCTAssertEqual(result.timeIndices.last, numberOfColumns.intValue - 1, "Path should end at (N-1, M-1).")
+
+            // Check path continuity and bounds
+            for i in 1..<result.textIndices.count {
+                let (prevRow, prevCol) = (result.textIndices[i - 1], result.timeIndices[i - 1])
+                let (currentRow, currentCol) = (result.textIndices[i], result.timeIndices[i])
+
+                let rowDiff = currentRow - prevRow
+                let colDiff = currentCol - prevCol
+
+                // Assert that the row difference is 0 or 1
+                XCTAssertTrue(rowDiff == 0 || rowDiff == 1, "Row difference should be 0 or 1")
+
+                // Assert that the column difference is 0 or 1
+                XCTAssertTrue(colDiff == 0 || colDiff == 1, "Column difference should be 0 or 1")
+
+                // Assert that at least one of rowDiff or colDiff is 1
+                XCTAssertTrue(rowDiff == 1 || colDiff == 1, "At least one of rowDiff or colDiff should be 1")
+
+                // Assert that rowDiff and colDiff are not both 0
+                XCTAssertFalse(rowDiff == 0 && colDiff == 0, "Both rowDiff and colDiff should not be 0 at the same time")
+            }
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    func testMergePunctuations() async {
+//        let tokenizer = try! await loadTokenizer(for: .tiny)
+//        let text = "Hello, world! How are you?"
+//        let expected = "Hello, world ! How are you ?"
+//        let result = mergePunctuations(in: text, with: tokenizer)
+//        XCTAssertEqual(result, expected)
+    }
+
+    func testFindAlignment() async {
+        let numberOfRows: NSNumber = 448
+        let numberOfColumns: NSNumber = 1500
+
+        // Populate the matrix with some non-linear data
+        let matrix = try! MLMultiArray(shape: [numberOfRows, numberOfColumns], dataType: .float16)
+        let tokenProbs = Array(repeating: 0.0, count: numberOfRows.intValue).map { _ in Float.random(in: -1..<0) }
+        for i in 0..<numberOfRows.intValue {
+            for j in 0..<numberOfColumns.intValue {
+                matrix[i * numberOfColumns.intValue + j] = NSNumber(value: Double.random(in: 0...1))
+            }
+        }
+
+        let tokenizer = try! await loadTokenizer(for: .tiny)
+
+        let wordTokenIds = [400, 370, 452, 7177, 6280, 11, 1029, 406, 437, 428, 1941, 393, 360, 337, 291, 11, 1029, 437, 291, 393, 360, 337, 428, 1941, 13]
+        do {
+            let result = try SegmentSeeker().findAlignment(
+                wordTokenIds: wordTokenIds,
+                alignmentWeights: matrix,
+                tokenLogProbs: tokenProbs,
+                tokenizer: tokenizer
+            )
+
+            XCTAssertFalse(result.isEmpty, "Result should not be empty.")
+
+            var previousEndTime: Float = -1.0
+            for wordTiming in result {
+                XCTAssertFalse(wordTiming.word.isEmpty, "Word should not be empty.")
+                XCTAssertFalse(wordTiming.tokens.isEmpty, "Tokens should not be empty.")
+                XCTAssert(wordTiming.tokens.allSatisfy { $0 >= 0 }, "All token IDs should be non-negative.")
+                XCTAssertLessThanOrEqual(wordTiming.start, wordTiming.end, "Start should be less than or equal to end.")
+                XCTAssertGreaterThanOrEqual(wordTiming.start, previousEndTime, "Start time should not be earlier than the previous end time.")
+                XCTAssertGreaterThanOrEqual(wordTiming.probability, 0.0, "Probability should not be negative.")
+                XCTAssertLessThanOrEqual(wordTiming.probability, 1.0, "Probability should not be greater than 1.")
+
+                previousEndTime = wordTiming.end
+            }
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
 }
 
 // MARK: Helpers
@@ -545,10 +715,10 @@ extension XCTestCase {
     func transcribe(with variant: ModelVariant, options: DecodingOptions, audioFile: String = "jfk.wav", file: StaticString = #file, line: UInt = #line) async throws -> TranscriptionResult? {
         var modelPath = tinyModelPath()
         switch variant {
-        case .largev3:
-            modelPath = largev3ModelPath()
-        default:
-            modelPath = tinyModelPath()
+            case .largev3:
+                modelPath = largev3ModelPath()
+            default:
+                modelPath = tinyModelPath()
         }
         let computeOptions = ModelComputeOptions(
             melCompute: .cpuOnly,

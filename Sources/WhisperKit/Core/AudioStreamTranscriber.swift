@@ -3,8 +3,8 @@
 
 import Foundation
 
-extension AudioStreamTranscriber {
-    public struct State {
+public extension AudioStreamTranscriber {
+    struct State {
         public var isRecording: Bool = false
         public var currentFallbacks: Int = 0
         public var lastBufferSize: Int = 0
@@ -26,6 +26,7 @@ public actor AudioStreamTranscriber {
             stateChangeCallback?(oldValue, state)
         }
     }
+
     private let stateChangeCallback: AudioStreamTranscriberCallback?
 
     private let requiredSegmentsForConfirmation: Int
