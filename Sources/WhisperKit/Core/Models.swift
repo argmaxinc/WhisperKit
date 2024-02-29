@@ -348,11 +348,11 @@ public struct TranscriptionSegment: Hashable, Codable {
 }
 
 public struct WordTiming: Hashable, Codable {
-    var word: String
-    var tokens: [Int]
-    var start: Float
-    var end: Float
-    var probability: Float
+    public var word: String
+    public var tokens: [Int]
+    public var start: Float
+    public var end: Float
+    public var probability: Float
 }
 
 public struct TranscriptionProgress {
