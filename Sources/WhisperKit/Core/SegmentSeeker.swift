@@ -286,7 +286,7 @@ public class SegmentSeeker: SegmentSeeking {
         // Merge prepended punctuations
         for i in 1..<alignment.count {
             let currentWord = alignment[i]
-            if currentWord.word.starts(with: " "), prepended.contains(currentWord.word.trimmingCharacters(in: .whitespaces)) {
+            if i > 1, currentWord.word.starts(with: " "), prepended.contains(currentWord.word.trimmingCharacters(in: .whitespaces)) {
                 mergedAlignment[mergedAlignment.count - 1].word += currentWord.word
                 mergedAlignment[mergedAlignment.count - 1].tokens += currentWord.tokens
                 mergedAlignment[mergedAlignment.count - 1].end = currentWord.end
