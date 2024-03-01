@@ -840,54 +840,83 @@ public extension Tokenizer {
     /// - Parameter tokenIds: Array of tokens to split
     /// - Returns: Tuple containing and array of the split words and and all tokens for each word
     func splitToWordTokens(tokenIds: [Int]) -> (words: [String], wordTokens: [[Int]]) {
-        let decodedFull = decode(tokens: tokenIds)
+        let decodedWords = decode(tokens: tokenIds.filter { $0 < specialTokenBegin })
+
+        // Detect language of input text
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(decodedWords)
+        let languageCode = recognizer.dominantLanguage?.rawValue
+
+        if ["zh", "ja", "th", "lo", "my", "yue"].contains(languageCode) {
+            return splitTokensOnUnicode(tokens: tokenIds)
+        } else {
+            return splitTokensOnSpaces(tokens: tokenIds)
+        }
+    }
+
+    func splitTokensOnUnicode(tokens: [Int]) -> (words: [String], wordTokens: [[Int]]) {
+        let decodedFull = decode(tokens: tokens)
+        let replacementString = "\u{fffd}"
 
         var words: [String] = []
         var wordTokens: [[Int]] = []
-        var currentTokenIndex = 0
-        var currentCharIndex = 0
+        var currentTokens: [Int] = []
+        var unicodeOffset = 0
 
-        let tagger = NLTagger(tagSchemes: [.lexicalClass])
-        tagger.string = decodedFull
+        for token in tokens {
+            currentTokens.append(token)
+            let decoded = decode(tokens: currentTokens)
 
-        tagger.enumerateTags(in: decodedFull.startIndex..<decodedFull.endIndex, unit: .word, scheme: .lexicalClass, options: [.omitWhitespace]) { tag, tokenRange in
-            var currentTokens: [Int] = []
-            var tokenLength = 0
-            let wordLength = decodedFull.distance(from: tokenRange.lowerBound, to: tokenRange.upperBound)
-
-            while currentTokenIndex < tokenIds.count {
-                let token = tokenIds[currentTokenIndex]
-                var tokenString = decode(tokens: [token])
-                var hasUnicodeReplacement = false
-                if tokenString == "\u{fffd}" {
-                    hasUnicodeReplacement = true
-                    tokenString = String(decodedFull[tokenRange])
-                }
-
-                if currentCharIndex + tokenString.count > tokenRange.upperBound.utf16Offset(in: decodedFull) {
-                    break
-                }
-
-                if !hasUnicodeReplacement {
-                    currentTokens.append(token)
-                }
-                tokenLength += tokenString.count
-                currentCharIndex += tokenString.count
-                currentTokenIndex += 1
-
-                if tokenLength >= wordLength {
-                    break
-                }
+            var hasUnicodeInFullString = false
+            if let range = decoded.range(of: replacementString) {
+                hasUnicodeInFullString = decodedFull[range] == replacementString
             }
 
-            if !currentTokens.isEmpty {
-                words.append(decode(tokens: currentTokens))
+            if !decoded.contains(replacementString) || hasUnicodeInFullString {
+                words.append(decoded)
                 wordTokens.append(currentTokens)
+                currentTokens = []
+                unicodeOffset += decoded.count
             }
-            return true
         }
 
         return (words, wordTokens)
+    }
+
+    func splitTokensOnSpaces(tokens: [Int]) -> (words: [String], wordTokens: [[Int]]) {
+        let (subwords, subwordTokensList) = splitTokensOnUnicode(tokens: tokens)
+        var words: [String] = []
+        var wordTokens: [[Int]] = []
+
+        for (subword, subwordTokens) in zip(subwords, subwordTokensList) {
+            let special = subwordTokens.first! >= specialTokenBegin
+            let withSpace = subword.hasPrefix(" ")
+            var punctuation = false
+            if let strippedSubword = UnicodeScalar(subword.trimmingCharacters(in: .whitespaces)) {
+                punctuation = CharacterSet.punctuationCharacters.contains(strippedSubword)
+            }
+            if special || withSpace || punctuation || words.isEmpty {
+                words.append(subword)
+                wordTokens.append(subwordTokens)
+            } else {
+                words[words.count - 1] += subword
+                wordTokens[words.count - 1].append(contentsOf: subwordTokens)
+            }
+        }
+
+        return (words, wordTokens)
+    }
+
+    func isPunctuation(_ text: String, tokenRange: Range<String.Index>, tag: NLTag?) -> Bool {
+        let punctuationCharacters = CharacterSet.punctuationCharacters
+        let token = String(text[tokenRange])
+        print(token)
+        if let tag = tag, tag == .punctuation {
+            return true
+        } else if token.unicodeScalars.allSatisfy({ punctuationCharacters.contains($0) }) {
+            return true
+        }
+        return false
     }
 
     var langauges: [String: String] { [

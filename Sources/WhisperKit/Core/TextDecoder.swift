@@ -468,7 +468,7 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
                 if let newAlignmentWeights = decoderOutput.cache?.alignmentWeights {
                     hasAlignment = true
                     for column in 0..<decoderInputs.alignmentWeights.shape[1].intValue {
-                        let alignmentWeightIndex = [tokenIndex, column] as [NSNumber]
+                        let alignmentWeightIndex = [tokenIndex + 1, column] as [NSNumber] // +1 to account for SOT
                         let weightValue = newAlignmentWeights[[0, column] as [NSNumber]].doubleValue
                         decoderInputs.alignmentWeights[alignmentWeightIndex] = NSNumber(value: weightValue)
                     }

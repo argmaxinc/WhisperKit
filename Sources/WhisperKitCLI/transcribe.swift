@@ -205,7 +205,8 @@ struct WhisperKitCLI: AsyncParsableCommand {
         ) { oldState, newState in
             guard oldState.currentText != newState.currentText ||
                 oldState.unconfirmedSegments != newState.unconfirmedSegments ||
-                oldState.confirmedSegments != newState.confirmedSegments else {
+                oldState.confirmedSegments != newState.confirmedSegments
+            else {
                 return
             }
             // TODO: Print only net new text without any repeats

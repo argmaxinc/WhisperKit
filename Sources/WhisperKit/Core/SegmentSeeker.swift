@@ -278,12 +278,18 @@ public class SegmentSeeker: SegmentSeeking {
     func mergePunctuations(alignment: [WordTiming], prepended: String, appended: String) -> [WordTiming] {
         var mergedAlignment = [WordTiming]()
 
+        // Include the first word if it's not a prepended punctuation
+        if !alignment.isEmpty && !prepended.contains(alignment[0].word.trimmingCharacters(in: .whitespaces)) {
+            mergedAlignment.append(alignment[0])
+        }
+
         // Merge prepended punctuations
         for i in 1..<alignment.count {
             let currentWord = alignment[i]
-            if i > 0, currentWord.word.starts(with: " "), prepended.contains(currentWord.word.trimmingCharacters(in: .whitespaces)) {
+            if currentWord.word.starts(with: " "), prepended.contains(currentWord.word.trimmingCharacters(in: .whitespaces)) {
                 mergedAlignment[mergedAlignment.count - 1].word += currentWord.word
                 mergedAlignment[mergedAlignment.count - 1].tokens += currentWord.tokens
+                mergedAlignment[mergedAlignment.count - 1].end = currentWord.end
             } else {
                 mergedAlignment.append(currentWord)
             }
@@ -296,6 +302,7 @@ public class SegmentSeeker: SegmentSeeking {
             if i < mergedAlignment.count - 1, appended.contains(mergedAlignment[i + 1].word) {
                 mergedAlignment[i].word += mergedAlignment[i + 1].word
                 mergedAlignment[i].tokens += mergedAlignment[i + 1].tokens
+                mergedAlignment[i].end = mergedAlignment[i + 1].end
                 shouldSkipNextWord = true
             }
 
@@ -397,15 +404,12 @@ public class SegmentSeeker: SegmentSeeking {
         var indexOffset = 0
         for segment in segments {
             for (index, token) in segment.tokens.enumerated() {
-                // Check if the token is within the range of words or timestamps
-                if token < tokenizer.specialTokenBegin || token >= tokenizer.noTimestampsToken {
-                    wordTokenIds.append(token)
-                    filteredIndices.append(index + indexOffset) // Add the index to filteredIndices
+                wordTokenIds.append(token)
+                filteredIndices.append(index + indexOffset) // Add the index to filteredIndices
 
-                    // Assuming tokenLogProbs is structured as [[Int: Float]]
-                    if let logProb = segment.tokenLogProbs[index][token] {
-                        filteredLogProbs.append(logProb)
-                    }
+                // Assuming tokenLogProbs is structured as [[Int: Float]]
+                if let logProb = segment.tokenLogProbs[index][token] {
+                    filteredLogProbs.append(logProb)
                 }
             }
 

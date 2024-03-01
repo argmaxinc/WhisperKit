@@ -23,6 +23,18 @@ public extension ResultWriting {
             return String(format: "%02d:%02d\(decimalMarker)%03d", mins, secs, msec)
         }
     }
+
+    func formatSegment(index: Int, start: Float, end: Float, text: String) -> String {
+        let startFormatted = formatTime(seconds: Float(start), alwaysIncludeHours: true, decimalMarker: ",")
+        let endFormatted = formatTime(seconds: Float(end), alwaysIncludeHours: true, decimalMarker: ",")
+        return "\(index)\n\(startFormatted) --> \(endFormatted)\n\(text)\n\n"
+    }
+
+    func formatTiming(start: Float, end: Float, text: String) -> String {
+        let startFormatted = formatTime(seconds: Float(start), alwaysIncludeHours: false, decimalMarker: ".")
+        let endFormatted = formatTime(seconds: Float(end), alwaysIncludeHours: false, decimalMarker: ".")
+        return "\(startFormatted) --> \(endFormatted)\n\(text)\n\n"
+    }
 }
 
 public class WriteJSON: ResultWriting {
@@ -67,18 +79,25 @@ public class WriteSRT: ResultWriting {
 
         do {
             var srtContent = ""
-            for (index, segment) in result.segments.enumerated() {
-                let start = formatTime(seconds: segment.start, alwaysIncludeHours: true, decimalMarker: ",")
-                let end = formatTime(seconds: segment.end, alwaysIncludeHours: true, decimalMarker: ",")
-                srtContent += "\(index + 1)\n\(start) --> \(end)\n\(segment.text)\n\n"
+            var index = 1
+            for segment in result.segments {
+                if let wordTimings = segment.words, !wordTimings.isEmpty {
+                    for wordTiming in wordTimings {
+                        srtContent += formatSegment(index: index, start: wordTiming.start, end: wordTiming.end, text: wordTiming.word)
+                        index += 1
+                    }
+                } else {
+                    // Use segment timing if word timings are not available
+                    srtContent += formatSegment(index: index, start: segment.start, end: segment.end, text: segment.text)
+                    index += 1
+                }
             }
 
             try srtContent.write(to: outputFileURL, atomically: true, encoding: .utf8)
+            return .success(outputFileURL.absoluteString)
         } catch {
             return .failure(error)
         }
-
-        return .success(outputFileURL.absoluteString)
     }
 }
 
@@ -96,16 +115,20 @@ public class WriteVTT: ResultWriting {
         do {
             var vttContent = "WEBVTT\n\n"
             for segment in result.segments {
-                let start = formatTime(seconds: segment.start, alwaysIncludeHours: false, decimalMarker: ".")
-                let end = formatTime(seconds: segment.end, alwaysIncludeHours: false, decimalMarker: ".")
-                vttContent += "\(start) --> \(end)\n\(segment.text)\n\n"
+                if let wordTimings = segment.words, !wordTimings.isEmpty {
+                    for wordTiming in wordTimings {
+                        vttContent += formatTiming(start: wordTiming.start, end: wordTiming.end, text: wordTiming.word)
+                    }
+                } else {
+                    // Use segment timing if word timings are not available
+                    vttContent += formatTiming(start: segment.start, end: segment.end, text: segment.text)
+                }
             }
 
             try vttContent.write(to: outputFileURL, atomically: true, encoding: .utf8)
+            return .success(outputFileURL.absoluteString)
         } catch {
             return .failure(error)
         }
-
-        return .success(outputFileURL.absoluteString)
     }
 }
