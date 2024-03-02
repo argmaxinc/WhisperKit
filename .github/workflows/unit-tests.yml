@@ -9,7 +9,10 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: macos-14
+    strategy:
+      matrix:
+        os: [macos-13, macos-14]
+    runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
     - uses: maxim-lobanov/setup-xcode@v1
