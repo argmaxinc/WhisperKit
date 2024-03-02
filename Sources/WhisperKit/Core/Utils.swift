@@ -170,10 +170,10 @@ public func modelSupport(for deviceName: String) -> (default: String, disabled: 
         case let model where model.hasPrefix("iPhone11"), // A12
              let model where model.hasPrefix("iPhone12"), // A13
              let model where model.hasPrefix("Watch7"): // Series 9 and Ultra 2
-            return ("base", ["small", "small.en", "large-v3_turbo", "large-v3", "large-v3_turbo_1307MB", "large-v3_turbo_1049MB", "large-v2", "large-v2_turbo", "large-v2_turbo_1116MB", "large-v2_turbo_1430MB", "large-v2_1161MB", "large-v2_1400MB", "large-v3_1053MB", "large-v2_1382MB"])
+            return ("base", ["small", "small.en", "large-v3_turbo", "large-v3", "large-v3_turbo_1018MB", "large-v2", "large-v2_turbo", "large-v2_turbo_1022MB", "large-v2_1050MB"])
 
         case let model where model.hasPrefix("iPhone13"): // A14
-            return ("base", ["large-v3_turbo", "large-v3", "large-v3_turbo_1307MB", "large-v3_turbo_1049MB", "large-v2", "large-v2_turbo", "large-v2_turbo_1116MB", "large-v2_turbo_1430MB"])
+            return ("base", ["large-v3_turbo", "large-v3", "large-v3_turbo_1018MB", "large-v2", "large-v2_turbo", "large-v2_turbo_1022MB"])
 
         case let model where model.hasPrefix("iPhone14"), // A15
              let model where model.hasPrefix("iPhone15"), // A16
@@ -189,7 +189,7 @@ public func modelSupport(for deviceName: String) -> (default: String, disabled: 
     if deviceName.hasPrefix("arm64") {
         if Process.processor.contains("Apple M1") {
             // Disable turbo variants for M1
-            return ("base", ["large-v3_turbo", "large-v3_turbo_1049MB", "large-v3_turbo_1307MB", "large-v2_turbo", "large-v2_turbo_1116MB", "large-v2_turbo_1430MB"])
+            return ("base", ["large-v3_turbo", "large-v3_turbo_1018MB", "large-v2_turbo", "large-v2_turbo_1022MB"])
         } else {
             // Enable all variants for M2 or M3, none disabled
             return ("base", [])

@@ -331,7 +331,7 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
         let intialPromptIndex = decoderInputs.initialPrompt.count - 1
         var currentTokens: [Int] = decoderInputs.initialPrompt
         var nextToken: Int = decoderInputs.initialPrompt.last!
-        var logProbs: [Float] = [0]
+        var logProbs: [Float] = Array(repeating: 0, count: prefilledIndex + 1)
 
         guard let tokenizer = tokenizer else {
             // Tokenizer required for decoding
@@ -513,14 +513,8 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
         let avgLogProbs = sumLogProbs / Float(logProbs.count)
 
         var tokenProbs = [[Int: Float]]()
-        // TODO: once we have we have start of prev handling, first token is not always SOT
-        tokenProbs.append([segmentTokens.first ?? tokenizer.startOfTranscriptToken: 0.0])
         for (index, token) in segmentTokens.enumerated() {
-            if token == tokenizer.startOfTranscriptToken {
-                // Skip the start token because it wasn't predicted by the model, and so doesn't have logprobs
-                continue
-            }
-            tokenProbs.append([token: logProbs[index - 1]])
+            tokenProbs.append([token: logProbs[index]])
         }
 
         let wordTokens = segmentTokens.filter { $0 < tokenizer.specialTokenBegin }

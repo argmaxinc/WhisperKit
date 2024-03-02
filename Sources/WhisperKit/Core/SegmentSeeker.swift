@@ -105,7 +105,7 @@ public class SegmentSeeker: SegmentSeeking {
             // If the last timestamp is not consecutive, we need to add it as the final slice manually
             if singleTimestampEnding {
                 let singleTimestampEndingIndex = isTimestampToken.lastIndex(where: { $0 })!
-                sliceIndexes.append(singleTimestampEndingIndex)
+                sliceIndexes.append(singleTimestampEndingIndex + 1)
             }
 
             var lastSliceStart = 0
@@ -136,7 +136,7 @@ public class SegmentSeeker: SegmentSeeking {
                     noSpeechProb: decodingResult.noSpeechProb
                 )
                 currentSegments.append(newSegment)
-                lastSliceStart = currentSliceEnd
+                lastSliceStart = currentSliceEnd - (singleTimestampEnding ? 1 : 0)
             }
 
             // Seek to the last timestamp in the segment
@@ -399,6 +399,7 @@ public class SegmentSeeker: SegmentSeeking {
         var wordTokenIds = [Int]()
         var filteredLogProbs = [Float]()
         var filteredIndices = [Int]()
+        var lastSpeechTimestamp = lastSpeechTimestamp
 
         // Iterate through each segment
         var indexOffset = 0
@@ -478,30 +479,67 @@ public class SegmentSeeker: SegmentSeeking {
 
         for segment in segments {
             var savedTokens = 0
-            let textTokens = segment.tokens.filter { $0 < tokenizer.specialTokenBegin || $0 >= tokenizer.noTimestampsToken }
+            let textTokens = segment.tokens.filter { $0 < tokenizer.specialTokenBegin }
             var wordsInSegment = [WordTiming]()
 
-            while wordIndex < mergedAlignment.count && savedTokens < textTokens.count {
-                let timing = mergedAlignment[wordIndex]
+            for timing in mergedAlignment[wordIndex...] where savedTokens < textTokens.count {
+                wordIndex += 1
 
-                if !timing.word.isEmpty {
-                    let start = round((timeOffset + timing.start) * 100) / 100.0
-                    let end = round((timeOffset + timing.end) * 100) / 100.0
-                    let probability = round(timing.probability * 100) / 100.0
-                    let wordTiming = WordTiming(word: timing.word,
-                                                tokens: timing.tokens,
-                                                start: start,
-                                                end: end,
-                                                probability: probability)
-                    wordsInSegment.append(wordTiming)
+                // Remove special tokens and retokenize if needed
+                let timingTokens = timing.tokens.filter { $0 < tokenizer.specialTokenBegin }
+                if timingTokens.isEmpty {
+                    continue
                 }
 
-                savedTokens += timing.tokens.count
-                wordIndex += 1
+                let start = round((timeOffset + timing.start) * 100) / 100.0
+                let end = round((timeOffset + timing.end) * 100) / 100.0
+                let probability = round(timing.probability * 100) / 100.0
+                let wordTiming = WordTiming(word: timing.word,
+                                            tokens: timingTokens,
+                                            start: start,
+                                            end: end,
+                                            probability: probability)
+                wordsInSegment.append(wordTiming)
+
+                savedTokens += timingTokens.count
             }
 
             // Create an updated segment with the word timings
             var updatedSegment = segment
+
+            // TODO: This section is considered a "hack" in the source repo
+            // Reference: https://github.com/openai/whisper/blob/ba3f3cd54b0e5b8ce1ab3de13e32122d0d5f98ab/whisper/timing.py#L342
+            // Truncate long words at segment boundaries
+            if let firstWord = wordsInSegment.first, let lastWord = wordsInSegment.last {
+                // Logic for the first word
+                if firstWord.end - lastSpeechTimestamp > constrainedMedianDuration * 4 &&
+                    (firstWord.end - firstWord.start > maxDuration ||
+                     (wordsInSegment.count > 1 && wordsInSegment[1].end - firstWord.start > maxDuration * 2)) {
+                    if wordsInSegment.count > 1 && wordsInSegment[1].end - wordsInSegment[1].start > maxDuration {
+                        let boundary = max(wordsInSegment[1].end / 2, wordsInSegment[1].end - maxDuration)
+                        wordsInSegment[0].end = boundary
+                        wordsInSegment[1].start = boundary
+                    }
+                    wordsInSegment[0].start = max(0, firstWord.end - maxDuration)
+                }
+
+                // Prefer segment-level start timestamp
+                if segment.start < firstWord.end && segment.start - 0.5 > firstWord.start {
+                    wordsInSegment[0].start = max(0, min(firstWord.end - constrainedMedianDuration, segment.start))
+                } else {
+                    updatedSegment.start = firstWord.start
+                }
+
+                // Prefer segment-level end timestamp
+                if updatedSegment.end > lastWord.start && segment.end + 0.5 < lastWord.end {
+                    wordsInSegment[wordsInSegment.count - 1].end = max(lastWord.start + constrainedMedianDuration, segment.end)
+                } else {
+                    updatedSegment.end = lastWord.end
+                }
+
+                lastSpeechTimestamp = updatedSegment.end
+            }
+            
             updatedSegment.words = wordsInSegment
             updatedSegments.append(updatedSegment)
         }

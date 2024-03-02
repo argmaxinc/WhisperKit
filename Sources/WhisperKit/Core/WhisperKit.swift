@@ -112,7 +112,7 @@ public class WhisperKit: Transcriber {
     public static func fetchAvailableModels(from repo: String = "argmaxinc/whisperkit-coreml") async throws -> [String] {
         let hubApi = HubApi()
         // TODO: get config from the source repo
-        _ = try await hubApi.httpGet(for: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/blob/main/config.json")!)
+        _ = try? await hubApi.httpGet(for: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/blob/main/config.json")!)
         let modelFiles = try await hubApi.getFilenames(from: repo, matching: ["openai_whisper*"])
 
         return formatModelFiles(modelFiles)
@@ -539,6 +539,11 @@ public class WhisperKit: Transcriber {
 
                     timings.decodingWordTimestamps += Date().timeIntervalSince(wordTimestampsStart)
                     timings.totalTimestampAlignmentRuns += 1
+
+                    // Update seek point with new (more accurate) segments
+                    if let lastSpeechTimestamp = currentSegments?.last?.end {
+                        seek = max(seek, Int(lastSpeechTimestamp * Float(WhisperKit.sampleRate)))
+                    }
 
                     if options.verbose {
                         Logging.debug("Word timestamps:")
