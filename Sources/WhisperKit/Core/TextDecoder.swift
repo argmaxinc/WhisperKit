@@ -509,12 +509,15 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
         // NOTE:
         // While `currentTokens` and `logProbs` are usually the same length
         // `currentTokens` does not always contain an end of text token at the end (it is added by this finalize function),
-        let (segmentTokens, sumLogProbs) = tokenSampler.finalize(tokens: currentTokens, logProbs: logProbs)
-        let avgLogProbs = sumLogProbs / Float(logProbs.count)
+        let finalSamplingResult = tokenSampler.finalize(tokens: currentTokens, logProbs: logProbs)
+        let segmentTokens = finalSamplingResult.tokens
+        let segmentLogProbs = finalSamplingResult.logProbs
+        let sumLogProbs = segmentLogProbs.reduce(0, +)
+        let avgLogProbs = sumLogProbs / Float(segmentLogProbs.count)
 
         var tokenProbs = [[Int: Float]]()
         for (index, token) in segmentTokens.enumerated() {
-            tokenProbs.append([token: logProbs[index]])
+            tokenProbs.append([token: segmentLogProbs[index]])
         }
 
         let wordTokens = segmentTokens.filter { $0 < tokenizer.specialTokenBegin }
