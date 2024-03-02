@@ -1,16 +1,12 @@
-//
-//  ContentView.swift
-//  WhisperAX
-//
-//  Created by Zach Nagengast on 1/16/24.
-//
+//  For licensing see accompanying LICENSE.md file.
+//  Copyright © 2024 Argmax, Inc. All rights reserved.
 
 import SwiftUI
 import WhisperKit
 #if canImport(UIKit)
-    import UIKit
+import UIKit
 #elseif canImport(AppKit)
-    import AppKit
+import AppKit
 #endif
 import AVFoundation
 
@@ -121,14 +117,14 @@ struct ContentView: View {
         } detail: {
             VStack {
                 #if os(iOS)
-                    modelSelectorView
-                        .padding()
-                    transcriptionView
-                #elseif os(macOS)
-                    VStack(alignment: .leading) {
-                        transcriptionView
-                    }
+                modelSelectorView
                     .padding()
+                transcriptionView
+                #elseif os(macOS)
+                VStack(alignment: .leading) {
+                    transcriptionView
+                }
+                .padding()
                 #endif
                 controlsView
             }
@@ -137,10 +133,10 @@ struct ContentView: View {
                     Button {
                         let fullTranscript = formatSegments(confirmedSegments + unconfirmedSegments, withTimestamps: enableTimestamps).joined(separator: "\n")
                         #if os(iOS)
-                            UIPasteboard.general.string = fullTranscript
+                        UIPasteboard.general.string = fullTranscript
                         #elseif os(macOS)
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(fullTranscript, forType: .string)
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(fullTranscript, forType: .string)
                         #endif
                     } label: {
                         Label("Copy Text", systemImage: "doc.on.doc")
@@ -152,7 +148,7 @@ struct ContentView: View {
         }
         .onAppear {
             #if os(macOS)
-                selectedCategoryId = menu.first(where: { $0.name == selectedTab })?.id
+            selectedCategoryId = menu.first(where: { $0.name == selectedTab })?.id
             #endif
             fetchModels()
         }
@@ -248,21 +244,21 @@ struct ContentView: View {
                     }
 
                     #if os(macOS)
-                        Button(action: {
-                            if let folder = whisperKit?.modelFolder {
-                                NSWorkspace.shared.open(folder)
-                            }
-                        }, label: {
-                            Image(systemName: "folder")
-                        })
-                        .buttonStyle(BorderlessButtonStyle())
+                    Button(action: {
+                        if let folder = whisperKit?.modelFolder {
+                            NSWorkspace.shared.open(folder)
+                        }
+                    }, label: {
+                        Image(systemName: "folder")
+                    })
+                    .buttonStyle(BorderlessButtonStyle())
                     #endif
                     Button(action: {
                         if let url = URL(string: "https://huggingface.co/\(repoName)") {
                             #if os(macOS)
-                                NSWorkspace.shared.open(url)
+                            NSWorkspace.shared.open(url)
                             #else
-                                UIApplication.shared.open(url)
+                            UIApplication.shared.open(url)
                             #endif
                         }
                     }, label: {
@@ -313,62 +309,32 @@ struct ContentView: View {
 
             if let selectedCategoryId, let item = menu.first(where: { $0.id == selectedCategoryId }) {
                 switch item.name {
-                case "Transcribe":
-                    VStack {
-                        HStack {
-                            Button {
-                                resetState()
-                            } label: {
-                                Label("Reset", systemImage: "arrow.clockwise")
-                            }
-                            .buttonStyle(.borderless)
-                            Spacer()
-                            Button {
-                                showAdvancedOptions.toggle()
-                            } label: {
-                                Label("Settings", systemImage: "slider.horizontal.3")
-                            }
-                            .buttonStyle(.borderless)
-                        }
-
-                        HStack {
-                            let color: Color = modelState != .loaded ? .gray : .red
-                            Button(action: {
-                                withAnimation {
-                                    selectFile()
+                    case "Transcribe":
+                        VStack {
+                            HStack {
+                                Button {
+                                    resetState()
+                                } label: {
+                                    Label("Reset", systemImage: "arrow.clockwise")
                                 }
-                            }) {
-                                Text("FROM FILE")
-                                    .font(.headline)
-                                    .foregroundColor(color)
-                                    .padding()
-                                    .cornerRadius(40)
-                                    .frame(minWidth: 70, minHeight: 70)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 40)
-                                            .stroke(color, lineWidth: 4)
-                                    )
-                            }
-                            .fileImporter(
-                                isPresented: $isFilePickerPresented,
-                                allowedContentTypes: [.audio],
-                                allowsMultipleSelection: false,
-                                onCompletion: handleFilePicker
-                            )
-                            .lineLimit(1)
-                            .contentTransition(.symbolEffect(.replace))
-                            .buttonStyle(BorderlessButtonStyle())
-                            .disabled(modelState != .loaded)
-                            .frame(minWidth: 0, maxWidth: .infinity)
-                            .padding()
-
-                            Button(action: {
-                                withAnimation {
-                                    toggleRecording(shouldLoop: false)
+                                .buttonStyle(.borderless)
+                                Spacer()
+                                Button {
+                                    showAdvancedOptions.toggle()
+                                } label: {
+                                    Label("Settings", systemImage: "slider.horizontal.3")
                                 }
-                            }) {
-                                if !isRecording {
-                                    Text("RECORD")
+                                .buttonStyle(.borderless)
+                            }
+
+                            HStack {
+                                let color: Color = modelState != .loaded ? .gray : .red
+                                Button(action: {
+                                    withAnimation {
+                                        selectFile()
+                                    }
+                                }) {
+                                    Text("FROM FILE")
                                         .font(.headline)
                                         .foregroundColor(color)
                                         .padding()
@@ -378,60 +344,90 @@ struct ContentView: View {
                                             RoundedRectangle(cornerRadius: 40)
                                                 .stroke(color, lineWidth: 4)
                                         )
-                                } else {
-                                    Image(systemName: "stop.circle.fill")
-                                        .resizable()
-                                        .scaledToFit()
-                                        .frame(width: 70, height: 70)
-                                        .padding()
-                                        .foregroundColor(modelState != .loaded ? .gray : .red)
                                 }
+                                .fileImporter(
+                                    isPresented: $isFilePickerPresented,
+                                    allowedContentTypes: [.audio],
+                                    allowsMultipleSelection: false,
+                                    onCompletion: handleFilePicker
+                                )
+                                .lineLimit(1)
+                                .contentTransition(.symbolEffect(.replace))
+                                .buttonStyle(BorderlessButtonStyle())
+                                .disabled(modelState != .loaded)
+                                .frame(minWidth: 0, maxWidth: .infinity)
+                                .padding()
+
+                                Button(action: {
+                                    withAnimation {
+                                        toggleRecording(shouldLoop: false)
+                                    }
+                                }) {
+                                    if !isRecording {
+                                        Text("RECORD")
+                                            .font(.headline)
+                                            .foregroundColor(color)
+                                            .padding()
+                                            .cornerRadius(40)
+                                            .frame(minWidth: 70, minHeight: 70)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 40)
+                                                    .stroke(color, lineWidth: 4)
+                                            )
+                                    } else {
+                                        Image(systemName: "stop.circle.fill")
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 70, height: 70)
+                                            .padding()
+                                            .foregroundColor(modelState != .loaded ? .gray : .red)
+                                    }
+                                }
+                                .lineLimit(1)
+                                .contentTransition(.symbolEffect(.replace))
+                                .buttonStyle(BorderlessButtonStyle())
+                                .disabled(modelState != .loaded)
+                                .frame(minWidth: 0, maxWidth: .infinity)
+                                .padding()
                             }
-                            .lineLimit(1)
+                        }
+                    case "Stream":
+                        HStack {
+                            Button {
+                                resetState()
+                            } label: {
+                                Label("Reset", systemImage: "arrow.clockwise")
+                            }
+                            .frame(minWidth: 0, maxWidth: .infinity)
+                            .buttonStyle(.borderless)
+
+                            Button {
+                                withAnimation {
+                                    toggleRecording(shouldLoop: true)
+                                }
+                            } label: {
+                                Image(systemName: !isRecording ? "record.circle" : "stop.circle.fill")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 70, height: 70)
+                                    .padding()
+                                    .foregroundColor(modelState != .loaded ? .gray : .red)
+                            }
                             .contentTransition(.symbolEffect(.replace))
                             .buttonStyle(BorderlessButtonStyle())
                             .disabled(modelState != .loaded)
                             .frame(minWidth: 0, maxWidth: .infinity)
-                            .padding()
-                        }
-                    }
-                case "Stream":
-                    HStack {
-                        Button {
-                            resetState()
-                        } label: {
-                            Label("Reset", systemImage: "arrow.clockwise")
-                        }
-                        .frame(minWidth: 0, maxWidth: .infinity)
-                        .buttonStyle(.borderless)
 
-                        Button {
-                            withAnimation {
-                                toggleRecording(shouldLoop: true)
+                            Button {
+                                showAdvancedOptions.toggle()
+                            } label: {
+                                Label("Settings", systemImage: "slider.horizontal.3")
                             }
-                        } label: {
-                            Image(systemName: !isRecording ? "record.circle" : "stop.circle.fill")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 70, height: 70)
-                                .padding()
-                                .foregroundColor(modelState != .loaded ? .gray : .red)
+                            .frame(minWidth: 0, maxWidth: .infinity)
+                            .buttonStyle(.borderless)
                         }
-                        .contentTransition(.symbolEffect(.replace))
-                        .buttonStyle(BorderlessButtonStyle())
-                        .disabled(modelState != .loaded)
-                        .frame(minWidth: 0, maxWidth: .infinity)
-
-                        Button {
-                            showAdvancedOptions.toggle()
-                        } label: {
-                            Label("Settings", systemImage: "slider.horizontal.3")
-                        }
-                        .frame(minWidth: 0, maxWidth: .infinity)
-                        .buttonStyle(.borderless)
-                    }
-                default:
-                    EmptyView()
+                    default:
+                        EmptyView()
                 }
             }
         }
@@ -491,18 +487,18 @@ struct ContentView: View {
 
     var advancedSettingsView: some View {
         #if os(iOS)
-            NavigationView {
-                settingsForm
-                    .navigationBarTitleDisplayMode(.inline)
-            }
+        NavigationView {
+            settingsForm
+                .navigationBarTitleDisplayMode(.inline)
+        }
         #else
-            VStack {
-                Text("Decoding Options")
-                    .font(.title2)
-                    .padding()
-                settingsForm
-                    .frame(minWidth: 500, minHeight: 500)
-            }
+        VStack {
+            Text("Decoding Options")
+                .font(.title2)
+                .padding()
+            settingsForm
+                .frame(minWidth: 500, minHeight: 500)
+        }
         #endif
     }
 
@@ -799,32 +795,32 @@ struct ContentView: View {
 
     func handleFilePicker(result: Result<[URL], Error>) {
         switch result {
-        case let .success(urls):
-            guard let selectedFileURL = urls.first else { return }
-            if selectedFileURL.startAccessingSecurityScopedResource() {
-                do {
-                    // Access the document data from the file URL
-                    let audioFileData = try Data(contentsOf: selectedFileURL)
+            case let .success(urls):
+                guard let selectedFileURL = urls.first else { return }
+                if selectedFileURL.startAccessingSecurityScopedResource() {
+                    do {
+                        // Access the document data from the file URL
+                        let audioFileData = try Data(contentsOf: selectedFileURL)
 
-                    // Create a unique file name to avoid overwriting any existing files
-                    let uniqueFileName = UUID().uuidString + "." + selectedFileURL.pathExtension
+                        // Create a unique file name to avoid overwriting any existing files
+                        let uniqueFileName = UUID().uuidString + "." + selectedFileURL.pathExtension
 
-                    // Construct the temporary file URL in the app's temp directory
-                    let tempDirectoryURL = FileManager.default.temporaryDirectory
-                    let localFileURL = tempDirectoryURL.appendingPathComponent(uniqueFileName)
+                        // Construct the temporary file URL in the app's temp directory
+                        let tempDirectoryURL = FileManager.default.temporaryDirectory
+                        let localFileURL = tempDirectoryURL.appendingPathComponent(uniqueFileName)
 
-                    // Write the data to the temp directory
-                    try audioFileData.write(to: localFileURL)
+                        // Write the data to the temp directory
+                        try audioFileData.write(to: localFileURL)
 
-                    print("File saved to temporary directory: \(localFileURL)")
+                        print("File saved to temporary directory: \(localFileURL)")
 
-                    transcribeFile(path: selectedFileURL.path)
-                } catch {
-                    print("File selection error: \(error.localizedDescription)")
+                        transcribeFile(path: selectedFileURL.path)
+                    } catch {
+                        print("File selection error: \(error.localizedDescription)")
+                    }
                 }
-            }
-        case let .failure(error):
-            print("File selection error: \(error.localizedDescription)")
+            case let .failure(error):
+                print("File selection error: \(error.localizedDescription)")
         }
     }
 

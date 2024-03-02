@@ -49,9 +49,8 @@ public protocol AudioProcessing {
     func stopRecording()
 }
 
-// Overrideable default methods for AudioProcessing
+/// Overrideable default methods for AudioProcessing
 public extension AudioProcessing {
-    // Use default recording device
     func startRecordingLive(callback: (([Float]) -> Void)?) throws {
         try startRecordingLive(callback: callback)
     }
@@ -229,12 +228,12 @@ public class AudioProcessor: NSObject, AudioProcessing {
         var error: NSError?
         let status = converter.convert(to: outputBuffer, error: &error, withInputFrom: inputBlock)
         switch status {
-        case .error:
-            if let conversionError = error {
-                Logging.error("Error converting audio file: \(conversionError)")
-            }
-            return nil
-        default: break
+            case .error:
+                if let conversionError = error {
+                    Logging.error("Error converting audio file: \(conversionError)")
+                }
+                return nil
+            default: break
         }
 
         return outputBuffer
@@ -288,7 +287,7 @@ public class AudioProcessor: NSObject, AudioProcessing {
         let refEnergy = 20 * log10(referenceEnergy)
 
         // Normalize based on reference
-        // Note: since signalEnergy elements are floats from 0 to 1, max (full volume) is always 0dB
+        // NOTE: since signalEnergy elements are floats from 0 to 1, max (full volume) is always 0dB
         let normalizedEnergy = rescale(value: dbEnergy, min: refEnergy, max: 0)
 
         // Clamp from 0 to 1
@@ -316,7 +315,7 @@ public class AudioProcessor: NSObject, AudioProcessing {
 @available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
 public extension AudioProcessor {
     /// We have a new buffer, process and store it.
-    /// Note: Assumes audio is 16khz mono
+    /// NOTE: Assumes audio is 16khz mono
     func processBuffer(_ buffer: [Float]) {
         audioSamples.append(contentsOf: buffer)
 
