@@ -132,7 +132,7 @@ public extension AudioProcessing {
     }
 }
 
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 17, watchOS 10, visionOS 1, *)
 public class AudioProcessor: NSObject, AudioProcessing {
     public var audioEngine: AVAudioEngine?
     public var audioSamples: ContiguousArray<Float> = []
@@ -303,7 +303,27 @@ public class AudioProcessor: NSObject, AudioProcessing {
     }
 
     public static func requestRecordPermission() async -> Bool {
-        await AVAudioApplication.requestRecordPermission()
+        if #available(macOS 14.0, *) {
+            return await AVAudioApplication.requestRecordPermission()
+        } else {
+            let microphoneStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+            switch microphoneStatus {
+                case .notDetermined:
+                    return await withCheckedContinuation { continuation in
+                        AVCaptureDevice.requestAccess(for: .audio) { granted in
+                            continuation.resume(returning: granted)
+                        }
+                    }
+                case .restricted, .denied:
+                    Logging.error("Microphone access denied")
+                    return false
+                case .authorized:
+                    return true
+                @unknown default:
+                    Logging.error("Unknown authorization status")
+                    return false
+            }
+        }
     }
 
     deinit {
@@ -313,7 +333,7 @@ public class AudioProcessor: NSObject, AudioProcessing {
 
 // MARK: - Streaming
 
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 17, watchOS 10, visionOS 1, *)
 public extension AudioProcessor {
     /// We have a new buffer, process and store it.
     /// Note: Assumes audio is 16khz mono

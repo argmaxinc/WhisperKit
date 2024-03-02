@@ -7,7 +7,7 @@ import Foundation
 
 import WhisperKit
 
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 17, watchOS 10, visionOS 1, *)
 @main
 struct WhisperKitCLI: AsyncParsableCommand {
     

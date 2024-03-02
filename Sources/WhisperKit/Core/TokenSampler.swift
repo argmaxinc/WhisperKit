@@ -16,7 +16,7 @@ public struct SamplingResult {
     public var completed: Bool
 }
 
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 17, watchOS 10, visionOS 1, *)
 public class GreedyTokenSampler: TokenSampling {
     public var temperature: FloatType
     public var eotToken: Int
