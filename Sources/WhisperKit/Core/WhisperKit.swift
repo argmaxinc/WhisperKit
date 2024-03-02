@@ -16,14 +16,14 @@ public protocol Transcriber {
 
 @available(macOS 13, iOS 17, watchOS 10, visionOS 1, *)
 public class WhisperKit: Transcriber {
-    // Models
+    /// Models
     public var modelVariant: ModelVariant = .tiny
     public var modelState: ModelState = .unloaded
     public var modelCompute: ModelComputeOptions
     public var modelFolder: URL?
     public var tokenizer: Tokenizer?
 
-    // Protocols
+    /// Protocols
     public var audioProcessor: any AudioProcessing
     public var featureExtractor: any FeatureExtracting
     public var audioEncoder: any AudioEncoding
@@ -31,7 +31,7 @@ public class WhisperKit: Transcriber {
     public var logitsFilters: [any LogitsFiltering]
     public var segmentSeeker: any SegmentSeeking
 
-    // Shapes
+    /// Shapes
     public static var maxTokenContext = Int(448 / 2)
     public static var sampleRate: Int = 16000
     public static var hopLength: Int = 160
@@ -39,7 +39,7 @@ public class WhisperKit: Transcriber {
     public static var windowSamples: Int = 480_000 // sampleRate * chunkLength
     public static var secondsPerTimeToken = Float(0.02)
 
-    // Features
+    /// Features
     public var audioSamples: MLMultiArray?
     public var melOutput: MLMultiArray?
     public var encoderOutput: MLMultiArray?
@@ -112,7 +112,7 @@ public class WhisperKit: Transcriber {
     public static func fetchAvailableModels(from repo: String = "argmaxinc/whisperkit-coreml") async throws -> [String] {
         let hubApi = HubApi()
         // TODO: get config from the source repo
-        _ = try await hubApi.httpGet(for: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/blob/main/config.json")!)
+        _ = try? await hubApi.httpGet(for: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/blob/main/config.json")!)
         let modelFiles = try await hubApi.getFilenames(from: repo, matching: ["openai_whisper*"])
 
         return formatModelFiles(modelFiles)
@@ -220,9 +220,9 @@ public class WhisperKit: Transcriber {
         let decoderUrl = path.appending(path: "TextDecoder.mlmodelc")
         let decoderPrefillUrl = path.appending(path: "TextDecoderContextPrefill.mlmodelc")
 
-        try [logmelUrl, encoderUrl, decoderUrl].forEach {
-            if !FileManager.default.fileExists(atPath: $0.path) {
-                throw WhisperError.modelsUnavailable("Model file not found at \($0.path)")
+        for item in [logmelUrl, encoderUrl, decoderUrl] {
+            if !FileManager.default.fileExists(atPath: item.path) {
+                throw WhisperError.modelsUnavailable("Model file not found at \(item.path)")
             }
         }
 
@@ -296,7 +296,7 @@ public class WhisperKit: Transcriber {
     public func unloadModels() async {
         modelState = .unloading
 
-        [featureExtractor, audioEncoder, textDecoder].forEach { model in
+        for model in [featureExtractor, audioEncoder, textDecoder] {
             if var model = model as? WhisperMLModel {
                 model.unloadModel()
             }
@@ -472,7 +472,7 @@ public class WhisperKit: Transcriber {
                 timings.totalAudioProcessingRuns += 1
 
                 let melStart = Date()
-                guard let melOutput = try? await featureExtractor.logMelSpectrogram(fromAudio: audioSamples) else {
+                guard let melOutput = try await featureExtractor.logMelSpectrogram(fromAudio: audioSamples) else {
                     Logging.error("Mel output is nil")
                     return nil
                 }
@@ -489,22 +489,22 @@ public class WhisperKit: Transcriber {
                 timings.encoding += encoderTime
                 timings.totalEncodingRuns += 1
 
-                // All features are computed, send to decoder
+                // All features are computed, now we can decode
                 Logging.info("Decoding \(timeOffset)s - \(timeOffsetEnd)s")
-                if timeOffset + 1 > timeOffsetEnd {
-                    print("broken")
-                }
-                guard let decodingResult = try? await decodeWithFallback(encoderSegment: encoderOutput, decodingOptions: options, callback: callback) else {
+
+                // Send to decoder to predict text tokens with fallback
+                guard let decodingResult = try await decodeWithFallback(encoderSegment: encoderOutput, decodingOptions: options, callback: callback) else {
                     Logging.error("Unable to decode text")
                     return nil
                 }
 
                 // MARK: Windowing
 
-                // at this point we have a completed window aka segment
+                // At this point we have a completed window aka segment
                 let windowingStart = Date()
 
-                let (newSeek, currentSegments) = segmentSeeker.findSeekPointAndSegments(
+                let previousSeek = seek
+                var (newSeek, currentSegments) = segmentSeeker.findSeekPointAndSegments(
                     decodingResult: decodingResult,
                     options: options,
                     allSegmentsCount: allSegments.count,
@@ -516,10 +516,46 @@ public class WhisperKit: Transcriber {
                     tokenizer: tokenizer
                 )
 
-                // Update seek point without moving backward backward
+                // Update seek point without moving backward
                 seek = max(seek, newSeek)
 
-                guard var currentSegments = currentSegments else {
+                // Optionally add word timestamps
+                if options.wordTimestamps,
+                   let alignmentWeights = decodingResult.cache?.alignmentWeights
+                {
+                    let wordTimestampsStart = Date()
+                    currentSegments = try segmentSeeker.addWordTimestamps(
+                        segments: currentSegments ?? [],
+                        alignmentWeights: alignmentWeights,
+                        tokenizer: tokenizer,
+                        seek: previousSeek,
+                        segmentSize: segmentSize,
+                        prependPunctuations: "\"'“¿([{-",
+                        appendPunctuations: "\"'.。,，!！?？:：”)]}、",
+                        lastSpeechTimestamp: currentSegments?.last?.end ?? 0,
+                        options: options,
+                        timings: timings
+                    )
+
+                    timings.decodingWordTimestamps += Date().timeIntervalSince(wordTimestampsStart)
+                    timings.totalTimestampAlignmentRuns += 1
+
+                    // Update seek point with new (more accurate) segments
+                    if let lastSpeechTimestamp = currentSegments?.last?.end {
+                        seek = max(seek, Int(lastSpeechTimestamp * Float(WhisperKit.sampleRate)))
+                    }
+
+                    if options.verbose {
+                        Logging.debug("Word timestamps:")
+                        for segment in currentSegments ?? [] {
+                            for word in segment.words ?? [] {
+                                Logging.debug("[\(word.start.formatted(.number.precision(.significantDigits(3)))) -> \(word.end.formatted(.number.precision(.significantDigits(3))))] prob: \(word.probability), word: \(word.word)")
+                            }
+                        }
+                    }
+                }
+
+                guard let currentSegments = currentSegments else {
                     // No current segment found, skip to next window
                     continue
                 }
@@ -531,23 +567,9 @@ public class WhisperKit: Transcriber {
                     }
                 }
 
-                // Clear invalid segments
-                // remove any segments that have very close start and end times
-                // or that have no text
-                for i in 0..<currentSegments.count {
-                    if currentSegments[i].start == currentSegments[i].end ||
-                        currentSegments[i].text.trimmingCharacters(in: .whitespacesAndNewlines) == "" ||
-                        // TODO: make this more robust or a decoding option, 1s hallucinations are anecdotally common when forcing prefill tokens
-                        (currentSegments[i].end - currentSegments[i].start) <= 1.0
-                    {
-                        currentSegments[i].text = tokenizer.convertIdToToken(tokenizer.noSpeechToken) ?? ""
-                        currentSegments[i].tokens = [tokenizer.noSpeechToken]
-                    }
-                }
-
                 // add them to the `allSegments` list
                 allSegments.append(contentsOf: currentSegments)
-                let allCurrentTokens = currentSegments.flatMap { $0.tokens }
+                let allCurrentTokens = currentSegments.reduce([]) { $0 + $1.tokens }
                 allTokens.append(contentsOf: allCurrentTokens)
 
                 timings.decodingWindowing += Date().timeIntervalSince(windowingStart)
@@ -686,8 +708,9 @@ public class WhisperKit: Transcriber {
             let predictionsInfo = formatTimeWithPercentage(timings.decodingPredictions, totalLoops, fullPipelineDuration)
             let samplingInfo = formatTimeWithPercentage(timings.decodingSampling, totalLoops, fullPipelineDuration)
             let kvCachingInfo = formatTimeWithPercentage(timings.decodingKvCaching, timings.totalKVUpdateRuns, fullPipelineDuration)
+            let wordTimestampInfo = formatTimeWithPercentage(timings.decodingWordTimestamps, timings.totalTimestampAlignmentRuns, fullPipelineDuration)
             let nonPredTimeInfo = formatTimeWithPercentage(timings.decodingNonPrediction, totalLoops, fullPipelineDuration)
-            let windowingInfo = formatTimeWithPercentage(timings.decodingWindowing, timings.totalDecodingWindows, fullPipelineDuration)
+            let windowingInfo = formatTimeWithPercentage(timings.decodingWindowing - timings.decodingWordTimestamps, timings.totalDecodingWindows, fullPipelineDuration)
             let fallbackInfo = formatTimeWithPercentage(timings.decodingFallback, timings.totalDecodingFallbacks, fullPipelineDuration)
             let decodingLoopInfo = formatTimeWithPercentage(timings.decodingLoop, totalLoops, fullPipelineDuration)
 
@@ -704,6 +727,7 @@ public class WhisperKit: Transcriber {
             Logging.info("Non-inference:       \(nonPredTimeInfo)")
             Logging.info("- Sampling:          \(samplingInfo)")
             Logging.info("- Kv Caching:        \(kvCachingInfo)")
+            Logging.info("- Word Timestamps:   \(wordTimestampInfo)")
             Logging.info("- Windowing:         \(windowingInfo)")
             Logging.info("Fallbacks:           \(fallbackInfo)")
             Logging.info("Decoding Full Loop:  \(decodingLoopInfo)")

@@ -3,13 +3,14 @@
 
 import CoreML
 import Hub
+import NaturalLanguage
 import Tokenizers
 
 #if os(watchOS) || arch(arm64)
-    @available(macOS 13, iOS 17, watchOS 10, visionOS 1, *)
-    public typealias FloatType = Float16
+@available(macOS 13, iOS 17, watchOS 10, visionOS 1, *)
+public typealias FloatType = Float16
 #else
-    public typealias FloatType = Float
+public typealias FloatType = Float
 #endif
 
 // MARK: - CoreML
@@ -54,37 +55,37 @@ public enum ModelVariant: CustomStringConvertible, CaseIterable {
     // TODO: implement config.json and generation_config.json parsing for models
     public var isMultilingual: Bool {
         switch self {
-        case .tiny, .base, .small, .medium, .large, .largev2, .largev3:
-            return true
-        case .tinyEn, .baseEn, .smallEn, .mediumEn:
-            return false
+            case .tiny, .base, .small, .medium, .large, .largev2, .largev3:
+                return true
+            case .tinyEn, .baseEn, .smallEn, .mediumEn:
+                return false
         }
     }
 
     public var description: String {
         switch self {
-        case .tiny:
-            return "tiny"
-        case .tinyEn:
-            return "tiny.en"
-        case .base:
-            return "base"
-        case .baseEn:
-            return "base.en"
-        case .small:
-            return "small"
-        case .smallEn:
-            return "small.en"
-        case .medium:
-            return "medium"
-        case .mediumEn:
-            return "medium.en"
-        case .large:
-            return "large"
-        case .largev2:
-            return "large-v2"
-        case .largev3:
-            return "large-v3"
+            case .tiny:
+                return "tiny"
+            case .tinyEn:
+                return "tiny.en"
+            case .base:
+                return "base"
+            case .baseEn:
+                return "base.en"
+            case .small:
+                return "small"
+            case .smallEn:
+                return "small.en"
+            case .medium:
+                return "medium"
+            case .mediumEn:
+                return "medium.en"
+            case .large:
+                return "large"
+            case .largev2:
+                return "large-v2"
+            case .largev3:
+                return "large-v3"
         }
     }
 }
@@ -101,22 +102,22 @@ public enum ModelState: CustomStringConvertible {
 
     public var description: String {
         switch self {
-        case .unloading:
-            return "Unloading"
-        case .unloaded:
-            return "Unloaded"
-        case .loading:
-            return "Loading"
-        case .loaded:
-            return "Loaded"
-        case .prewarming:
-            return "Specializing"
-        case .prewarmed:
-            return "Specialized"
-        case .downloading:
-            return "Downloading"
-        case .downloaded:
-            return "Downloading"
+            case .unloading:
+                return "Unloading"
+            case .unloaded:
+                return "Unloaded"
+            case .loading:
+                return "Loading"
+            case .loaded:
+                return "Loaded"
+            case .prewarming:
+                return "Specializing"
+            case .prewarmed:
+                return "Specialized"
+            case .downloading:
+                return "Downloading"
+            case .downloaded:
+                return "Downloading"
         }
     }
 }
@@ -148,10 +149,10 @@ public enum DecodingTask: CustomStringConvertible, CaseIterable {
 
     public var description: String {
         switch self {
-        case .transcribe:
-            return "transcribe"
-        case .translate:
-            return "translate"
+            case .transcribe:
+                return "transcribe"
+            case .translate:
+                return "translate"
         }
     }
 }
@@ -162,10 +163,17 @@ public struct DecodingInputs {
     var cacheLength: MLMultiArray
     var keyCache: MLMultiArray
     var valueCache: MLMultiArray
+    var alignmentWeights: MLMultiArray
     var kvCacheUpdateMask: MLMultiArray
     var decoderKeyPaddingMask: MLMultiArray
     var prefillKeyCache: MLMultiArray
     var prefillValueCache: MLMultiArray
+}
+
+public struct DecodingCache {
+    var keyCache: MLMultiArray?
+    var valueCache: MLMultiArray?
+    var alignmentWeights: MLMultiArray?
 }
 
 /// Options for how to transcribe an audio file using WhisperKit.
@@ -192,7 +200,6 @@ public struct DecodingInputs {
 ///   - logProbThreshold: If the average log probability over sampled tokens is below this value, treat as failed.
 ///   - noSpeechThreshold: If the no speech probability is higher than this value AND the average log
 ///                        probability over sampled tokens is below `logProbThreshold`, consider the segment as silent.
-
 @available(macOS 13, iOS 17, watchOS 10, visionOS 1, *)
 public struct DecodingOptions {
     public var verbose: Bool
@@ -207,6 +214,7 @@ public struct DecodingOptions {
     public var usePrefillCache: Bool
     public var skipSpecialTokens: Bool
     public var withoutTimestamps: Bool
+    public var wordTimestamps: Bool
     public var clipTimestamps: [Float]
     public var suppressBlank: Bool
     public var supressTokens: [Int]
@@ -226,6 +234,7 @@ public struct DecodingOptions {
                 usePrefillCache: Bool = true,
                 skipSpecialTokens: Bool = false,
                 withoutTimestamps: Bool = false,
+                wordTimestamps: Bool = false,
                 clipTimestamps: [Float] = [],
                 suppressBlank: Bool = false,
                 supressTokens: [Int]? = nil,
@@ -245,6 +254,7 @@ public struct DecodingOptions {
         self.usePrefillCache = usePrefillCache
         self.skipSpecialTokens = skipSpecialTokens
         self.withoutTimestamps = withoutTimestamps
+        self.wordTimestamps = wordTimestamps
         self.clipTimestamps = clipTimestamps
         self.suppressBlank = suppressBlank
         self.supressTokens = supressTokens ?? [] // nonSpeechTokens() // TODO: implement these as default
@@ -258,22 +268,26 @@ public struct DecodingResult {
     public var language: String
     public var languageProbs: [String: Float]
     public var tokens: [Int]
+    public var tokenLogProbs: [[Int: Float]]
     public var text: String
     public var avgLogProb: Float
     public var noSpeechProb: Float
     public var temperature: Float
     public var compressionRatio: Float
+    public var cache: DecodingCache?
     public var timings: TranscriptionTimings?
 
     public static var emptyResults: DecodingResult {
         return DecodingResult(language: "",
                               languageProbs: [:],
                               tokens: [],
+                              tokenLogProbs: [],
                               text: "",
                               avgLogProb: 0.0,
                               noSpeechProb: 0.0,
                               temperature: 0.0,
                               compressionRatio: 0.0,
+                              cache: nil,
                               timings: nil)
     }
 }
@@ -284,29 +298,33 @@ enum WhisperError: Error, LocalizedError {
     case prefillFailed(String = "Prefill failed")
     case audioProcessingFailed(String = "Audio processing failed")
     case decodingLogitsFailed(String = "Unable to decode logits from the model output")
+    case segmentingFailed(String = "Creating segments failed")
 
     var errorDescription: String? {
         switch self {
-        case let .tokenizerUnavailable(message):
-            Logging.error(message)
-            return message
-        case let .modelsUnavailable(message):
-            Logging.error(message)
-            return message
-        case let .prefillFailed(message):
-            Logging.error(message)
-            return message
-        case let .audioProcessingFailed(message):
-            Logging.error(message)
-            return message
-        case let .decodingLogitsFailed(message):
-            Logging.error(message)
-            return message
+            case let .tokenizerUnavailable(message):
+                Logging.error(message)
+                return message
+            case let .modelsUnavailable(message):
+                Logging.error(message)
+                return message
+            case let .prefillFailed(message):
+                Logging.error(message)
+                return message
+            case let .audioProcessingFailed(message):
+                Logging.error(message)
+                return message
+            case let .decodingLogitsFailed(message):
+                Logging.error(message)
+                return message
+            case let .segmentingFailed(message):
+                Logging.error(message)
+                return message
         }
     }
 }
 
-// Structs
+/// Structs
 public struct TranscriptionResult: Codable {
     public var text: String
     public var segments: [TranscriptionSegment]
@@ -321,10 +339,20 @@ public struct TranscriptionSegment: Hashable, Codable {
     public var end: Float
     public var text: String
     public var tokens: [Int]
+    public var tokenLogProbs: [[Int: Float]]
     public var temperature: Float
     public var avgLogprob: Float
     public var compressionRatio: Float
     public var noSpeechProb: Float
+    public var words: [WordTiming]?
+}
+
+public struct WordTiming: Hashable, Codable {
+    public var word: String
+    public var tokens: [Int]
+    public var start: Float
+    public var end: Float
+    public var probability: Float
 }
 
 public struct TranscriptionProgress {
@@ -357,17 +385,19 @@ public struct TranscriptionTimings: Codable {
     public var decodingFallback: TimeInterval
     public var decodingWindowing: TimeInterval
     public var decodingKvCaching: TimeInterval
+    public var decodingWordTimestamps: TimeInterval
     public var decodingNonPrediction: TimeInterval
     public var totalAudioProcessingRuns: Double
     public var totalLogmelRuns: Double
     public var totalEncodingRuns: Double
     public var totalDecodingLoops: Double
     public var totalKVUpdateRuns: Double
+    public var totalTimestampAlignmentRuns: Double
     public var totalDecodingFallbacks: Double
     public var totalDecodingWindows: Double
     public var fullPipeline: TimeInterval
 
-    // Computed properties
+    /// Computed properties
     public var tokensPerSecond: Double {
         Double(totalDecodingLoops) / Double(decodingLoop)
     }
@@ -390,12 +420,14 @@ public struct TranscriptionTimings: Codable {
                 decodingFallback: TimeInterval = 0,
                 decodingWindowing: TimeInterval = 0,
                 decodingKvCaching: TimeInterval = 0,
+                decodingTimestampAlignment: TimeInterval = 0,
                 decodingNonPrediction: TimeInterval = 0,
                 totalAudioProcessingRuns: Double = 0,
                 totalLogmelRuns: Double = 0,
                 totalEncodingRuns: Double = 0,
                 totalDecodingLoops: Double = 0,
                 totalKVUpdateRuns: Double = 0,
+                totalTimestampAlignmentRuns: Double = 0,
                 totalDecodingFallbacks: Double = 0,
                 totalDecodingWindows: Double = 0,
                 fullPipeline: TimeInterval = 0)
@@ -416,12 +448,14 @@ public struct TranscriptionTimings: Codable {
         self.decodingFallback = decodingFallback
         self.decodingWindowing = decodingWindowing
         self.decodingKvCaching = decodingKvCaching
+        self.decodingWordTimestamps = decodingTimestampAlignment
         self.decodingNonPrediction = decodingNonPrediction
         self.totalAudioProcessingRuns = totalAudioProcessingRuns
         self.totalLogmelRuns = totalLogmelRuns
         self.totalEncodingRuns = totalEncodingRuns
         self.totalDecodingLoops = totalDecodingLoops
         self.totalKVUpdateRuns = totalKVUpdateRuns
+        self.totalTimestampAlignmentRuns = totalTimestampAlignmentRuns
         self.totalDecodingFallbacks = totalDecodingFallbacks
         self.totalDecodingWindows = totalDecodingWindows
         self.fullPipeline = fullPipeline
@@ -466,7 +500,6 @@ public class MelSpectrogramOutput: MLFeatureProvider {
     }
 
     /// melspectrogram_features as 1 × 80 × 1 × 3000 4-dimensional array of 16-bit floats
-
     @available(macOS, unavailable)
     @available(macCatalyst, unavailable)
     public var melspectrogram_featuresShapedArray: MLShapedArray<Float16> {
@@ -530,7 +563,6 @@ public class AudioEncoderOutput: MLFeatureProvider {
     }
 
     /// encoder_output_embeds as 1 × embedDim × 1 × sequenceLength 4-dimensional array of 16-bit floats
-
     @available(macOS, unavailable)
     @available(macCatalyst, unavailable)
     public var encoder_output_embedsShapedArray: MLShapedArray<Float16> {
@@ -636,7 +668,6 @@ public class TextDecoderOutput: MLFeatureProvider {
     }
 
     /// logits as 1 × vocab size × 1 × 1 4-dimensional array of 16-bit floats
-
     @available(macOS, unavailable)
     @available(macCatalyst, unavailable)
     public var logitsShapedArray: MLShapedArray<Float16> {
@@ -649,7 +680,6 @@ public class TextDecoderOutput: MLFeatureProvider {
     }
 
     /// key_cache_updates as 1 × embed_dim * num_layers × 1 × 1 4-dimensional array of 16-bit floats
-
     @available(macOS, unavailable)
     @available(macCatalyst, unavailable)
     public var key_cache_updatesShapedArray: MLShapedArray<Float16> {
@@ -662,11 +692,25 @@ public class TextDecoderOutput: MLFeatureProvider {
     }
 
     /// value_cache_updates as 1 × kvCacheEmbedDim × 1 × 1 4-dimensional array of 16-bit floats
-
     @available(macOS, unavailable)
     @available(macCatalyst, unavailable)
     public var value_cache_updatesShapedArray: MLShapedArray<Float16> {
         return MLShapedArray<Float16>(self.value_cache_updates)
+    }
+
+    /// alignment_heads_weights as 1 × 1500 2-dimensional array of 16-bit floats
+    public var alignment_heads_weights: MLMultiArray? {
+        return self.provider.featureValue(for: "alignment_heads_weights")?.multiArrayValue
+    }
+
+    /// alignment_heads_weights as 1 × 1500 2-dimensional array of 16-bit floats
+    @available(macOS, unavailable)
+    @available(macCatalyst, unavailable)
+    public var alignment_heads_weightsShapedArray: MLShapedArray<Float16>? {
+        guard let alignment_heads_weights = self.alignment_heads_weights else {
+            return nil
+        }
+        return MLShapedArray<Float16>(alignment_heads_weights)
     }
 
     public var featureNames: Set<String> {
@@ -731,7 +775,6 @@ public class TextDecoderCachePrefillOutput: MLFeatureProvider {
     }
 
     /// key_cache_prefill as 1 × embed_dim * num_layers × 1 × 3 4-dimensional array of 16-bit floats
-
     @available(macOS, unavailable)
     @available(macCatalyst, unavailable)
     public var key_cache_prefillShapedArray: MLShapedArray<Float16> {
@@ -744,7 +787,6 @@ public class TextDecoderCachePrefillOutput: MLFeatureProvider {
     }
 
     /// value_cache_prefill as 1 × embed_dim * num_layers × 1 × 3 4-dimensional array of 16-bit floats
-
     @available(macOS, unavailable)
     @available(macCatalyst, unavailable)
     public var value_cache_prefillShapedArray: MLShapedArray<Float16> {
@@ -782,8 +824,8 @@ public extension Tokenizer {
     var noTimestampsToken: Int { convertTokenToId("<|notimestamps|>") ?? Self.defaultNoTimestampsToken }
     var timeTokenBegin: Int { convertTokenToId("<|0.00|>") ?? Self.defaultTimeTokenBegin }
 
-    // Default values for each token, using base vocab
-    internal static var defaultWhitespaceToken: Int { 50257 }
+    /// Default values for each token, using base vocab
+    internal static var defaultWhitespaceToken: Int { 220 }
     internal static var defaultSpecialTokenBegin: Int { 50257 }
     internal static var defaultEndToken: Int { 50257 }
     internal static var defaultStartOfTranscriptToken: Int { 50258 }
@@ -793,6 +835,89 @@ public extension Tokenizer {
     internal static var defaultNoSpeechToken: Int { 50362 }
     internal static var defaultNoTimestampsToken: Int { 50363 }
     internal static var defaultTimeTokenBegin: Int { 50364 }
+
+    /// Tokenizes the given text into individual words and associated tokens
+    /// - Parameter tokenIds: Array of tokens to split
+    /// - Returns: Tuple containing and array of the split words and and all tokens for each word
+    func splitToWordTokens(tokenIds: [Int]) -> (words: [String], wordTokens: [[Int]]) {
+        let decodedWords = decode(tokens: tokenIds.filter { $0 < specialTokenBegin })
+
+        // Detect language of input text
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(decodedWords)
+        let languageCode = recognizer.dominantLanguage?.rawValue
+
+        if ["zh", "ja", "th", "lo", "my", "yue"].contains(languageCode) {
+            return splitTokensOnUnicode(tokens: tokenIds)
+        } else {
+            return splitTokensOnSpaces(tokens: tokenIds)
+        }
+    }
+
+    func splitTokensOnUnicode(tokens: [Int]) -> (words: [String], wordTokens: [[Int]]) {
+        let decodedFull = decode(tokens: tokens)
+        let replacementString = "\u{fffd}"
+
+        var words: [String] = []
+        var wordTokens: [[Int]] = []
+        var currentTokens: [Int] = []
+        var unicodeOffset = 0
+
+        for token in tokens {
+            currentTokens.append(token)
+            let decoded = decode(tokens: currentTokens)
+
+            var hasUnicodeInFullString = false
+            if let range = decoded.range(of: replacementString) {
+                hasUnicodeInFullString = decodedFull[range] == replacementString
+            }
+
+            if !decoded.contains(replacementString) || hasUnicodeInFullString {
+                words.append(decoded)
+                wordTokens.append(currentTokens)
+                currentTokens = []
+                unicodeOffset += decoded.count
+            }
+        }
+
+        return (words, wordTokens)
+    }
+
+    func splitTokensOnSpaces(tokens: [Int]) -> (words: [String], wordTokens: [[Int]]) {
+        let (subwords, subwordTokensList) = splitTokensOnUnicode(tokens: tokens)
+        var words: [String] = []
+        var wordTokens: [[Int]] = []
+
+        for (subword, subwordTokens) in zip(subwords, subwordTokensList) {
+            let special = subwordTokens.first! >= specialTokenBegin
+            let withSpace = subword.hasPrefix(" ")
+            var punctuation = false
+            if let strippedSubword = UnicodeScalar(subword.trimmingCharacters(in: .whitespaces)) {
+                punctuation = CharacterSet.punctuationCharacters.contains(strippedSubword)
+            }
+            if special || withSpace || punctuation || words.isEmpty {
+                words.append(subword)
+                wordTokens.append(subwordTokens)
+            } else {
+                words[words.count - 1] += subword
+                wordTokens[words.count - 1].append(contentsOf: subwordTokens)
+            }
+        }
+
+        return (words, wordTokens)
+    }
+
+    func isPunctuation(_ text: String, tokenRange: Range<String.Index>, tag: NLTag?) -> Bool {
+        let punctuationCharacters = CharacterSet.punctuationCharacters
+        let token = String(text[tokenRange])
+        print(token)
+        if let tag = tag, tag == .punctuation {
+            return true
+        } else if token.unicodeScalars.allSatisfy({ punctuationCharacters.contains($0) }) {
+            return true
+        }
+        return false
+    }
 
     var langauges: [String: String] { [
         "english": "en",

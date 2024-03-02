@@ -10,7 +10,6 @@ import WhisperKit
 @available(macOS 13, iOS 17, watchOS 10, visionOS 1, *)
 @main
 struct WhisperKitCLI: AsyncParsableCommand {
-    
     @Option(help: "Path to audio file")
     var audioPath: String = "Tests/WhisperKitTests/Resources/jfk.wav"
 
@@ -55,6 +54,9 @@ struct WhisperKitCLI: AsyncParsableCommand {
 
     @Flag(help: "Force no timestamps when decoding")
     var withoutTimestamps: Bool = false
+
+    @Flag(help: "Add timestamps for each word in the output")
+    var wordTimestamps: Bool = false
 
     @Argument(help: "Supress given tokens in the output")
     var supressTokens: [Int] = []
@@ -114,6 +116,7 @@ struct WhisperKitCLI: AsyncParsableCommand {
             usePrefillCache: usePrefillCache,
             skipSpecialTokens: skipSpecialTokens,
             withoutTimestamps: withoutTimestamps,
+            wordTimestamps: wordTimestamps,
             supressTokens: supressTokens,
             compressionRatioThreshold: compressionRatioThreshold,
             logProbThreshold: logprobThreshold,
@@ -132,10 +135,10 @@ struct WhisperKitCLI: AsyncParsableCommand {
             let savedSrtReport = srtReportWriter.write(result: result, to: audioFileName)
             if verbose {
                 switch savedSrtReport {
-                case let .success(reportPath):
-                    print("\n\nSaved SRT Report: \n\n\(reportPath)\n")
-                case let .failure(error):
-                    print("\n\nCouldn't save report: \(error)\n")
+                    case let .success(reportPath):
+                        print("\n\nSaved SRT Report: \n\n\(reportPath)\n")
+                    case let .failure(error):
+                        print("\n\nCouldn't save report: \(error)\n")
                 }
             }
 
@@ -144,10 +147,10 @@ struct WhisperKitCLI: AsyncParsableCommand {
             let savedJsonReport = jsonReportWriter.write(result: result, to: audioFileName)
             if verbose {
                 switch savedJsonReport {
-                case let .success(reportPath):
-                    print("\n\nSaved JSON Report: \n\n\(reportPath)\n")
-                case let .failure(error):
-                    print("\n\nCouldn't save report: \(error)\n")
+                    case let .success(reportPath):
+                        print("\n\nSaved JSON Report: \n\n\(reportPath)\n")
+                    case let .failure(error):
+                        print("\n\nCouldn't save report: \(error)\n")
                 }
             }
         }
@@ -202,7 +205,8 @@ struct WhisperKitCLI: AsyncParsableCommand {
         ) { oldState, newState in
             guard oldState.currentText != newState.currentText ||
                 oldState.unconfirmedSegments != newState.unconfirmedSegments ||
-                oldState.confirmedSegments != newState.confirmedSegments else {
+                oldState.confirmedSegments != newState.confirmedSegments
+            else {
                 return
             }
             // TODO: Print only net new text without any repeats
@@ -236,11 +240,11 @@ enum ComputeUnits: String, ExpressibleByArgument, CaseIterable {
     case all, cpuAndGPU, cpuOnly, cpuAndNeuralEngine, random
     var asMLComputeUnits: MLComputeUnits {
         switch self {
-        case .all: return .all
-        case .cpuAndGPU: return .cpuAndGPU
-        case .cpuOnly: return .cpuOnly
-        case .cpuAndNeuralEngine: return .cpuAndNeuralEngine
-        case .random: return Bool.random() ? .cpuAndGPU : .cpuAndNeuralEngine
+            case .all: return .all
+            case .cpuAndGPU: return .cpuAndGPU
+            case .cpuOnly: return .cpuOnly
+            case .cpuAndNeuralEngine: return .cpuAndNeuralEngine
+            case .random: return Bool.random() ? .cpuAndGPU : .cpuAndNeuralEngine
         }
     }
 }

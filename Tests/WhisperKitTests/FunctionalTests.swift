@@ -30,6 +30,7 @@ final class FunctionalTests: XCTestCase {
                 XCTFail("Transcription failed")
                 return
             }
+
             print("[Integration] \(transcriptionResult.text)")
             XCTAssertEqual(
                 transcriptionResult.text.normalized,

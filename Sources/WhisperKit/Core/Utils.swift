@@ -6,9 +6,9 @@ import CoreML
 import Foundation
 import Tokenizers
 #if canImport(UIKit)
-    import UIKit
+import UIKit
 #elseif canImport(AppKit)
-    import AppKit
+import AppKit
 #endif
 
 // MARK: - Helpers
@@ -45,28 +45,28 @@ func initMLMultiArray(shape: [NSNumber], dataType: MLMultiArrayDataType, initial
     let count = multiArray.count
     let pointer = multiArray.dataPointer
     switch dataType {
-    case .double:
-        if let value = initialValue as? Double {
-            let typedPointer = pointer.bindMemory(to: Double.self, capacity: count)
-            typedPointer.initialize(repeating: value, count: count)
-        }
-    case .float32:
-        if let value = initialValue as? Float {
-            let typedPointer = pointer.bindMemory(to: Float.self, capacity: count)
-            typedPointer.initialize(repeating: value, count: count)
-        }
-    case .float16:
-        if let value = initialValue as? FloatType {
-            let typedPointer = pointer.bindMemory(to: FloatType.self, capacity: count)
-            typedPointer.initialize(repeating: value, count: count)
-        }
-    case .int32:
-        if let value = initialValue as? Int32 {
-            let typedPointer = pointer.bindMemory(to: Int32.self, capacity: count)
-            typedPointer.initialize(repeating: value, count: count)
-        }
-    @unknown default:
-        fatalError("Unsupported data type")
+        case .double:
+            if let value = initialValue as? Double {
+                let typedPointer = pointer.bindMemory(to: Double.self, capacity: count)
+                typedPointer.initialize(repeating: value, count: count)
+            }
+        case .float32:
+            if let value = initialValue as? Float {
+                let typedPointer = pointer.bindMemory(to: Float.self, capacity: count)
+                typedPointer.initialize(repeating: value, count: count)
+            }
+        case .float16:
+            if let value = initialValue as? FloatType {
+                let typedPointer = pointer.bindMemory(to: FloatType.self, capacity: count)
+                typedPointer.initialize(repeating: value, count: count)
+            }
+        case .int32:
+            if let value = initialValue as? Int32 {
+                let typedPointer = pointer.bindMemory(to: Int32.self, capacity: count)
+                typedPointer.initialize(repeating: value, count: count)
+            }
+        @unknown default:
+            fatalError("Unsupported data type")
     }
 
     return multiArray
@@ -91,28 +91,28 @@ func getModelOutputDimention(_ model: MLModel?, named: String, position: Int) ->
 func tokenizerNameForVariant(_ variant: ModelVariant) -> String {
     var tokenizerName: String
     switch variant {
-    case .tiny:
-        tokenizerName = "openai/whisper-tiny"
-    case .tinyEn:
-        tokenizerName = "openai/whisper-tiny.en"
-    case .base:
-        tokenizerName = "openai/whisper-base"
-    case .baseEn:
-        tokenizerName = "openai/whisper-base.en"
-    case .small:
-        tokenizerName = "openai/whisper-small"
-    case .smallEn:
-        tokenizerName = "openai/whisper-small.en"
-    case .medium:
-        tokenizerName = "openai/whisper-medium"
-    case .mediumEn:
-        tokenizerName = "openai/whisper-medium.en"
-    case .large:
-        tokenizerName = "openai/whisper-large"
-    case .largev2:
-        tokenizerName = "openai/whisper-large-v2"
-    case .largev3:
-        tokenizerName = "openai/whisper-large-v3"
+        case .tiny:
+            tokenizerName = "openai/whisper-tiny"
+        case .tinyEn:
+            tokenizerName = "openai/whisper-tiny.en"
+        case .base:
+            tokenizerName = "openai/whisper-base"
+        case .baseEn:
+            tokenizerName = "openai/whisper-base.en"
+        case .small:
+            tokenizerName = "openai/whisper-small"
+        case .smallEn:
+            tokenizerName = "openai/whisper-small.en"
+        case .medium:
+            tokenizerName = "openai/whisper-medium"
+        case .mediumEn:
+            tokenizerName = "openai/whisper-medium.en"
+        case .large:
+            tokenizerName = "openai/whisper-large"
+        case .largev2:
+            tokenizerName = "openai/whisper-large-v2"
+        case .largev3:
+            tokenizerName = "openai/whisper-large-v3"
     }
 
     return tokenizerName
@@ -126,32 +126,32 @@ func detectVariant(logitsDim: Int, encoderDim: Int) -> ModelVariant {
     if logitsDim == 51865 {
         // Muiltilingual
         switch encoderDim {
-        case 384:
-            modelVariant = .tiny
-        case 512:
-            modelVariant = .base
-        case 768:
-            modelVariant = .small
-        case 1024:
-            modelVariant = .medium
-        case 1280:
-            modelVariant = .largev2 // same for v1
-        default:
-            modelVariant = .base
+            case 384:
+                modelVariant = .tiny
+            case 512:
+                modelVariant = .base
+            case 768:
+                modelVariant = .small
+            case 1024:
+                modelVariant = .medium
+            case 1280:
+                modelVariant = .largev2 // same for v1
+            default:
+                modelVariant = .base
         }
     } else if logitsDim == 51864 {
         // English only
         switch encoderDim {
-        case 384:
-            modelVariant = .tinyEn
-        case 512:
-            modelVariant = .baseEn
-        case 768:
-            modelVariant = .smallEn
-        case 1024:
-            modelVariant = .mediumEn
-        default:
-            modelVariant = .baseEn
+            case 384:
+                modelVariant = .tinyEn
+            case 512:
+                modelVariant = .baseEn
+            case 768:
+                modelVariant = .smallEn
+            case 1024:
+                modelVariant = .mediumEn
+            default:
+                modelVariant = .baseEn
         }
 
     } else if logitsDim == 51866 {
@@ -167,34 +167,34 @@ func detectVariant(logitsDim: Int, encoderDim: Int) -> ModelVariant {
 
 public func modelSupport(for deviceName: String) -> (default: String, disabled: [String]) {
     switch deviceName {
-    case let model where model.hasPrefix("iPhone11"), // A12
-         let model where model.hasPrefix("iPhone12"), // A13
-         let model where model.hasPrefix("Watch7"): // Series 9 and Ultra 2
-        return ("base", ["small", "small.en", "large-v3_turbo", "large-v3", "large-v3_turbo_1307MB", "large-v3_turbo_1049MB", "large-v2", "large-v2_turbo", "large-v2_turbo_1116MB", "large-v2_turbo_1430MB", "large-v2_1161MB", "large-v2_1400MB", "large-v3_1053MB", "large-v2_1382MB"])
+        case let model where model.hasPrefix("iPhone11"), // A12
+             let model where model.hasPrefix("iPhone12"), // A13
+             let model where model.hasPrefix("Watch7"): // Series 9 and Ultra 2
+            return ("base", ["small", "small.en", "large-v3_turbo", "large-v3", "large-v3_turbo_1018MB", "large-v2", "large-v2_turbo", "large-v2_turbo_1022MB", "large-v2_1050MB"])
 
-    case let model where model.hasPrefix("iPhone13"): // A14
-        return ("base", ["large-v3_turbo", "large-v3", "large-v3_turbo_1307MB", "large-v3_turbo_1049MB", "large-v2", "large-v2_turbo", "large-v2_turbo_1116MB", "large-v2_turbo_1430MB"])
+        case let model where model.hasPrefix("iPhone13"): // A14
+            return ("base", ["large-v3_turbo", "large-v3", "large-v3_turbo_1018MB", "large-v2", "large-v2_turbo", "large-v2_turbo_1022MB"])
 
-    case let model where model.hasPrefix("iPhone14"), // A15
-         let model where model.hasPrefix("iPhone15"), // A16
-         let model where model.hasPrefix("iPhone16"): // A17
-        return ("base", ["large-v3_turbo", "large-v3", "large-v2_turbo", "large-v2"])
+        case let model where model.hasPrefix("iPhone14"), // A15
+             let model where model.hasPrefix("iPhone15"), // A16
+             let model where model.hasPrefix("iPhone16"): // A17
+            return ("base", ["large-v3_turbo", "large-v3", "large-v2_turbo", "large-v2"])
 
-    // Fall through to macOS checks
-    default:
-        break
+        // Fall through to macOS checks
+        default:
+            break
     }
 
     #if os(macOS)
-        if deviceName.hasPrefix("arm64") {
-            if Process.processor.contains("Apple M1") {
-                // Disable turbo variants for M1
-                return ("base", ["large-v3_turbo", "large-v3_turbo_1049MB", "large-v3_turbo_1307MB", "large-v2_turbo", "large-v2_turbo_1116MB", "large-v2_turbo_1430MB"])
-            } else {
-                // Enable all variants for M2 or M3, none disabled
-                return ("base", [])
-            }
+    if deviceName.hasPrefix("arm64") {
+        if Process.processor.contains("Apple M1") {
+            // Disable turbo variants for M1
+            return ("base", ["large-v3_turbo", "large-v3_turbo_1018MB", "large-v2_turbo", "large-v2_turbo_1022MB"])
+        } else {
+            // Enable all variants for M2 or M3, none disabled
+            return ("base", [])
         }
+    }
     #endif
 
     // Unhandled device, default to base variant
@@ -202,24 +202,24 @@ public func modelSupport(for deviceName: String) -> (default: String, disabled: 
 }
 
 #if os(macOS)
-    // From: https://stackoverflow.com/a/71726663
-    extension Process {
-        static func stringFromTerminal(command: String) -> String {
-            let task = Process()
-            let pipe = Pipe()
-            task.standardOutput = pipe
-            task.launchPath = "/bin/bash"
-            task.arguments = ["-c", "sysctl -n " + command]
-            task.launch()
-            return String(bytes: pipe.fileHandleForReading.availableData, encoding: .utf8) ?? ""
-        }
-
-        static let processor = stringFromTerminal(command: "machdep.cpu.brand_string")
-        static let cores = stringFromTerminal(command: "machdep.cpu.core_count")
-        static let threads = stringFromTerminal(command: "machdep.cpu.thread_count")
-        static let vendor = stringFromTerminal(command: "machdep.cpu.vendor")
-        static let family = stringFromTerminal(command: "machdep.cpu.family")
+// From: https://stackoverflow.com/a/71726663
+extension Process {
+    static func stringFromTerminal(command: String) -> String {
+        let task = Process()
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.launchPath = "/bin/bash"
+        task.arguments = ["-c", "sysctl -n " + command]
+        task.launch()
+        return String(bytes: pipe.fileHandleForReading.availableData, encoding: .utf8) ?? ""
     }
+
+    static let processor = stringFromTerminal(command: "machdep.cpu.brand_string")
+    static let cores = stringFromTerminal(command: "machdep.cpu.core_count")
+    static let threads = stringFromTerminal(command: "machdep.cpu.thread_count")
+    static let vendor = stringFromTerminal(command: "machdep.cpu.vendor")
+    static let family = stringFromTerminal(command: "machdep.cpu.family")
+}
 #endif
 
 public func resolveAbsolutePath(_ inputPath: String) -> String {
@@ -243,6 +243,7 @@ public func resolveAbsolutePath(_ inputPath: String) -> String {
 }
 
 func loadTokenizer(for pretrained: ModelVariant) async throws -> Tokenizer {
+    // TODO: Cache tokenizer config to avoid repeated network requests
     let tokenizerName = tokenizerNameForVariant(pretrained)
     return try await AutoTokenizer.from(pretrained: tokenizerName)
 }

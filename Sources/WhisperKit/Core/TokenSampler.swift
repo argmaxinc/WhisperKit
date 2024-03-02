@@ -7,7 +7,7 @@ import Foundation
 
 public protocol TokenSampling {
     func update(tokens: [Int], logits: MLMultiArray, logProbs: [Float]) -> SamplingResult
-    func finalize(tokens: [Int], logProbs: [Float]) -> (tokens: [Int], sumLogProbs: Float)
+    func finalize(tokens: [Int], logProbs: [Float]) -> SamplingResult
 }
 
 public struct SamplingResult {
@@ -157,14 +157,15 @@ public class GreedyTokenSampler: TokenSampling {
         return SamplingResult(tokens: nextTokens, logProbs: nextLogprobs, completed: completed)
     }
 
-    public func finalize(tokens: [Int], logProbs: [Float]) -> (tokens: [Int], sumLogProbs: Float) {
+    public func finalize(tokens: [Int], logProbs: [Float]) -> SamplingResult {
         var finalTokens = tokens
+        var finalLogProbs = logProbs
         if tokens.last != eotToken {
             finalTokens.append(eotToken)
+            finalLogProbs.append(0)
         }
 
-        let sumLogProbs = logProbs.reduce(0, +)
-        return (tokens: finalTokens, sumLogProbs: sumLogProbs)
+        return SamplingResult(tokens: finalTokens, logProbs: finalLogProbs, completed: true)
     }
 }
 
@@ -200,7 +201,7 @@ public class BeamSearchTokenSampler: TokenSampling {
         fatalError("Not implemented: \(#function)")
     }
 
-    public func finalize(tokens: [Int], logProbs: [Float]) -> (tokens: [Int], sumLogProbs: Float) {
+    public func finalize(tokens: [Int], logProbs: [Float]) -> SamplingResult{
         // TODO: Implement
         fatalError("Not implemented: \(#function)")
     }

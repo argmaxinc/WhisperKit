@@ -23,9 +23,9 @@ public protocol TextDecoding {
         kvCacheUpdateMask: MLMultiArray,
         encoderOutputEmbeds: MLMultiArray,
         decoderKeyPaddingMask: MLMultiArray
-    ) async throws -> (logits: MLMultiArray?, keyCache: MLMultiArray?, valueCache: MLMultiArray?)?
+    ) async throws -> (logits: MLMultiArray?, cache: DecodingCache?)?
 
-    func prefillKVCache(withTask task: MLMultiArray, andLanguage language: MLMultiArray) async throws -> (keyCache: MLMultiArray?, valueCache: MLMultiArray?)?
+    func prefillKVCache(withTask task: MLMultiArray, andLanguage language: MLMultiArray) async throws -> DecodingCache?
     func decodeText(
         from encoderOutput: MLMultiArray,
         using decoderInputs: DecodingInputs,
@@ -68,14 +68,21 @@ public extension TextDecoding {
             return nil
         }
 
+        guard let encoderOutputDim = self.windowSize else {
+            Logging.error("Unable to determine encoderOutputDim")
+            return nil
+        }
+
         // Initialize each MLMultiArray
         let kvCacheEmbedDimValue = NSNumber(value: kvCacheEmbedDim)
         let kvCacheMaxSequenceLengthValue = NSNumber(value: kvCacheMaxSequenceLength)
+        let encoderOutputDimValue = NSNumber(value: encoderOutputDim)
 
         let inputIds = initMLMultiArray(shape: [1], dataType: .int32, initialValue: Int32(0))
         let cacheLength = initMLMultiArray(shape: [1], dataType: .int32, initialValue: Int32(0))
         let keyCache = initMLMultiArray(shape: [1, kvCacheEmbedDimValue, 1, kvCacheMaxSequenceLengthValue], dataType: .float16, initialValue: FloatType(0))
         let valueCache = initMLMultiArray(shape: [1, kvCacheEmbedDimValue, 1, kvCacheMaxSequenceLengthValue], dataType: .float16, initialValue: FloatType(0))
+        let alignmentWeights = initMLMultiArray(shape: [kvCacheMaxSequenceLengthValue, encoderOutputDimValue], dataType: .float16, initialValue: FloatType(0))
         let kvCacheUpdateMask = initMLMultiArray(shape: [1, kvCacheMaxSequenceLengthValue], dataType: .int32, initialValue: Int32(0))
         let decoderKeyPaddingMask = initMLMultiArray(shape: [1, kvCacheMaxSequenceLengthValue], dataType: .float16, initialValue: FloatType(-10000))
         let prefillKeyCache = try! MLMultiArray(shape: [1, kvCacheEmbedDimValue, 1, kvCacheMaxSequenceLengthValue], dataType: .float16)
@@ -87,6 +94,7 @@ public extension TextDecoding {
             cacheLength: cacheLength,
             keyCache: keyCache,
             valueCache: valueCache,
+            alignmentWeights: alignmentWeights,
             kvCacheUpdateMask: kvCacheUpdateMask,
             decoderKeyPaddingMask: decoderKeyPaddingMask,
             prefillKeyCache: prefillKeyCache,
@@ -156,7 +164,7 @@ public extension TextDecoding {
         return prefilledDecoderInputs
     }
 
-    func prefillKVCache(withTask task: MLMultiArray, andLanguage language: MLMultiArray) async throws -> (keyCache: MLMultiArray?, valueCache: MLMultiArray?)? {
+    func prefillKVCache(withTask task: MLMultiArray, andLanguage language: MLMultiArray) async throws -> DecodingCache? {
         let modelInputs = TextDecoderCachePrefillInput(
             task: task,
             language: language
@@ -172,10 +180,13 @@ public extension TextDecoding {
 
         let output = TextDecoderCachePrefillOutput(features: outputFeatures)
 
-        let keyCache = output.key_cache_prefill
-        let valueCache = output.value_cache_prefill
+        let kvCache = DecodingCache(
+            keyCache: output.key_cache_prefill,
+            valueCache: output.value_cache_prefill,
+            alignmentWeights: nil
+        )
 
-        return (keyCache, valueCache)
+        return kvCache
     }
 
     static func updateKVCache(keyTensor: MLMultiArray, keySlice: MLMultiArray,
@@ -195,8 +206,8 @@ public extension TextDecoding {
                         DispatchQueue.concurrentPerform(iterations: tensorShape[1]) { j in
                             // Slice size is 3 for prefill and 1 for decode loops
                             for k in 0..<sliceShape[3] {
-                                /// Equivalent to:
-                                /// `tensor[0, j, 0, k + index] = slice[0, j, 0, k + index]`
+                                // Equivalent to:
+                                // `tensor[0, j, 0, k + index] = slice[0, j, 0, k + index]`
                                 let keyDestIndex = j * keyTargetStrides[1] + (index + k) * keyTargetStrides[3]
                                 let keyDest = keyTensorPointer.baseAddress! + keyDestIndex * bytesPerSample
 
@@ -263,7 +274,7 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
         kvCacheUpdateMask: MLMultiArray,
         encoderOutputEmbeds: MLMultiArray,
         decoderKeyPaddingMask: MLMultiArray
-    ) async throws -> (logits: MLMultiArray?, keyCache: MLMultiArray?, valueCache: MLMultiArray?)? {
+    ) async throws -> (logits: MLMultiArray?, cache: DecodingCache?)? {
         let modelInputs = TextDecoderInput(
             input_ids: inputIds,
             cache_length: cacheLength,
@@ -285,10 +296,13 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
         let output = TextDecoderOutput(features: outputFeatures)
 
         let logits = output.logits
-        let keyCache = output.key_cache_updates
-        let valueCache = output.value_cache_updates
+        let cache = DecodingCache(
+            keyCache: output.key_cache_updates,
+            valueCache: output.value_cache_updates,
+            alignmentWeights: output.alignment_heads_weights
+        )
 
-        return (logits, keyCache, valueCache)
+        return (logits, cache)
     }
 
     public func detectLanguage(
@@ -311,21 +325,20 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
         options: DecodingOptions,
         callback: TranscriptionCallback = nil
     ) async throws -> [DecodingResult] {
-        // Decode text loop timings
+        // Single loop variables
         var timings = TranscriptionTimings()
         let prefilledIndex = decoderInputs.cacheLength[0].intValue
         let intialPromptIndex = decoderInputs.initialPrompt.count - 1
         var currentTokens: [Int] = decoderInputs.initialPrompt
         var nextToken: Int = decoderInputs.initialPrompt.last!
+        var logProbs: [Float] = Array(repeating: 0, count: prefilledIndex + 1)
 
         guard let tokenizer = tokenizer else {
             // Tokenizer required for decoding
             throw WhisperError.tokenizerUnavailable()
         }
 
-        // Sampling
-        var logProbs: [Float] = []
-
+        // Logits filters
         var logitsFilters: [any LogitsFiltering] = []
         if options.suppressBlank {
             logitsFilters.append(
@@ -350,6 +363,7 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
         let loopCount = min(options.sampleLength, WhisperKit.maxTokenContext)
         Logging.debug("Running main loop for a maximum of \(loopCount) iterations, starting at index \(prefilledIndex)")
         var isPrefill: Bool
+        var hasAlignment = false
         for tokenIndex in prefilledIndex..<loopCount {
             let loopStart = Date()
 
@@ -427,8 +441,9 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
                 }
 
                 // Update KV cache for this token
-                guard let newKeyCache = decoderOutput.keyCache,
-                      let newValueCache = decoderOutput.valueCache
+                guard let decoderCache = decoderOutput.cache,
+                      let newKeyCache = decoderCache.keyCache,
+                      let newValueCache = decoderCache.valueCache
                 else {
                     fatalError("Invalid model output")
                 }
@@ -449,6 +464,17 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
                 decoderInputs.kvCacheUpdateMask[tokenIndex] = 0
                 decoderInputs.kvCacheUpdateMask[tokenIndex + 1] = 1
 
+                // Update alignment weights for token if present
+                if let newAlignmentWeights = decoderOutput.cache?.alignmentWeights {
+                    hasAlignment = true
+                    for column in 0..<decoderInputs.alignmentWeights.shape[1].intValue {
+                        let alignmentWeightIndex = [tokenIndex + 1, column] as [NSNumber] // +1 to account for SOT
+                        let weightValue = newAlignmentWeights[[0, column] as [NSNumber]].doubleValue
+                        decoderInputs.alignmentWeights[alignmentWeightIndex] = NSNumber(value: weightValue)
+                    }
+                }
+
+                // Prepare results
                 let currentTranscript = tokenizer.decode(tokens: currentTokens)
                 let averageLogProb = logProbs.reduce(0, +) / Float(logProbs.count)
                 let compressionRatio = compressionRatio(of: currentTokens)
@@ -474,8 +500,25 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
             }
         }
 
-        let (segmentTokens, sumLogProbs) = tokenSampler.finalize(tokens: currentTokens, logProbs: logProbs)
-        let avgLogProbs = sumLogProbs / Float(logProbs.count)
+        let cache = DecodingCache(
+            keyCache: decoderInputs.keyCache,
+            valueCache: decoderInputs.valueCache,
+            alignmentWeights: hasAlignment ? decoderInputs.alignmentWeights : nil
+        )
+
+        // NOTE:
+        // While `currentTokens` and `logProbs` are usually the same length
+        // `currentTokens` does not always contain an end of text token at the end (it is added by this finalize function),
+        let finalSamplingResult = tokenSampler.finalize(tokens: currentTokens, logProbs: logProbs)
+        let segmentTokens = finalSamplingResult.tokens
+        let segmentLogProbs = finalSamplingResult.logProbs
+        let sumLogProbs = segmentLogProbs.reduce(0, +)
+        let avgLogProbs = sumLogProbs / Float(segmentLogProbs.count)
+
+        var tokenProbs = [[Int: Float]]()
+        for (index, token) in segmentTokens.enumerated() {
+            tokenProbs.append([token: segmentLogProbs[index]])
+        }
 
         let wordTokens = segmentTokens.filter { $0 < tokenizer.specialTokenBegin }
         let compressionRatio = compressionRatio(of: wordTokens)
@@ -492,11 +535,13 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
             language: options.language ?? "en",
             languageProbs: [options.language ?? "en": 1.0],
             tokens: segmentTokens,
+            tokenLogProbs: tokenProbs,
             text: transcript,
             avgLogProb: avgLogProbs,
             noSpeechProb: 0, // TODO: implement no speech prob
             temperature: temperature,
             compressionRatio: compressionRatio,
+            cache: cache,
             timings: timings
         )
 
