@@ -305,23 +305,28 @@ public class AudioProcessor: NSObject, AudioProcessing {
         if #available(macOS 14.0, *) {
             return await AVAudioApplication.requestRecordPermission()
         } else {
+            #if os(watchOS)
+            // watchOS does not support AVCaptureDevice
+            return true
+            #else
             let microphoneStatus = AVCaptureDevice.authorizationStatus(for: .audio)
             switch microphoneStatus {
                 case .notDetermined:
-                    return await withCheckedContinuation { continuation in
-                        AVCaptureDevice.requestAccess(for: .audio) { granted in
-                            continuation.resume(returning: granted)
-                        }
+                return await withCheckedContinuation { continuation in
+                    AVCaptureDevice.requestAccess(for: .audio) { granted in
+                        continuation.resume(returning: granted)
                     }
+                }
                 case .restricted, .denied:
-                    Logging.error("Microphone access denied")
-                    return false
+                Logging.error("Microphone access denied")
+                return false
                 case .authorized:
-                    return true
+                return true
                 @unknown default:
-                    Logging.error("Unknown authorization status")
-                    return false
+                Logging.error("Unknown authorization status")
+                return false
             }
+            #endif
         }
     }
 
