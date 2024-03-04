@@ -412,7 +412,7 @@ public class WhisperKit: Transcriber {
         let prefillTime = CFAbsoluteTimeGetCurrent() - prefillStartTime
         timings.prefill = prefillTime
 
-        // Add intial prompt to history
+        // Add initial prompt to history
         let currentTokens = decoderInputs.initialPrompt
 
         // Setup masks based on prefill values
