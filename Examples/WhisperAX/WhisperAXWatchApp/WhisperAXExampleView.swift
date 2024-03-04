@@ -409,7 +409,7 @@ struct WhisperAXWatchView: View {
                 try await whisperKit.loadModels()
 
                 await MainActor.run {
-                    availableLanguages = whisperKit.tokenizer?.languages.map { $0.key }.sorted() ?? ["english"]
+                    availableLanguages = whisperKit.tokenizer?.langauges.map { $0.key }.sorted() ?? ["english"]
                     loadingProgressValue = 1.0
                     modelState = whisperKit.modelState
                 }
@@ -491,7 +491,7 @@ struct WhisperAXWatchView: View {
     func transcribeAudioSamples(_ samples: [Float]) async throws -> TranscriptionResult? {
         guard let whisperKit = whisperKit else { return nil }
 
-        let languageCode = whisperKit.tokenizer?.languages[selectedLanguage] ?? "en"
+        let languageCode = whisperKit.tokenizer?.langauges[selectedLanguage] ?? "en"
         let task: DecodingTask = selectedTask == "transcribe" ? .transcribe : .translate
         let seekClip = [lastConfirmedSegmentEndSeconds]
 
