@@ -919,7 +919,7 @@ public extension Tokenizer {
         return false
     }
 
-    var langauges: [String: String] { [
+    var languages: [String: String] { [
         "english": "en",
         "chinese": "zh",
         "german": "de",
