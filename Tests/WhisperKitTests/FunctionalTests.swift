@@ -5,7 +5,7 @@ import CoreML
 @testable import WhisperKit
 import XCTest
 
-@available(macOS 13, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 final class FunctionalTests: XCTestCase {
     func testInitLarge() async {
         let modelPath = largev3ModelPath()

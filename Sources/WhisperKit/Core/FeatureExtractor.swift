@@ -12,7 +12,7 @@ public protocol FeatureExtracting {
     func logMelSpectrogram(fromAudio inputAudio: MLMultiArray) async throws -> MLMultiArray?
 }
 
-@available(macOS 13, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class FeatureExtractor: FeatureExtracting, WhisperMLModel {
     public var model: MLModel?
 
