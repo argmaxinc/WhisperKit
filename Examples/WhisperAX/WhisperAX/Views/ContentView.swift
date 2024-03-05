@@ -12,6 +12,9 @@ import AVFoundation
 
 struct ContentView: View {
     @State var whisperKit: WhisperKit? = nil
+    #if os(macOS)
+    @State var audioDevices: [AudioDevice]? = nil
+    #endif
     @State var isRecording: Bool = false
     @State var isTranscribing: Bool = false
     @State var currentText: String = ""
@@ -24,7 +27,8 @@ struct ContentView: View {
     @State private var availableModels: [String] = []
     @State private var availableLanguages: [String] = []
     @State private var disabledModels: [String] = WhisperKit.recommendedModels().disabled
-
+    
+    @AppStorage("selectedAudioInput") private var selectedAudioInput: String = "No Audio Input"
     @AppStorage("selectedModel") private var selectedModel: String = WhisperKit.recommendedModels().default
     @AppStorage("selectedTab") private var selectedTab: String = "Transcribe"
     @AppStorage("selectedTask") private var selectedTask: String = "transcribe"
@@ -129,7 +133,12 @@ struct ContentView: View {
                 controlsView
             }
             .toolbar(content: {
-                ToolbarItem {
+                ToolbarItemGroup {
+                    #if os(macOS)
+                    audioDevicesView
+                        .frame(minWidth: 100, maxWidth: .infinity)
+                    #endif
+                    
                     Button {
                         let fullTranscript = formatSegments(confirmedSegments + unconfirmedSegments, withTimestamps: enableTimestamps).joined(separator: "\n")
                         #if os(iOS)
@@ -302,6 +311,29 @@ struct ContentView: View {
     }
 
     // MARK: - Controls
+    #if os(macOS)
+    var audioDevicesView: some View {
+        VStack {
+            if let audioDevices = audioDevices, audioDevices.count > 0 {
+                Picker("", selection: $selectedAudioInput) {
+                    ForEach(audioDevices, id: \.self) { device in
+                        Text(device.name).tag(device.name)
+                    }
+                }
+                .disabled(isRecording)
+            }
+        }
+        .onAppear {
+            audioDevices = AudioProcessor.getAudioDevices()
+            if let audioDevices = audioDevices, 
+                !audioDevices.isEmpty,
+                selectedAudioInput == "No Audio Input",
+                let device = audioDevices.first {
+                selectedAudioInput = device.name
+            }
+        }
+    }
+    #endif
 
     var controlsView: some View {
         VStack {
@@ -854,12 +886,27 @@ struct ContentView: View {
                     print("Microphone access was not granted.")
                     return
                 }
+                
+                #if os(macOS)
+                var deviceId: AudioDeviceID?
+                if self.selectedAudioInput != "No Audio Input",
+                   let devices = self.audioDevices,
+                   let device = devices.first(where: {$0.name == selectedAudioInput}) {
+                    deviceId = device.id
+                }
 
-                try? audioProcessor.startRecordingLive { _ in
+                try? audioProcessor.startRecordingLive(inputDeviceID: deviceId) { _ in
                     DispatchQueue.main.async {
                         bufferEnergy = whisperKit?.audioProcessor.relativeEnergy ?? []
                     }
                 }
+                #else
+                try? audioProcessor.startRecordingLive() { _ in
+                    DispatchQueue.main.async {
+                        bufferEnergy = whisperKit?.audioProcessor.relativeEnergy ?? []
+                    }
+                }
+                #endif
 
                 // Delay the timer start by 1 second
                 isRecording = true

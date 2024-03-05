@@ -6,6 +6,14 @@ import AVFoundation
 import CoreAudio
 import CoreML
 
+/// Core Audio Device 
+#if os(macOS)
+public struct AudioDevice: Identifiable, Hashable {
+    public let id: AudioDeviceID
+    public let name: String
+}
+#endif
+ 
 public protocol AudioProcessing {
     /// Loads audio data from a specified file path.
     /// - Parameter audioFilePath: The file path of the audio file.
@@ -40,8 +48,12 @@ public protocol AudioProcessing {
     var relativeEnergyWindow: Int { get set }
 
     /// Starts recording audio from the specified input device, resetting the previous state
+    #if os(macOS)
+    func startRecordingLive(inputDeviceID: AudioDeviceID?, callback: (([Float]) -> Void)?) throws
+    #else
     func startRecordingLive(callback: (([Float]) -> Void)?) throws
-
+    #endif
+    
     /// Pause recording
     func pauseRecording()
 
@@ -51,9 +63,15 @@ public protocol AudioProcessing {
 
 /// Overrideable default methods for AudioProcessing
 public extension AudioProcessing {
+    #if os(macOS)
+    func startRecordingLive(inputDeviceID: AudioDeviceID? = nil, callback: (([Float]) -> Void)?) throws {
+        try startRecordingLive(inputDeviceID: inputDeviceID, callback: callback)
+    }
+    #else
     func startRecordingLive(callback: (([Float]) -> Void)?) throws {
         try startRecordingLive(callback: callback)
     }
+    #endif
 
     static func padOrTrimAudio(fromArray audioArray: [Float], startAt startIndex: Int = 0, toLength frameLength: Int = 480_000, saveSegment: Bool = false) -> MLMultiArray? {
         let currentFrameLength = audioArray.count
@@ -304,6 +322,94 @@ public class AudioProcessor: NSObject, AudioProcessing {
     public static func requestRecordPermission() async -> Bool {
         await AVAudioApplication.requestRecordPermission()
     }
+    
+    #if os(macOS)
+    public static func getAudioDevices() -> [AudioDevice] {
+        var devices = [AudioDevice]()
+        
+        var propertySize: UInt32 = 0
+        var status: OSStatus = noErr
+        
+        // Get the number of devices
+        var propertyAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        status = AudioObjectGetPropertyDataSize(
+            AudioObjectID(kAudioObjectSystemObject),
+            &propertyAddress,
+            0,
+            nil,
+            &propertySize
+        )
+        if status != noErr {
+            Logging.error("Error: Unable to get the number of audio devices.")
+            return devices
+        }
+        
+        // Get the device IDs
+        let deviceCount = Int(propertySize) / MemoryLayout<AudioDeviceID>.size
+        var deviceIDs = [AudioDeviceID](repeating: 0, count: deviceCount)
+        status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &propertyAddress,
+            0,
+            nil,
+            &propertySize,
+            &deviceIDs
+        )
+        if status != noErr {
+            Logging.error("Error: Unable to get the audio device IDs.")
+            return devices
+        }
+        
+        // Get device info for each device
+        for deviceID in deviceIDs {
+            var deviceName: String = ""
+            var inputChannels: Int = 0
+            
+            // Get device name
+            var propertySize: UInt32 = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+            var name: Unmanaged<CFString>? = nil
+            propertyAddress.mSelector = kAudioDevicePropertyDeviceNameCFString
+            
+            status = AudioObjectGetPropertyData(
+                deviceID,
+                &propertyAddress,
+                0,
+                nil,
+                &propertySize,
+                &name
+            )
+            if status == noErr, let deviceNameCF = name?.takeUnretainedValue() as String? {
+                deviceName = deviceNameCF
+            }
+            
+            // Get input channels
+            propertyAddress.mSelector = kAudioDevicePropertyStreamConfiguration
+            propertyAddress.mScope = kAudioDevicePropertyScopeInput
+            status = AudioObjectGetPropertyDataSize(deviceID, &propertyAddress, 0, nil, &propertySize)
+            if status == noErr {
+                let bufferListPointer = UnsafeMutablePointer<AudioBufferList>.allocate(capacity: 1)
+                defer { bufferListPointer.deallocate() }
+                status = AudioObjectGetPropertyData(deviceID, &propertyAddress, 0, nil, &propertySize, bufferListPointer)
+                if status == noErr {
+                    let bufferList = UnsafeMutableAudioBufferListPointer(bufferListPointer)
+                    for buffer in bufferList {
+                        inputChannels += Int(buffer.mNumberChannels)
+                    }
+                }
+            }
+            
+            if inputChannels > 0 {
+                devices.append(AudioDevice(id: deviceID, name: deviceName))
+            }
+        }
+        
+        return devices
+    }
+    #endif
 
     deinit {
         stopRecording()
@@ -336,7 +442,81 @@ public extension AudioProcessor {
             Logging.debug("Current audio size: \(self.audioSamples.count) samples, most recent buffer: \(buffer.count) samples, most recent energy: \(newEnergy)")
         }
     }
+    
+    #if os(macOS)
+    func assignAudioInput(inputNode: AVAudioInputNode, inputDeviceID: AudioDeviceID) {
+        guard let audioUnit = inputNode.audioUnit else {
+            Logging.error("Failed to access the audio unit of the input node.")
+            return
+        }
+        
+        var inputDeviceID = inputDeviceID
 
+        let error = AudioUnitSetProperty(
+            audioUnit,
+            kAudioOutputUnitProperty_CurrentDevice,
+            kAudioUnitScope_Global,
+            0,
+            &inputDeviceID,
+            UInt32(MemoryLayout<AudioDeviceID>.size)
+        )
+        
+        if error != noErr {
+            Logging.error("Error setting Audio Unit property: \(error)")
+        } else {
+            Logging.info("Successfully set input device.")
+        }
+    }
+    #endif
+    
+    #if os(macOS)
+    func setupEngine(inputDeviceID: AudioDeviceID? = nil) throws -> AVAudioEngine {
+        let audioEngine = AVAudioEngine()
+        let inputNode = audioEngine.inputNode
+        
+        if let inputDeviceID = inputDeviceID {
+            assignAudioInput(inputNode: inputNode, inputDeviceID: inputDeviceID)
+        }
+        
+        let inputFormat = inputNode.outputFormat(forBus: 0)
+
+        // Desired format (16,000 Hz, 1 channel)
+        guard let desiredFormat = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: Double(WhisperKit.sampleRate),
+            channels: AVAudioChannelCount(1),
+            interleaved: false
+        ) else {
+            throw WhisperError.audioProcessingFailed("Failed to create desired format")
+        }
+
+        guard let converter = AVAudioConverter(from: inputFormat, to: desiredFormat) else {
+            throw WhisperError.audioProcessingFailed("Failed to create audio converter")
+        }
+
+        let bufferSize = AVAudioFrameCount(minBufferLength) // 100ms - 400ms supported
+        inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: inputFormat) { [weak self] (buffer: AVAudioPCMBuffer, _: AVAudioTime) in
+            guard let self = self else { return }
+            var buffer = buffer
+            if !buffer.format.sampleRate.isEqual(to: Double(WhisperKit.sampleRate)) {
+                do {
+                    buffer = try Self.resampleBuffer(buffer, with: converter)
+                } catch {
+                    Logging.error("Failed to resample buffer: \(error)")
+                    return
+                }
+            }
+
+            let newBufferArray = Self.convertBufferToArray(buffer: buffer)
+            self.processBuffer(newBufferArray)
+        }
+
+        audioEngine.prepare()
+        try audioEngine.start()
+
+        return audioEngine
+    }
+    #else
     func setupEngine() throws -> AVAudioEngine {
         let audioEngine = AVAudioEngine()
         let inputNode = audioEngine.inputNode
@@ -378,24 +558,35 @@ public extension AudioProcessor {
 
         return audioEngine
     }
+    #endif
 
     func purgeAudioSamples(keepingLast keep: Int) {
         if audioSamples.count > keep {
             audioSamples.removeFirst(audioSamples.count - keep)
         }
     }
-
-    func startRecordingLive(callback: (([Float]) -> Void)? = nil) throws {
+    
+    #if os(macOS)
+    func startRecordingLive(inputDeviceID: AudioDeviceID? = nil, callback: (([Float]) -> Void)? = nil) throws {
         audioSamples = []
         audioEnergy = []
 
-        // TODO: implement selecting input device
+        audioEngine = try setupEngine(inputDeviceID: inputDeviceID)
+
+        // Set the callback
+        audioBufferCallback = callback
+    }
+    #else
+    func startRecordingLive(callback: (([Float]) -> Void)? = nil) throws {
+        audioSamples = []
+        audioEnergy = []
 
         audioEngine = try setupEngine()
 
         // Set the callback
         audioBufferCallback = callback
     }
+    #endif
 
     func pauseRecording() {
         audioEngine?.pause()
