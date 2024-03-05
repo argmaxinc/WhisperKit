@@ -13,7 +13,7 @@ jobs:
       matrix:
         os: [macos-13-large, macos-14]
         include:
-          - os: macos-13
+          - os: macos-13-large
             ios-version: "16.1"
             watchos-version: "9.1"
           - os: macos-14
