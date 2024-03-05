@@ -11,7 +11,7 @@ jobs:
   build-and-test:
     strategy:
       matrix:
-        os: [macos-13, macos-14]
+        os: [macos-13-large, macos-14]
         include:
           - os: macos-13
             ios-version: "16.1"
