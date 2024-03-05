@@ -12,6 +12,13 @@ jobs:
     strategy:
       matrix:
         os: [macos-13, macos-14]
+        include:
+          - os: macos-13
+            ios-version: "16.1"
+            watchos-version: "9.1"
+          - os: macos-14
+            ios-version: "17.2"
+            watchos-version: "10.2"
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
@@ -43,13 +50,14 @@ jobs:
       run: |
         set -o pipefail
         xcodebuild clean build-for-testing -scheme whisperkit-Package -destination generic/platform=iOS | xcpretty
-        xcodebuild test -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -destination "platform=iOS Simulator,OS=17.2,name=iPhone 15" | xcpretty
+        xcodebuild test -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -destination "platform=iOS Simulator,OS=${{ matrix.ios-version }},name=iPhone 15" | xcpretty
     - name: Build and Test - watchOS
       run: |
         set -o pipefail
         xcodebuild clean build-for-testing -scheme whisperkit-Package -destination generic/platform=watchOS | xcpretty
-        xcodebuild test -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -destination "platform=watchOS Simulator,OS=10.2,name=Apple Watch Ultra 2 (49mm)" | xcpretty
+        xcodebuild test -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -destination "platform=watchOS Simulator,OS=${{ matrix.watchos-version }},name=Apple Watch Ultra (49mm)" | xcpretty
     - name: Build and Test - visionOS
+      if: matrix.os == 'macos-14'
       run: |
         set -o pipefail
         xcodebuild clean build-for-testing -scheme whisperkit-Package -destination generic/platform=visionOS | xcpretty
