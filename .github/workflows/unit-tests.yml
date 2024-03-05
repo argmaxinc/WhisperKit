@@ -11,9 +11,9 @@ jobs:
   build-and-test:
     strategy:
       matrix:
-        os: [macos-13-large, macos-14]
+        os: [macos-13-xlarge, macos-14]
         include:
-          - os: macos-13-large
+          - os: macos-13-xlarge
             ios-version: "16.1"
             watchos-version: "9.1"
           - os: macos-14
