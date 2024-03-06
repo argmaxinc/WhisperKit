@@ -14,9 +14,9 @@ jobs:
         os: [macos-13-xlarge, macos-14]
         include:
           - os: macos-13-xlarge
-            ios-version: "16.1"
+            ios-version: "16.1" # oldest available version
           - os: macos-14
-            ios-version: "17.2"
+            ios-version: "17.2" # latest available version
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
