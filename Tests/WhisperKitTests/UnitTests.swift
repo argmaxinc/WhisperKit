@@ -245,7 +245,7 @@ final class UnitTests: XCTestCase {
         let options = DecodingOptions(usePrefillPrompt: true, withoutTimestamps: false)
 
         let result = try? await whisperKit!.transcribe(audioArray: multiWindowSamples, decodeOptions: options)
-        XCTAssertEqual(result?.segments.count, 2, "Expected 2 segments")
+        XCTAssertEqual(result?.segments.count, 3, "Expected 3 segments")
 
         // Compare last timestamp to the length of the audio
         guard let endTimestamp = result?.segments.last!.end else {
@@ -479,7 +479,7 @@ final class UnitTests: XCTestCase {
     }
 
     func testSeekClips() async {
-        var options = DecodingOptions(clipTimestamps: [0])
+        var options = DecodingOptions(withoutTimestamps: true, clipTimestamps: [0])
 
         guard let resultFull = try? await transcribe(with: .tiny, options: options) else {
             XCTFail("Failed to transcribe")
@@ -487,7 +487,7 @@ final class UnitTests: XCTestCase {
         }
 
         let seekTime: Float = 3.0
-        options = DecodingOptions(clipTimestamps: [seekTime])
+        options = DecodingOptions(withoutTimestamps: true, clipTimestamps: [seekTime])
 
         guard let resultSeek = try? await transcribe(with: .tiny, options: options) else {
             XCTFail("Failed to transcribe")

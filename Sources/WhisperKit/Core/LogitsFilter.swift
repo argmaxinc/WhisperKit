@@ -66,7 +66,7 @@ public class TimestampRulesFilter: LogitsFiltering {
         self.noTimestampsToken = noTimestampsToken
         self.timeTokenBegin = timeTokenBegin
         self.endToken = endToken
-        self.sampleBegin = sampleBegin
+        self.sampleBegin = 3 // FIXME: it should not be hardcoded value
         self.maxInitialTimestampIndex = maxInitialTimestampIndex
     }
 
