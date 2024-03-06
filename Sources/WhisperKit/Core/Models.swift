@@ -129,7 +129,7 @@ public struct ModelComputeOptions {
     public var prefillCompute: MLComputeUnits
 
     public init(
-        melCompute: MLComputeUnits = .cpuAndGPU,
+        melCompute: MLComputeUnits = .cpuOnly,
         audioEncoderCompute: MLComputeUnits = .cpuAndNeuralEngine,
         textDecoderCompute: MLComputeUnits = .cpuAndNeuralEngine,
         prefillCompute: MLComputeUnits = .cpuOnly
