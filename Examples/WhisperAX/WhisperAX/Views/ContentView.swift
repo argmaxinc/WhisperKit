@@ -133,12 +133,7 @@ struct ContentView: View {
                 controlsView
             }
             .toolbar(content: {
-                ToolbarItemGroup {
-                    #if os(macOS)
-                    audioDevicesView
-                        .frame(minWidth: 100, maxWidth: .infinity)
-                    #endif
-                    
+                ToolbarItem {
                     Button {
                         let fullTranscript = formatSegments(confirmedSegments + unconfirmedSegments, withTimestamps: enableTimestamps).joined(separator: "\n")
                         #if os(iOS)
@@ -311,30 +306,6 @@ struct ContentView: View {
     }
 
     // MARK: - Controls
-    #if os(macOS)
-    var audioDevicesView: some View {
-        VStack {
-            if let audioDevices = audioDevices, audioDevices.count > 0 {
-                Picker("", selection: $selectedAudioInput) {
-                    ForEach(audioDevices, id: \.self) { device in
-                        Text(device.name).tag(device.name)
-                    }
-                }
-                .disabled(isRecording)
-            }
-        }
-        .onAppear {
-            audioDevices = AudioProcessor.getAudioDevices()
-            if let audioDevices = audioDevices, 
-                !audioDevices.isEmpty,
-                selectedAudioInput == "No Audio Input",
-                let device = audioDevices.first {
-                selectedAudioInput = device.name
-            }
-        }
-    }
-    #endif
-
     var controlsView: some View {
         VStack {
             basicSettingsView
@@ -449,14 +420,39 @@ struct ContentView: View {
                             .buttonStyle(BorderlessButtonStyle())
                             .disabled(modelState != .loaded)
                             .frame(minWidth: 0, maxWidth: .infinity)
-
-                            Button {
-                                showAdvancedOptions.toggle()
-                            } label: {
-                                Label("Settings", systemImage: "slider.horizontal.3")
+                            
+                            VStack {
+                                Button {
+                                    showAdvancedOptions.toggle()
+                                } label: {
+                                    Label("Settings", systemImage: "slider.horizontal.3")
+                                }
+                                .frame(minWidth: 0, maxWidth: .infinity)
+                                .buttonStyle(.borderless)
+                                
+                                #if os(macOS)
+                                HStack {
+                                    if let audioDevices = audioDevices, audioDevices.count > 0 {
+                                        Picker("", selection: $selectedAudioInput) {
+                                            ForEach(audioDevices, id: \.self) { device in
+                                                Text(device.name).tag(device.name)
+                                            }
+                                        }
+                                        .frame(minWidth: 80)
+                                        .disabled(isRecording)
+                                    }
+                                }
+                                .onAppear {
+                                    audioDevices = AudioProcessor.getAudioDevices()
+                                    if let audioDevices = audioDevices,
+                                       !audioDevices.isEmpty,
+                                       selectedAudioInput == "No Audio Input",
+                                       let device = audioDevices.first {
+                                        selectedAudioInput = device.name
+                                    }
+                                }
+                                #endif
                             }
-                            .frame(minWidth: 0, maxWidth: .infinity)
-                            .buttonStyle(.borderless)
                         }
                     default:
                         EmptyView()
@@ -887,26 +883,20 @@ struct ContentView: View {
                     return
                 }
                 
+                var deviceId: DeviceID?
                 #if os(macOS)
-                var deviceId: AudioDeviceID?
                 if self.selectedAudioInput != "No Audio Input",
                    let devices = self.audioDevices,
                    let device = devices.first(where: {$0.name == selectedAudioInput}) {
                     deviceId = device.id
                 }
+                #endif
 
                 try? audioProcessor.startRecordingLive(inputDeviceID: deviceId) { _ in
                     DispatchQueue.main.async {
                         bufferEnergy = whisperKit?.audioProcessor.relativeEnergy ?? []
                     }
                 }
-                #else
-                try? audioProcessor.startRecordingLive() { _ in
-                    DispatchQueue.main.async {
-                        bufferEnergy = whisperKit?.audioProcessor.relativeEnergy ?? []
-                    }
-                }
-                #endif
 
                 // Delay the timer start by 1 second
                 isRecording = true

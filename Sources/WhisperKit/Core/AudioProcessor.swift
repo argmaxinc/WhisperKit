@@ -8,11 +8,15 @@ import CoreML
 
 /// Core Audio Device 
 #if os(macOS)
+public typealias DeviceID = AudioDeviceID
+#else
+public typealias DeviceID = String 
+#endif
+
 public struct AudioDevice: Identifiable, Hashable {
-    public let id: AudioDeviceID
+    public let id: DeviceID
     public let name: String
 }
-#endif
  
 public protocol AudioProcessing {
     /// Loads audio data from a specified file path.
@@ -48,11 +52,7 @@ public protocol AudioProcessing {
     var relativeEnergyWindow: Int { get set }
 
     /// Starts recording audio from the specified input device, resetting the previous state
-    #if os(macOS)
-    func startRecordingLive(inputDeviceID: AudioDeviceID?, callback: (([Float]) -> Void)?) throws
-    #else
-    func startRecordingLive(callback: (([Float]) -> Void)?) throws
-    #endif
+    func startRecordingLive(inputDeviceID: DeviceID?, callback: (([Float]) -> Void)?) throws
     
     /// Pause recording
     func pauseRecording()
@@ -63,15 +63,9 @@ public protocol AudioProcessing {
 
 /// Overrideable default methods for AudioProcessing
 public extension AudioProcessing {
-    #if os(macOS)
-    func startRecordingLive(inputDeviceID: AudioDeviceID? = nil, callback: (([Float]) -> Void)?) throws {
+    func startRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)?) throws {
         try startRecordingLive(inputDeviceID: inputDeviceID, callback: callback)
     }
-    #else
-    func startRecordingLive(callback: (([Float]) -> Void)?) throws {
-        try startRecordingLive(callback: callback)
-    }
-    #endif
 
     static func padOrTrimAudio(fromArray audioArray: [Float], startAt startIndex: Int = 0, toLength frameLength: Int = 480_000, saveSegment: Bool = false) -> MLMultiArray? {
         let currentFrameLength = audioArray.count
@@ -469,14 +463,15 @@ public extension AudioProcessor {
     }
     #endif
     
-    #if os(macOS)
-    func setupEngine(inputDeviceID: AudioDeviceID? = nil) throws -> AVAudioEngine {
+    func setupEngine(inputDeviceID: DeviceID? = nil) throws -> AVAudioEngine {
         let audioEngine = AVAudioEngine()
         let inputNode = audioEngine.inputNode
         
+        #if os(macOS)
         if let inputDeviceID = inputDeviceID {
             assignAudioInput(inputNode: inputNode, inputDeviceID: inputDeviceID)
         }
+        #endif
         
         let inputFormat = inputNode.outputFormat(forBus: 0)
 
@@ -516,49 +511,6 @@ public extension AudioProcessor {
 
         return audioEngine
     }
-    #else
-    func setupEngine() throws -> AVAudioEngine {
-        let audioEngine = AVAudioEngine()
-        let inputNode = audioEngine.inputNode
-        let inputFormat = inputNode.outputFormat(forBus: 0)
-
-        // Desired format (16,000 Hz, 1 channel)
-        guard let desiredFormat = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: Double(WhisperKit.sampleRate),
-            channels: AVAudioChannelCount(1),
-            interleaved: false
-        ) else {
-            throw WhisperError.audioProcessingFailed("Failed to create desired format")
-        }
-
-        guard let converter = AVAudioConverter(from: inputFormat, to: desiredFormat) else {
-            throw WhisperError.audioProcessingFailed("Failed to create audio converter")
-        }
-
-        let bufferSize = AVAudioFrameCount(minBufferLength) // 100ms - 400ms supported
-        inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: inputFormat) { [weak self] (buffer: AVAudioPCMBuffer, _: AVAudioTime) in
-            guard let self = self else { return }
-            var buffer = buffer
-            if !buffer.format.sampleRate.isEqual(to: Double(WhisperKit.sampleRate)) {
-                do {
-                    buffer = try Self.resampleBuffer(buffer, with: converter)
-                } catch {
-                    Logging.error("Failed to resample buffer: \(error)")
-                    return
-                }
-            }
-
-            let newBufferArray = Self.convertBufferToArray(buffer: buffer)
-            self.processBuffer(newBufferArray)
-        }
-
-        audioEngine.prepare()
-        try audioEngine.start()
-
-        return audioEngine
-    }
-    #endif
 
     func purgeAudioSamples(keepingLast keep: Int) {
         if audioSamples.count > keep {
@@ -566,8 +518,7 @@ public extension AudioProcessor {
         }
     }
     
-    #if os(macOS)
-    func startRecordingLive(inputDeviceID: AudioDeviceID? = nil, callback: (([Float]) -> Void)? = nil) throws {
+    func startRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)? = nil) throws {
         audioSamples = []
         audioEnergy = []
 
@@ -576,17 +527,6 @@ public extension AudioProcessor {
         // Set the callback
         audioBufferCallback = callback
     }
-    #else
-    func startRecordingLive(callback: (([Float]) -> Void)? = nil) throws {
-        audioSamples = []
-        audioEnergy = []
-
-        audioEngine = try setupEngine()
-
-        // Set the callback
-        audioBufferCallback = callback
-    }
-    #endif
 
     func pauseRecording() {
         audioEngine?.pause()
