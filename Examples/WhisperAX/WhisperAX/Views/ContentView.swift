@@ -12,6 +12,9 @@ import AVFoundation
 
 struct ContentView: View {
     @State var whisperKit: WhisperKit? = nil
+    #if os(macOS)
+    @State var audioDevices: [AudioDevice]? = nil
+    #endif
     @State var isRecording: Bool = false
     @State var isTranscribing: Bool = false
     @State var currentText: String = ""
@@ -24,7 +27,8 @@ struct ContentView: View {
     @State private var availableModels: [String] = []
     @State private var availableLanguages: [String] = []
     @State private var disabledModels: [String] = WhisperKit.recommendedModels().disabled
-
+    
+    @AppStorage("selectedAudioInput") private var selectedAudioInput: String = "No Audio Input"
     @AppStorage("selectedModel") private var selectedModel: String = WhisperKit.recommendedModels().default
     @AppStorage("selectedTab") private var selectedTab: String = "Transcribe"
     @AppStorage("selectedTask") private var selectedTask: String = "transcribe"
@@ -302,7 +306,6 @@ struct ContentView: View {
     }
 
     // MARK: - Controls
-
     var controlsView: some View {
         VStack {
             basicSettingsView
@@ -417,14 +420,39 @@ struct ContentView: View {
                             .buttonStyle(BorderlessButtonStyle())
                             .disabled(modelState != .loaded)
                             .frame(minWidth: 0, maxWidth: .infinity)
-
-                            Button {
-                                showAdvancedOptions.toggle()
-                            } label: {
-                                Label("Settings", systemImage: "slider.horizontal.3")
+                            
+                            VStack {
+                                Button {
+                                    showAdvancedOptions.toggle()
+                                } label: {
+                                    Label("Settings", systemImage: "slider.horizontal.3")
+                                }
+                                .frame(minWidth: 0, maxWidth: .infinity)
+                                .buttonStyle(.borderless)
+                                
+                                #if os(macOS)
+                                HStack {
+                                    if let audioDevices = audioDevices, audioDevices.count > 0 {
+                                        Picker("", selection: $selectedAudioInput) {
+                                            ForEach(audioDevices, id: \.self) { device in
+                                                Text(device.name).tag(device.name)
+                                            }
+                                        }
+                                        .frame(minWidth: 80)
+                                        .disabled(isRecording)
+                                    }
+                                }
+                                .onAppear {
+                                    audioDevices = AudioProcessor.getAudioDevices()
+                                    if let audioDevices = audioDevices,
+                                       !audioDevices.isEmpty,
+                                       selectedAudioInput == "No Audio Input",
+                                       let device = audioDevices.first {
+                                        selectedAudioInput = device.name
+                                    }
+                                }
+                                #endif
                             }
-                            .frame(minWidth: 0, maxWidth: .infinity)
-                            .buttonStyle(.borderless)
                         }
                     default:
                         EmptyView()
@@ -854,8 +882,17 @@ struct ContentView: View {
                     print("Microphone access was not granted.")
                     return
                 }
+                
+                var deviceId: DeviceID?
+                #if os(macOS)
+                if self.selectedAudioInput != "No Audio Input",
+                   let devices = self.audioDevices,
+                   let device = devices.first(where: {$0.name == selectedAudioInput}) {
+                    deviceId = device.id
+                }
+                #endif
 
-                try? audioProcessor.startRecordingLive { _ in
+                try? audioProcessor.startRecordingLive(inputDeviceID: deviceId) { _ in
                     DispatchQueue.main.async {
                         bufferEnergy = whisperKit?.audioProcessor.relativeEnergy ?? []
                     }
