@@ -131,7 +131,7 @@ public extension AudioProcessing {
     }
 }
 
-@available(macOS 13, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class AudioProcessor: NSObject, AudioProcessing {
     public var audioEngine: AVAudioEngine?
     public var audioSamples: ContiguousArray<Float> = []
@@ -302,7 +302,7 @@ public class AudioProcessor: NSObject, AudioProcessing {
     }
 
     public static func requestRecordPermission() async -> Bool {
-        if #available(macOS 14.0, *) {
+        if #available(macOS 14, iOS 17, watchOS 10, visionOS 1, *) {
             return await AVAudioApplication.requestRecordPermission()
         } else {
             #if os(watchOS)
@@ -337,7 +337,7 @@ public class AudioProcessor: NSObject, AudioProcessing {
 
 // MARK: - Streaming
 
-@available(macOS 13, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public extension AudioProcessor {
     /// We have a new buffer, process and store it.
     /// NOTE: Assumes audio is 16khz mono

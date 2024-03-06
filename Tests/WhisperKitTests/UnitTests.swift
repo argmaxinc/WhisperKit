@@ -7,7 +7,7 @@ import Tokenizers
 @testable import WhisperKit
 import XCTest
 
-@available(macOS 13, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 final class UnitTests: XCTestCase {
     func testInit() async {
         let whisperKit = try? await WhisperKit(prewarm: false, load: false, download: false)
@@ -858,7 +858,7 @@ extension MLMultiArray {
     }
 }
 
-@available(macOS 13, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 extension XCTestCase {
     func transcribe(with variant: ModelVariant, options: DecodingOptions, audioFile: String = "jfk.wav", file: StaticString = #file, line: UInt = #line) async throws -> TranscriptionResult? {
         var modelPath = tinyModelPath()
