@@ -129,10 +129,17 @@ public struct ModelComputeOptions {
     public var prefillCompute: MLComputeUnits
 
     public init(
+        #if targetEnvironment(simulator)
         melCompute: MLComputeUnits = .cpuOnly,
+        audioEncoderCompute: MLComputeUnits = .cpuOnly,
+        textDecoderCompute: MLComputeUnits = .cpuOnly,
+        prefillCompute: MLComputeUnits = .cpuOnly
+        #else
+        melCompute: MLComputeUnits = .cpuAndGpu,
         audioEncoderCompute: MLComputeUnits = .cpuAndNeuralEngine,
         textDecoderCompute: MLComputeUnits = .cpuAndNeuralEngine,
         prefillCompute: MLComputeUnits = .cpuOnly
+        #endif    
     ) {
         self.melCompute = melCompute
         self.audioEncoderCompute = audioEncoderCompute
