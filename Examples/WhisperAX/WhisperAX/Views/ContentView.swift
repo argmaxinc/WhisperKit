@@ -246,6 +246,16 @@ struct ContentView: View {
                             .progressViewStyle(CircularProgressViewStyle())
                             .scaleEffect(0.5)
                     }
+                    
+                    Button(action: {
+                        deleteModel()
+                    }, label: {
+                        Image(systemName: "trash")
+                    })
+                    .help("Delete model")
+                    .buttonStyle(BorderlessButtonStyle())
+                    .disabled(localModels.count == 0)
+                    .disabled(!localModels.contains(selectedModel))
 
                     #if os(macOS)
                     Button(action: {
@@ -293,6 +303,21 @@ struct ContentView: View {
                             Text(String(format: "%.1f%%", loadingProgressValue * 100))
                                 .font(.caption)
                                 .foregroundColor(.gray)
+                            
+                            if modelState == .downloading {
+                                Spacer()
+                                
+                                Button(action: {
+                                    resetState()
+                                    loadingProgressValue = 0.0
+                                    loadModel(selectedModel, redownload: true)
+                                    modelState = .loading
+                                }, label: {
+                                    Image(systemName: "arrow.uturn.forward.circle")
+                                })
+                                .help("Restart download")
+                                .buttonStyle(BorderlessButtonStyle())
+                            }
                         }
                         if modelState == .prewarming {
                             Text("Specializing \(selectedModel) for your device...\nThis can take several minutes on first load")
@@ -787,10 +812,32 @@ struct ContentView: View {
                 try await whisperKit.loadModels()
 
                 await MainActor.run {
+                    if !localModels.contains(model) {
+                        localModels.append(model)
+                    }
+                    
                     availableLanguages = whisperKit.tokenizer?.langauges.map { $0.key }.sorted() ?? ["english"]
                     loadingProgressValue = 1.0
                     modelState = whisperKit.modelState
                 }
+            }
+        }
+    }
+    
+    func deleteModel() {
+        if localModels.contains(selectedModel) {
+            let modelFolder = URL(fileURLWithPath: localModelPath).appendingPathComponent("openai_whisper-\(selectedModel)")
+            
+            do {
+                try FileManager.default.removeItem(at: modelFolder)
+                
+                if let index = localModels.firstIndex(of: selectedModel) {
+                    localModels.remove(at: index)
+                }
+                
+                modelState = .unloaded
+            } catch {
+                print("Error deleting model: \(error)")
             }
         }
     }
