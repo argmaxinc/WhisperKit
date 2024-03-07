@@ -39,6 +39,21 @@ extension MLMultiArray {
     }
 }
 
+extension MLModel {
+    func asyncPrediction(
+        from input: MLFeatureProvider,
+        options: MLPredictionOptions
+    ) async throws -> MLFeatureProvider {
+        if #available(macOS 14, iOS 17, watchOS 10, visionOS 1, *) {
+            return try await prediction(from: input, options: options)
+        } else {
+            return try await Task {
+                try prediction(from: input, options: options)
+            }.value
+        }
+    }
+}
+
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 func initMLMultiArray(shape: [NSNumber], dataType: MLMultiArrayDataType, initialValue: Any) -> MLMultiArray {
     let multiArray = try! MLMultiArray(shape: shape, dataType: dataType)

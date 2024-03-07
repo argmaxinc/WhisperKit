@@ -46,7 +46,7 @@ public class AudioEncoder: AudioEncoding, WhisperMLModel {
 
         try Task.checkCancellation()
 
-        let outputFeatures = try await model.prediction(from: modelInputs, options: MLPredictionOptions())
+        let outputFeatures = try await model.asyncPrediction(from: modelInputs, options: MLPredictionOptions())
 
         let output = AudioEncoderOutput(features: outputFeatures)
 
