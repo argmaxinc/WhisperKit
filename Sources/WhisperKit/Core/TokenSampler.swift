@@ -44,7 +44,7 @@ public class GreedyTokenSampler: TokenSampling {
 
             let logitsDescriptor = BNNSNDArrayDescriptor(
                 data: logitsRawPointer,
-                scalarType: FloatType.self, // FIXME: Float16 here breaks in swift 6
+                scalarType: FloatType.self,
                 shape: .vector(logits.count, stride: 1)
             )!
 
