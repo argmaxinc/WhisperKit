@@ -831,6 +831,7 @@ final class UnitTests: XCTestCase {
 
 // MARK: Helpers
 
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 extension MLMultiArray {
     /// Create `MLMultiArray` of shape [1, 1, arr.count] and fill up the last
     /// dimension with with values from arr.

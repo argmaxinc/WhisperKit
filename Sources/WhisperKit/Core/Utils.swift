@@ -39,6 +39,7 @@ extension MLMultiArray {
     }
 }
 
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 func initMLMultiArray(shape: [NSNumber], dataType: MLMultiArrayDataType, initialValue: Any) -> MLMultiArray {
     let multiArray = try! MLMultiArray(shape: shape, dataType: dataType)
 

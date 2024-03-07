@@ -9,6 +9,7 @@ import Hub
 import TensorUtils
 import Tokenizers
 
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public protocol Transcriber {
     func transcribe(audioPath: String, decodeOptions: DecodingOptions?, callback: TranscriptionCallback) async throws -> TranscriptionResult?
     func transcribe(audioArray: [Float], decodeOptions: DecodingOptions?, callback: TranscriptionCallback) async throws -> TranscriptionResult?

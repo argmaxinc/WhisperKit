@@ -1105,12 +1105,8 @@ struct ContentView: View {
 }
 
 #Preview {
-    if #available(macOS 14.0, *) {
-        ContentView()
-#if os(macOS)
-            .frame(width: 800, height: 500)
-#endif
-    } else {
-        // Fallback on earlier versions
-    }
+    ContentView()
+    #if os(macOS)
+        .frame(width: 800, height: 500)
+    #endif
 }
