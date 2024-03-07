@@ -302,7 +302,7 @@ public class AudioProcessor: NSObject, AudioProcessing {
     }
 
     public static func requestRecordPermission() async -> Bool {
-        if #available(macOS 14, iOS 17, watchOS 10, visionOS 1, *) {
+        if #available(macOS 14, iOS 17, *) {
             return await AVAudioApplication.requestRecordPermission()
         } else {
             #if os(watchOS)

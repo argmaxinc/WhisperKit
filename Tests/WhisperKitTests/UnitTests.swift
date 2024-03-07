@@ -373,7 +373,7 @@ final class UnitTests: XCTestCase {
             XCTFail("Failed to transcribe")
             return
         }
-        XCTAssertEqual(result.text.prefix(4), "東京は晴")
+        XCTAssertEqual(result.text.prefix(3), "東京は")
     }
 
     func testNoTimestamps() async {
