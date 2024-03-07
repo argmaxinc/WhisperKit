@@ -226,7 +226,9 @@ final class UnitTests: XCTestCase {
     }
 
     func testWindowing() async {
-        let computeOptions = ModelComputeOptions()
+        let computeOptions = ModelComputeOptions(
+            melCompute: .cpuOnly
+        )
         let whisperKit = try? await WhisperKit(modelFolder: tinyModelPath(), computeOptions: computeOptions, verbose: true, logLevel: .debug)
 
         guard let audioFilePath = Bundle.module.path(forResource: "jfk", ofType: "wav") else {
