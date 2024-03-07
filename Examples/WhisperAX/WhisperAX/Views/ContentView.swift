@@ -306,6 +306,33 @@ struct ContentView: View {
     }
 
     // MARK: - Controls
+    var audioDevicesView: some View {
+        Group {
+            #if os(macOS)
+            HStack {
+                if let audioDevices = audioDevices, audioDevices.count > 0 {
+                    Picker("", selection: $selectedAudioInput) {
+                        ForEach(audioDevices, id: \.self) { device in
+                            Text(device.name).tag(device.name)
+                        }
+                    }
+                    .frame(minWidth: 80)
+                    .disabled(isRecording)
+                }
+            }
+            .onAppear {
+                audioDevices = AudioProcessor.getAudioDevices()
+                if let audioDevices = audioDevices,
+                   !audioDevices.isEmpty,
+                   selectedAudioInput == "No Audio Input",
+                   let device = audioDevices.first {
+                    selectedAudioInput = device.name
+                }
+            }
+            #endif
+        }
+    }
+    
     var controlsView: some View {
         VStack {
             basicSettingsView
@@ -360,6 +387,8 @@ struct ContentView: View {
                                 .disabled(modelState != .loaded)
                                 .frame(minWidth: 0, maxWidth: .infinity)
                                 .padding()
+                                
+                                audioDevicesView
 
                                 Button(action: {
                                     withAnimation {
@@ -430,28 +459,7 @@ struct ContentView: View {
                                 .frame(minWidth: 0, maxWidth: .infinity)
                                 .buttonStyle(.borderless)
                                 
-                                #if os(macOS)
-                                HStack {
-                                    if let audioDevices = audioDevices, audioDevices.count > 0 {
-                                        Picker("", selection: $selectedAudioInput) {
-                                            ForEach(audioDevices, id: \.self) { device in
-                                                Text(device.name).tag(device.name)
-                                            }
-                                        }
-                                        .frame(minWidth: 80)
-                                        .disabled(isRecording)
-                                    }
-                                }
-                                .onAppear {
-                                    audioDevices = AudioProcessor.getAudioDevices()
-                                    if let audioDevices = audioDevices,
-                                       !audioDevices.isEmpty,
-                                       selectedAudioInput == "No Audio Input",
-                                       let device = audioDevices.first {
-                                        selectedAudioInput = device.name
-                                    }
-                                }
-                                #endif
+                                audioDevicesView
                             }
                         }
                     default:
