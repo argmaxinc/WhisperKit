@@ -341,7 +341,7 @@ struct ContentView: View {
                             Text(device.name).tag(device.name)
                         }
                     }
-                    .frame(minWidth: 80)
+                    .frame(width: 250)
                     .disabled(isRecording)
                 }
             }
@@ -373,7 +373,13 @@ struct ContentView: View {
                                     Label("Reset", systemImage: "arrow.clockwise")
                                 }
                                 .buttonStyle(.borderless)
+
                                 Spacer()
+
+                                audioDevicesView
+
+                                Spacer()
+
                                 Button {
                                     showAdvancedOptions.toggle()
                                 } label: {
@@ -412,8 +418,6 @@ struct ContentView: View {
                                 .disabled(modelState != .loaded)
                                 .frame(minWidth: 0, maxWidth: .infinity)
                                 .padding()
-                                
-                                audioDevicesView
 
                                 Button(action: {
                                     withAnimation {
@@ -449,42 +453,50 @@ struct ContentView: View {
                             }
                         }
                     case "Stream":
-                        HStack {
-                            Button {
-                                resetState()
-                            } label: {
-                                Label("Reset", systemImage: "arrow.clockwise")
-                            }
-                            .frame(minWidth: 0, maxWidth: .infinity)
-                            .buttonStyle(.borderless)
-
-                            Button {
-                                withAnimation {
-                                    toggleRecording(shouldLoop: true)
-                                }
-                            } label: {
-                                Image(systemName: !isRecording ? "record.circle" : "stop.circle.fill")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 70, height: 70)
-                                    .padding()
-                                    .foregroundColor(modelState != .loaded ? .gray : .red)
-                            }
-                            .contentTransition(.symbolEffect(.replace))
-                            .buttonStyle(BorderlessButtonStyle())
-                            .disabled(modelState != .loaded)
-                            .frame(minWidth: 0, maxWidth: .infinity)
-                            
-                            VStack {
+                        VStack {
+                            HStack {
                                 Button {
-                                    showAdvancedOptions.toggle()
+                                    resetState()
                                 } label: {
-                                    Label("Settings", systemImage: "slider.horizontal.3")
+                                    Label("Reset", systemImage: "arrow.clockwise")
                                 }
                                 .frame(minWidth: 0, maxWidth: .infinity)
                                 .buttonStyle(.borderless)
-                                
+
+                                Spacer()
+
                                 audioDevicesView
+
+                                Spacer()
+
+                                VStack {
+                                    Button {
+                                        showAdvancedOptions.toggle()
+                                    } label: {
+                                        Label("Settings", systemImage: "slider.horizontal.3")
+                                    }
+                                    .frame(minWidth: 0, maxWidth: .infinity)
+                                    .buttonStyle(.borderless)
+                                }
+                            }
+
+                            HStack {
+                                Button {
+                                    withAnimation {
+                                        toggleRecording(shouldLoop: true)
+                                    }
+                                } label: {
+                                    Image(systemName: !isRecording ? "record.circle" : "stop.circle.fill")
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 70, height: 70)
+                                        .padding()
+                                        .foregroundColor(modelState != .loaded ? .gray : .red)
+                                }
+                                .contentTransition(.symbolEffect(.replace))
+                                .buttonStyle(BorderlessButtonStyle())
+                                .disabled(modelState != .loaded)
+                                .frame(minWidth: 0, maxWidth: .infinity)
                             }
                         }
                     default:
