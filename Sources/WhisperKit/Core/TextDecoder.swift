@@ -5,7 +5,7 @@ import Accelerate
 import CoreML
 import Tokenizers
 
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public protocol TextDecoding {
     var tokenizer: Tokenizer? { get set }
     var prefillData: WhisperMLModel? { get set }
@@ -43,7 +43,7 @@ public protocol TextDecoding {
     )
 }
 
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public extension TextDecoding {
     func prepareDecoderInputs(withPrompt initialPrompt: [Int]) -> DecodingInputs? {
         let tokenShape = [NSNumber(value: 1), NSNumber(value: initialPrompt.count)]
@@ -234,7 +234,7 @@ public class TextDecoderContextPrefill: WhisperMLModel {
     public var model: MLModel?
 }
 
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class TextDecoder: TextDecoding, WhisperMLModel {
     public var model: MLModel?
     public var tokenizer: Tokenizer?
