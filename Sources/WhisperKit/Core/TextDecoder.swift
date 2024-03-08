@@ -484,7 +484,7 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
 
                 // Call the callback if it is provided
                 if let shouldContinue = callback?(result) {
-                    if !shouldContinue {
+                    if !shouldContinue && !isPrefill {
                         Logging.debug("Early stopping")
                         break
                     }
