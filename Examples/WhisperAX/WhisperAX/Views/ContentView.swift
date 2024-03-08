@@ -303,21 +303,6 @@ struct ContentView: View {
                             Text(String(format: "%.1f%%", loadingProgressValue * 100))
                                 .font(.caption)
                                 .foregroundColor(.gray)
-                            
-                            if modelState == .downloading {
-                                Spacer()
-                                
-                                Button(action: {
-                                    resetState()
-                                    loadingProgressValue = 0.0
-                                    loadModel(selectedModel, redownload: true)
-                                    modelState = .loading
-                                }, label: {
-                                    Image(systemName: "arrow.uturn.forward.circle")
-                                })
-                                .help("Restart download")
-                                .buttonStyle(BorderlessButtonStyle())
-                            }
                         }
                         if modelState == .prewarming {
                             Text("Specializing \(selectedModel) for your device...\nThis can take several minutes on first load")
