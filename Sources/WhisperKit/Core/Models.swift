@@ -126,6 +126,7 @@ public enum ModelState: CustomStringConvertible {
     }
 }
 
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public struct ModelComputeOptions {
     public var melCompute: MLComputeUnits
     public var audioEncoderCompute: MLComputeUnits
