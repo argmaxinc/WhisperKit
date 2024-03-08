@@ -126,6 +126,7 @@ public enum ModelState: CustomStringConvertible {
     }
 }
 
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public struct ModelComputeOptions {
     public var melCompute: MLComputeUnits
     public var audioEncoderCompute: MLComputeUnits
@@ -138,6 +139,13 @@ public struct ModelComputeOptions {
         textDecoderCompute: MLComputeUnits = .cpuAndNeuralEngine,
         prefillCompute: MLComputeUnits = .cpuOnly
     ) {
+        if WhisperKit.isRunningOnSimulator {
+            self.melCompute = .cpuOnly
+            self.audioEncoderCompute = .cpuOnly
+            self.textDecoderCompute = .cpuOnly
+            self.prefillCompute = .cpuOnly
+            return
+        }
         self.melCompute = melCompute
         self.audioEncoderCompute = audioEncoderCompute
         self.textDecoderCompute = textDecoderCompute

@@ -73,7 +73,7 @@ struct WhisperAXWatchView: View {
 
     var body: some View {
         NavigationSplitView {
-            if WhisperKit.deviceName().hasPrefix("Watch7") {
+            if WhisperKit.deviceName().hasPrefix("Watch7") || WhisperKit.isRunningOnSimulator {
                 modelSelectorView
                     .navigationTitle("WhisperAX")
                     .navigationBarTitleDisplayMode(.automatic)
