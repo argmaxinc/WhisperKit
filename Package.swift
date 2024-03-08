@@ -6,10 +6,8 @@ import PackageDescription
 let package = Package(
     name: "whisperkit",
     platforms: [
-        .iOS(.v17),
-        .macOS(.v14),
-        .watchOS(.v10),
-        .visionOS(.v1)
+        .iOS(.v16),
+        .macOS(.v13),
     ],
     products: [
         .library(
@@ -18,7 +16,8 @@ let package = Package(
         ),
         .executable(
             name: "transcribe",
-            targets: ["WhisperKitCLI"])
+            targets: ["WhisperKitCLI"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/huggingface/swift-transformers.git", exact: "0.1.2"),
@@ -35,7 +34,7 @@ let package = Package(
             name: "WhisperKitCLI",
             dependencies: [
                 "WhisperKit",
-                .product(name: "ArgumentParser", package: "swift-argument-parser")
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
         ),
         .testTarget(
@@ -51,11 +50,11 @@ let package = Package(
                 "Makefile",
                 "README.md",
                 "LICENSE",
-                "CONTRIBUTING.md"
+                "CONTRIBUTING.md",
             ],
             resources: [
                 .process("Tests/WhisperKitTests/Resources"),
-                .copy("Models/whisperkit-coreml")
+                .copy("Models/whisperkit-coreml"),
             ]
         ),
     ]

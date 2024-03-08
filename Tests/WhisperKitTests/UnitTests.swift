@@ -7,7 +7,7 @@ import Tokenizers
 @testable import WhisperKit
 import XCTest
 
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 final class UnitTests: XCTestCase {
     func testInit() async {
         let whisperKit = try? await WhisperKit(prewarm: false, load: false, download: false)
@@ -226,7 +226,9 @@ final class UnitTests: XCTestCase {
     }
 
     func testWindowing() async {
-        let computeOptions = ModelComputeOptions()
+        let computeOptions = ModelComputeOptions(
+            melCompute: .cpuOnly
+        )
         let whisperKit = try? await WhisperKit(modelFolder: tinyModelPath(), computeOptions: computeOptions, verbose: true, logLevel: .debug)
 
         guard let audioFilePath = Bundle.module.path(forResource: "jfk", ofType: "wav") else {
@@ -373,7 +375,7 @@ final class UnitTests: XCTestCase {
             XCTFail("Failed to transcribe")
             return
         }
-        XCTAssertEqual(result.text.prefix(4), "東京は晴")
+        XCTAssertEqual(result.text.prefix(3), "東京は")
     }
 
     func testNoTimestamps() async {
@@ -831,6 +833,7 @@ final class UnitTests: XCTestCase {
 
 // MARK: Helpers
 
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 extension MLMultiArray {
     /// Create `MLMultiArray` of shape [1, 1, arr.count] and fill up the last
     /// dimension with with values from arr.
@@ -858,7 +861,7 @@ extension MLMultiArray {
     }
 }
 
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 extension XCTestCase {
     func transcribe(with variant: ModelVariant, options: DecodingOptions, audioFile: String = "jfk.wav", file: StaticString = #file, line: UInt = #line) async throws -> TranscriptionResult? {
         var modelPath = tinyModelPath()

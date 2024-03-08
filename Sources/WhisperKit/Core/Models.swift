@@ -1,16 +1,20 @@
 //  For licensing see accompanying LICENSE.md file.
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
+import Accelerate
 import CoreML
 import Hub
 import NaturalLanguage
 import Tokenizers
 
-#if os(watchOS) || arch(arm64)
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
 public typealias FloatType = Float16
 #else
 public typealias FloatType = Float
+#endif
+
+#if (os(macOS) || targetEnvironment(macCatalyst)) && arch(arm64)
+extension Float16: BNNSScalar {}
 #endif
 
 // MARK: - CoreML
@@ -207,7 +211,7 @@ public struct DecodingCache {
 ///   - logProbThreshold: If the average log probability over sampled tokens is below this value, treat as failed.
 ///   - noSpeechThreshold: If the no speech probability is higher than this value AND the average log
 ///                        probability over sampled tokens is below `logProbThreshold`, consider the segment as silent.
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public struct DecodingOptions {
     public var verbose: Bool
     public var task: DecodingTask
@@ -496,7 +500,7 @@ public class MelSpectrogramInput: MLFeatureProvider {
 }
 
 /// Model Prediction Output Type
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class MelSpectrogramOutput: MLFeatureProvider {
     /// Source provided by CoreML
     private let provider: MLFeatureProvider
@@ -533,7 +537,7 @@ public class MelSpectrogramOutput: MLFeatureProvider {
 // MARK: AudioEncoder
 
 /// Model Prediction Input Type
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class AudioEncoderInput: MLFeatureProvider {
     /// melspectrogram_features as 1 × {80,128} × 1 × 3000 4-dimensional array of floats
     public var melspectrogram_features: MLMultiArray
@@ -559,7 +563,7 @@ public class AudioEncoderInput: MLFeatureProvider {
 }
 
 /// Model Prediction Output Type
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class AudioEncoderOutput: MLFeatureProvider {
     /// Source provided by CoreML
     private let provider: MLFeatureProvider
@@ -596,7 +600,7 @@ public class AudioEncoderOutput: MLFeatureProvider {
 // MARK: TextDecoder
 
 /// Model Prediction Input Type
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class TextDecoderInput: MLFeatureProvider {
     /// input_ids as 1 element vector of 32-bit integers
     public var input_ids: MLMultiArray
@@ -664,7 +668,7 @@ public class TextDecoderInput: MLFeatureProvider {
 }
 
 /// Model Prediction Output Type
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class TextDecoderOutput: MLFeatureProvider {
     /// Source provided by CoreML
     private let provider: MLFeatureProvider
@@ -771,7 +775,7 @@ public class TextDecoderCachePrefillInput: MLFeatureProvider {
 }
 
 /// Model Prediction Output Type
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class TextDecoderCachePrefillOutput: MLFeatureProvider {
     /// Source provided by CoreML
     private let provider: MLFeatureProvider
