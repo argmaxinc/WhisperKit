@@ -133,18 +133,18 @@ public struct ModelComputeOptions {
     public var prefillCompute: MLComputeUnits
 
     public init(
-        #if targetEnvironment(simulator)
-        melCompute: MLComputeUnits = .cpuOnly,
-        audioEncoderCompute: MLComputeUnits = .cpuOnly,
-        textDecoderCompute: MLComputeUnits = .cpuOnly,
-        prefillCompute: MLComputeUnits = .cpuOnly
-        #else
-        melCompute: MLComputeUnits = .cpuAndGpu,
+        melCompute: MLComputeUnits = .cpuAndGPU,
         audioEncoderCompute: MLComputeUnits = .cpuAndNeuralEngine,
         textDecoderCompute: MLComputeUnits = .cpuAndNeuralEngine,
         prefillCompute: MLComputeUnits = .cpuOnly
-        #endif    
     ) {
+        if WhisperKit.isRunningOnSimulator {
+            self.melCompute = .cpuOnly
+            self.audioEncoderCompute = .cpuOnly
+            self.textDecoderCompute = .cpuOnly
+            self.prefillCompute = .cpuOnly
+            return
+        }
         self.melCompute = melCompute
         self.audioEncoderCompute = audioEncoderCompute
         self.textDecoderCompute = textDecoderCompute

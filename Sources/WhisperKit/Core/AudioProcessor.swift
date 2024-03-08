@@ -487,7 +487,27 @@ public extension AudioProcessor {
         }
     }
     #endif
-    
+
+    /// Attempts to setup the shared audio session if available on the device's OS
+    func setupAudioSessionForDevice() throws {
+        #if !os(macOS) // AVAudioSession is not available on macOS
+
+        #if !os(watchOS) // watchOS does not support .defaultToSpeaker
+        let options: AVAudioSession.CategoryOptions = [.defaultToSpeaker, .allowBluetooth]
+        #else
+        let options: AVAudioSession.CategoryOptions = .mixWithOthers
+        #endif
+
+        let audioSession = AVAudioSession.sharedInstance()
+        do {
+            try audioSession.setCategory(.playAndRecord, options: options)
+            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+        } catch let error as NSError {
+            throw WhisperError.audioProcessingFailed("Failed to set up audio session: \(error)")
+        }
+        #endif
+    }
+
     func setupEngine(inputDeviceID: DeviceID? = nil) throws -> AVAudioEngine {
         let audioEngine = AVAudioEngine()
         let inputNode = audioEngine.inputNode
@@ -546,6 +566,8 @@ public extension AudioProcessor {
     func startRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)? = nil) throws {
         audioSamples = []
         audioEnergy = []
+        
+        try? setupAudioSessionForDevice()
 
         audioEngine = try setupEngine(inputDeviceID: inputDeviceID)
 

@@ -1,4 +1,5 @@
 {
+  "originHash" : "cd17206b47bb810af9459722192530e3838d8e6629a970988e32a432aaa05f6e",
   "pins" : [
     {
       "identity" : "networkimage",
@@ -37,5 +38,5 @@
       }
     }
   ],
-  "version" : 2
+  "version" : 3
 }

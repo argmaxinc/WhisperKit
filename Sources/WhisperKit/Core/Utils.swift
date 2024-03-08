@@ -238,6 +238,17 @@ extension Process {
 }
 #endif
 
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
+public extension WhisperKit {
+    static var isRunningOnSimulator: Bool {
+        #if targetEnvironment(simulator)
+        return true
+        #else
+        return false
+        #endif
+    }
+}
+
 public func resolveAbsolutePath(_ inputPath: String) -> String {
     let fileManager = FileManager.default
 
