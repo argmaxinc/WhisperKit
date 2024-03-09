@@ -829,6 +829,24 @@ final class UnitTests: XCTestCase {
             XCTAssertEqual(mergedAlignmentTiming[i].probability, expectedWordTimings[i].probability, "Probability at index \(i) does not match")
         }
     }
+    
+    func testGitLFSPointerFile() {
+        // Assumption:
+        // 1 - the openai_whisper-tiny is downloaded locally. This means that the proxyFile is an actual data file.
+        // 2 - the openai_whisper-large-v3_turbo is not downloaded locally. This means that the proxyFile is pointer file.
+        let proxyFile = "AudioEncoder.mlmodelc/coremldata.bin"
+
+        // First, we check that a data file is not considered a git lfs pointer file.
+        var filePath = URL(filePath: tinyModelPath()).appending(path: proxyFile)
+        var isPointerFile = isGitLFSPointerFile(url: filePath)
+        XCTAssertEqual(isPointerFile, false, "Assuming whisper-tiny was downloaded, \(proxyFile) should not be a git-lfs pointer file.")
+        
+        // Second, we check that a pointer file is considered so.
+        let modelDir = largev3TurboModelPath()
+        filePath = URL(filePath: modelDir).appending(path: proxyFile)
+        isPointerFile = isGitLFSPointerFile(url: filePath)
+        XCTAssertEqual(isPointerFile, true, "Assuming whisper-large-v3_turbo was not downloaded, \(proxyFile) should be a git-lfs pointer file.")
+    }
 }
 
 // MARK: Helpers
@@ -907,6 +925,15 @@ extension XCTestCase {
         return modelPath
     }
 
+    func largev3TurboModelPath() -> String {
+        let modelDir = "whisperkit-coreml/openai_whisper-large-v3_turbo"
+        guard let modelPath = Bundle.module.urls(forResourcesWithExtension: "mlmodelc", subdirectory: modelDir)?.first?.deletingLastPathComponent().path else {
+            print("Failed to load model, ensure \"Models/\(modelDir)\" exists via Makefile command: `make download-models`")
+            return ""
+        }
+        return modelPath
+    }
+
     func allModelPaths() -> [String] {
         let fileManager = FileManager.default
         var modelPaths: [String] = []
@@ -924,6 +951,13 @@ extension XCTestCase {
             for folderURL in directoryContents {
                 let resourceValues = try folderURL.resourceValues(forKeys: Set(resourceKeys))
                 if resourceValues.isDirectory == true {
+                    // Check if the directory contains actual data files, or if it contains pointer files.
+                    // As a proxy, use the MelSpectrogramc.mlmodel/coredata.bin file.
+                    let proxyFileToCheck = folderURL.appendingPathComponent("MelSpectrogram.mlmodelc/coremldata.bin")
+                    if isGitLFSPointerFile(url: proxyFileToCheck) {
+                        continue
+                    }
+                    
                     // Check if the directory name contains the quantization pattern
                     // Only test large quantized models
                     let dirName = folderURL.lastPathComponent
@@ -937,6 +971,25 @@ extension XCTestCase {
         }
 
         return modelPaths
+    }
+    
+    // Function to check if the beginning of the file matches a Git LFS pointer pattern
+    func isGitLFSPointerFile(url: URL) -> Bool {
+        do {
+            let fileHandle = try FileHandle(forReadingFrom: url)
+            // Read the first few bytes of the file to get enough for the Git LFS pointer signature
+            let data = fileHandle.readData(ofLength: 512) // Read first 512 bytes
+            fileHandle.closeFile()
+
+            if let string = String(data: data, encoding: .utf8),
+               string.starts(with: "version https://git-lfs.github.com/") {
+                return true
+            }
+        } catch {
+            print("Failed to read file: \(error)")
+        }
+        
+        return false
     }
 
     func trackForMemoryLeaks(on instance: AnyObject, file: StaticString = #filePath, line: UInt = #line) {
