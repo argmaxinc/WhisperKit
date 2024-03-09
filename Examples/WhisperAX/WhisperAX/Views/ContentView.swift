@@ -12,6 +12,9 @@ import AVFoundation
 
 struct ContentView: View {
     @State var whisperKit: WhisperKit? = nil
+    #if os(macOS)
+    @State var audioDevices: [AudioDevice]? = nil
+    #endif
     @State var isRecording: Bool = false
     @State var isTranscribing: Bool = false
     @State var currentText: String = ""
@@ -24,7 +27,8 @@ struct ContentView: View {
     @State private var availableModels: [String] = []
     @State private var availableLanguages: [String] = []
     @State private var disabledModels: [String] = WhisperKit.recommendedModels().disabled
-
+    
+    @AppStorage("selectedAudioInput") private var selectedAudioInput: String = "No Audio Input"
     @AppStorage("selectedModel") private var selectedModel: String = WhisperKit.recommendedModels().default
     @AppStorage("selectedTab") private var selectedTab: String = "Transcribe"
     @AppStorage("selectedTask") private var selectedTask: String = "transcribe"
@@ -242,6 +246,16 @@ struct ContentView: View {
                             .progressViewStyle(CircularProgressViewStyle())
                             .scaleEffect(0.5)
                     }
+                    
+                    Button(action: {
+                        deleteModel()
+                    }, label: {
+                        Image(systemName: "trash")
+                    })
+                    .help("Delete model")
+                    .buttonStyle(BorderlessButtonStyle())
+                    .disabled(localModels.count == 0)
+                    .disabled(!localModels.contains(selectedModel))
 
                     #if os(macOS)
                     Button(action: {
@@ -302,7 +316,33 @@ struct ContentView: View {
     }
 
     // MARK: - Controls
-
+    var audioDevicesView: some View {
+        Group {
+            #if os(macOS)
+            HStack {
+                if let audioDevices = audioDevices, audioDevices.count > 0 {
+                    Picker("", selection: $selectedAudioInput) {
+                        ForEach(audioDevices, id: \.self) { device in
+                            Text(device.name).tag(device.name)
+                        }
+                    }
+                    .frame(width: 250)
+                    .disabled(isRecording)
+                }
+            }
+            .onAppear {
+                audioDevices = AudioProcessor.getAudioDevices()
+                if let audioDevices = audioDevices,
+                   !audioDevices.isEmpty,
+                   selectedAudioInput == "No Audio Input",
+                   let device = audioDevices.first {
+                    selectedAudioInput = device.name
+                }
+            }
+            #endif
+        }
+    }
+    
     var controlsView: some View {
         VStack {
             basicSettingsView
@@ -318,7 +358,13 @@ struct ContentView: View {
                                     Label("Reset", systemImage: "arrow.clockwise")
                                 }
                                 .buttonStyle(.borderless)
+
                                 Spacer()
+
+                                audioDevicesView
+
+                                Spacer()
+
                                 Button {
                                     showAdvancedOptions.toggle()
                                 } label: {
@@ -392,39 +438,51 @@ struct ContentView: View {
                             }
                         }
                     case "Stream":
-                        HStack {
-                            Button {
-                                resetState()
-                            } label: {
-                                Label("Reset", systemImage: "arrow.clockwise")
-                            }
-                            .frame(minWidth: 0, maxWidth: .infinity)
-                            .buttonStyle(.borderless)
-
-                            Button {
-                                withAnimation {
-                                    toggleRecording(shouldLoop: true)
+                        VStack {
+                            HStack {
+                                Button {
+                                    resetState()
+                                } label: {
+                                    Label("Reset", systemImage: "arrow.clockwise")
                                 }
-                            } label: {
-                                Image(systemName: !isRecording ? "record.circle" : "stop.circle.fill")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 70, height: 70)
-                                    .padding()
-                                    .foregroundColor(modelState != .loaded ? .gray : .red)
-                            }
-                            .contentTransition(.symbolEffect(.replace))
-                            .buttonStyle(BorderlessButtonStyle())
-                            .disabled(modelState != .loaded)
-                            .frame(minWidth: 0, maxWidth: .infinity)
+                                .frame(minWidth: 0, maxWidth: .infinity)
+                                .buttonStyle(.borderless)
 
-                            Button {
-                                showAdvancedOptions.toggle()
-                            } label: {
-                                Label("Settings", systemImage: "slider.horizontal.3")
+                                Spacer()
+
+                                audioDevicesView
+
+                                Spacer()
+
+                                VStack {
+                                    Button {
+                                        showAdvancedOptions.toggle()
+                                    } label: {
+                                        Label("Settings", systemImage: "slider.horizontal.3")
+                                    }
+                                    .frame(minWidth: 0, maxWidth: .infinity)
+                                    .buttonStyle(.borderless)
+                                }
                             }
-                            .frame(minWidth: 0, maxWidth: .infinity)
-                            .buttonStyle(.borderless)
+
+                            HStack {
+                                Button {
+                                    withAnimation {
+                                        toggleRecording(shouldLoop: true)
+                                    }
+                                } label: {
+                                    Image(systemName: !isRecording ? "record.circle" : "stop.circle.fill")
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 70, height: 70)
+                                        .padding()
+                                        .foregroundColor(modelState != .loaded ? .gray : .red)
+                                }
+                                .contentTransition(.symbolEffect(.replace))
+                                .buttonStyle(BorderlessButtonStyle())
+                                .disabled(modelState != .loaded)
+                                .frame(minWidth: 0, maxWidth: .infinity)
+                            }
                         }
                     default:
                         EmptyView()
@@ -751,10 +809,32 @@ struct ContentView: View {
                 try await whisperKit.loadModels()
 
                 await MainActor.run {
+                    if !localModels.contains(model) {
+                        localModels.append(model)
+                    }
+                    
                     availableLanguages = whisperKit.tokenizer?.langauges.map { $0.key }.sorted() ?? ["english"]
                     loadingProgressValue = 1.0
                     modelState = whisperKit.modelState
                 }
+            }
+        }
+    }
+    
+    func deleteModel() {
+        if localModels.contains(selectedModel) {
+            let modelFolder = URL(fileURLWithPath: localModelPath).appendingPathComponent("openai_whisper-\(selectedModel)")
+            
+            do {
+                try FileManager.default.removeItem(at: modelFolder)
+                
+                if let index = localModels.firstIndex(of: selectedModel) {
+                    localModels.remove(at: index)
+                }
+                
+                modelState = .unloaded
+            } catch {
+                print("Error deleting model: \(error)")
             }
         }
     }
@@ -854,8 +934,17 @@ struct ContentView: View {
                     print("Microphone access was not granted.")
                     return
                 }
+                
+                var deviceId: DeviceID?
+                #if os(macOS)
+                if self.selectedAudioInput != "No Audio Input",
+                   let devices = self.audioDevices,
+                   let device = devices.first(where: {$0.name == selectedAudioInput}) {
+                    deviceId = device.id
+                }
+                #endif
 
-                try? audioProcessor.startRecordingLive { _ in
+                try? audioProcessor.startRecordingLive(inputDeviceID: deviceId) { _ in
                     DispatchQueue.main.async {
                         bufferEnergy = whisperKit?.audioProcessor.relativeEnergy ?? []
                     }

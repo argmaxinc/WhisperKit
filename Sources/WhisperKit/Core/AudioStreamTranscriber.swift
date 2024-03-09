@@ -3,6 +3,7 @@
 
 import Foundation
 
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public extension AudioStreamTranscriber {
     struct State {
         public var isRecording: Bool = false
@@ -17,9 +18,11 @@ public extension AudioStreamTranscriber {
     }
 }
 
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public typealias AudioStreamTranscriberCallback = (AudioStreamTranscriber.State, AudioStreamTranscriber.State) -> Void
 
 /// Responsible for streaming audio from the microphone, processing it, and transcribing it in real-time.
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public actor AudioStreamTranscriber {
     private var state: AudioStreamTranscriber.State = .init() {
         didSet {

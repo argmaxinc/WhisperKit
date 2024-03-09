@@ -9,12 +9,13 @@ import Hub
 import TensorUtils
 import Tokenizers
 
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public protocol Transcriber {
     func transcribe(audioPath: String, decodeOptions: DecodingOptions?, callback: TranscriptionCallback) async throws -> TranscriptionResult?
     func transcribe(audioArray: [Float], decodeOptions: DecodingOptions?, callback: TranscriptionCallback) async throws -> TranscriptionResult?
 }
 
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class WhisperKit: Transcriber {
     /// Models
     public var modelVariant: ModelVariant = .tiny
@@ -48,6 +49,7 @@ public class WhisperKit: Transcriber {
 
     public init(
         model: String? = nil,
+        downloadBase: URL? = nil,
         modelRepo: String? = nil,
         modelFolder: String? = nil,
         computeOptions: ModelComputeOptions? = nil,
@@ -73,7 +75,7 @@ public class WhisperKit: Transcriber {
         Logging.shared.logLevel = verbose ? logLevel : .none
         currentTimings = TranscriptionTimings()
 
-        try await setupModels(model: model, modelRepo: modelRepo, modelFolder: modelFolder, download: download)
+        try await setupModels(model: model, downloadBase: downloadBase, modelRepo: modelRepo, modelFolder: modelFolder, download: download)
 
         if let prewarm = prewarm, prewarm {
             Logging.info("Prewarming models...")
@@ -178,7 +180,7 @@ public class WhisperKit: Transcriber {
     }
 
     /// Sets up the model folder either from a local path or by downloading from a repository.
-    public func setupModels(model: String?, modelRepo: String?, modelFolder: String?, download: Bool) async throws {
+    public func setupModels(model: String?, downloadBase: URL? = nil, modelRepo: String?, modelFolder: String?, download: Bool) async throws {
         // Determine the model variant to use
         let modelVariant = model ?? WhisperKit.recommendedModels().default
 
@@ -188,7 +190,7 @@ public class WhisperKit: Transcriber {
         } else if download {
             let repo = modelRepo ?? "argmaxinc/whisperkit-coreml"
             do {
-                let hubModelFolder = try await Self.download(variant: modelVariant, from: repo)
+                let hubModelFolder = try await Self.download(variant: modelVariant, downloadBase: downloadBase, from: repo)
                 self.modelFolder = hubModelFolder!
             } catch {
                 // Handle errors related to model downloading

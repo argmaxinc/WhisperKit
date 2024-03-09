@@ -6,6 +6,18 @@ import AVFoundation
 import CoreAudio
 import CoreML
 
+/// Core Audio Device 
+#if os(macOS)
+public typealias DeviceID = AudioDeviceID
+#else
+public typealias DeviceID = String 
+#endif
+
+public struct AudioDevice: Identifiable, Hashable {
+    public let id: DeviceID
+    public let name: String
+}
+ 
 public protocol AudioProcessing {
     /// Loads audio data from a specified file path.
     /// - Parameter audioFilePath: The file path of the audio file.
@@ -40,8 +52,8 @@ public protocol AudioProcessing {
     var relativeEnergyWindow: Int { get set }
 
     /// Starts recording audio from the specified input device, resetting the previous state
-    func startRecordingLive(callback: (([Float]) -> Void)?) throws
-
+    func startRecordingLive(inputDeviceID: DeviceID?, callback: (([Float]) -> Void)?) throws
+    
     /// Pause recording
     func pauseRecording()
 
@@ -51,8 +63,8 @@ public protocol AudioProcessing {
 
 /// Overrideable default methods for AudioProcessing
 public extension AudioProcessing {
-    func startRecordingLive(callback: (([Float]) -> Void)?) throws {
-        try startRecordingLive(callback: callback)
+    func startRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)?) throws {
+        try startRecordingLive(inputDeviceID: inputDeviceID, callback: callback)
     }
 
     static func padOrTrimAudio(fromArray audioArray: [Float], startAt startIndex: Int = 0, toLength frameLength: Int = 480_000, saveSegment: Bool = false) -> MLMultiArray? {
@@ -131,7 +143,7 @@ public extension AudioProcessing {
     }
 }
 
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class AudioProcessor: NSObject, AudioProcessing {
     public var audioEngine: AVAudioEngine?
     public var audioSamples: ContiguousArray<Float> = []
@@ -302,8 +314,121 @@ public class AudioProcessor: NSObject, AudioProcessing {
     }
 
     public static func requestRecordPermission() async -> Bool {
-        await AVAudioApplication.requestRecordPermission()
+        if #available(macOS 14, iOS 17, *) {
+            return await AVAudioApplication.requestRecordPermission()
+        } else {
+            #if os(watchOS)
+            // watchOS does not support AVCaptureDevice
+            return true
+            #else
+            let microphoneStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+            switch microphoneStatus {
+                case .notDetermined:
+                return await withCheckedContinuation { continuation in
+                    AVCaptureDevice.requestAccess(for: .audio) { granted in
+                        continuation.resume(returning: granted)
+                    }
+                }
+                case .restricted, .denied:
+                Logging.error("Microphone access denied")
+                return false
+                case .authorized:
+                return true
+                @unknown default:
+                Logging.error("Unknown authorization status")
+                return false
+            }
+            #endif
+        }
     }
+    
+    #if os(macOS)
+    public static func getAudioDevices() -> [AudioDevice] {
+        var devices = [AudioDevice]()
+        
+        var propertySize: UInt32 = 0
+        var status: OSStatus = noErr
+        
+        // Get the number of devices
+        var propertyAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        status = AudioObjectGetPropertyDataSize(
+            AudioObjectID(kAudioObjectSystemObject),
+            &propertyAddress,
+            0,
+            nil,
+            &propertySize
+        )
+        if status != noErr {
+            Logging.error("Error: Unable to get the number of audio devices.")
+            return devices
+        }
+        
+        // Get the device IDs
+        let deviceCount = Int(propertySize) / MemoryLayout<AudioDeviceID>.size
+        var deviceIDs = [AudioDeviceID](repeating: 0, count: deviceCount)
+        status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &propertyAddress,
+            0,
+            nil,
+            &propertySize,
+            &deviceIDs
+        )
+        if status != noErr {
+            Logging.error("Error: Unable to get the audio device IDs.")
+            return devices
+        }
+        
+        // Get device info for each device
+        for deviceID in deviceIDs {
+            var deviceName: String = ""
+            var inputChannels: Int = 0
+            
+            // Get device name
+            var propertySize: UInt32 = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+            var name: Unmanaged<CFString>? = nil
+            propertyAddress.mSelector = kAudioDevicePropertyDeviceNameCFString
+            
+            status = AudioObjectGetPropertyData(
+                deviceID,
+                &propertyAddress,
+                0,
+                nil,
+                &propertySize,
+                &name
+            )
+            if status == noErr, let deviceNameCF = name?.takeUnretainedValue() as String? {
+                deviceName = deviceNameCF
+            }
+            
+            // Get input channels
+            propertyAddress.mSelector = kAudioDevicePropertyStreamConfiguration
+            propertyAddress.mScope = kAudioDevicePropertyScopeInput
+            status = AudioObjectGetPropertyDataSize(deviceID, &propertyAddress, 0, nil, &propertySize)
+            if status == noErr {
+                let bufferListPointer = UnsafeMutablePointer<AudioBufferList>.allocate(capacity: 1)
+                defer { bufferListPointer.deallocate() }
+                status = AudioObjectGetPropertyData(deviceID, &propertyAddress, 0, nil, &propertySize, bufferListPointer)
+                if status == noErr {
+                    let bufferList = UnsafeMutableAudioBufferListPointer(bufferListPointer)
+                    for buffer in bufferList {
+                        inputChannels += Int(buffer.mNumberChannels)
+                    }
+                }
+            }
+            
+            if inputChannels > 0 {
+                devices.append(AudioDevice(id: deviceID, name: deviceName))
+            }
+        }
+        
+        return devices
+    }
+    #endif
 
     deinit {
         stopRecording()
@@ -312,7 +437,7 @@ public class AudioProcessor: NSObject, AudioProcessing {
 
 // MARK: - Streaming
 
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public extension AudioProcessor {
     /// We have a new buffer, process and store it.
     /// NOTE: Assumes audio is 16khz mono
@@ -336,10 +461,63 @@ public extension AudioProcessor {
             Logging.debug("Current audio size: \(self.audioSamples.count) samples, most recent buffer: \(buffer.count) samples, most recent energy: \(newEnergy)")
         }
     }
+    
+    #if os(macOS)
+    func assignAudioInput(inputNode: AVAudioInputNode, inputDeviceID: AudioDeviceID) {
+        guard let audioUnit = inputNode.audioUnit else {
+            Logging.error("Failed to access the audio unit of the input node.")
+            return
+        }
+        
+        var inputDeviceID = inputDeviceID
 
-    func setupEngine() throws -> AVAudioEngine {
+        let error = AudioUnitSetProperty(
+            audioUnit,
+            kAudioOutputUnitProperty_CurrentDevice,
+            kAudioUnitScope_Global,
+            0,
+            &inputDeviceID,
+            UInt32(MemoryLayout<AudioDeviceID>.size)
+        )
+        
+        if error != noErr {
+            Logging.error("Error setting Audio Unit property: \(error)")
+        } else {
+            Logging.info("Successfully set input device.")
+        }
+    }
+    #endif
+
+    /// Attempts to setup the shared audio session if available on the device's OS
+    func setupAudioSessionForDevice() throws {
+        #if !os(macOS) // AVAudioSession is not available on macOS
+
+        #if !os(watchOS) // watchOS does not support .defaultToSpeaker
+        let options: AVAudioSession.CategoryOptions = [.defaultToSpeaker, .allowBluetooth]
+        #else
+        let options: AVAudioSession.CategoryOptions = .mixWithOthers
+        #endif
+
+        let audioSession = AVAudioSession.sharedInstance()
+        do {
+            try audioSession.setCategory(.playAndRecord, options: options)
+            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+        } catch let error as NSError {
+            throw WhisperError.audioProcessingFailed("Failed to set up audio session: \(error)")
+        }
+        #endif
+    }
+
+    func setupEngine(inputDeviceID: DeviceID? = nil) throws -> AVAudioEngine {
         let audioEngine = AVAudioEngine()
         let inputNode = audioEngine.inputNode
+        
+        #if os(macOS)
+        if let inputDeviceID = inputDeviceID {
+            assignAudioInput(inputNode: inputNode, inputDeviceID: inputDeviceID)
+        }
+        #endif
+        
         let inputFormat = inputNode.outputFormat(forBus: 0)
 
         // Desired format (16,000 Hz, 1 channel)
@@ -384,14 +562,14 @@ public extension AudioProcessor {
             audioSamples.removeFirst(audioSamples.count - keep)
         }
     }
-
-    func startRecordingLive(callback: (([Float]) -> Void)? = nil) throws {
+    
+    func startRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)? = nil) throws {
         audioSamples = []
         audioEnergy = []
+        
+        try? setupAudioSessionForDevice()
 
-        // TODO: implement selecting input device
-
-        audioEngine = try setupEngine()
+        audioEngine = try setupEngine(inputDeviceID: inputDeviceID)
 
         // Set the callback
         audioBufferCallback = callback
