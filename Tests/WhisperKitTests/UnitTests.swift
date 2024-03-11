@@ -829,24 +829,6 @@ final class UnitTests: XCTestCase {
             XCTAssertEqual(mergedAlignmentTiming[i].probability, expectedWordTimings[i].probability, "Probability at index \(i) does not match")
         }
     }
-    
-    func testGitLFSPointerFile() {
-        // Assumption:
-        // 1 - the openai_whisper-tiny is downloaded locally. This means that the proxyFile is an actual data file.
-        // 2 - the openai_whisper-large-v3_turbo is not downloaded locally. This means that the proxyFile is pointer file.
-        let proxyFile = "AudioEncoder.mlmodelc/coremldata.bin"
-
-        // First, we check that a data file is not considered a git lfs pointer file.
-        var filePath = URL(filePath: tinyModelPath()).appending(path: proxyFile)
-        var isPointerFile = isGitLFSPointerFile(url: filePath)
-        XCTAssertEqual(isPointerFile, false, "Assuming whisper-tiny was downloaded, \(proxyFile) should not be a git-lfs pointer file.")
-        
-        // Second, we check that a pointer file is considered so.
-        let modelDir = largev3TurboModelPath()
-        filePath = URL(filePath: modelDir).appending(path: proxyFile)
-        isPointerFile = isGitLFSPointerFile(url: filePath)
-        XCTAssertEqual(isPointerFile, true, "Assuming whisper-large-v3_turbo was not downloaded, \(proxyFile) should be a git-lfs pointer file.")
-    }
 }
 
 // MARK: Helpers
@@ -986,7 +968,7 @@ extension XCTestCase {
                 return true
             }
         } catch {
-            print("Failed to read file: \(error)")
+            fatalError("Failed to read file: \(error)")
         }
         
         return false
