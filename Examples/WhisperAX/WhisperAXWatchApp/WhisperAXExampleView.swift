@@ -350,8 +350,6 @@ struct WhisperAXWatchView: View {
                 return
             }
 
-            let recommended = WhisperKit.recommendedModels()
-
             var folder: URL?
 
             // Check if the model is available locally
