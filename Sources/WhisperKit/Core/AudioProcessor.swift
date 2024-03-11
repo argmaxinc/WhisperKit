@@ -480,6 +480,8 @@ public extension AudioProcessor {
             UInt32(MemoryLayout<AudioDeviceID>.size)
         )
         
+        let format = inputNode.outputFormat(forBus: 0)
+        
         if error != noErr {
             Logging.error("Error setting Audio Unit property: \(error)")
         } else {
@@ -511,31 +513,31 @@ public extension AudioProcessor {
     func setupEngine(inputDeviceID: DeviceID? = nil) throws -> AVAudioEngine {
         let audioEngine = AVAudioEngine()
         let inputNode = audioEngine.inputNode
-        
+
         #if os(macOS)
         if let inputDeviceID = inputDeviceID {
             assignAudioInput(inputNode: inputNode, inputDeviceID: inputDeviceID)
         }
         #endif
-        
+
+        let hardwareSampleRate = audioEngine.inputNode.inputFormat(forBus: 0).sampleRate
         let inputFormat = inputNode.outputFormat(forBus: 0)
 
+        guard let nodeFormat = AVAudioFormat(commonFormat: inputFormat.commonFormat, sampleRate: hardwareSampleRate, channels: inputFormat.channelCount, interleaved: inputFormat.isInterleaved) else {
+            throw WhisperError.audioProcessingFailed("Failed to create node format")
+        }
+
         // Desired format (16,000 Hz, 1 channel)
-        guard let desiredFormat = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: Double(WhisperKit.sampleRate),
-            channels: AVAudioChannelCount(1),
-            interleaved: false
-        ) else {
+        guard let desiredFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: Double(WhisperKit.sampleRate), channels: AVAudioChannelCount(1), interleaved: false) else {
             throw WhisperError.audioProcessingFailed("Failed to create desired format")
         }
 
-        guard let converter = AVAudioConverter(from: inputFormat, to: desiredFormat) else {
+        guard let converter = AVAudioConverter(from: nodeFormat, to: desiredFormat) else {
             throw WhisperError.audioProcessingFailed("Failed to create audio converter")
         }
 
         let bufferSize = AVAudioFrameCount(minBufferLength) // 100ms - 400ms supported
-        inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: inputFormat) { [weak self] (buffer: AVAudioPCMBuffer, _: AVAudioTime) in
+        inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: nodeFormat) { [weak self] (buffer: AVAudioPCMBuffer, _: AVAudioTime) in
             guard let self = self else { return }
             var buffer = buffer
             if !buffer.format.sampleRate.isEqual(to: Double(WhisperKit.sampleRate)) {
