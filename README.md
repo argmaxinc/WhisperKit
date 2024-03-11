@@ -121,13 +121,13 @@ make download-models
 You can then run them via the CLI with:
 
 ```bash
-swift run transcribe --model-path "Models/whisperkit-coreml/openai_whisper-large-v3" --audio-path "path/to/your/audio.{wav,mp3,m4a,flac}" 
+swift run whisper-kit transcribe --model-path "Models/whisperkit-coreml/openai_whisper-large-v3" --audio-path "path/to/your/audio.{wav,mp3,m4a,flac}" 
 ```
 
 Which should print a transcription of the audio file. If you would like to stream the audio directly from a microphone, use:
 
 ```bash
-swift run transcribe --model-path "Models/whisperkit-coreml/openai_whisper-large-v3" --stream
+swift run whisper-kit transcribe --model-path "Models/whisperkit-coreml/openai_whisper-large-v3" --stream
 ```
 
 ## Contributing & Roadmap
