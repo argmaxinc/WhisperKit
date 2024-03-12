@@ -479,9 +479,7 @@ public extension AudioProcessor {
             &inputDeviceID,
             UInt32(MemoryLayout<AudioDeviceID>.size)
         )
-        
-        let format = inputNode.outputFormat(forBus: 0)
-        
+                
         if error != noErr {
             Logging.error("Error setting Audio Unit property: \(error)")
         } else {
