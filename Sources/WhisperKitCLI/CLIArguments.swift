@@ -3,7 +3,7 @@
 
 import ArgumentParser
 
-struct WhisperKitArguments: ParsableArguments {
+struct CLIArguments: ParsableArguments {
     @Option(help: "Path to audio file")
     var audioPath: String = "Tests/WhisperKitTests/Resources/jfk.wav"
 
