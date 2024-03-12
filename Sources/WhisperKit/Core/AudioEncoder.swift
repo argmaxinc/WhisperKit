@@ -14,7 +14,7 @@ public protocol AudioEncoding {
     func encodeFeatures(_ features: MLMultiArray) async throws -> MLMultiArray?
 }
 
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class AudioEncoder: AudioEncoding, WhisperMLModel {
     public var model: MLModel?
 
@@ -46,7 +46,7 @@ public class AudioEncoder: AudioEncoding, WhisperMLModel {
 
         try Task.checkCancellation()
 
-        let outputFeatures = try await model.prediction(from: modelInputs, options: MLPredictionOptions())
+        let outputFeatures = try await model.asyncPrediction(from: modelInputs, options: MLPredictionOptions())
 
         let output = AudioEncoderOutput(features: outputFeatures)
 

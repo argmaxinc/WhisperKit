@@ -16,7 +16,7 @@ public struct SamplingResult {
     public var completed: Bool
 }
 
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class GreedyTokenSampler: TokenSampling {
     public var temperature: FloatType
     public var eotToken: Int
@@ -44,7 +44,7 @@ public class GreedyTokenSampler: TokenSampling {
 
             let logitsDescriptor = BNNSNDArrayDescriptor(
                 data: logitsRawPointer,
-                scalarType: FloatType.self, // FIXME: Float16 here breaks in swift 6
+                scalarType: FloatType.self,
                 shape: .vector(logits.count, stride: 1)
             )!
 

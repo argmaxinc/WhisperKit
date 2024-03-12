@@ -5,7 +5,7 @@ import Accelerate
 import CoreML
 import Tokenizers
 
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public protocol TextDecoding {
     var tokenizer: Tokenizer? { get set }
     var prefillData: WhisperMLModel? { get set }
@@ -43,7 +43,7 @@ public protocol TextDecoding {
     )
 }
 
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public extension TextDecoding {
     func prepareDecoderInputs(withPrompt initialPrompt: [Int]) -> DecodingInputs? {
         let tokenShape = [NSNumber(value: 1), NSNumber(value: initialPrompt.count)]
@@ -176,7 +176,7 @@ public extension TextDecoding {
 
         try Task.checkCancellation()
 
-        let outputFeatures = try await prefillModel.prediction(from: modelInputs, options: MLPredictionOptions())
+        let outputFeatures = try await prefillModel.asyncPrediction(from: modelInputs, options: MLPredictionOptions())
 
         let output = TextDecoderCachePrefillOutput(features: outputFeatures)
 
@@ -234,7 +234,7 @@ public class TextDecoderContextPrefill: WhisperMLModel {
     public var model: MLModel?
 }
 
-@available(macOS 14, iOS 17, watchOS 10, visionOS 1, *)
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class TextDecoder: TextDecoding, WhisperMLModel {
     public var model: MLModel?
     public var tokenizer: Tokenizer?
@@ -291,7 +291,7 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
 
         try Task.checkCancellation()
 
-        let outputFeatures = try await model.prediction(from: modelInputs, options: MLPredictionOptions())
+        let outputFeatures = try await model.asyncPrediction(from: modelInputs, options: MLPredictionOptions())
 
         let output = TextDecoderOutput(features: outputFeatures)
 
@@ -497,7 +497,7 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
 
                 // Call the callback if it is provided
                 if let shouldContinue = callback?(result) {
-                    if !shouldContinue {
+                    if !shouldContinue && !isPrefill {
                         Logging.debug("Early stopping")
                         break
                     }
