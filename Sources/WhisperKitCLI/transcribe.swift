@@ -6,6 +6,7 @@ import CoreML
 import Foundation
 import WhisperKit
 
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 @main
 struct WhisperKitCLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
