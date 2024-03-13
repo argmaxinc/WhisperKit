@@ -430,6 +430,9 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
                 logits = filter.filterLogits(logits, withTokens: currentTokens)
             }
 
+            let filteringTime = Date().timeIntervalSince(nonInferenceStartTime)
+            timings.decodingFiltering += filteringTime
+
             // MARK: Sampling
 
             let samplingStartTime = Date()

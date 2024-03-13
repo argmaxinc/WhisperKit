@@ -616,6 +616,7 @@ public class WhisperKit: Transcriber {
                     timings.decodingPredictions += decodingTimings.decodingPredictions
                     timings.totalDecodingLoops += decodingTimings.totalDecodingLoops
                     timings.decodingNonPrediction += decodingTimings.decodingNonPrediction
+                    timings.decodingFiltering += decodingTimings.decodingFiltering
                     timings.decodingSampling += decodingTimings.decodingSampling
                     timings.decodingKvCaching += decodingTimings.decodingKvCaching
                     timings.totalKVUpdateRuns += decodingTimings.totalKVUpdateRuns
@@ -708,6 +709,7 @@ public class WhisperKit: Transcriber {
             let decodingInitTime = formatTimeWithPercentage(timings.decodingInit, 1, fullPipelineDuration)
             let prefillInfo = formatTimeWithPercentage(timings.prefill, 1, fullPipelineDuration)
             let predictionsInfo = formatTimeWithPercentage(timings.decodingPredictions, totalLoops, fullPipelineDuration)
+            let filteringInfo = formatTimeWithPercentage(timings.decodingFiltering, totalLoops, fullPipelineDuration)
             let samplingInfo = formatTimeWithPercentage(timings.decodingSampling, totalLoops, fullPipelineDuration)
             let kvCachingInfo = formatTimeWithPercentage(timings.decodingKvCaching, timings.totalKVUpdateRuns, fullPipelineDuration)
             let wordTimestampInfo = formatTimeWithPercentage(timings.decodingWordTimestamps, timings.totalTimestampAlignmentRuns, fullPipelineDuration)
@@ -727,6 +729,7 @@ public class WhisperKit: Transcriber {
             Logging.info("Prefill:             \(prefillInfo)")
             Logging.info("Decoding:            \(predictionsInfo)")
             Logging.info("Non-inference:       \(nonPredTimeInfo)")
+            Logging.info("- Logit Filtering:   \(filteringInfo)")
             Logging.info("- Sampling:          \(samplingInfo)")
             Logging.info("- Kv Caching:        \(kvCachingInfo)")
             Logging.info("- Word Timestamps:   \(wordTimestampInfo)")

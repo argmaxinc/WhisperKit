@@ -397,6 +397,7 @@ public struct TranscriptionTimings: Codable {
     public var decodingInit: TimeInterval
     public var decodingLoop: TimeInterval
     public var decodingPredictions: TimeInterval
+    public var decodingFiltering: TimeInterval
     public var decodingSampling: TimeInterval
     public var decodingFallback: TimeInterval
     public var decodingWindowing: TimeInterval
@@ -432,6 +433,7 @@ public struct TranscriptionTimings: Codable {
                 decodingInit: TimeInterval = 0,
                 decodingLoop: TimeInterval = 0,
                 decodingPredictions: TimeInterval = 0,
+                decodingFiltering: TimeInterval = 0,
                 decodingSampling: TimeInterval = 0,
                 decodingFallback: TimeInterval = 0,
                 decodingWindowing: TimeInterval = 0,
@@ -460,6 +462,7 @@ public struct TranscriptionTimings: Codable {
         self.decodingInit = decodingInit
         self.decodingLoop = decodingLoop
         self.decodingPredictions = decodingPredictions
+        self.decodingFiltering = decodingFiltering
         self.decodingSampling = decodingSampling
         self.decodingFallback = decodingFallback
         self.decodingWindowing = decodingWindowing
