@@ -8,7 +8,7 @@ import Foundation
 @main
 struct WhisperKitCLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-        commandName: "whisperkit",
+        commandName: "whisperkit-cli",
         abstract: "WhisperKit CLI",
         discussion: "Swift native speech recognition with Whisper for Apple Silicon",
         subcommands: [Transcribe.self]

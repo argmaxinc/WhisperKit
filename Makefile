@@ -79,7 +79,7 @@ build:
 
 build-cli:
 	@echo "Building WhisperKit CLI..."
-	@swift build -c release --product whisperkit
+	@swift build -c release --product whisperkit-cli
 
 
 test:

@@ -15,7 +15,7 @@ let package = Package(
             targets: ["WhisperKit"]
         ),
         .executable(
-            name: "whisper-kit",
+            name: "whisperkit-cli",
             targets: ["WhisperKitCLI"]
         ),
     ],
