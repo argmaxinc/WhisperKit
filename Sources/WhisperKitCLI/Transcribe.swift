@@ -17,25 +17,19 @@ struct Transcribe: AsyncParsableCommand {
 
     mutating func run() async throws {
         if cliArguments.stream {
-            try await transcribeStream(modelPath: cliArguments.modelPath)
+            try await transcribeStream()
         } else {
-            let audioURL = URL(fileURLWithPath: cliArguments.audioPath)
-            if cliArguments.verbose {
-                print("Transcribing audio at \(audioURL)")
-            }
-            try await transcribe(audioPath: cliArguments.audioPath, modelPath: cliArguments.modelPath)
+            try await transcribe()
         }
     }
 
-    private func transcribe(audioPath: String, modelPath: String) async throws {
-        let resolvedModelPath = resolveAbsolutePath(modelPath)
-        guard FileManager.default.fileExists(atPath: resolvedModelPath) else {
-            throw CocoaError.error(.fileNoSuchFile)
-        }
-
-        let resolvedAudioPath = resolveAbsolutePath(audioPath)
+    private func transcribe() async throws {
+        let resolvedAudioPath = resolveAbsolutePath(cliArguments.audioPath)
         guard FileManager.default.fileExists(atPath: resolvedAudioPath) else {
             throw CocoaError.error(.fileNoSuchFile)
+        }
+        if cliArguments.verbose {
+            print("Transcribing audio at \(cliArguments.audioPath)")
         }
 
         let computeOptions = ModelComputeOptions(
@@ -43,17 +37,26 @@ struct Transcribe: AsyncParsableCommand {
             textDecoderCompute: cliArguments.textDecoderComputeUnits.asMLComputeUnits
         )
         
-        let tokenizerFolder: URL? =
-            if let tokenizerPath = cliArguments.tokenizerPath {
-                URL(filePath: tokenizerPath)
+        let downloadTokenizerFolder: URL? =
+            if let filePath = cliArguments.downloadTokenizerPath {
+                URL(filePath: filePath)
+            } else {
+                nil
+            }
+        
+        let downloadModelFolder: URL? =
+            if let filePath = cliArguments.downloadModelPath {
+                URL(filePath: filePath)
             } else {
                 nil
             }
 
         print("Initializing models...")
         let whisperKit = try await WhisperKit(
-            modelFolder: modelPath,
-            tokenizerFolder: tokenizerFolder,
+            model: cliArguments.model,
+            downloadBase: downloadModelFolder,
+            modelFolder: cliArguments.modelPath,
+            tokenizerFolder: downloadTokenizerFolder,
             computeOptions: computeOptions,
             verbose: cliArguments.verbose,
             logLevel: .debug
@@ -87,7 +90,7 @@ struct Transcribe: AsyncParsableCommand {
         let transcription = transcribeResult?.text ?? "Transcription failed"
 
         if cliArguments.report, let result = transcribeResult {
-            let audioFileName = URL(fileURLWithPath: audioPath).lastPathComponent.components(separatedBy: ".").first!
+            let audioFileName = URL(fileURLWithPath: cliArguments.audioPath).lastPathComponent.components(separatedBy: ".").first!
 
             // Write SRT (SubRip Subtitle Format) for the transcription
             let srtReportWriter = WriteSRT(outputDir: cliArguments.reportPath)
@@ -121,28 +124,32 @@ struct Transcribe: AsyncParsableCommand {
         }
     }
 
-    private func transcribeStream(modelPath: String) async throws {
-        let resolvedModelPath = resolveAbsolutePath(modelPath)
-        guard FileManager.default.fileExists(atPath: resolvedModelPath) else {
-            throw CocoaError.error(.fileNoSuchFile)
-        }
-
+    private func transcribeStream() async throws {
         let computeOptions = ModelComputeOptions(
             audioEncoderCompute: cliArguments.audioEncoderComputeUnits.asMLComputeUnits,
             textDecoderCompute: cliArguments.textDecoderComputeUnits.asMLComputeUnits
         )
 
-        let tokenizerFolder: URL? =
-            if let tokenizerPath = cliArguments.tokenizerPath {
-                URL(filePath: tokenizerPath)
+        let downloadTokenizerFolder: URL? =
+            if let filePath = cliArguments.downloadTokenizerPath {
+                URL(filePath: filePath)
+            } else {
+                nil
+            }
+        
+        let downloadModelFolder: URL? =
+            if let filePath = cliArguments.downloadModelPath {
+                URL(filePath: filePath)
             } else {
                 nil
             }
 
         print("Initializing models...")
         let whisperKit = try await WhisperKit(
-            modelFolder: modelPath,
-            tokenizerFolder: tokenizerFolder,
+            model: cliArguments.model,
+            downloadBase: downloadModelFolder,
+            modelFolder: cliArguments.modelPath,
+            tokenizerFolder: downloadTokenizerFolder,
             computeOptions: computeOptions,
             verbose: cliArguments.verbose,
             logLevel: .debug

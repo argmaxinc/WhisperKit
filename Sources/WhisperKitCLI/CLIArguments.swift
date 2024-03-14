@@ -8,10 +8,16 @@ struct CLIArguments: ParsableArguments {
     var audioPath: String = "Tests/WhisperKitTests/Resources/jfk.wav"
 
     @Option(help: "Path of model files")
-    var modelPath: String = "Models/whisperkit-coreml/openai_whisper-tiny"
+    var modelPath: String?
     
-    @Option(help: "Path of tokenizer files")
-    var tokenizerPath: String?
+    @Option(help: "Model to download if no modelPath is provided")
+    var model: String?
+    
+    @Option(help: "Path to save the downloaded model")
+    var downloadModelPath: String?
+    
+    @Option(help: "Path to save the downloaded tokenizer files")
+    var downloadTokenizerPath: String?
 
     @Option(help: "Compute units for audio encoder model with {all,cpuOnly,cpuAndGPU,cpuAndNeuralEngine,random}")
     var audioEncoderComputeUnits: ComputeUnits = .cpuAndNeuralEngine
