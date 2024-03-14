@@ -47,6 +47,8 @@ public class WhisperKit: Transcriber {
     public var decoderInputs: DecodingInputs?
     public var currentTimings: TranscriptionTimings?
 
+    public let progress = Progress()
+
     public init(
         model: String? = nil,
         downloadBase: URL? = nil,
@@ -362,6 +364,7 @@ public class WhisperKit: Transcriber {
                            decodeOptions: DecodingOptions? = nil,
                            callback: TranscriptionCallback = nil) async throws -> TranscriptionResult?
     {
+        progress.completedUnitCount = 0
         if currentTimings == nil {
             currentTimings = TranscriptionTimings()
         }
@@ -451,10 +454,15 @@ public class WhisperKit: Transcriber {
 
         let startDecodeLoopTime = CFAbsoluteTimeGetCurrent()
 
+        let totalSeekDuration = seekClips.reduce(0, { return $0 + ($1.end - $1.start) })
+        progress.totalUnitCount = Int64(totalSeekDuration)
+        defer { progress.completedUnitCount = progress.totalUnitCount }
         for (seekClipStart, seekClipEnd) in seekClips {
             // Loop through the current clip until we reach the end
             // Typically this will be the full audio file, unless seek points are explicitly provided
             var seek: Int = seekClipStart
+
+            let previousSeekProgress = progress.completedUnitCount
 
             let windowPadding = 16000 // prevent hallucinations at the end of the clip by stopping up to 1.0s early
             while seek < seekClipEnd - windowPadding {
@@ -579,6 +587,9 @@ public class WhisperKit: Transcriber {
 
                 // Reset cache and move on to the next window
                 resetDecoderInputs()
+
+                let clipProgress = min(seek, seekClipEnd) - seekClipStart
+                progress.completedUnitCount = previousSeekProgress + Int64(clipProgress)
             }
         }
 

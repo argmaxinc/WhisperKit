@@ -212,6 +212,16 @@ struct ContentView: View {
             .frame(maxWidth: .infinity)
             .defaultScrollAnchor(.bottom)
             .padding()
+            if let whisperKit,
+               !isRecording,
+               !isTranscribing,
+               whisperKit.progress.fractionCompleted > 0,
+               whisperKit.progress.fractionCompleted < 1 {
+                ProgressView(whisperKit.progress)
+                    .progressViewStyle(.linear)
+                    .labelsHidden()
+                    .padding(.horizontal)
+            }
         }
     }
 
