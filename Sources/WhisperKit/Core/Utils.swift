@@ -5,6 +5,7 @@ import AVFoundation
 import CoreML
 import Foundation
 import Tokenizers
+import Hub
 #if canImport(UIKit)
 import UIKit
 #elseif canImport(AppKit)
@@ -269,10 +270,13 @@ public func resolveAbsolutePath(_ inputPath: String) -> String {
     return inputPath
 }
 
-func loadTokenizer(for pretrained: ModelVariant) async throws -> Tokenizer {
-    // TODO: Cache tokenizer config to avoid repeated network requests
+func loadTokenizer(
+    for pretrained: ModelVariant,
+    tokenizerFolder: URL? = nil
+) async throws -> Tokenizer {
     let tokenizerName = tokenizerNameForVariant(pretrained)
-    return try await AutoTokenizer.from(pretrained: tokenizerName)
+    let hubApi = HubApi(downloadBase: tokenizerFolder)
+    return try await AutoTokenizer.from(pretrained: tokenizerName, hubApi: hubApi)
 }
 
 func formatTimestamp(_ timestamp: Float) -> String {

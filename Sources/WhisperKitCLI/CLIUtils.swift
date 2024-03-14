@@ -4,7 +4,6 @@
 import ArgumentParser
 import CoreML
 import Foundation
-import WhisperKit
 
 enum ComputeUnits: String, ExpressibleByArgument, CaseIterable {
     case all, cpuAndGPU, cpuOnly, cpuAndNeuralEngine, random

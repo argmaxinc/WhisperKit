@@ -22,6 +22,7 @@ public class WhisperKit: Transcriber {
     public var modelState: ModelState = .unloaded
     public var modelCompute: ModelComputeOptions
     public var modelFolder: URL?
+    public var tokenizerFolder: URL?
     public var tokenizer: Tokenizer?
 
     /// Protocols
@@ -52,6 +53,7 @@ public class WhisperKit: Transcriber {
         downloadBase: URL? = nil,
         modelRepo: String? = nil,
         modelFolder: String? = nil,
+        tokenizerFolder: URL? = nil,
         computeOptions: ModelComputeOptions? = nil,
         audioProcessor: (any AudioProcessing)? = nil,
         featureExtractor: (any FeatureExtracting)? = nil,
@@ -72,10 +74,17 @@ public class WhisperKit: Transcriber {
         self.textDecoder = textDecoder ?? TextDecoder()
         self.logitsFilters = logitsFilters ?? []
         self.segmentSeeker = segmentSeeker ?? SegmentSeeker()
+        self.tokenizerFolder = tokenizerFolder
         Logging.shared.logLevel = verbose ? logLevel : .none
         currentTimings = TranscriptionTimings()
 
-        try await setupModels(model: model, downloadBase: downloadBase, modelRepo: modelRepo, modelFolder: modelFolder, download: download)
+        try await setupModels(
+            model: model,
+            downloadBase: downloadBase,
+            modelRepo: modelRepo,
+            modelFolder: modelFolder,
+            download: download
+        )
 
         if let prewarm = prewarm, prewarm {
             Logging.info("Prewarming models...")
@@ -281,7 +290,7 @@ public class WhisperKit: Transcriber {
         {
             modelVariant = detectVariant(logitsDim: logitsDim, encoderDim: encoderDim)
             Logging.debug("Loading tokenizer for \(modelVariant)")
-            tokenizer = try await loadTokenizer(for: modelVariant)
+            tokenizer = try await loadTokenizer(for: modelVariant, tokenizerFolder: tokenizerFolder)
             textDecoder.tokenizer = tokenizer
             Logging.debug("Loaded tokenizer")
         } else {

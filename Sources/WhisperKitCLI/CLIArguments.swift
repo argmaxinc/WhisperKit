@@ -9,6 +9,9 @@ struct CLIArguments: ParsableArguments {
 
     @Option(help: "Path of model files")
     var modelPath: String = "Models/whisperkit-coreml/openai_whisper-tiny"
+    
+    @Option(help: "Path of tokenizer files")
+    var tokenizerPath: String?
 
     @Option(help: "Compute units for audio encoder model with {all,cpuOnly,cpuAndGPU,cpuAndNeuralEngine,random}")
     var audioEncoderComputeUnits: ComputeUnits = .cpuAndNeuralEngine
