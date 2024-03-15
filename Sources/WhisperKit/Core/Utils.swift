@@ -272,10 +272,11 @@ public func resolveAbsolutePath(_ inputPath: String) -> String {
 
 func loadTokenizer(
     for pretrained: ModelVariant,
-    tokenizerFolder: URL? = nil
+    tokenizerFolder: URL? = nil,
+    useBackgroundSession: Bool = true
 ) async throws -> Tokenizer {
     let tokenizerName = tokenizerNameForVariant(pretrained)
-    let hubApi = HubApi(downloadBase: tokenizerFolder)
+    let hubApi = HubApi(downloadBase: tokenizerFolder, useBackgroundSession: useBackgroundSession)
     return try await AutoTokenizer.from(pretrained: tokenizerName, hubApi: hubApi)
 }
 

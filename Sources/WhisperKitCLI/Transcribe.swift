@@ -59,7 +59,8 @@ struct Transcribe: AsyncParsableCommand {
             tokenizerFolder: downloadTokenizerFolder,
             computeOptions: computeOptions,
             verbose: cliArguments.verbose,
-            logLevel: .debug
+            logLevel: .debug,
+            useBackgroundDownloadSession: false
         )
         print("Models initialized")
 
@@ -152,7 +153,8 @@ struct Transcribe: AsyncParsableCommand {
             tokenizerFolder: downloadTokenizerFolder,
             computeOptions: computeOptions,
             verbose: cliArguments.verbose,
-            logLevel: .debug
+            logLevel: .debug,
+            useBackgroundDownloadSession: false
         )
         print("Models initialized")
 

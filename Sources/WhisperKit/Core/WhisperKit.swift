@@ -49,6 +49,9 @@ public class WhisperKit: Transcriber {
     public var currentTimings: TranscriptionTimings?
 
     public let progress = Progress()
+    
+    /// Configuration
+    private let useBackgroundDownloadSession: Bool
 
     public init(
         model: String? = nil,
@@ -67,7 +70,9 @@ public class WhisperKit: Transcriber {
         logLevel: Logging.LogLevel = .info,
         prewarm: Bool? = nil,
         load: Bool? = nil,
-        download: Bool = true
+        download: Bool = true,
+        useBackgroundDownloadSession: Bool = true
+    
     ) async throws {
         self.modelCompute = computeOptions ?? ModelComputeOptions()
         self.audioProcessor = audioProcessor ?? AudioProcessor()
@@ -77,6 +82,7 @@ public class WhisperKit: Transcriber {
         self.logitsFilters = logitsFilters ?? []
         self.segmentSeeker = segmentSeeker ?? SegmentSeeker()
         self.tokenizerFolder = tokenizerFolder
+        self.useBackgroundDownloadSession = useBackgroundDownloadSession
         Logging.shared.logLevel = verbose ? logLevel : .none
         currentTimings = TranscriptionTimings()
 
@@ -85,18 +91,19 @@ public class WhisperKit: Transcriber {
             downloadBase: downloadBase,
             modelRepo: modelRepo,
             modelFolder: modelFolder,
-            download: download
+            download: download,
+            useBackgroundDownloadSession: useBackgroundDownloadSession
         )
 
         if let prewarm = prewarm, prewarm {
             Logging.info("Prewarming models...")
-            try await prewarmModels()
+            try await prewarmModels(useBackgroundDownloadSession: useBackgroundDownloadSession)
         }
 
         // If load is not passed in, load based on whether a modelFolder is passed
         if load ?? (modelFolder != nil) {
             Logging.info("Loading models...")
-            try await loadModels()
+            try await loadModels(useBackgroundDownloadSession: useBackgroundDownloadSession)
         }
     }
 
@@ -170,8 +177,14 @@ public class WhisperKit: Transcriber {
         return sortedModels
     }
 
-    public static func download(variant: String, downloadBase: URL? = nil, from repo: String = "argmaxinc/whisperkit-coreml", progressCallback: ((Progress) -> Void)? = nil) async throws -> URL? {
-        let hubApi = HubApi(downloadBase: downloadBase)
+    public static func download(
+        variant: String,
+        downloadBase: URL? = nil,
+        useBackgroundSession: Bool = true,
+        from repo: String = "argmaxinc/whisperkit-coreml",
+        progressCallback: ((Progress) -> Void)? = nil
+    ) async throws -> URL? {
+        let hubApi = HubApi(downloadBase: downloadBase, useBackgroundSession: useBackgroundSession)
         let repo = Hub.Repo(id: repo, type: .models)
         do {
             let modelFolder = try await hubApi.snapshot(from: repo, matching: ["*\(variant.description)/*"]) { progress in
@@ -191,7 +204,14 @@ public class WhisperKit: Transcriber {
     }
 
     /// Sets up the model folder either from a local path or by downloading from a repository.
-    public func setupModels(model: String?, downloadBase: URL? = nil, modelRepo: String?, modelFolder: String?, download: Bool) async throws {
+    public func setupModels(
+        model: String?,
+        downloadBase: URL? = nil,
+        modelRepo: String?,
+        modelFolder: String?,
+        download: Bool,
+        useBackgroundDownloadSession: Bool
+    ) async throws {
         // Determine the model variant to use
         let modelVariant = model ?? WhisperKit.recommendedModels().default
 
@@ -201,7 +221,12 @@ public class WhisperKit: Transcriber {
         } else if download {
             let repo = modelRepo ?? "argmaxinc/whisperkit-coreml"
             do {
-                let hubModelFolder = try await Self.download(variant: modelVariant, downloadBase: downloadBase, from: repo)
+                let hubModelFolder = try await Self.download(
+                    variant: modelVariant,
+                    downloadBase: downloadBase,
+                    useBackgroundSession: useBackgroundDownloadSession,
+                    from: repo
+                )
                 self.modelFolder = hubModelFolder!
             } catch {
                 // Handle errors related to model downloading
@@ -213,11 +238,14 @@ public class WhisperKit: Transcriber {
         }
     }
 
-    public func prewarmModels() async throws {
-        try await loadModels(prewarmMode: true)
+    public func prewarmModels(useBackgroundDownloadSession: Bool) async throws {
+        try await loadModels(prewarmMode: true, useBackgroundDownloadSession: useBackgroundDownloadSession)
     }
 
-    public func loadModels(prewarmMode: Bool = false) async throws {
+    public func loadModels(
+        prewarmMode: Bool = false,
+        useBackgroundDownloadSession: Bool
+    ) async throws {
         modelState = prewarmMode ? .prewarming : .loading
 
         let modelLoadStart = CFAbsoluteTimeGetCurrent()
@@ -292,7 +320,11 @@ public class WhisperKit: Transcriber {
         {
             modelVariant = detectVariant(logitsDim: logitsDim, encoderDim: encoderDim)
             Logging.debug("Loading tokenizer for \(modelVariant)")
-            tokenizer = try await loadTokenizer(for: modelVariant, tokenizerFolder: tokenizerFolder)
+            tokenizer = try await loadTokenizer(
+                for: modelVariant,
+                tokenizerFolder: tokenizerFolder,
+                useBackgroundSession: useBackgroundDownloadSession
+            )
             textDecoder.tokenizer = tokenizer
             Logging.debug("Loaded tokenizer")
         } else {
@@ -379,7 +411,7 @@ public class WhisperKit: Transcriber {
         }
 
         if self.modelState != .loaded {
-            try await loadModels()
+            try await loadModels(useBackgroundDownloadSession: useBackgroundDownloadSession)
         }
 
         var timings = currentTimings!
