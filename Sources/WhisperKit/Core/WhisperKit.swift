@@ -72,7 +72,7 @@ public class WhisperKit: Transcriber {
         prewarm: Bool? = nil,
         load: Bool? = nil,
         download: Bool = true,
-        useBackgroundDownloadSession: Bool = true
+        useBackgroundDownloadSession: Bool = false
     ) async throws {
         self.modelCompute = computeOptions ?? ModelComputeOptions()
         self.audioProcessor = audioProcessor ?? AudioProcessor()
@@ -91,19 +91,18 @@ public class WhisperKit: Transcriber {
             downloadBase: downloadBase,
             modelRepo: modelRepo,
             modelFolder: modelFolder,
-            download: download,
-            useBackgroundDownloadSession: useBackgroundDownloadSession
+            download: download
         )
 
         if let prewarm = prewarm, prewarm {
             Logging.info("Prewarming models...")
-            try await prewarmModels(useBackgroundDownloadSession: useBackgroundDownloadSession)
+            try await prewarmModels()
         }
 
         // If load is not passed in, load based on whether a modelFolder is passed
         if load ?? (modelFolder != nil) {
             Logging.info("Loading models...")
-            try await loadModels(useBackgroundDownloadSession: useBackgroundDownloadSession)
+            try await loadModels()
         }
     }
 
@@ -180,7 +179,7 @@ public class WhisperKit: Transcriber {
     public static func download(
         variant: String,
         downloadBase: URL? = nil,
-        useBackgroundSession: Bool = true,
+        useBackgroundSession: Bool = false,
         from repo: String = "argmaxinc/whisperkit-coreml",
         progressCallback: ((Progress) -> Void)? = nil
     ) async throws -> URL? {
@@ -209,8 +208,7 @@ public class WhisperKit: Transcriber {
         downloadBase: URL? = nil,
         modelRepo: String?,
         modelFolder: String?,
-        download: Bool,
-        useBackgroundDownloadSession: Bool
+        download: Bool
     ) async throws {
         // Determine the model variant to use
         let modelVariant = model ?? WhisperKit.recommendedModels().default
@@ -238,13 +236,12 @@ public class WhisperKit: Transcriber {
         }
     }
 
-    public func prewarmModels(useBackgroundDownloadSession: Bool) async throws {
-        try await loadModels(prewarmMode: true, useBackgroundDownloadSession: useBackgroundDownloadSession)
+    public func prewarmModels() async throws {
+        try await loadModels(prewarmMode: true)
     }
 
     public func loadModels(
-        prewarmMode: Bool = false,
-        useBackgroundDownloadSession: Bool
+        prewarmMode: Bool = false
     ) async throws {
         modelState = prewarmMode ? .prewarming : .loading
 
@@ -411,7 +408,7 @@ public class WhisperKit: Transcriber {
         }
 
         if self.modelState != .loaded {
-            try await loadModels(useBackgroundDownloadSession: useBackgroundDownloadSession)
+            try await loadModels()
         }
 
         var timings = currentTimings!
