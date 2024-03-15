@@ -21,8 +21,6 @@ public class WhisperKit: Transcriber {
     public var modelVariant: ModelVariant = .tiny
     public var modelState: ModelState = .unloaded
     public var modelCompute: ModelComputeOptions
-    public var modelFolder: URL?
-    public var tokenizerFolder: URL?
     public var tokenizer: Tokenizer?
 
     /// Protocols
@@ -48,9 +46,12 @@ public class WhisperKit: Transcriber {
     public var decoderInputs: DecodingInputs?
     public var currentTimings: TranscriptionTimings?
 
+    /// State
     public let progress = Progress()
     
     /// Configuration
+    public var modelFolder: URL?
+    public var tokenizerFolder: URL?
     private let useBackgroundDownloadSession: Bool
 
     public init(
