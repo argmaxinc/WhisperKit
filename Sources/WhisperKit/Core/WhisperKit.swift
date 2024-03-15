@@ -72,7 +72,6 @@ public class WhisperKit: Transcriber {
         load: Bool? = nil,
         download: Bool = true,
         useBackgroundDownloadSession: Bool = true
-    
     ) async throws {
         self.modelCompute = computeOptions ?? ModelComputeOptions()
         self.audioProcessor = audioProcessor ?? AudioProcessor()
