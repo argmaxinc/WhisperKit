@@ -15,12 +15,12 @@ let package = Package(
             targets: ["WhisperKit"]
         ),
         .executable(
-            name: "transcribe",
+            name: "whisperkit-cli",
             targets: ["WhisperKitCLI"]
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/huggingface/swift-transformers.git", exact: "0.1.2"),
+        .package(url: "https://github.com/huggingface/swift-transformers.git", exact: "0.1.3"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", exact: "1.3.0"),
     ],
     targets: [
