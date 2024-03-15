@@ -12,7 +12,7 @@ struct Transcribe: AsyncParsableCommand {
         abstract: "Transcribe audio to text using WhisperKit"
     )
 
-    @OptionGroup 
+    @OptionGroup
     var cliArguments: CLIArguments
 
     mutating func run() async throws {
@@ -36,14 +36,14 @@ struct Transcribe: AsyncParsableCommand {
             audioEncoderCompute: cliArguments.audioEncoderComputeUnits.asMLComputeUnits,
             textDecoderCompute: cliArguments.textDecoderComputeUnits.asMLComputeUnits
         )
-        
+
         let downloadTokenizerFolder: URL? =
             if let filePath = cliArguments.downloadTokenizerPath {
                 URL(filePath: filePath)
             } else {
                 nil
             }
-        
+
         let downloadModelFolder: URL? =
             if let filePath = cliArguments.downloadModelPath {
                 URL(filePath: filePath)
@@ -51,7 +51,10 @@ struct Transcribe: AsyncParsableCommand {
                 nil
             }
 
-        print("Initializing models...")
+        if cliArguments.verbose {
+            print("Initializing models...")
+        }
+
         let whisperKit = try await WhisperKit(
             model: cliArguments.model,
             downloadBase: downloadModelFolder,
@@ -62,7 +65,10 @@ struct Transcribe: AsyncParsableCommand {
             logLevel: .debug,
             useBackgroundDownloadSession: false
         )
-        print("Models initialized")
+
+        if cliArguments.verbose {
+            print("Models initialized")
+        }
 
         let options = DecodingOptions(
             verbose: cliArguments.verbose,
@@ -84,7 +90,7 @@ struct Transcribe: AsyncParsableCommand {
         )
 
         let transcribeResult = try await whisperKit.transcribe(
-            audioPath: resolvedAudioPath, 
+            audioPath: resolvedAudioPath,
             decodeOptions: options
         )
 
@@ -137,7 +143,7 @@ struct Transcribe: AsyncParsableCommand {
             } else {
                 nil
             }
-        
+
         let downloadModelFolder: URL? =
             if let filePath = cliArguments.downloadModelPath {
                 URL(filePath: filePath)
@@ -145,7 +151,10 @@ struct Transcribe: AsyncParsableCommand {
                 nil
             }
 
-        print("Initializing models...")
+        if cliArguments.verbose {
+            print("Initializing models...")
+        }
+
         let whisperKit = try await WhisperKit(
             model: cliArguments.model,
             downloadBase: downloadModelFolder,
@@ -156,8 +165,10 @@ struct Transcribe: AsyncParsableCommand {
             logLevel: .debug,
             useBackgroundDownloadSession: false
         )
-        print("Models initialized")
 
+        if cliArguments.verbose {
+            print("Models initialized")
+        }
         let decodingOptions = DecodingOptions(
             verbose: cliArguments.verbose,
             task: .transcribe,
