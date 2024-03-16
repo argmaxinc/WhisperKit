@@ -13,8 +13,6 @@ jobs:
       macos-runner: 'macos-14'
       
   pre-merge-tests:
-    needs: build-and-test
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && needs.build-and-test.result == 'success') }}
     uses: ./.github/workflows/unit-tests.yml
     with:
       ios-version: '16.1'
