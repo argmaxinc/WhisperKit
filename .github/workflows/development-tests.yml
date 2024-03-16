@@ -7,6 +7,10 @@ on:
     types: [submitted]  
   workflow_dispatch:
 
+concurrency: 
+    group: ${{ github.head_ref }}
+    cancel-in-progress: true
+
 jobs:
   build-and-test:
     uses: ./.github/workflows/unit-tests.yml
