@@ -11,7 +11,6 @@ jobs:
     with:
       ios-version: '17.2'
       macos-runner: 'macos-14'
-      environment: 'development'
       
   pre-merge-tests:
     needs: build-and-test

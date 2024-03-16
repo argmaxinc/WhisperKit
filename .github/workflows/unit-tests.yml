@@ -10,14 +10,15 @@ on:
         required: true
         type: string
       environment:
-        required: true
+        required: false
         type: string
 
 jobs:
-  build-and-test:
+  unit-tests:
     runs-on: ${{ inputs.macos-runner }}
+    if: ${{ inputs.environment != '' }}
     environment: ${{ inputs.environment }}
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: maxim-lobanov/setup-xcode@v1
