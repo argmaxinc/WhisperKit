@@ -3,6 +3,8 @@ name: Development Tests
 on:
   pull_request:
     branches: [ "main" ]
+  pull_request_review:
+    types: [submitted]  
   workflow_dispatch:
 
 jobs:
@@ -13,8 +15,8 @@ jobs:
       macos-runner: 'macos-14'
       
   pre-merge-tests:
+    if: ${{ (github.event_name == 'pull_request_review' && github.event.review.state == 'approved') || github.event_name == 'workflow_dispatch'}}
     uses: ./.github/workflows/unit-tests.yml
     with:
       ios-version: '16.1'
       macos-runner: 'macos-13-xlarge'
-      environment: 'pre-release'

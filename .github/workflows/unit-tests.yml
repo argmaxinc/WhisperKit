@@ -9,16 +9,11 @@ on:
       macos-runner:
         required: true
         type: string
-      environment:
-        required: false
-        default: ''
-        type: string
 
 jobs:
   unit-tests:
+    name: unit-tests-${{ inputs.macos-runner }}
     runs-on: ${{ inputs.macos-runner }}
-    if: ${{ inputs.environment != '' }}
-    environment: ${{ inputs.environment }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
