@@ -1,0 +1,23 @@
+name: Development Tests
+
+on:
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    uses: ./.github/workflows/unit-tests.yml
+    with:
+      ios-version: '17.2'
+      macos-runner: 'macos-14'
+      environment: 'development'
+      
+  pre-merge-tests:
+    needs: build-and-test
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && needs.build-and-test.result == 'success') }}
+    uses: ./.github/workflows/unit-tests.yml
+    with:
+      ios-version: '16.1'
+      macos-runner: 'macos-13-xlarge'
+      environment: 'pre-release'
