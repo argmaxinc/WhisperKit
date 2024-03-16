@@ -14,9 +14,7 @@ jobs:
             ios-version: "16.1"  # Oldest available version
           - os: macos-14
             ios-version: "17.2"  # Latest available version
-    runs-on: ${{ matrix.os }}
-    steps:
-    - uses: ./.github/workflows/unit-tests.yml
-      with:
-        ios-version: ${{ matrix.ios-version }}
-        macos-runner: ${{ matrix.os }}
+    uses: ./.github/workflows/unit-tests.yml
+    with:
+      ios-version: ${{ matrix.ios-version }}
+      macos-runner: ${{ matrix.os }}
