@@ -25,6 +25,7 @@ jobs:
     steps:
       - id: reviews
         env:
+          GH_TOKEN: ${{ github.token }}
           pr: ${{ github.event.number }}
         run: |
           state=$(gh pr view "$pr" \
@@ -35,7 +36,7 @@ jobs:
 
   pre-merge-tests:
     needs: [check-approvals]
-    if: needs.check-approvals.outputs.reviews == 'approved' || github.event_name == 'workflow_dispatch'
+    if: needs.check-approvals.outputs.reviews == 'APPROVED' || github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/unit-tests.yml
     with:
       ios-version: '16.1'
