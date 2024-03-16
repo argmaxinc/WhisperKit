@@ -4,12 +4,12 @@ on:
   pull_request:
     branches: [ "main" ]
   pull_request_review:
-    types: [submitted]  
+    types: [submitted]
   workflow_dispatch:
 
 concurrency: 
-    group: ${{ github.ref_name }}
-    cancel-in-progress: true
+  group: ${{ github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
   build-and-test:
@@ -17,9 +17,25 @@ jobs:
     with:
       ios-version: '17.2'
       macos-runner: 'macos-14'
-      
+
+  check-approvals:
+    runs-on: ubuntu-latest
+    outputs:
+      reviews: ${{ steps.reviews.outputs.state }}
+    steps:
+      - id: reviews
+        env:
+          pr: ${{ github.event.number }}
+        run: |
+          state=$(gh pr view "$pr" \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --json reviewDecision \
+                  --jq '.reviewDecision')
+          echo "state=$state" >> "$GITHUB_OUTPUT"
+
   pre-merge-tests:
-    if: ${{ (github.event_name == 'pull_request_review' && github.event.review.state == 'approved') || github.event_name == 'workflow_dispatch'}}
+    needs: [check-approvals]
+    if: needs.check-approvals.outputs.reviews == 'approved' || github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/unit-tests.yml
     with:
       ios-version: '16.1'
