@@ -11,6 +11,7 @@ on:
         type: string
       environment:
         required: false
+        default: ''
         type: string
 
 jobs:
