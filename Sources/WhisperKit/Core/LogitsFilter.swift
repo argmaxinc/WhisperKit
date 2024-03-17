@@ -62,3 +62,37 @@ public class TimestampRulesFilter: LogitsFiltering {
         return logits
     }
 }
+
+
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
+public class LanguageLogitsFilter: LogitsFiltering {
+    let allLanguageTokens: [Int]
+    let logitsDim: Int
+    let sampleBegin: Int
+
+    public init(allLanguageTokens: [Int], logitsDim: Int, sampleBegin: Int) {
+        self.allLanguageTokens = allLanguageTokens
+        self.logitsDim = logitsDim
+        self.sampleBegin = sampleBegin
+    }
+
+    public func filterLogits(_ logits: MLMultiArray, withTokens tokens: [Int]) -> MLMultiArray {
+        guard tokens.count == sampleBegin else{
+            return logits
+        }
+        //get the non-language token indexes and suppress them
+        let nonLanguageTokenIndexes = self.getNonLanguageTokenIndexes(logitsDim: self.logitsDim, allLanguageTokens: self.allLanguageTokens)
+        logits.fill(indexes: nonLanguageTokenIndexes, with: -FloatType.infinity)
+        return logits
+    }
+    
+    private func getNonLanguageTokenIndexes(logitsDim: Int, allLanguageTokens: [Int]) -> [[NSNumber]]{
+        var indexes: [[NSNumber]] = []
+        for i in 0..<logitsDim{
+            if !allLanguageTokens.contains(i){
+                indexes.append([0, 0, i as NSNumber])
+            }
+        }
+        return indexes
+    }
+}
