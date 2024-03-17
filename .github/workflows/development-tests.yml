@@ -22,8 +22,12 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
         reviews: ${{ steps.reviews.outputs.state }}
+    permissions: 
+        pull-requests: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Check Approvals
         id: reviews
         env:
