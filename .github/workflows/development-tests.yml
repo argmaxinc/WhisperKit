@@ -23,23 +23,13 @@ jobs:
     outputs:
         reviews: ${{ steps.reviews.outputs.state }}
     steps:
-      - name: Determine PR Number
-        id: determine-pr
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: echo "::set-output name=pull_request_number::$(gh pr view --json number -q .number || echo "")"
-
+      - uses: actions/checkout@v4
       - name: Check Approvals
         id: reviews
-        if: steps.determine-pr.outputs.pull_request_number != ''
         env:
             GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-            pr_number=${{ steps.determine-pr.outputs.pull_request_number }}
-            state=$(gh pr view "$pr_number" \
-                    --repo "$GITHUB_REPOSITORY" \
-                    --json reviewDecision \
-                    --jq '.reviewDecision')
+            state=$(gh pr view --json reviewDecision --jq '.reviewDecision')
             echo "state=$state" >> "$GITHUB_OUTPUT"
 
   pre-merge-tests:
