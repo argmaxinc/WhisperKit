@@ -28,12 +28,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Extract branch name
+        shell: bash
+        run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_ENV
+        id: extract_branch
       - name: Check Approvals
         id: reviews
         env:
             GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-            state=$(gh pr view --json reviewDecision --jq '.reviewDecision')
+            branch=${{ steps.extract_branch.outputs.branch }}
+            state=$(gh pr view $branch --json reviewDecision --jq '.reviewDecision')
             echo "state=$state" >> "$GITHUB_OUTPUT"
 
   pre-merge-tests:
