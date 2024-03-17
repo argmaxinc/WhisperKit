@@ -27,24 +27,16 @@ jobs:
         id: determine-pr
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-            pr_number=$(gh pr list --repo $GITHUB_REPOSITORY --head $GITHUB_REF_NAME --json number --jq ".[0].number" --limit 1)
-            if [[ ! -z "$pr_number" ]]; then
-              echo "PR number found: $pr_number"
-              echo "::set-output name=pr_number::$pr_number"
-            else
-              echo "No PR number found for branch $GITHUB_REF_NAME"
-              echo "::set-output name=pr_number::"
-              exit 0
-            fi
+        run: echo "::set-output name=pull_request_number::$(gh pr view --json number -q .number || echo "")"
+
       - name: Check Approvals
         id: reviews
-        if: steps.determine-pr.outputs.pr_number != ''
+        if: steps.determine-pr.outputs.pull_request_number != ''
         env:
             GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-            pr=${{ steps.determine-pr.outputs.pr_number }}
-            state=$(gh pr view "$pr" \
+            pr_number=${{ steps.determine-pr.outputs.pull_request_number }}
+            state=$(gh pr view "$pr_number" \
                     --repo "$GITHUB_REPOSITORY" \
                     --json reviewDecision \
                     --jq '.reviewDecision')
