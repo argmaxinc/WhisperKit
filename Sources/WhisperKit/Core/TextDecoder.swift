@@ -342,7 +342,7 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
         // Logits filters
         var logitsFilters: [any LogitsFiltering] = []
         let allLanguageTokens:[Int] = tokenizer.languages.compactMap {tokenizer.convertTokenToId("<|\($0)|>")}
-        Logging.debug(allLanguageTokens.count)
+        
         // language filter
         logitsFilters.append(
             LanguageLogitsFilter(
@@ -405,9 +405,10 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
         let samplingTime = Date().timeIntervalSince(samplingStartTime)
         timings.decodingSampling += samplingTime
         
+        var detectedLanguage = tokenizer.decode(tokens: [nextToken]).dropFirst(2).dropLast(2)
         var decodingResult = DecodingResult.emptyResults
         decodingResult.timings = timings
-        decodingResult.language = tokenizer.decode(tokens: [nextToken])
+        decodingResult.language = String(detectedLanguage)
         return [decodingResult]
         
     }

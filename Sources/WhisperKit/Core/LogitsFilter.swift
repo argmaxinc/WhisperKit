@@ -76,6 +76,7 @@ public class LanguageLogitsFilter: LogitsFiltering {
         self.sampleBegin = sampleBegin
     }
 
+    // Retain the logits that correspond to language tokens and suppress non-language tokens
     public func filterLogits(_ logits: MLMultiArray, withTokens tokens: [Int]) -> MLMultiArray {
         guard tokens.count == sampleBegin else{
             return logits
