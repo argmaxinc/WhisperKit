@@ -36,7 +36,7 @@ jobs:
               echo "No PR number found for branch $GITHUB_REF_NAME"
               echo "::set-output name=pr_number::"
               exit 0
-
+            fi
       - name: Check Approvals
         id: reviews
         if: steps.determine-pr.outputs.pr_number != ''
