@@ -31,13 +31,13 @@ jobs:
       - name: Check Approvals
         id: reviews
         env:
-            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          pr: ${{ github.event.pull_request.number }}
         run: |
-            branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
-            echo "Extracted branch name: $branch"
-            state=$(gh pr view $branch --json reviewDecision --jq '.reviewDecision')
-            echo "Review decision state: $state"
-            echo "state=$state" >> "$GITHUB_OUTPUT"
+          echo "Checking PR approval for: $pr"
+          state=$(gh pr view $pr --json reviewDecision --jq '.reviewDecision')
+          echo "Review decision state: $state"
+          echo "state=$state" >> "$GITHUB_OUTPUT"
 
   pre-merge-tests:
     needs: [check-approvals]
