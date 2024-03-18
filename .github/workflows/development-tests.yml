@@ -1,0 +1,43 @@
+name: Development Tests
+
+on:
+  pull_request:
+    branches: [ "main" ]
+  pull_request_review:
+    types: [submitted]
+  workflow_dispatch:
+
+concurrency: 
+  group: ${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    uses: ./.github/workflows/unit-tests.yml
+    with:
+      ios-version: '17.2'
+      macos-runner: 'macos-14'
+
+  check-approvals:
+    runs-on: ubuntu-latest
+    outputs:
+      reviews: ${{ steps.reviews.outputs.state }}
+    steps:
+      - id: reviews
+        env:
+          GH_TOKEN: ${{ github.token }}
+          pr: ${{ github.event.number }}
+        run: |
+          state=$(gh pr view "$pr" \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --json reviewDecision \
+                  --jq '.reviewDecision')
+          echo "state=$state" >> "$GITHUB_OUTPUT"
+
+  pre-merge-tests:
+    needs: [check-approvals]
+    if: needs.check-approvals.outputs.reviews == 'APPROVED' || github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/unit-tests.yml
+    with:
+      ios-version: '16.1'
+      macos-runner: 'macos-13-xlarge'

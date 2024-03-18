@@ -4,6 +4,7 @@
 import AVFoundation
 import CoreML
 import Tokenizers
+import Hub
 @testable import WhisperKit
 import XCTest
 
