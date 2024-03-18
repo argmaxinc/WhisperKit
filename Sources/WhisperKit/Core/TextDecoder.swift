@@ -320,8 +320,7 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
         options: DecodingOptions,
         temperature: FloatType
     ) async throws -> [DecodingResult] {
-        // TODO: implement
-        // predict logits for 1 iteration with sot
+        // Predict logits for 1 iteration with sot
         // 1. LanguageLogitsFilter for only language tokens
         // 2. GreedyTokenSampler for most likely language
         var timings = TranscriptionTimings()
