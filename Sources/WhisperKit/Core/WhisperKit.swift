@@ -648,12 +648,25 @@ public class WhisperKit: Transcriber {
                 let decodeWithFallbackStart = Date()
 
                 let tokenSampler = GreedyTokenSampler(temperature: temp, eotToken: tokenizer.endToken, decodingOptions: options)
+                
+                var currentDecodingOptions = options
+                // If language is not passed and usePrefill is false, detect language and set in options
+                if options.language == nil && !options.usePrefillCache{
+                    let languageDecodingResult = try? await textDecoder.detectLanguage(
+                        from: encoderOutput,
+                        using: decoderInputs,
+                        sampler: tokenSampler,
+                        options: options,
+                        temperature: temp
+                    ).first
+                    currentDecodingOptions.language = languageDecodingResult?.language
+                }
 
                 decodingResult = try await textDecoder.decodeText(
                     from: encoderOutput,
                     using: decoderInputs,
                     sampler: tokenSampler,
-                    options: options,
+                    options: currentDecodingOptions,
                     callback: callback
                 ).first
 
@@ -675,21 +688,21 @@ public class WhisperKit: Transcriber {
                 var needsFallback = false
                 var fallbackReason = ""
                 if let result = decodingResult {
-                    if let threshold = options.compressionRatioThreshold,
+                    if let threshold = currentDecodingOptions.compressionRatioThreshold,
                        result.compressionRatio > threshold
                     {
                         needsFallback = true // too repetitive
                         fallbackReason = "compressionRatioThreshold"
                     }
 
-                    if let threshold = options.logProbThreshold,
+                    if let threshold = currentDecodingOptions.logProbThreshold,
                        result.avgLogProb < threshold
                     {
                         needsFallback = true // average log probablity too low (model is not confident enough)
                         fallbackReason = "logProbThreshold"
                     }
 
-                    if let threshold = options.noSpeechThreshold,
+                    if let threshold = currentDecodingOptions.noSpeechThreshold,
                        result.noSpeechProb > threshold
                     {
                         needsFallback = false // silence
