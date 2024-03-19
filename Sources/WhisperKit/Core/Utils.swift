@@ -30,13 +30,12 @@ extension MLMultiArray {
         return linearOffset
     }
 
-    /// NOTE: must have [1, 1, n] shape
-    func fillLastDimension<S: Sequence, Value>(indexes: S, with value: Value) where S.Element == Int {
-        let pointer = UnsafeMutablePointer<Value>(OpaquePointer(dataPointer))
-        let strideInts = strides.map { $0.intValue }
-        for index in indexes {
-            let linearOffset = linearOffset(for: [0, 0, index as NSNumber], strides: strideInts)
-            pointer[linearOffset] = value
+    func fillLastDimension(indexes: Range<Int>, with value: FloatType) {
+        precondition(shape.count == 3 && shape[0] == 1 && shape[1] == 1, "Must have [1, 1, n] shape")
+        withUnsafeMutableBufferPointer(ofType: FloatType.self) { ptr, strides in
+            for index in indexes {
+                ptr[index * strides[2]] = value
+            }
         }
     }
 

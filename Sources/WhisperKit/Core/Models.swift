@@ -15,6 +15,7 @@ public typealias FloatType = Float
 
 #if (os(macOS) || targetEnvironment(macCatalyst)) && arch(arm64)
 extension Float16: BNNSScalar {}
+extension Float16: MLShapedArrayScalar {}
 #endif
 
 // MARK: - CoreML
