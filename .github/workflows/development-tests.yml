@@ -21,17 +21,22 @@ jobs:
   check-approvals:
     runs-on: ubuntu-latest
     outputs:
-      reviews: ${{ steps.reviews.outputs.state }}
+        reviews: ${{ steps.reviews.outputs.state }}
+    permissions: 
+        pull-requests: read
     steps:
-      - id: reviews
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check Approvals
+        id: reviews
         env:
           GH_TOKEN: ${{ github.token }}
-          pr: ${{ github.event.number }}
+          pr: ${{ github.event.pull_request.number }}
         run: |
-          state=$(gh pr view "$pr" \
-                  --repo "$GITHUB_REPOSITORY" \
-                  --json reviewDecision \
-                  --jq '.reviewDecision')
+          echo "Checking PR approval for: $pr"
+          state=$(gh pr view $pr --json reviewDecision --jq '.reviewDecision')
+          echo "Review decision state: $state"
           echo "state=$state" >> "$GITHUB_OUTPUT"
 
   pre-merge-tests:
