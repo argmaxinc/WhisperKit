@@ -32,9 +32,19 @@ struct Transcribe: AsyncParsableCommand {
             print("Transcribing audio at \(cliArguments.audioPath)")
         }
 
+        var audioEncoderComputeUnits = cliArguments.audioEncoderComputeUnits.asMLComputeUnits
+        let textDecoderComputeUnits = cliArguments.textDecoderComputeUnits.asMLComputeUnits
+        
+        // Use gpu for audio encoder on macOS below 14
+        if audioEncoderComputeUnits == .cpuAndNeuralEngine {
+            if #unavailable(macOS 14.0) {
+                audioEncoderComputeUnits = .cpuAndGPU
+            }
+        }
+        
         let computeOptions = ModelComputeOptions(
-            audioEncoderCompute: cliArguments.audioEncoderComputeUnits.asMLComputeUnits,
-            textDecoderCompute: cliArguments.textDecoderComputeUnits.asMLComputeUnits
+            audioEncoderCompute: audioEncoderComputeUnits,
+            textDecoderCompute: textDecoderComputeUnits
         )
 
         let downloadTokenizerFolder: URL? =

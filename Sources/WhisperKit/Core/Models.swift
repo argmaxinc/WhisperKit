@@ -151,7 +151,7 @@ public struct ModelComputeOptions {
         self.prefillCompute = prefillCompute
         self.textDecoderCompute = textDecoderCompute
         
-        if #available(macOS 14.0, *) {
+        if #available(macOS 14.0, iOS 17.0, watchOS 10, visionOS 1, *) {
             self.audioEncoderCompute = audioEncoderCompute ?? .cpuAndNeuralEngine
         } else {
             self.audioEncoderCompute = audioEncoderCompute ?? .cpuAndGPU
