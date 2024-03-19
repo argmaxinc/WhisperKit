@@ -182,7 +182,7 @@ public class WhisperKit: Transcriber {
         useBackgroundSession: Bool = false,
         from repo: String = "argmaxinc/whisperkit-coreml",
         progressCallback: ((Progress) -> Void)? = nil
-    ) async throws -> URL? {
+    ) async throws -> URL {
         let hubApi = HubApi(downloadBase: downloadBase, useBackgroundSession: useBackgroundSession)
         let repo = Hub.Repo(id: repo, type: .models)
         do {
@@ -197,9 +197,8 @@ public class WhisperKit: Transcriber {
             return modelFolderName
         } catch {
             Logging.debug(error)
+            throw error
         }
-
-        return nil
     }
 
     /// Sets up the model folder either from a local path or by downloading from a repository.
@@ -219,13 +218,12 @@ public class WhisperKit: Transcriber {
         } else if download {
             let repo = modelRepo ?? "argmaxinc/whisperkit-coreml"
             do {
-                let hubModelFolder = try await Self.download(
+                self.modelFolder = try await Self.download(
                     variant: modelVariant,
                     downloadBase: downloadBase,
                     useBackgroundSession: useBackgroundDownloadSession,
                     from: repo
                 )
-                self.modelFolder = hubModelFolder!
             } catch {
                 // Handle errors related to model downloading
                 throw WhisperError.modelsUnavailable("""
