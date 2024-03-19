@@ -20,8 +20,14 @@ struct CLIArguments: ParsableArguments {
     var downloadTokenizerPath: String?
 
     @Option(help: "Compute units for audio encoder model with {all,cpuOnly,cpuAndGPU,cpuAndNeuralEngine,random}")
-    var audioEncoderComputeUnits: ComputeUnits = .cpuAndNeuralEngine
-
+    var audioEncoderComputeUnits: ComputeUnits {
+        if #available(macOS 14.0, *) {
+            return .cpuAndNeuralEngine
+        } else {
+            return .cpuAndGpu
+        }
+    }
+    
     @Option(help: "Compute units for text decoder model with {all,cpuOnly,cpuAndGPU,cpuAndNeuralEngine,random}")
     var textDecoderComputeUnits: ComputeUnits = .cpuAndNeuralEngine
 
