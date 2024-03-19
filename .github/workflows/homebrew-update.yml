@@ -1,0 +1,15 @@
+name: Bump Homebrew Formula
+
+on:
+  push:
+    tags: 'v*'
+
+jobs:
+  homebrew:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: mislav/bump-homebrew-formula-action@v3
+        with:
+          formula-name: whisperkit-cli
+        env:
+          COMMITTER_TOKEN: ${{ secrets.COMMITTER_TOKEN }}
