@@ -21,7 +21,6 @@ struct CLIArguments: ParsableArguments {
 
     @Option(help: "Compute units for audio encoder model with {all,cpuOnly,cpuAndGPU,cpuAndNeuralEngine,random}")
     var audioEncoderComputeUnits: ComputeUnits = .cpuAndNeuralEngine
-    
     @Option(help: "Compute units for text decoder model with {all,cpuOnly,cpuAndGPU,cpuAndNeuralEngine,random}")
     var textDecoderComputeUnits: ComputeUnits = .cpuAndNeuralEngine
 
