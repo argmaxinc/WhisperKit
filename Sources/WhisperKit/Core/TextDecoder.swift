@@ -362,11 +362,14 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
                 }
             logitsFilters.append(
                 TimestampRulesFilter(
+                    transcribeToken: tokenizer.transcribeToken,
+                    translateToken: tokenizer.translateToken,
                     noTimestampsToken: tokenizer.noTimestampsToken,
                     timeTokenBegin: tokenizer.timeTokenBegin,
                     endToken: tokenizer.endToken,
-                    sampleBegin: prefilledIndex,
-                    maxInitialTimestampIndex: maxInitialTimestampIndex
+                    sampleBegin: intialPromptIndex,
+                    maxInitialTimestampIndex: maxInitialTimestampIndex,
+                    isModelMultilingual: isModelMultilingual(logitsDim: logitsSize)
                 )
             )
         }

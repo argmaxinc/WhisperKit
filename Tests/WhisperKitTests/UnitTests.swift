@@ -571,29 +571,81 @@ final class UnitTests: XCTestCase {
         let result5 = tokensFilter5.filterLogits(logits5, withTokens: [1, 2, 3])
         XCTAssertEqual(result5.data(for: 2), [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
     }
-
+    
     func testTimestampRulesFilter() throws {
+        // NOTE: for non-multilingual models we supress tokens immediately
         let tokensFilter1 = TimestampRulesFilter(
+            transcribeToken: 100,
+            translateToken: 101,
             noTimestampsToken: 2,
             timeTokenBegin: 4,
             endToken: 3,
             sampleBegin: 2,
-            maxInitialTimestampIndex: nil
+            maxInitialTimestampIndex: nil,
+            isModelMultilingual: false
         )
         let logits1 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2])
         let result1 = tokensFilter1.filterLogits(logits1, withTokens: [])
         XCTAssertEqual(result1.data(for: 2), [1.1, 5.2, -.infinity, 0.4, 0.2, 0.1, 0.2])
 
         let tokensFilter2 = TimestampRulesFilter(
+            transcribeToken: 100,
+            translateToken: 101,
             noTimestampsToken: 2,
             timeTokenBegin: 4,
             endToken: 3,
             sampleBegin: 2,
-            maxInitialTimestampIndex: nil
+            maxInitialTimestampIndex: nil,
+            isModelMultilingual: false
         )
         let logits2 = try MLMultiArray.logits([1.1, 0.2, 0.3, 0.4, 0.2, 0.1, 0.2])
         let result2 = tokensFilter2.filterLogits(logits2, withTokens: [])
         XCTAssertEqual(result2.data(for: 2), [-.infinity, -.infinity, -.infinity, -.infinity, 0.2, 0.1, 0.2])
+    }
+
+    func testTimestampRulesFilterMultilingual() throws {
+        // NOTE: for multilingual models we supress tokens only after transcribe or translate token
+        let tokensFilter1 = TimestampRulesFilter(
+            transcribeToken: 100,
+            translateToken: 101,
+            noTimestampsToken: 2,
+            timeTokenBegin: 4,
+            endToken: 3,
+            sampleBegin: 2,
+            maxInitialTimestampIndex: nil,
+            isModelMultilingual: true
+        )
+        let logits1 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2])
+        let result1 = tokensFilter1.filterLogits(logits1, withTokens: [])
+        XCTAssertEqual(result1.data(for: 2), [1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2])
+        
+        let tokensFilter2 = TimestampRulesFilter(
+            transcribeToken: 100,
+            translateToken: 101,
+            noTimestampsToken: 2,
+            timeTokenBegin: 4,
+            endToken: 3,
+            sampleBegin: 2,
+            maxInitialTimestampIndex: nil,
+            isModelMultilingual: true
+        )
+        let logits2 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2])
+        let result2 = tokensFilter2.filterLogits(logits2, withTokens: [100])
+        XCTAssertEqual(result2.data(for: 2), [1.1, 5.2, -.infinity, 0.4, 0.2, 0.1, 0.2])
+
+        let tokensFilter3 = TimestampRulesFilter(
+            transcribeToken: 100,
+            translateToken: 101,
+            noTimestampsToken: 2,
+            timeTokenBegin: 4,
+            endToken: 3,
+            sampleBegin: 2,
+            maxInitialTimestampIndex: nil,
+            isModelMultilingual: true
+        )
+        let logits3 = try MLMultiArray.logits([1.1, 0.2, 0.3, 0.4, 0.2, 0.1, 0.2])
+        let result3 = tokensFilter3.filterLogits(logits3, withTokens: [101])
+        XCTAssertEqual(result3.data(for: 2), [-.infinity, -.infinity, -.infinity, -.infinity, 0.2, 0.1, 0.2])
     }
 
     // MARK: - Word Timestamp Tests

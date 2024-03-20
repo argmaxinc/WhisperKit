@@ -144,6 +144,10 @@ func tokenizerNameForVariant(_ variant: ModelVariant) -> String {
     return tokenizerName
 }
 
+func isModelMultilingual(logitsDim: Int?) -> Bool {
+    logitsDim != 51864
+}
+
 func detectVariant(logitsDim: Int, encoderDim: Int) -> ModelVariant {
     // Defaults
     var modelVariant: ModelVariant = .base
