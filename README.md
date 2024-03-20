@@ -39,6 +39,8 @@ Check out the demo app on [TestFlight](https://testflight.apple.com/join/LPVOyJZ
 
 ## Installation
 
+### Swift Package Manager
+
 WhisperKit can be integrated into your Swift project using the Swift Package Manager.
 
 ### Prerequisites
@@ -53,6 +55,14 @@ WhisperKit can be integrated into your Swift project using the Swift Package Man
 3. Enter the package repository URL: `https://github.com/argmaxinc/whisperkit`.
 4. Choose the version range or specific version.
 5. Click `Finish` to add WhisperKit to your project.
+
+### Homebrew
+
+You can install `WhisperKit` command line app using [Homebrew](https://brew.sh) by running the following command:
+
+```bash
+brew install whisperkit-cli
+```  
 
 ## Getting Started
 

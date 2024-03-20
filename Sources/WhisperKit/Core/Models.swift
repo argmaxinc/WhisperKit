@@ -136,7 +136,7 @@ public struct ModelComputeOptions {
 
     public init(
         melCompute: MLComputeUnits = .cpuAndGPU,
-        audioEncoderCompute: MLComputeUnits = .cpuAndNeuralEngine,
+        audioEncoderCompute: MLComputeUnits? = nil,
         textDecoderCompute: MLComputeUnits = .cpuAndNeuralEngine,
         prefillCompute: MLComputeUnits = .cpuOnly
     ) {
@@ -147,10 +147,16 @@ public struct ModelComputeOptions {
             self.prefillCompute = .cpuOnly
             return
         }
+        
         self.melCompute = melCompute
-        self.audioEncoderCompute = audioEncoderCompute
-        self.textDecoderCompute = textDecoderCompute
         self.prefillCompute = prefillCompute
+        self.textDecoderCompute = textDecoderCompute
+        
+        if #available(macOS 14.0, iOS 17.0, watchOS 10, visionOS 1, *) {
+            self.audioEncoderCompute = audioEncoderCompute ?? .cpuAndNeuralEngine
+        } else {
+            self.audioEncoderCompute = audioEncoderCompute ?? .cpuAndGPU
+        }
     }
 }
 
