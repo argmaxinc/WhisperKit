@@ -11,7 +11,7 @@ import XCTest
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 final class UnitTests: XCTestCase {
     func testInit() async {
-        let whisperKit = try? await WhisperKit(prewarm: false, load: false, download: false)
+        let whisperKit = try? await WhisperKit(prewarm: false, load: false)
         XCTAssertNotNil(whisperKit)
     }
 

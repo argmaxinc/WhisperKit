@@ -24,10 +24,10 @@ public class WhisperKit: Transcriber {
     public var tokenizer: Tokenizer?
 
     /// Protocols
+    public var featureExtractor: any FeatureExtracting & WhisperMLModel
+    public var audioEncoder: any AudioEncoding & WhisperMLModel
+    public var textDecoder: any TextDecoding & WhisperMLModel
     public var audioProcessor: any AudioProcessing
-    public var featureExtractor: any FeatureExtracting
-    public var audioEncoder: any AudioEncoding
-    public var textDecoder: any TextDecoding
     public var logitsFilters: [any LogitsFiltering]
     public var segmentSeeker: any SegmentSeeking
 
@@ -50,9 +50,9 @@ public class WhisperKit: Transcriber {
     public let progress = Progress()
     
     /// Configuration
-    public var modelFolder: URL?
+    public var modelFolder: URL
     public var tokenizerFolder: URL?
-    private let useBackgroundDownloadSession: Bool
+    public let useBackgroundDownloadSession: Bool
 
     public init(
         model: String? = nil,
@@ -62,18 +62,18 @@ public class WhisperKit: Transcriber {
         tokenizerFolder: URL? = nil,
         computeOptions: ModelComputeOptions? = nil,
         audioProcessor: (any AudioProcessing)? = nil,
-        featureExtractor: (any FeatureExtracting)? = nil,
-        audioEncoder: (any AudioEncoding)? = nil,
-        textDecoder: (any TextDecoding)? = nil,
+        featureExtractor: (any FeatureExtracting & WhisperMLModel)? = nil,
+        audioEncoder: (any AudioEncoding & WhisperMLModel)? = nil,
+        textDecoder: (any TextDecoding & WhisperMLModel)? = nil,
         logitsFilters: [any LogitsFiltering]? = nil,
         segmentSeeker: (any SegmentSeeking)? = nil,
         verbose: Bool = true,
         logLevel: Logging.LogLevel = .info,
         prewarm: Bool? = nil,
         load: Bool? = nil,
-        download: Bool = true,
         useBackgroundDownloadSession: Bool = false
     ) async throws {
+        Logging.shared.logLevel = verbose ? logLevel : .none
         self.modelCompute = computeOptions ?? ModelComputeOptions()
         self.audioProcessor = audioProcessor ?? AudioProcessor()
         self.featureExtractor = featureExtractor ?? FeatureExtractor()
@@ -83,15 +83,13 @@ public class WhisperKit: Transcriber {
         self.segmentSeeker = segmentSeeker ?? SegmentSeeker()
         self.tokenizerFolder = tokenizerFolder
         self.useBackgroundDownloadSession = useBackgroundDownloadSession
-        Logging.shared.logLevel = verbose ? logLevel : .none
-        currentTimings = TranscriptionTimings()
-
-        try await setupModels(
+        self.currentTimings = TranscriptionTimings()
+        self.modelFolder = try await Self.setupModelFolder(
             model: model,
             downloadBase: downloadBase,
             modelRepo: modelRepo,
             modelFolder: modelFolder,
-            download: download
+            useBackgroundDownloadSession: useBackgroundDownloadSession
         )
 
         if let prewarm = prewarm, prewarm {
@@ -192,9 +190,7 @@ public class WhisperKit: Transcriber {
                     callback(progress)
                 }
             }
-
-            let modelFolderName = modelFolder.appending(path: "openai_whisper-\(variant)")
-            return modelFolderName
+            return modelFolder.appending(path: "openai_whisper-\(variant)")
         } catch {
             Logging.debug(error)
             throw error
@@ -202,35 +198,26 @@ public class WhisperKit: Transcriber {
     }
 
     /// Sets up the model folder either from a local path or by downloading from a repository.
-    public func setupModels(
+    public static func setupModelFolder(
         model: String?,
         downloadBase: URL? = nil,
         modelRepo: String?,
         modelFolder: String?,
-        download: Bool
-    ) async throws {
+        useBackgroundDownloadSession: Bool
+    ) async throws -> URL {
         // Determine the model variant to use
         let modelVariant = model ?? WhisperKit.recommendedModels().default
-
         // If a local model folder is provided, use it; otherwise, download the model
-        if let folder = modelFolder {
-            self.modelFolder = URL(fileURLWithPath: folder)
-        } else if download {
+        if let modelFolder {
+            return URL(fileURLWithPath: modelFolder)
+        } else {
             let repo = modelRepo ?? "argmaxinc/whisperkit-coreml"
-            do {
-                self.modelFolder = try await Self.download(
-                    variant: modelVariant,
-                    downloadBase: downloadBase,
-                    useBackgroundSession: useBackgroundDownloadSession,
-                    from: repo
-                )
-            } catch {
-                // Handle errors related to model downloading
-                throw WhisperError.modelsUnavailable("""
-                Model not found. Please check the model or repo name and try again.
-                Error: \(error)
-                """)
-            }
+            return try await Self.download(
+                variant: modelVariant,
+                downloadBase: downloadBase,
+                useBackgroundSession: useBackgroundDownloadSession,
+                from: repo
+            )
         }
     }
 
@@ -245,16 +232,12 @@ public class WhisperKit: Transcriber {
 
         let modelLoadStart = CFAbsoluteTimeGetCurrent()
 
-        guard let path = modelFolder else {
-            throw WhisperError.modelsUnavailable("Model folder is not set.")
-        }
+        Logging.debug("Loading models from \(modelFolder.path) with prewarmMode: \(prewarmMode)")
 
-        Logging.debug("Loading models from \(path.path) with prewarmMode: \(prewarmMode)")
-
-        let logmelUrl = path.appending(path: "MelSpectrogram.mlmodelc")
-        let encoderUrl = path.appending(path: "AudioEncoder.mlmodelc")
-        let decoderUrl = path.appending(path: "TextDecoder.mlmodelc")
-        let decoderPrefillUrl = path.appending(path: "TextDecoderContextPrefill.mlmodelc")
+        let logmelUrl = modelFolder.appending(path: "MelSpectrogram.mlmodelc")
+        let encoderUrl = modelFolder.appending(path: "AudioEncoder.mlmodelc")
+        let decoderUrl = modelFolder.appending(path: "TextDecoder.mlmodelc")
+        let decoderPrefillUrl = modelFolder.appending(path: "TextDecoderContextPrefill.mlmodelc")
 
         for item in [logmelUrl, encoderUrl, decoderUrl] {
             if !FileManager.default.fileExists(atPath: item.path) {
@@ -262,35 +245,29 @@ public class WhisperKit: Transcriber {
             }
         }
 
-        if var featureExtractor = featureExtractor as? WhisperMLModel {
-            Logging.debug("Loading feature extractor")
-            try await featureExtractor.loadModel(
-                at: logmelUrl,
-                computeUnits: modelCompute.melCompute, // hardcoded to use GPU
-                prewarmMode: prewarmMode
-            )
-            Logging.debug("Loaded feature extractor")
-        }
+        Logging.debug("Loading feature extractor")
+        try await featureExtractor.loadModel(
+            at: logmelUrl,
+            computeUnits: modelCompute.melCompute, // hardcoded to use GPU
+            prewarmMode: prewarmMode
+        )
+        Logging.debug("Loaded feature extractor")
 
-        if var audioEncoder = audioEncoder as? WhisperMLModel {
-            Logging.debug("Loading audio encoder")
-            try await audioEncoder.loadModel(
-                at: encoderUrl,
-                computeUnits: modelCompute.audioEncoderCompute,
-                prewarmMode: prewarmMode
-            )
-            Logging.debug("Loaded audio encoder")
-        }
+        Logging.debug("Loading audio encoder")
+        try await audioEncoder.loadModel(
+            at: encoderUrl,
+            computeUnits: modelCompute.audioEncoderCompute,
+            prewarmMode: prewarmMode
+        )
+        Logging.debug("Loaded audio encoder")
 
-        if var textDecoder = textDecoder as? WhisperMLModel {
-            Logging.debug("Loading text decoder")
-            try await textDecoder.loadModel(
-                at: decoderUrl,
-                computeUnits: modelCompute.textDecoderCompute,
-                prewarmMode: prewarmMode
-            )
-            Logging.debug("Loaded text decoder")
-        }
+        Logging.debug("Loading text decoder")
+        try await textDecoder.loadModel(
+            at: decoderUrl,
+            computeUnits: modelCompute.textDecoderCompute,
+            prewarmMode: prewarmMode
+        )
+        Logging.debug("Loaded text decoder")
 
         if FileManager.default.fileExists(atPath: decoderPrefillUrl.path) {
             Logging.debug("Loading text decoder prefill data")
@@ -336,14 +313,11 @@ public class WhisperKit: Transcriber {
     public func unloadModels() async {
         modelState = .unloading
 
-        for model in [featureExtractor, audioEncoder, textDecoder] {
-            if var model = model as? WhisperMLModel {
-                model.unloadModel()
-            }
-        }
+        featureExtractor.unloadModel()
+        audioEncoder.unloadModel()
+        textDecoder.unloadModel()
 
         modelState = .unloaded
-
         Logging.info("Unloaded all models")
     }
 
