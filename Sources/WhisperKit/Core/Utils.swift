@@ -30,6 +30,15 @@ extension MLMultiArray {
         return linearOffset
     }
 
+    func fillLastDimension(indexes: Range<Int>, with value: FloatType) {
+        precondition(shape.count == 3 && shape[0] == 1 && shape[1] == 1, "Must have [1, 1, n] shape")
+        withUnsafeMutableBufferPointer(ofType: FloatType.self) { ptr, strides in
+            for index in indexes {
+                ptr[index * strides[2]] = value
+            }
+        }
+    }
+
     func fill<Value>(indexes: [[NSNumber]], with value: Value) {
         let pointer = UnsafeMutablePointer<Value>(OpaquePointer(dataPointer))
         let strideInts = strides.map { $0.intValue }
@@ -133,6 +142,10 @@ func tokenizerNameForVariant(_ variant: ModelVariant) -> String {
     }
 
     return tokenizerName
+}
+
+func isModelMultilingual(logitsDim: Int?) -> Bool {
+    logitsDim != 51864
 }
 
 func detectVariant(logitsDim: Int, encoderDim: Int) -> ModelVariant {

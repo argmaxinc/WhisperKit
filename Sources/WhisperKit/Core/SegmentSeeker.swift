@@ -87,21 +87,19 @@ public class SegmentSeeker: SegmentSeeking {
         let lastThreeTokens = isTimestampToken.suffix(3)
         let singleTimestampEnding = lastThreeTokens == [false, true, false]
 
-        // find all indexes of time token pairs
-        var consecutive = [(start: Int, end: Int)]()
+        // find all end indexes of time token pairs
+        var sliceIndexes = [Int]()
 
         var previousTokenIsTimestamp = false
-        for (i, tokenIsTimestamp) in isTimestampToken.enumerated() {
-            if previousTokenIsTimestamp && tokenIsTimestamp {
-                consecutive.append((i - 1, i))
+        for (currentTokenIsTimestampIndex, currentTokenIsTimestamp) in isTimestampToken.enumerated() {
+            if previousTokenIsTimestamp && currentTokenIsTimestamp {
+                sliceIndexes.append(currentTokenIsTimestampIndex)
             }
-            previousTokenIsTimestamp = tokenIsTimestamp
+            previousTokenIsTimestamp = currentTokenIsTimestamp
         }
 
-        if !consecutive.isEmpty {
-            // Window contains multiple consecutive timestamps, split into sub-segments
-            var sliceIndexes = consecutive.map { $0.end }
-
+        // Window contains multiple consecutive timestamps, split into sub-segments
+        if !sliceIndexes.isEmpty {
             // If the last timestamp is not consecutive, we need to add it as the final slice manually
             if singleTimestampEnding {
                 let singleTimestampEndingIndex = isTimestampToken.lastIndex(where: { $0 })!

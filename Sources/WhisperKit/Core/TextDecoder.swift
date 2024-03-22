@@ -354,8 +354,24 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
         }
 
         if !options.withoutTimestamps {
-            // TODO: implement
-            // logitsFilters.append(TimestampRulesFilter(tokenizer: tokenizer, sampleBegin: prefilledIndex))
+            let maxInitialTimestampIndex: Int? =
+                if let maxInitialTimestamp = options.maxInitialTimestamp {
+                    Int(maxInitialTimestamp / WhisperKit.secondsPerTimeToken)
+                } else {
+                    nil
+                }
+            logitsFilters.append(
+                TimestampRulesFilter(
+                    transcribeToken: tokenizer.transcribeToken,
+                    translateToken: tokenizer.translateToken,
+                    noTimestampsToken: tokenizer.noTimestampsToken,
+                    timeTokenBegin: tokenizer.timeTokenBegin,
+                    endToken: tokenizer.endToken,
+                    sampleBegin: intialPromptIndex,
+                    maxInitialTimestampIndex: maxInitialTimestampIndex,
+                    isModelMultilingual: isModelMultilingual(logitsDim: logitsSize)
+                )
+            )
         }
 
         // MARK: Main loop
@@ -416,6 +432,9 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
             for filter in logitsFilters {
                 logits = filter.filterLogits(logits, withTokens: currentTokens)
             }
+
+            let filteringTime = Date().timeIntervalSince(nonInferenceStartTime)
+            timings.decodingFiltering += filteringTime
 
             // MARK: Sampling
 
