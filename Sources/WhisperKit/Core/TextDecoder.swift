@@ -104,7 +104,7 @@ public extension TextDecoding {
         return decoderInputs
     }
 
-    func prefillDecoderInputs(_ decoderInputs: DecodingInputs, withOptions options: DecodingOptions?, multilingual: Bool) async throws -> DecodingInputs {
+    func prefillDecoderInputs(_ decoderInputs: DecodingInputs, withOptions options: DecodingOptions, multilingual: Bool) async throws -> DecodingInputs {
         guard let tokenizer = tokenizer else {
             // Tokenizer required for prefill
             throw WhisperError.tokenizerUnavailable()
@@ -117,8 +117,7 @@ public extension TextDecoding {
 
         var languageToken: Int = tokenizer.englishToken
         var taskToken: Int = tokenizer.transcribeToken
-        if let options = options,
-           multilingual // Multilingual models require language and task tokens
+        if multilingual // Multilingual models require language and task tokens
         {
             // Set languageToken
             let languageTokenString = "<|\(options.language ?? "en")|>"
@@ -131,13 +130,13 @@ public extension TextDecoding {
             prefillTokens.append(taskToken)
         }
 
-        let timestampsToken = options?.withoutTimestamps ?? false ? tokenizer.noTimestampsToken : tokenizer.timeTokenBegin // withoutTimestamps must be non-nil and true in order to disable it
+        let timestampsToken = options.withoutTimestamps ? tokenizer.noTimestampsToken : tokenizer.timeTokenBegin // withoutTimestamps must be non-nil and true in order to disable it
         prefillTokens.append(timestampsToken)
+        prefillTokens.append(contentsOf: options.initialPromptTokens)
 
         prefilledDecoderInputs.initialPrompt = prefillTokens
 
-        if let options = options,
-           options.usePrefillCache,
+        if options.usePrefillCache,
            prefillData != nil
         {
             // Prefilling kv cache data requires non-nil task and language tokens, set defaults if not provided
@@ -331,7 +330,7 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
         let intialPromptIndex = decoderInputs.initialPrompt.count - 1
         var currentTokens: [Int] = decoderInputs.initialPrompt
         var nextToken: Int = decoderInputs.initialPrompt.last!
-        var logProbs: [Float] = Array(repeating: 0, count: prefilledIndex + 1)
+        var logProbs: [Float] = Array(repeating: 0, count: currentTokens.count)
 
         guard let tokenizer = tokenizer else {
             // Tokenizer required for decoding
@@ -360,7 +359,7 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
 
         // MARK: Main loop
 
-        let loopCount = min(options.sampleLength, WhisperKit.maxTokenContext)
+        let loopCount = min(options.sampleLength, WhisperKit.maxTokenContext - 1)
         Logging.debug("Running main loop for a maximum of \(loopCount) iterations, starting at index \(prefilledIndex)")
         var isPrefill: Bool
         var hasAlignment = false
@@ -424,12 +423,12 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
             let sampleResult = tokenSampler.update(tokens: currentTokens, logits: logits, logProbs: logProbs)
 
             nextToken = sampleResult.tokens.last!
-            logProbs = sampleResult.logProbs
+            let logProb = sampleResult.logProbs.last!
 
             let samplingTime = Date().timeIntervalSince(samplingStartTime)
             timings.decodingSampling += samplingTime
 
-            if sampleResult.completed || currentTokens.count >= WhisperKit.maxTokenContext {
+            if sampleResult.completed || currentTokens.count >= WhisperKit.maxTokenContext - 1  {
                 // Completed segment, stop the loop
                 break
             } else {
@@ -438,6 +437,7 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
                 if !isPrefill {
                     // Found the next token, store it
                     currentTokens.append(nextToken)
+                    logProbs.append(logProb)
                 }
 
                 // Update KV cache for this token
@@ -557,12 +557,13 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
                 decoderInputs.inputIds[0].floatValue
             )
         )
-        Logging.debug("Key Cache | Val Cache | Update Mask | Decoder Mask | Position")
+        Logging.debug("Key Cache | Val Cache | Align Cache | Update Mask | Decoder Mask | Position")
 
-        for i in 0..<prefillSize + 4 {
-            let formattedString = String(format: "%9.6f | %9.6f | %11.0f | %12.0f | %d",
+        for i in 0..<min(prefillSize + 4, WhisperKit.maxTokenContext) {
+            let formattedString = String(format: "%9.6f | %9.6f | %9.6f | %11.0f | %12.0f | %d",
                                          decoderInputs.keyCache[i].floatValue,
                                          decoderInputs.valueCache[i].floatValue,
+                                         decoderInputs.alignmentWeights[i*1500].floatValue,
                                          decoderInputs.kvCacheUpdateMask[i].floatValue,
                                          decoderInputs.decoderKeyPaddingMask[i].floatValue,
                                          i)

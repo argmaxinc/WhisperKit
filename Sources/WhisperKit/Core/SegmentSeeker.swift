@@ -86,6 +86,8 @@ public class SegmentSeeker: SegmentSeeking {
         // check if single or double timestamp ending
         let lastThreeTokens = isTimestampToken.suffix(3)
         let singleTimestampEnding = lastThreeTokens == [false, true, false]
+        let noTimestampEnding = lastThreeTokens == [false, false, false]
+
 
         // find all indexes of time token pairs
         var consecutive = [(start: Int, end: Int)]()
@@ -106,6 +108,8 @@ public class SegmentSeeker: SegmentSeeking {
             if singleTimestampEnding {
                 let singleTimestampEndingIndex = isTimestampToken.lastIndex(where: { $0 })!
                 sliceIndexes.append(singleTimestampEndingIndex + 1)
+            } else if noTimestampEnding {
+                sliceIndexes.append(currentTokens.count)
             }
 
             var lastSliceStart = 0
@@ -140,10 +144,14 @@ public class SegmentSeeker: SegmentSeeking {
             }
 
             // Seek to the last timestamp in the segment
-            let lastTimestampToken = currentTokens[lastSliceStart] - timeToken
-            let lastTimestampSeconds = Float(lastTimestampToken) * secondsPerTimeToken
-            let lastTimestampSamples = Int(lastTimestampSeconds * Float(sampleRate))
-            seek += lastTimestampSamples
+            if !noTimestampEnding {
+                let lastTimestampToken = currentTokens[lastSliceStart] - timeToken
+                let lastTimestampSeconds = Float(lastTimestampToken) * secondsPerTimeToken
+                let lastTimestampSamples = Int(lastTimestampSeconds * Float(sampleRate))
+                seek += lastTimestampSamples
+            } else {
+                seek += segmentSize
+            }
         } else {
             // Model is not giving any consecutive timestamps, so lump all the current tokens together
             var durationSeconds = Float(segmentSize) / Float(sampleRate)

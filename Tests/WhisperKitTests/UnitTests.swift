@@ -830,9 +830,186 @@ final class UnitTests: XCTestCase {
             XCTAssertEqual(mergedAlignmentTiming[i].probability, expectedWordTimings[i].probability, "Probability at index \(i) does not match")
         }
     }
+
+    func testWordTimestampCorrectness() async {
+        let options = DecodingOptions(wordTimestamps: true)
+
+        guard let result = try? await transcribe(with: .tiny, options: options) else {
+            XCTFail("Failed to transcribe")
+            return
+        }
+
+        let wordTimings = result.segments.compactMap { $0.words }.flatMap { $0 }
+
+        let expectedWordTimings = [
+            WordTiming(word: " And", tokens: [400], start: 0.32, end: 0.68, probability: 0.85),
+            WordTiming(word: " so", tokens: [370], start: 0.68, end: 1.1, probability: 1.0),
+            WordTiming(word: " my", tokens: [452], start: 1.1, end: 1.36, probability: 0.51),
+            WordTiming(word: " fellow", tokens: [7177], start: 1.36, end: 1.74, probability: 0.52),
+            WordTiming(word: " Americans", tokens: [6280], start: 1.74, end: 2.26, probability: 0.82),
+            WordTiming(word: " ask", tokens: [1029], start: 2.26, end: 3.82, probability: 0.4),
+            WordTiming(word: " not", tokens: [406], start: 3.82, end: 4.56, probability: 1.0),
+            WordTiming(word: " what", tokens: [437], start: 4.56, end: 5.68, probability: 0.91),
+            WordTiming(word: " your", tokens: [428], start: 5.68, end: 5.92, probability: 0.22),
+            WordTiming(word: " country", tokens: [1941], start: 5.92, end: 6.38, probability: 0.64),
+            WordTiming(word: " can", tokens: [393], start: 6.38, end: 6.76, probability: 0.52),
+            WordTiming(word: " do", tokens: [360], start: 6.76, end: 6.98, probability: 0.85),
+            WordTiming(word: " for", tokens: [337], start: 6.98, end: 7.22, probability: 0.97),
+            WordTiming(word: " you,", tokens: [291, 11], start: 7.22, end: 8.36, probability: 0.97),
+            WordTiming(word: " ask", tokens: [1029], start: 8.36, end: 8.66, probability: 0.93),
+            WordTiming(word: " what", tokens: [437], start: 8.66, end: 8.86, probability: 0.98),
+            WordTiming(word: " you", tokens: [291], start: 8.86, end: 9.22, probability: 0.06),
+            WordTiming(word: " can", tokens: [393], start: 9.22, end: 9.44, probability: 0.58),
+            WordTiming(word: " do", tokens: [360], start: 9.44, end: 9.64, probability: 0.87),
+            WordTiming(word: " for", tokens: [337], start: 9.64, end: 9.86, probability: 0.95),
+            WordTiming(word: " your", tokens: [428], start: 9.86, end: 10.06, probability: 0.96),
+            WordTiming(word: " country.", tokens: [1941, 13], start: 10.06, end: 10.5, probability: 0.91)
+        ]
+
+        XCTAssertEqual(wordTimings.count, expectedWordTimings.count, "Number of word timings should match")
+
+        for (index, wordTiming) in wordTimings.enumerated() {
+            let expectedWordTiming = expectedWordTimings[index]
+
+            XCTAssertEqual(wordTiming.word, expectedWordTiming.word, "Word should match at index \(index)")
+            XCTAssertEqual(wordTiming.tokens, expectedWordTiming.tokens, "Tokens should match at index \(index)")
+
+            let startTimeDifference = abs(wordTiming.start - expectedWordTiming.start)
+            XCTAssertLessThanOrEqual(startTimeDifference, 0.1, "Start time difference for word '\(wordTiming.word)' should be within +/- 0.1 seconds (expected: \(expectedWordTiming.start), actual: \(wordTiming.start))")
+
+            let endTimeDifference = abs(wordTiming.end - expectedWordTiming.end)
+            XCTAssertLessThanOrEqual(endTimeDifference, 0.1, "End time difference for word '\(wordTiming.word)' should be within +/- 0.1 seconds (expected: \(expectedWordTiming.end), actual: \(wordTiming.end))")
+
+            let probabilityDifference = abs(wordTiming.probability - expectedWordTiming.probability)
+            XCTAssertLessThanOrEqual(probabilityDifference, 0.1, "Probability difference for word '\(wordTiming.word)' should be within +/- 0.1 (expected: \(expectedWordTiming.probability), actual: \(wordTiming.probability))")
+        }
+    }
+
+    // MARK: - Streaming Timestamp Tests
+
+    func testStreamingTimestamps() async throws {
+        let options = DecodingOptions(usePrefillPrompt: true, wordTimestamps: true)
+//        let audioFile = "ted_60.m4a"
+        let audioFile = "jfk.wav"
+        let modelPath = tinyModelPath()
+//        let modelPath = largev3ModelPath()
+//        let computeOptions = ModelComputeOptions(
+//            melCompute: .cpuOnly,
+//            audioEncoderCompute: .cpuOnly,
+//            textDecoderCompute: .cpuOnly,
+//            prefillCompute: .cpuOnly
+//        )
+
+        let whisperKit = try await WhisperKit(modelFolder: modelPath,/* computeOptions: computeOptions,*/ verbose: true, logLevel: .debug)
+
+        // Get the current decoderState from the textDecoder
+        let textDecoder = whisperKit.textDecoder as! TextDecoder
+//        var decodingState = textDecoder.decodingState
+
+
+        // Create a new DecodingInputs instance if decoderState is nil
+//        if decodingState == nil {
+//            let decodingInputs = textDecoder.prepareDecoderInputs(withPrompt: [whisperKit.tokenizer!.startOfTranscriptToken])!
+//            decodingState = DecodingState(
+//                decodingInputs: decodingInputs,
+//                currentTokens: decodingInputs.initialPrompt,
+//                logProbs: Array(repeating: 0, count: decodingInputs.initialPrompt.count)
+//            )
+//        }
+
+        let startTime = Date()
+        let audioComponents = audioFile.components(separatedBy: ".")
+        guard let audioFileURL = Bundle.module.path(forResource: audioComponents.first, ofType: audioComponents.last) else {
+            XCTFail("Audio file not found")
+            return
+        }
+        guard let audioBuffer = AudioProcessor.loadAudio(fromPath: audioFileURL) else {
+            XCTFail("Failed to load audio buffer")
+            return
+        }
+        let audioArray = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
+
+
+        var results: [TranscriptionResult?] = []
+        var prevResult: TranscriptionResult?
+        var lastAgreedSeconds: Float = 0.0
+        let agreementCountNeeded = 3
+        var hypothesisWords: [WordTiming] = []
+        var prevWords: [WordTiming] = []
+        var lastAgreedWords: [WordTiming] = []
+        var confirmedWords: [WordTiming] = []
+
+        for seekSample in stride(from: 0, to: audioArray.count, by: 16000) {
+            let endSample = min(seekSample + 16000, audioArray.count)
+            Logging.info("[testStreamingTimestamps] \(lastAgreedSeconds)-\(Double(endSample)/16000.0) seconds")
+
+            let simulatedStreamingAudio = Array(audioArray[..<endSample])
+            var streamOptions = options
+            streamOptions.clipTimestamps = [lastAgreedSeconds]
+            let lastAgreedTokens = lastAgreedWords.flatMap { $0.tokens }
+            streamOptions.initialPromptTokens = lastAgreedTokens
+            do {
+                let result: TranscriptionResult? = try await whisperKit.transcribe(audioArray: simulatedStreamingAudio, decodeOptions: streamOptions)
+                if let result = result {
+                    hypothesisWords = result.allWords.filter { $0.start > lastAgreedSeconds - 0.1 }
+
+                    if let prevResult = prevResult {
+                        prevWords = prevResult.allWords.filter { $0.start > lastAgreedSeconds - 0.1 }
+                        let commonPrefix = findLongestCommonPrefix(prevWords, hypothesisWords)
+                        Logging.info("[testStreamingTimestamps] Prev \"\((prevWords.map { $0.word }).joined())\"")
+                        Logging.info("[testStreamingTimestamps] Next \"\((hypothesisWords.map { $0.word }).joined())\"")
+                        Logging.info("[testStreamingTimestamps] Found common prefix \"\((commonPrefix.map { $0.word }).joined())\"")
+
+                        if commonPrefix.count >= agreementCountNeeded {
+                            lastAgreedWords = commonPrefix.suffix(agreementCountNeeded)
+                            lastAgreedSeconds = lastAgreedWords.first!.start
+                            Logging.info("[testStreamingTimestamps] Found new last agreed word \(lastAgreedWords.first!.word) at \(lastAgreedSeconds) seconds")
+
+                            confirmedWords.append(contentsOf: commonPrefix.prefix(commonPrefix.count - agreementCountNeeded))
+                            let currentWords = confirmedWords.map { $0.word }.joined()
+                            Logging.info("[testStreamingTimestamps] Current:  \(lastAgreedSeconds) -> \(Double(endSample)/16000.0) \(currentWords)")
+                        } else {
+                            Logging.info("[testStreamingTimestamps] Using same last agreed time \(lastAgreedSeconds)")
+                        }
+
+
+                    }
+                    prevResult = result
+                }
+                results.append(result)
+            } catch {
+                XCTFail(error.localizedDescription)
+            }
+        }
+
+        // Accept the final hypothesis because it is the last of the available audio
+        let final = lastAgreedWords + findLongestDifferentSuffix(prevWords, hypothesisWords)
+        confirmedWords.append(contentsOf: final)
+
+        let finalWords = confirmedWords.map { $0.word }.joined()
+        Logging.info("[testStreamingTimestamps] Current: \(finalWords)")
+        Logging.info("[testStreamingTimestamps] Time taken: \(Date().timeIntervalSince(startTime)) seconds")
+
+        // Perform assertions or further processing with the results array
+        Logging.info("[testStreamingTimestamps] Done")
+
+        XCTAssertEqual(finalWords, " And so my fellow Americans. Ask not what your country can do for you ask what you can do for your country.")
+    }
+
+    func findLongestCommonPrefix(_ words1: [WordTiming], _ words2: [WordTiming]) -> [WordTiming] {
+        let commonPrefix = zip(words1, words2).prefix(while: { $0.word == $1.word })
+        return commonPrefix.map { $0.0 }
+    }
+
+    func findLongestDifferentSuffix(_ words1: [WordTiming], _ words2: [WordTiming]) -> [WordTiming] {
+        let commonPrefix = findLongestCommonPrefix(words1, words2)
+        let remainingWords = words2[commonPrefix.count...]
+        return Array(remainingWords)
+    }
+
 }
 
-// MARK: Helpers
+// MARK: - Helpers
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 extension MLMultiArray {

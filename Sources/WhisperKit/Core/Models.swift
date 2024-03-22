@@ -203,9 +203,12 @@ public struct DecodingCache {
 ///   - sampleLength: The maximum number of tokens to sample.
 ///   - topK: Number of candidates when sampling with non-zero temperature.
 ///   - usePrefillPrompt: If true, the prefill tokens will be forced according to task and language settings.
-///   - usePrefillPrompt: If true, the kv cache will be prefilled based on the prefill data mlmodel.
+///   - usePrefillCache: If true, the kv cache will be prefilled based on the prefill data mlmodel.
 ///   - skipSpecialTokens: Whether to skip special tokens in the output.
 ///   - withoutTimestamps: Whether to include timestamps in the transcription result.
+///   - wordTimestamps: Whether to include word-level timestamps in the transcription result.
+///   - clipTimestamps: Array of timestamps (in seconds) to split the audio into segments for transcription.
+///   - initialPromptTokens: Array of token IDs to use as the initial prompt for the decoder. These are appended to the prefill tokens.
 ///   - suppressBlank: If true, blank tokens will be suppressed during decoding.
 ///   - supressTokens: List of token IDs to suppress during decoding.
 ///   - compressionRatioThreshold: If the compression ratio of the transcription text is above this value, it is too repetitive and treated as failed.
@@ -228,6 +231,7 @@ public struct DecodingOptions {
     public var withoutTimestamps: Bool
     public var wordTimestamps: Bool
     public var clipTimestamps: [Float]
+    public var initialPromptTokens: [Int]
     public var suppressBlank: Bool
     public var supressTokens: [Int]
     public var compressionRatioThreshold: Float?
@@ -248,6 +252,7 @@ public struct DecodingOptions {
                 withoutTimestamps: Bool = false,
                 wordTimestamps: Bool = false,
                 clipTimestamps: [Float] = [],
+                initialPromptTokens: [Int] = [],
                 suppressBlank: Bool = false,
                 supressTokens: [Int]? = nil,
                 compressionRatioThreshold: Float? = 2.4,
@@ -268,6 +273,7 @@ public struct DecodingOptions {
         self.withoutTimestamps = withoutTimestamps
         self.wordTimestamps = wordTimestamps
         self.clipTimestamps = clipTimestamps
+        self.initialPromptTokens = initialPromptTokens
         self.suppressBlank = suppressBlank
         self.supressTokens = supressTokens ?? [] // nonSpeechTokens() // TODO: implement these as default
         self.compressionRatioThreshold = compressionRatioThreshold
@@ -342,6 +348,12 @@ public struct TranscriptionResult: Codable {
     public var segments: [TranscriptionSegment]
     public var language: String
     public var timings: TranscriptionTimings?
+}
+
+public extension TranscriptionResult {
+    var allWords: [WordTiming] {
+        return segments.compactMap { $0.words }.flatMap { $0 }
+    }
 }
 
 public struct TranscriptionSegment: Hashable, Codable {
