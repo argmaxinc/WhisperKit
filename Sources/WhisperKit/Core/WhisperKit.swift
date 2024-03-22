@@ -443,7 +443,7 @@ public class WhisperKit: Transcriber {
         let prefillStartTime = CFAbsoluteTimeGetCurrent()
         var prefilledCacheSize = 0
         if options.usePrefillPrompt {
-            guard let prefilledInputs = try? await textDecoder.prefillDecoderInputs(decoderInputs, withOptions: options, multilingual: modelVariant.isMultilingual) else {
+            guard let prefilledInputs = try? await textDecoder.prefillDecoderInputs(decoderInputs, withOptions: options) else {
                 throw WhisperError.prefillFailed()
             }
             decoderInputs = prefilledInputs

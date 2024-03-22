@@ -105,7 +105,7 @@ public extension TextDecoding {
         return decoderInputs
     }
 
-    func prefillDecoderInputs(_ decoderInputs: DecodingInputs, withOptions options: DecodingOptions?, multilingual: Bool) async throws -> DecodingInputs {
+    func prefillDecoderInputs(_ decoderInputs: DecodingInputs, withOptions options: DecodingOptions?) async throws -> DecodingInputs {
         guard let tokenizer = tokenizer else {
             // Tokenizer required for prefill
             throw WhisperError.tokenizerUnavailable()
@@ -118,9 +118,9 @@ public extension TextDecoding {
 
         var languageToken: Int = tokenizer.specialTokens.englishToken
         var taskToken: Int = tokenizer.specialTokens.transcribeToken
-        if let options = options,
-           multilingual // Multilingual models require language and task tokens
-        {
+
+        // Multilingual models require language and task tokens
+        if let options = options, isModelMultilingual {
             // Set languageToken
             let languageTokenString = "<|\(options.language ?? "en")|>"
             languageToken = tokenizer.convertTokenToId(languageTokenString) ?? tokenizer.specialTokens.englishToken
