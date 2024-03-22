@@ -21,7 +21,7 @@ public class WhisperKit: Transcriber {
     public var modelVariant: ModelVariant = .tiny
     public var modelState: ModelState = .unloaded
     public var modelCompute: ModelComputeOptions
-    public var tokenizer: Tokenizer?
+    public var tokenizer: WhisperTokenizer?
 
     /// Protocols
     public var audioProcessor: any AudioProcessing
@@ -310,21 +310,20 @@ public class WhisperKit: Transcriber {
         }
 
         // Check model dimensions to assign appropriate tokenizer
-        if let logitsDim = textDecoder.logitsSize,
-           let encoderDim = audioEncoder.embedSize
-        {
-            modelVariant = detectVariant(logitsDim: logitsDim, encoderDim: encoderDim)
-            Logging.debug("Loading tokenizer for \(modelVariant)")
-            tokenizer = try await loadTokenizer(
-                for: modelVariant,
-                tokenizerFolder: tokenizerFolder,
-                useBackgroundSession: useBackgroundDownloadSession
-            )
-            textDecoder.tokenizer = tokenizer
-            Logging.debug("Loaded tokenizer")
-        } else {
-            Logging.error("Could not load tokenizer")
+        guard let logitsDim = textDecoder.logitsSize, let encoderDim = audioEncoder.embedSize else {
+            throw WhisperError.tokenizerUnavailable()
         }
+        textDecoder.isModelMultilingual = isModelMultilingual(logitsDim: logitsDim)
+        modelVariant = detectVariant(logitsDim: logitsDim, encoderDim: encoderDim)
+        Logging.debug("Loading tokenizer for \(modelVariant)")
+        let tokenizer = try await loadTokenizer(
+            for: modelVariant,
+            tokenizerFolder: tokenizerFolder,
+            useBackgroundSession: useBackgroundDownloadSession
+        )
+        self.tokenizer = tokenizer
+        textDecoder.tokenizer = tokenizer
+        Logging.debug("Loaded tokenizer")
 
         modelState = .loaded
 
@@ -431,7 +430,7 @@ public class WhisperKit: Transcriber {
         }
 
         let startDecoderInit = CFAbsoluteTimeGetCurrent()
-        decoderInputs = textDecoder.prepareDecoderInputs(withPrompt: [tokenizer.startOfTranscriptToken])
+        decoderInputs = textDecoder.prepareDecoderInputs(withPrompt: [tokenizer.specialTokens.startOfTranscriptToken])
         guard var decoderInputs = decoderInputs else {
             throw WhisperError.prefillFailed("Unable to prepare decoder inputs")
         }
@@ -557,8 +556,8 @@ public class WhisperKit: Transcriber {
                     currentSeek: seek,
                     segmentSize: segmentSize,
                     sampleRate: WhisperKit.sampleRate,
-                    timeToken: tokenizer.timeTokenBegin,
-                    specialToken: tokenizer.specialTokenBegin,
+                    timeToken: tokenizer.specialTokens.timeTokenBegin,
+                    specialToken: tokenizer.specialTokens.specialTokenBegin,
                     tokenizer: tokenizer
                 )
 
@@ -645,7 +644,7 @@ public class WhisperKit: Transcriber {
                 Logging.info("Decoding Temperature: \(temp)")
                 let decodeWithFallbackStart = Date()
 
-                let tokenSampler = GreedyTokenSampler(temperature: temp, eotToken: tokenizer.endToken, decodingOptions: options)
+                let tokenSampler = GreedyTokenSampler(temperature: temp, eotToken: tokenizer.specialTokens.endToken, decodingOptions: options)
 
                 decodingResult = try await textDecoder.decodeText(
                     from: encoderOutput,
@@ -805,7 +804,7 @@ public class WhisperKit: Transcriber {
             Logging.debug(line)
         }
 
-        let wordTokens = allTokens.filter { $0 < tokenizer.specialTokenBegin }
+        let wordTokens = allTokens.filter { $0 < tokenizer.specialTokens.specialTokenBegin }
         transcription = tokenizer.decode(tokens: wordTokens)
 
         transcription = transcription.trimmingCharacters(in: .whitespaces)

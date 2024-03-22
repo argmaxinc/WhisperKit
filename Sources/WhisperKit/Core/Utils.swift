@@ -287,10 +287,15 @@ func loadTokenizer(
     for pretrained: ModelVariant,
     tokenizerFolder: URL? = nil,
     useBackgroundSession: Bool = false
-) async throws -> Tokenizer {
+) async throws -> WhisperTokenizer {
     let tokenizerName = tokenizerNameForVariant(pretrained)
     let hubApi = HubApi(downloadBase: tokenizerFolder, useBackgroundSession: useBackgroundSession)
-    return try await AutoTokenizer.from(pretrained: tokenizerName, hubApi: hubApi)
+    return try await WhisperTokenizerWrapper(
+        tokenizer: AutoTokenizer.from(
+            pretrained: tokenizerName,
+            hubApi: hubApi
+        )
+    )
 }
 
 func formatTimestamp(_ timestamp: Float) -> String {
