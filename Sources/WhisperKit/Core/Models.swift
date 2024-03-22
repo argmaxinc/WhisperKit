@@ -966,9 +966,9 @@ struct WhisperTokenizerWrapper: WhisperTokenizer {
         return false
     }
 
-    /// Tokenizes the given texta into individual words and associated tokens
-    /// - Parameter tokenIds: Array of tokens to split
-    /// - Returns: Tuple containing and array of the split words and and all tokens for each word
+    /// Decodes token ids into individual words and per-word subtokens
+    /// - Parameter tokenIds: Array of tokens to decode and then split 
+    /// - Returns: Tuple containing and array of the split words and all tokens for each word
     func splitToWordTokens(tokenIds: [Int]) -> (words: [String], wordTokens: [[Int]]) {
         let decodedWords = tokenizer.decode(tokens: tokenIds.filter { $0 < specialTokens.specialTokenBegin })
 
