@@ -28,13 +28,31 @@ struct Transcribe: AsyncParsableCommand {
         guard FileManager.default.fileExists(atPath: resolvedAudioPath) else {
             throw CocoaError.error(.fileNoSuchFile)
         }
+        
+        let task: DecodingTask
+        if cliArguments.task.lowercased() == "translate" {
+            task = .translate
+        } else {
+            task = .transcribe
+        }
+        
         if cliArguments.verbose {
-            print("Transcribing audio at \(cliArguments.audioPath)")
+            print("Task: \(task.description.capitalized) audio at \(cliArguments.audioPath)")
         }
 
+        var audioEncoderComputeUnits = cliArguments.audioEncoderComputeUnits.asMLComputeUnits
+        let textDecoderComputeUnits = cliArguments.textDecoderComputeUnits.asMLComputeUnits
+        
+        // Use gpu for audio encoder on macOS below 14
+        if audioEncoderComputeUnits == .cpuAndNeuralEngine {
+            if #unavailable(macOS 14.0) {
+                audioEncoderComputeUnits = .cpuAndGPU
+            }
+        }
+        
         let computeOptions = ModelComputeOptions(
-            audioEncoderCompute: cliArguments.audioEncoderComputeUnits.asMLComputeUnits,
-            textDecoderCompute: cliArguments.textDecoderComputeUnits.asMLComputeUnits
+            audioEncoderCompute: audioEncoderComputeUnits,
+            textDecoderCompute: textDecoderComputeUnits
         )
 
         let downloadTokenizerFolder: URL? =
@@ -72,13 +90,13 @@ struct Transcribe: AsyncParsableCommand {
 
         let options = DecodingOptions(
             verbose: cliArguments.verbose,
-            task: .transcribe,
+            task: task,
             language: cliArguments.language,
             temperature: cliArguments.temperature,
             temperatureIncrementOnFallback: cliArguments.temperatureIncrementOnFallback,
             temperatureFallbackCount: cliArguments.temperatureFallbackCount,
             topK: cliArguments.bestOf,
-            usePrefillPrompt: cliArguments.usePrefillPrompt,
+            usePrefillPrompt: cliArguments.usePrefillPrompt || cliArguments.language != nil,
             usePrefillCache: cliArguments.usePrefillCache,
             skipSpecialTokens: cliArguments.skipSpecialTokens,
             withoutTimestamps: cliArguments.withoutTimestamps,
