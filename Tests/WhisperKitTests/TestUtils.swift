@@ -236,7 +236,7 @@ extension SpecialTokens {
         translateToken: Int = 0,
         whitespaceToken: Int = 0
     ) -> SpecialTokens {
-        SpecialTokens.init(
+        SpecialTokens(
             endToken: endToken,
             englishToken: englishToken,
             noSpeechToken: noSpeechToken,
