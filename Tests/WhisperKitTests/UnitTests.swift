@@ -168,6 +168,110 @@ final class UnitTests: XCTestCase {
         XCTAssertNotNil(decoderOutput, "Failed to decode text")
         XCTAssertEqual(decoderOutput.count, expectedShape, "Decoder output shape is not as expected")
     }
+    
+    func testDecoderLogProbThresholdDecodingFallback() async throws {
+        var textDecoder = TextDecoder()
+        let decodingOptions = DecodingOptions(logProbThreshold: -1.0)
+        let modelPath = URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
+        textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
+
+        let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.endToken, decodingOptions: decodingOptions)
+
+        let encoderInput = try MLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16)
+        let decoderInputs = textDecoder.prepareDecoderInputs(withPrompt: [textDecoder.tokenizer!.startOfTranscriptToken])
+
+        let inputs = try XCTUnwrap(decoderInputs, "Failed to prepare decoder inputs")
+        let decoderOutput = try await textDecoder.decodeText(from: encoderInput, using: inputs, sampler: tokenSampler, options: decodingOptions)
+
+        let fallback = try XCTUnwrap(decoderOutput.first?.fallback)
+        XCTAssertEqual(fallback.fallbackReason, "logProbThreshold")
+        XCTAssertTrue(fallback.needsFallback)
+    }
+
+    func testDecoderFirstTokenLogProbThresholdDecodingFallback() async throws {
+        var textDecoder = TextDecoder()
+        let decodingOptions = DecodingOptions(firstTokenLogProbThreshold: -1.0)
+        let modelPath = URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
+        textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
+
+        let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.endToken, decodingOptions: decodingOptions)
+
+        let encoderInput = try MLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16)
+        let decoderInputs = textDecoder.prepareDecoderInputs(withPrompt: [textDecoder.tokenizer!.startOfTranscriptToken])
+
+        let inputs = try XCTUnwrap(decoderInputs, "Failed to prepare decoder inputs")
+        let decoderOutput = try await textDecoder.decodeText(from: encoderInput, using: inputs, sampler: tokenSampler, options: decodingOptions)
+
+        let fallback = try XCTUnwrap(decoderOutput.first?.fallback)
+        XCTAssertEqual(fallback.fallbackReason, "firstTokenLogProbThreshold")
+        XCTAssertTrue(fallback.needsFallback)
+    }
+
+    func testDecodingFallbackInit() throws {
+        let fallback1 = try XCTUnwrap(
+            DecodingFallback(
+                options: DecodingOptions(compressionRatioThreshold: -1.0, logProbThreshold: -1.0, noSpeechThreshold: -1.0),
+                isFirstTokenLogProbTooLow: true,
+                noSpeechProb: 0,
+                compressionRatio: 0,
+                avgLogProb: -2.0
+            )
+        )
+
+        XCTAssertEqual(fallback1.fallbackReason, "firstTokenLogProbThreshold")
+        XCTAssertTrue(fallback1.needsFallback)
+
+        let fallback2 = try XCTUnwrap(
+            DecodingFallback(
+                options: DecodingOptions(compressionRatioThreshold: -1.0, logProbThreshold: -1.0, noSpeechThreshold: -1.0),
+                isFirstTokenLogProbTooLow: false,
+                noSpeechProb: 0,
+                compressionRatio: 0,
+                avgLogProb: -2.0
+            )
+        )
+
+        XCTAssertEqual(fallback2.fallbackReason, "silence")
+        XCTAssertFalse(fallback2.needsFallback)
+
+        let fallback3 = try XCTUnwrap(
+            DecodingFallback(
+                options: DecodingOptions(compressionRatioThreshold: -1.0, logProbThreshold: -1.0, noSpeechThreshold: 0.0),
+                isFirstTokenLogProbTooLow: false,
+                noSpeechProb: 0,
+                compressionRatio: 0,
+                avgLogProb: -2.0
+            )
+        )
+
+        XCTAssertEqual(fallback3.fallbackReason, "compressionRatioThreshold")
+        XCTAssertTrue(fallback3.needsFallback)
+
+        let fallback4 = try XCTUnwrap(
+            DecodingFallback(
+                options: DecodingOptions(compressionRatioThreshold: 0.0, logProbThreshold: -1.0, noSpeechThreshold: 0.0),
+                isFirstTokenLogProbTooLow: false,
+                noSpeechProb: 0,
+                compressionRatio: 0,
+                avgLogProb: -2.0
+            )
+        )
+
+        XCTAssertEqual(fallback4.fallbackReason, "logProbThreshold")
+        XCTAssertTrue(fallback4.needsFallback)
+
+        XCTAssertNil(
+            DecodingFallback(
+                options: DecodingOptions(compressionRatioThreshold: 0.0, logProbThreshold: 0.0, noSpeechThreshold: 0.0),
+                isFirstTokenLogProbTooLow: false,
+                noSpeechProb: 0,
+                compressionRatio: 0,
+                avgLogProb: 0
+            )
+        )
+    }
 
     // MARK: - Tokenizer Tests
 

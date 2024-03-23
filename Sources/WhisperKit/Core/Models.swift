@@ -241,6 +241,7 @@ public struct DecodingOptions {
     public var supressTokens: [Int]
     public var compressionRatioThreshold: Float?
     public var logProbThreshold: Float?
+    public var firstTokenLogProbThreshold: Float?
     public var noSpeechThreshold: Float?
 
     public init(verbose: Bool = false,
@@ -262,6 +263,7 @@ public struct DecodingOptions {
                 supressTokens: [Int]? = nil,
                 compressionRatioThreshold: Float? = 2.4,
                 logProbThreshold: Float? = -1.0,
+                firstTokenLogProbThreshold: Float? = nil,
                 noSpeechThreshold: Float? = 0.6)
     {
         self.verbose = verbose
@@ -283,7 +285,44 @@ public struct DecodingOptions {
         self.supressTokens = supressTokens ?? [] // nonSpeechTokens() // TODO: implement these as default
         self.compressionRatioThreshold = compressionRatioThreshold
         self.logProbThreshold = logProbThreshold
+        self.firstTokenLogProbThreshold = firstTokenLogProbThreshold
         self.noSpeechThreshold = noSpeechThreshold
+    }
+}
+
+public struct DecodingFallback {
+    public var needsFallback: Bool
+    public var fallbackReason: String
+    
+    public init(needsFallback: Bool, fallbackReason: String) {
+        self.needsFallback = needsFallback
+        self.fallbackReason = fallbackReason
+    }
+}
+
+extension DecodingFallback {
+    public init?(
+        options: DecodingOptions,
+        isFirstTokenLogProbTooLow: Bool,
+        noSpeechProb: Float,
+        compressionRatio: Float,
+        avgLogProb: Float
+    ) {
+        // NOTE: order matters here
+        if isFirstTokenLogProbTooLow {
+            self.init(needsFallback: true, fallbackReason: "firstTokenLogProbThreshold")
+        } else if let threshold = options.noSpeechThreshold, noSpeechProb > threshold {
+            // silence detected
+            self.init(needsFallback: false, fallbackReason: "silence")
+        } else if let threshold = options.compressionRatioThreshold, compressionRatio > threshold {
+            // too repetitive
+            self.init(needsFallback: true, fallbackReason: "compressionRatioThreshold")
+        } else if let threshold = options.logProbThreshold, avgLogProb < threshold {
+            // average log probablity too low (model is not confident enough)
+            self.init(needsFallback: true, fallbackReason: "logProbThreshold")
+        } else {
+            return nil
+        }
     }
 }
 
@@ -299,6 +338,7 @@ public struct DecodingResult {
     public var compressionRatio: Float
     public var cache: DecodingCache?
     public var timings: TranscriptionTimings?
+    public var fallback: DecodingFallback?
 
     public static var emptyResults: DecodingResult {
         return DecodingResult(language: "",
@@ -311,7 +351,8 @@ public struct DecodingResult {
                               temperature: 0.0,
                               compressionRatio: 0.0,
                               cache: nil,
-                              timings: nil)
+                              timings: nil,
+                              fallback: nil)
     }
 }
 

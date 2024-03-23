@@ -671,39 +671,15 @@ public class WhisperKit: Transcriber {
 
                 // MARK: Fallback checks
 
-                var needsFallback = false
-                var fallbackReason = ""
-                if let result = decodingResult {
-                    if let threshold = options.compressionRatioThreshold,
-                       result.compressionRatio > threshold
-                    {
-                        needsFallback = true // too repetitive
-                        fallbackReason = "compressionRatioThreshold"
-                    }
-
-                    if let threshold = options.logProbThreshold,
-                       result.avgLogProb < threshold
-                    {
-                        needsFallback = true // average log probablity too low (model is not confident enough)
-                        fallbackReason = "logProbThreshold"
-                    }
-
-                    if let threshold = options.noSpeechThreshold,
-                       result.noSpeechProb > threshold
-                    {
-                        needsFallback = false // silence
-                    }
-                }
-
-                if !needsFallback {
-                    break
-                } else {
+                if let fallback = decodingResult?.fallback, fallback.needsFallback {
                     // Reset decoder inputs for fallback
                     fallbackCount = Double(i)
                     timings.decodingFallback += Date().timeIntervalSince(decodeWithFallbackStart)
                     timings.totalDecodingFallbacks = fallbackCount
                     resetDecoderInputs()
-                    Logging.info("Fallback #\(fallbackCount + 1) (\(fallbackReason))")
+                    Logging.info("Fallback #\(fallbackCount + 1) (\(fallback.fallbackReason))")
+                } else {
+                    break
                 }
             }
 
