@@ -26,8 +26,10 @@ Check out the demo app on [TestFlight](https://testflight.apple.com/join/LPVOyJZ
 ## Table of Contents
 
 - [Installation](#installation)
+  - [Swift Package Manager](#swift-package-manager)
   - [Prerequisites](#prerequisites)
   - [Steps](#steps)
+  - [Homebrew](#homebrew)
 - [Getting Started](#getting-started)
   - [Quick Example](#quick-example)
   - [Model Selection](#model-selection)
@@ -88,7 +90,7 @@ Task {
 WhisperKit automatically downloads the recommended model for the device if not specified. You can also select a specific model by passing in the model name:
 
 ```swift
-let pipe = try? await WhisperKit(model: "large-v3")
+let pipe = try? await WhisperKit(model: "openai_whisper-large-v3")
 ```
 
 For a list of available models, see our [HuggingFace repo](https://huggingface.co/argmaxinc/whisperkit-coreml).
@@ -98,7 +100,7 @@ For a list of available models, see our [HuggingFace repo](https://huggingface.c
 WhisperKit also comes with the supporting repo [`whisperkittools`](https://github.com/argmaxinc/whisperkittools) which lets you create and deploy your own fine tuned versions of Whisper in CoreML format to HuggingFace. Once generated, they can be loaded by simply changing the repo name to the one used to upload the model:
 
 ```swift
-let pipe = try? await WhisperKit(model: "large-v3", modelRepo: "username/your-model-repo")
+let pipe = try? await WhisperKit(model: "openai_whisper-large-v3", modelRepo: "username/your-model-repo")
 ```
 
 ### Swift CLI
