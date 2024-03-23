@@ -35,7 +35,7 @@ public protocol SegmentSeeking {
 }
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-public class SegmentSeeker: SegmentSeeking {
+open class SegmentSeeker: SegmentSeeking {
     public init() {}
 
     // MARK: - Seek & Segments
