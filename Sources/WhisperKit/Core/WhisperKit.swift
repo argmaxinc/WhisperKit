@@ -50,9 +50,9 @@ public class WhisperKit: Transcriber {
     public let progress = Progress()
     
     /// Configuration
-    public var modelFolder: URL
+    public var modelFolder: URL?
     public var tokenizerFolder: URL?
-    public let useBackgroundDownloadSession: Bool
+    private let useBackgroundDownloadSession: Bool
 
     public init(
         model: String? = nil,
@@ -71,6 +71,7 @@ public class WhisperKit: Transcriber {
         logLevel: Logging.LogLevel = .info,
         prewarm: Bool? = nil,
         load: Bool? = nil,
+        download: Bool = true,
         useBackgroundDownloadSession: Bool = false
     ) async throws {
         Logging.shared.logLevel = verbose ? logLevel : .none
@@ -83,13 +84,14 @@ public class WhisperKit: Transcriber {
         self.segmentSeeker = segmentSeeker ?? SegmentSeeker()
         self.tokenizerFolder = tokenizerFolder
         self.useBackgroundDownloadSession = useBackgroundDownloadSession
-        self.currentTimings = TranscriptionTimings()
-        self.modelFolder = try await Self.setupModelFolder(
+        currentTimings = TranscriptionTimings()
+
+        try await setupModels(
             model: model,
             downloadBase: downloadBase,
             modelRepo: modelRepo,
             modelFolder: modelFolder,
-            useBackgroundDownloadSession: useBackgroundDownloadSession
+            download: download
         )
 
         if let prewarm = prewarm, prewarm {
@@ -198,26 +200,35 @@ public class WhisperKit: Transcriber {
     }
 
     /// Sets up the model folder either from a local path or by downloading from a repository.
-    public static func setupModelFolder(
+    public func setupModels(
         model: String?,
         downloadBase: URL? = nil,
         modelRepo: String?,
         modelFolder: String?,
-        useBackgroundDownloadSession: Bool
-    ) async throws -> URL {
+        download: Bool
+    ) async throws {
         // Determine the model variant to use
         let modelVariant = model ?? WhisperKit.recommendedModels().default
+
         // If a local model folder is provided, use it; otherwise, download the model
-        if let modelFolder {
-            return URL(fileURLWithPath: modelFolder)
-        } else {
+        if let folder = modelFolder {
+            self.modelFolder = URL(fileURLWithPath: folder)
+        } else if download {
             let repo = modelRepo ?? "argmaxinc/whisperkit-coreml"
-            return try await Self.download(
-                variant: modelVariant,
-                downloadBase: downloadBase,
-                useBackgroundSession: useBackgroundDownloadSession,
-                from: repo
-            )
+            do {
+                self.modelFolder = try await Self.download(
+                    variant: modelVariant,
+                    downloadBase: downloadBase,
+                    useBackgroundSession: useBackgroundDownloadSession,
+                    from: repo
+                )
+            } catch {
+                // Handle errors related to model downloading
+                throw WhisperError.modelsUnavailable("""
+                Model not found. Please check the model or repo name and try again.
+                Error: \(error)
+                """)
+            }
         }
     }
 
@@ -232,12 +243,16 @@ public class WhisperKit: Transcriber {
 
         let modelLoadStart = CFAbsoluteTimeGetCurrent()
 
-        Logging.debug("Loading models from \(modelFolder.path) with prewarmMode: \(prewarmMode)")
+        guard let path = modelFolder else {
+            throw WhisperError.modelsUnavailable("Model folder is not set.")
+        }
 
-        let logmelUrl = modelFolder.appending(path: "MelSpectrogram.mlmodelc")
-        let encoderUrl = modelFolder.appending(path: "AudioEncoder.mlmodelc")
-        let decoderUrl = modelFolder.appending(path: "TextDecoder.mlmodelc")
-        let decoderPrefillUrl = modelFolder.appending(path: "TextDecoderContextPrefill.mlmodelc")
+        Logging.debug("Loading models from \(path.path) with prewarmMode: \(prewarmMode)")
+
+        let logmelUrl = path.appending(path: "MelSpectrogram.mlmodelc")
+        let encoderUrl = path.appending(path: "AudioEncoder.mlmodelc")
+        let decoderUrl = path.appending(path: "TextDecoder.mlmodelc")
+        let decoderPrefillUrl = path.appending(path: "TextDecoderContextPrefill.mlmodelc")
 
         for item in [logmelUrl, encoderUrl, decoderUrl] {
             if !FileManager.default.fileExists(atPath: item.path) {
