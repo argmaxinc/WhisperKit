@@ -9,7 +9,7 @@ struct CLIArguments: ParsableArguments {
 
     @Option(help: "Path of model files")
     var modelPath: String?
-    
+
     @Option(help: "Model to download if no modelPath is provided")
     var model: String?
 
@@ -18,25 +18,25 @@ struct CLIArguments: ParsableArguments {
 
     @Option(help: "Path to save the downloaded model")
     var downloadModelPath: String?
-    
+
     @Option(help: "Path to save the downloaded tokenizer files")
     var downloadTokenizerPath: String?
 
     @Option(help: "Compute units for audio encoder model with {all,cpuOnly,cpuAndGPU,cpuAndNeuralEngine,random}")
     var audioEncoderComputeUnits: ComputeUnits = .cpuAndNeuralEngine
-    
+
     @Option(help: "Compute units for text decoder model with {all,cpuOnly,cpuAndGPU,cpuAndNeuralEngine,random}")
     var textDecoderComputeUnits: ComputeUnits = .cpuAndNeuralEngine
 
     @Flag(help: "Verbose mode")
     var verbose: Bool = false
-    
+
     @Option(help: "Task to perform (transcribe or translate)")
     var task: String = "transcribe"
-    
+
     @Option(help: "Language spoken in the audio")
     var language: String?
-    
+
     @Option(help: "Temperature to use for sampling")
     var temperature: Float = 0
 

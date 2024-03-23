@@ -48,7 +48,7 @@ public class WhisperKit: Transcriber {
 
     /// State
     public let progress = Progress()
-    
+
     /// Configuration
     public var modelFolder: URL?
     public var tokenizerFolder: URL?
@@ -128,7 +128,7 @@ public class WhisperKit: Transcriber {
         return deviceName
     }
 
-    public static func fetchAvailableModels(from repo: String = "argmaxinc/whisperkit-coreml", matching: [String] = ["openai_*", "distil-whisper_*"] ) async throws -> [String] {
+    public static func fetchAvailableModels(from repo: String = "argmaxinc/whisperkit-coreml", matching: [String] = ["openai_*", "distil-whisper_*"]) async throws -> [String] {
         let hubApi = HubApi()
         let modelFiles = try await hubApi.getFilenames(from: repo, matching: matching)
 
@@ -147,7 +147,7 @@ public class WhisperKit: Transcriber {
         })
 
         let availableModels = filteredVariants.map { variant -> String in
-            return variant.trimmingFromEnd(character: "/", upto: 1)
+            variant.trimmingFromEnd(character: "/", upto: 1)
         }
 
         // Sorting order based on enum
@@ -485,7 +485,7 @@ public class WhisperKit: Transcriber {
 
         let startDecodeLoopTime = CFAbsoluteTimeGetCurrent()
 
-        let totalSeekDuration = seekClips.reduce(0, { return $0 + ($1.end - $1.start) })
+        let totalSeekDuration = seekClips.reduce(0) { $0 + ($1.end - $1.start) }
         progress.totalUnitCount = Int64(totalSeekDuration)
         defer { progress.completedUnitCount = progress.totalUnitCount }
         for (seekClipStart, seekClipEnd) in seekClips {

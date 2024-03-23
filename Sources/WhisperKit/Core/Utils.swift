@@ -4,8 +4,8 @@
 import AVFoundation
 import CoreML
 import Foundation
-import Tokenizers
 import Hub
+import Tokenizers
 #if canImport(UIKit)
 import UIKit
 #elseif canImport(AppKit)
@@ -198,9 +198,9 @@ func detectVariant(logitsDim: Int, encoderDim: Int) -> ModelVariant {
 public func modelSupport(for deviceName: String) -> (default: String, disabled: [String]) {
     switch deviceName {
         case let model where model.hasPrefix("iPhone11"), // A12
-            let model where model.hasPrefix("iPhone12"), // A13
-            let model where model.hasPrefix("Watch7"): // Series 9 and Ultra 2
-            return ("openai_whisper-base", ["openai_whisper-small", 
+             let model where model.hasPrefix("iPhone12"), // A13
+             let model where model.hasPrefix("Watch7"): // Series 9 and Ultra 2
+            return ("openai_whisper-base", ["openai_whisper-small",
                                             "openai_whisper-small.en",
                                             "openai_whisper-large-v2",
                                             "openai_whisper-large-v2_949MB",
@@ -208,7 +208,7 @@ public func modelSupport(for deviceName: String) -> (default: String, disabled: 
                                             "openai_whisper-large-v2_turbo_955MB",
                                             "openai_whisper-large-v3",
                                             "openai_whisper-large-v3_947MB",
-                                            "openai_whisper-large-v3_turbo", 
+                                            "openai_whisper-large-v3_turbo",
                                             "openai_whisper-large-v3_turbo_954MB",
                                             "distil-whisper_distil-large-v3",
                                             "distil-whisper_distil-large-v3_594MB",
@@ -226,13 +226,12 @@ public func modelSupport(for deviceName: String) -> (default: String, disabled: 
                                             "distil-whisper_distil-large-v3_turbo"])
 
         case let model where model.hasPrefix("iPhone14"), // A15
-            let model where model.hasPrefix("iPhone15"), // A16
-            let model where model.hasPrefix("iPhone16"): // A17
+             let model where model.hasPrefix("iPhone15"), // A16
+             let model where model.hasPrefix("iPhone16"): // A17
             return ("openai_whisper-base", ["openai_whisper-large-v2",
                                             "openai_whisper-large-v2_turbo",
                                             "openai_whisper-large-v3",
                                             "openai_whisper-large-v3_turbo"])
-
 
         // Fall through to macOS checks
         default:

@@ -201,7 +201,7 @@ public class BeamSearchTokenSampler: TokenSampling {
         fatalError("Not implemented: \(#function)")
     }
 
-    public func finalize(tokens: [Int], logProbs: [Float]) -> SamplingResult{
+    public func finalize(tokens: [Int], logProbs: [Float]) -> SamplingResult {
         // TODO: Implement
         fatalError("Not implemented: \(#function)")
     }
