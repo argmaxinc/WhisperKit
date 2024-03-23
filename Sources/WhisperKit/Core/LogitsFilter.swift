@@ -11,7 +11,7 @@ public protocol LogitsFiltering {
 }
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-public class SuppressTokensFilter: LogitsFiltering {
+open class SuppressTokensFilter: LogitsFiltering {
     let suppressTokens: [Int]
     private let suppressTokenIndexes: [[NSNumber]]
 
@@ -27,7 +27,7 @@ public class SuppressTokensFilter: LogitsFiltering {
 }
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-public class SuppressBlankFilter: LogitsFiltering {
+open class SuppressBlankFilter: LogitsFiltering {
     let suppressBlankTokens: [Int]
     let sampleBegin: Int
     private let suppressTokenIndexes: [[NSNumber]]
@@ -49,7 +49,7 @@ public class SuppressBlankFilter: LogitsFiltering {
 
 /// Implementation based on https://github.com/openai/whisper/blob/master/whisper/decoding.py#L441
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-public class TimestampRulesFilter: LogitsFiltering {
+open class TimestampRulesFilter: LogitsFiltering {
     let transcribeToken: Int
     let translateToken: Int
     let noTimestampsToken: Int

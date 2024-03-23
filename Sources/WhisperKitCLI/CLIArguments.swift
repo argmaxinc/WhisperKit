@@ -12,7 +12,10 @@ struct CLIArguments: ParsableArguments {
     
     @Option(help: "Model to download if no modelPath is provided")
     var model: String?
-    
+
+    @Option(help: "Text to add in front of the model name to specify between different types of the same variant (values: \"openai_whisper-\", \"distil-whisper_distil-\")")
+    var modelPrefix: String = "openai_whisper-"
+
     @Option(help: "Path to save the downloaded model")
     var downloadModelPath: String?
     

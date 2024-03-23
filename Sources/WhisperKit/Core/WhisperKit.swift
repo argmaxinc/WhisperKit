@@ -128,11 +128,9 @@ public class WhisperKit: Transcriber {
         return deviceName
     }
 
-    public static func fetchAvailableModels(from repo: String = "argmaxinc/whisperkit-coreml") async throws -> [String] {
+    public static func fetchAvailableModels(from repo: String = "argmaxinc/whisperkit-coreml", matching: [String] = ["openai_*", "distil-whisper_*"] ) async throws -> [String] {
         let hubApi = HubApi()
-        // TODO: get config from the source repo
-        _ = try? await hubApi.httpGet(for: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/blob/main/config.json")!)
-        let modelFiles = try await hubApi.getFilenames(from: repo, matching: ["openai_whisper*"])
+        let modelFiles = try await hubApi.getFilenames(from: repo, matching: matching)
 
         return formatModelFiles(modelFiles)
     }
@@ -149,10 +147,7 @@ public class WhisperKit: Transcriber {
         })
 
         let availableModels = filteredVariants.map { variant -> String in
-            let parts = variant.split(separator: "_")
-            let modelInfo = parts[1].split(separator: "-").dropFirst().joined(separator: "-")
-            let additionalInfo = parts.count > 2 ? "_\(parts[2...].joined(separator: "_"))" : ""
-            return (modelInfo + additionalInfo).trimmingFromEnd(character: "/", upto: 1)
+            return variant.trimmingFromEnd(character: "/", upto: 1)
         }
 
         // Sorting order based on enum
@@ -193,7 +188,7 @@ public class WhisperKit: Transcriber {
                 }
             }
 
-            let modelFolderName = modelFolder.appending(path: "openai_whisper-\(variant)")
+            let modelFolderName = modelFolder.appending(path: variant)
             return modelFolderName
         } catch {
             Logging.debug(error)
