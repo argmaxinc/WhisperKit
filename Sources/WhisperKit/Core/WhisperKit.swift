@@ -182,7 +182,7 @@ public class WhisperKit: Transcriber {
         let repo = Hub.Repo(id: repo, type: .models)
         let modelSearchPath = "*\(variant.description)/*"
         do {
-            Logging.debug("Searching for models matching \"\(modelSearchPath) in \(repo)")
+            Logging.debug("Searching for models matching \"\(modelSearchPath)\" in \(repo)")
             let modelFiles = try await hubApi.getFilenames(from: repo, matching: [modelSearchPath])
             var uniquePaths = Set(modelFiles.map { $0.components(separatedBy: "/").first! })
 
@@ -192,7 +192,9 @@ public class WhisperKit: Transcriber {
                 variantPath = uniquePaths.first
             } else {
                 // If the model name search returns more than one unique model folder, then prepend the default "openai" prefix from whisperkittools to disambiguate
+                Logging.debug("Multiple models found matching \"\(modelSearchPath)\"")
                 let adjustedModelSearchPath = "*openai*\(variant.description)/*"
+                Logging.debug("Searching for models matching \"\(adjustedModelSearchPath)\" in \(repo)")
                 let adjustedModelFiles = try await hubApi.getFilenames(from: repo, matching: [adjustedModelSearchPath])
                 uniquePaths = Set(adjustedModelFiles.map { $0.components(separatedBy: "/").first! })
 
@@ -203,7 +205,7 @@ public class WhisperKit: Transcriber {
 
             guard let variantPath else {
                 // If there is still ambiguity, throw an error
-                throw WhisperError.modelsUnavailable("Multiple models found matching \(modelSearchPath)")
+                throw WhisperError.modelsUnavailable("Multiple models found matching \"\(modelSearchPath)\"")
             }
 
             Logging.debug("Downloading model \(variantPath)...")
