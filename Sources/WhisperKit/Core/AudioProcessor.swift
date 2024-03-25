@@ -6,18 +6,18 @@ import AVFoundation
 import CoreAudio
 import CoreML
 
-/// Core Audio Device 
+// Core Audio Device
 #if os(macOS)
 public typealias DeviceID = AudioDeviceID
 #else
-public typealias DeviceID = String 
+public typealias DeviceID = String
 #endif
 
 public struct AudioDevice: Identifiable, Hashable {
     public let id: DeviceID
     public let name: String
 }
- 
+
 public protocol AudioProcessing {
     /// Loads audio data from a specified file path.
     /// - Parameter audioFilePath: The file path of the audio file.
@@ -53,7 +53,7 @@ public protocol AudioProcessing {
 
     /// Starts recording audio from the specified input device, resetting the previous state
     func startRecordingLive(inputDeviceID: DeviceID?, callback: (([Float]) -> Void)?) throws
-    
+
     /// Pause recording
     func pauseRecording()
 
@@ -341,14 +341,14 @@ public class AudioProcessor: NSObject, AudioProcessing {
             #endif
         }
     }
-    
+
     #if os(macOS)
     public static func getAudioDevices() -> [AudioDevice] {
         var devices = [AudioDevice]()
-        
+
         var propertySize: UInt32 = 0
         var status: OSStatus = noErr
-        
+
         // Get the number of devices
         var propertyAddress = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDevices,
@@ -366,7 +366,7 @@ public class AudioProcessor: NSObject, AudioProcessing {
             Logging.error("Error: Unable to get the number of audio devices.")
             return devices
         }
-        
+
         // Get the device IDs
         let deviceCount = Int(propertySize) / MemoryLayout<AudioDeviceID>.size
         var deviceIDs = [AudioDeviceID](repeating: 0, count: deviceCount)
@@ -382,17 +382,17 @@ public class AudioProcessor: NSObject, AudioProcessing {
             Logging.error("Error: Unable to get the audio device IDs.")
             return devices
         }
-        
+
         // Get device info for each device
         for deviceID in deviceIDs {
-            var deviceName: String = ""
-            var inputChannels: Int = 0
-            
+            var deviceName = ""
+            var inputChannels = 0
+
             // Get device name
-            var propertySize: UInt32 = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
-            var name: Unmanaged<CFString>? = nil
+            var propertySize = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+            var name: Unmanaged<CFString>?
             propertyAddress.mSelector = kAudioDevicePropertyDeviceNameCFString
-            
+
             status = AudioObjectGetPropertyData(
                 deviceID,
                 &propertyAddress,
@@ -404,7 +404,7 @@ public class AudioProcessor: NSObject, AudioProcessing {
             if status == noErr, let deviceNameCF = name?.takeUnretainedValue() as String? {
                 deviceName = deviceNameCF
             }
-            
+
             // Get input channels
             propertyAddress.mSelector = kAudioDevicePropertyStreamConfiguration
             propertyAddress.mScope = kAudioDevicePropertyScopeInput
@@ -420,12 +420,12 @@ public class AudioProcessor: NSObject, AudioProcessing {
                     }
                 }
             }
-            
+
             if inputChannels > 0 {
                 devices.append(AudioDevice(id: deviceID, name: deviceName))
             }
         }
-        
+
         return devices
     }
     #endif
@@ -461,14 +461,14 @@ public extension AudioProcessor {
             Logging.debug("Current audio size: \(self.audioSamples.count) samples, most recent buffer: \(buffer.count) samples, most recent energy: \(newEnergy)")
         }
     }
-    
+
     #if os(macOS)
     func assignAudioInput(inputNode: AVAudioInputNode, inputDeviceID: AudioDeviceID) {
         guard let audioUnit = inputNode.audioUnit else {
             Logging.error("Failed to access the audio unit of the input node.")
             return
         }
-        
+
         var inputDeviceID = inputDeviceID
 
         let error = AudioUnitSetProperty(
@@ -479,7 +479,7 @@ public extension AudioProcessor {
             &inputDeviceID,
             UInt32(MemoryLayout<AudioDeviceID>.size)
         )
-                
+
         if error != noErr {
             Logging.error("Error setting Audio Unit property: \(error)")
         } else {
@@ -562,11 +562,11 @@ public extension AudioProcessor {
             audioSamples.removeFirst(audioSamples.count - keep)
         }
     }
-    
+
     func startRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)? = nil) throws {
         audioSamples = []
         audioEnergy = []
-        
+
         try? setupAudioSessionForDevice()
 
         audioEngine = try setupEngine(inputDeviceID: inputDeviceID)
