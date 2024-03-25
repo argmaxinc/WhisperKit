@@ -138,4 +138,27 @@ final class FunctionalTests: XCTestCase {
 
         XCTAssertGreaterThan(transcription!.count, 0)
     }
+
+    func testModelSearchPathLarge() async throws {
+        guard let audioFilePath = Bundle.module.path(forResource: "jfk", ofType: "wav") else {
+            XCTFail("Audio file not found")
+            return
+        }
+
+        var pipe = try await WhisperKit(model: "large-v3", verbose: true, logLevel: .debug)
+
+        guard let transcriptionResult = try await pipe.transcribe(audioPath: audioFilePath) else {
+            XCTFail("Transcription failed")
+            return
+        }
+        XCTAssertGreaterThan(transcriptionResult.text.count, 0)
+
+        pipe = try await WhisperKit(model: "distil*large-v3", verbose: true, logLevel: .debug)
+
+        guard let transcriptionResult = try await pipe.transcribe(audioPath: audioFilePath) else {
+            XCTFail("Transcription failed")
+            return
+        }
+        XCTAssertGreaterThan(transcriptionResult.text.count, 0)
+    }
 }

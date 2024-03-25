@@ -71,7 +71,7 @@ struct Transcribe: AsyncParsableCommand {
 
         let modelName: String? =
             if let modelVariant = cliArguments.model {
-                cliArguments.modelPrefix + modelVariant
+                cliArguments.modelPrefix + "*" + modelVariant
             } else {
                 nil
             }
