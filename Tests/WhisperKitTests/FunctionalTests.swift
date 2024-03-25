@@ -160,5 +160,13 @@ final class FunctionalTests: XCTestCase {
             return
         }
         XCTAssertGreaterThan(transcriptionResult.text.count, 0)
+
+        pipe = try await WhisperKit(model: "distil-whisper_distil-large-v3", verbose: true, logLevel: .debug)
+
+        guard let transcriptionResult = try await pipe.transcribe(audioPath: audioFilePath) else {
+            XCTFail("Transcription failed")
+            return
+        }
+        XCTAssertGreaterThan(transcriptionResult.text.count, 0)
     }
 }
