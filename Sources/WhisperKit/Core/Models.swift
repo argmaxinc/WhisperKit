@@ -15,6 +15,7 @@ public typealias FloatType = Float
 
 #if (os(macOS) || targetEnvironment(macCatalyst)) && arch(arm64)
 extension Float16: BNNSScalar {}
+extension Float16: MLShapedArrayScalar {}
 #endif
 
 // MARK: - CoreML
@@ -135,7 +136,7 @@ public struct ModelComputeOptions {
 
     public init(
         melCompute: MLComputeUnits = .cpuAndGPU,
-        audioEncoderCompute: MLComputeUnits = .cpuAndNeuralEngine,
+        audioEncoderCompute: MLComputeUnits? = nil,
         textDecoderCompute: MLComputeUnits = .cpuAndNeuralEngine,
         prefillCompute: MLComputeUnits = .cpuOnly
     ) {
@@ -146,10 +147,16 @@ public struct ModelComputeOptions {
             self.prefillCompute = .cpuOnly
             return
         }
+
         self.melCompute = melCompute
-        self.audioEncoderCompute = audioEncoderCompute
-        self.textDecoderCompute = textDecoderCompute
         self.prefillCompute = prefillCompute
+        self.textDecoderCompute = textDecoderCompute
+
+        if #available(macOS 14.0, iOS 17.0, watchOS 10, visionOS 1, *) {
+            self.audioEncoderCompute = audioEncoderCompute ?? .cpuAndNeuralEngine
+        } else {
+            self.audioEncoderCompute = audioEncoderCompute ?? .cpuAndGPU
+        }
     }
 }
 
@@ -207,6 +214,7 @@ public struct DecodingCache {
 ///   - skipSpecialTokens: Whether to skip special tokens in the output.
 ///   - withoutTimestamps: Whether to include timestamps in the transcription result.
 ///   - wordTimestamps: Whether to include word-level timestamps in the transcription result.
+///   - maxInitialTimestamp: Maximal initial timestamp.
 ///   - clipTimestamps: Array of timestamps (in seconds) to split the audio into segments for transcription.
 ///   - initialPromptTokens: Array of token IDs to use as the initial prompt for the decoder. These are appended to the prefill tokens.
 ///   - suppressBlank: If true, blank tokens will be suppressed during decoding.
@@ -230,6 +238,7 @@ public struct DecodingOptions {
     public var skipSpecialTokens: Bool
     public var withoutTimestamps: Bool
     public var wordTimestamps: Bool
+    public var maxInitialTimestamp: Float?
     public var clipTimestamps: [Float]
     public var initialPromptTokens: [Int]
     public var suppressBlank: Bool
@@ -251,6 +260,7 @@ public struct DecodingOptions {
                 skipSpecialTokens: Bool = false,
                 withoutTimestamps: Bool = false,
                 wordTimestamps: Bool = false,
+                maxInitialTimestamp: Float? = nil,
                 clipTimestamps: [Float] = [],
                 initialPromptTokens: [Int] = [],
                 suppressBlank: Bool = false,
@@ -272,6 +282,7 @@ public struct DecodingOptions {
         self.skipSpecialTokens = skipSpecialTokens
         self.withoutTimestamps = withoutTimestamps
         self.wordTimestamps = wordTimestamps
+        self.maxInitialTimestamp = maxInitialTimestamp
         self.clipTimestamps = clipTimestamps
         self.initialPromptTokens = initialPromptTokens
         self.suppressBlank = suppressBlank
@@ -405,6 +416,7 @@ public struct TranscriptionTimings: Codable {
     public var decodingInit: TimeInterval
     public var decodingLoop: TimeInterval
     public var decodingPredictions: TimeInterval
+    public var decodingFiltering: TimeInterval
     public var decodingSampling: TimeInterval
     public var decodingFallback: TimeInterval
     public var decodingWindowing: TimeInterval
@@ -440,6 +452,7 @@ public struct TranscriptionTimings: Codable {
                 decodingInit: TimeInterval = 0,
                 decodingLoop: TimeInterval = 0,
                 decodingPredictions: TimeInterval = 0,
+                decodingFiltering: TimeInterval = 0,
                 decodingSampling: TimeInterval = 0,
                 decodingFallback: TimeInterval = 0,
                 decodingWindowing: TimeInterval = 0,
@@ -468,6 +481,7 @@ public struct TranscriptionTimings: Codable {
         self.decodingInit = decodingInit
         self.decodingLoop = decodingLoop
         self.decodingPredictions = decodingPredictions
+        self.decodingFiltering = decodingFiltering
         self.decodingSampling = decodingSampling
         self.decodingFallback = decodingFallback
         self.decodingWindowing = decodingWindowing

@@ -248,7 +248,7 @@ final class UnitTests: XCTestCase {
         let options = DecodingOptions(usePrefillPrompt: true, withoutTimestamps: false)
 
         let result = try? await whisperKit!.transcribe(audioArray: multiWindowSamples, decodeOptions: options)
-        XCTAssertEqual(result?.segments.count, 2, "Expected 2 segments")
+        XCTAssertEqual(result?.segments.count, 3, "Expected 3 segments")
 
         // Compare last timestamp to the length of the audio
         guard let endTimestamp = result?.segments.last!.end else {
@@ -482,7 +482,7 @@ final class UnitTests: XCTestCase {
     }
 
     func testSeekClips() async {
-        var options = DecodingOptions(clipTimestamps: [0])
+        var options = DecodingOptions(withoutTimestamps: true, clipTimestamps: [0])
 
         guard let resultFull = try? await transcribe(with: .tiny, options: options) else {
             XCTFail("Failed to transcribe")
@@ -490,7 +490,7 @@ final class UnitTests: XCTestCase {
         }
 
         let seekTime: Float = 3.0
-        options = DecodingOptions(clipTimestamps: [seekTime])
+        options = DecodingOptions(withoutTimestamps: true, clipTimestamps: [seekTime])
 
         guard let resultSeek = try? await transcribe(with: .tiny, options: options) else {
             XCTFail("Failed to transcribe")
@@ -509,13 +509,21 @@ final class UnitTests: XCTestCase {
 
     func testFillIndexesWithValue() throws {
         let logits = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
-        logits.fill(indexes: [], with: -FloatType.infinity)
+        logits.fill(indexes: [] as [[NSNumber]], with: -FloatType.infinity)
         XCTAssertEqual(logits.data(for: 2), [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
 
         let logits2 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
         let indexes2: [[NSNumber]] = [[0, 0, 0], [0, 0, 1], [0, 0, 5]]
         logits2.fill(indexes: indexes2, with: -FloatType.infinity)
         XCTAssertEqual(logits2.data(for: 2), [-.infinity, -.infinity, 0.3, 0.4, 0.5, -.infinity, 0.7])
+
+        let logits3 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+        logits3.fillLastDimension(indexes: 0..<1, with: -FloatType.infinity)
+        XCTAssertEqual(logits3.data(for: 2), [-.infinity, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+
+        let logits4 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+        logits4.fillLastDimension(indexes: 2..<5, with: -FloatType.infinity)
+        XCTAssertEqual(logits4.data(for: 2), [0.1, 0.2, -.infinity, -.infinity, -.infinity, 0.6, 0.7])
     }
 
     // MARK: - LogitsFilter Tests
@@ -562,6 +570,82 @@ final class UnitTests: XCTestCase {
         let logits5 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
         let result5 = tokensFilter5.filterLogits(logits5, withTokens: [1, 2, 3])
         XCTAssertEqual(result5.data(for: 2), [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+    }
+    
+    func testTimestampRulesFilter() throws {
+        // NOTE: for non-multilingual models we supress tokens immediately
+        let tokensFilter1 = TimestampRulesFilter(
+            transcribeToken: 100,
+            translateToken: 101,
+            noTimestampsToken: 2,
+            timeTokenBegin: 4,
+            endToken: 3,
+            sampleBegin: 2,
+            maxInitialTimestampIndex: nil,
+            isModelMultilingual: false
+        )
+        let logits1 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2])
+        let result1 = tokensFilter1.filterLogits(logits1, withTokens: [])
+        XCTAssertEqual(result1.data(for: 2), [1.1, 5.2, -.infinity, 0.4, 0.2, 0.1, 0.2])
+
+        let tokensFilter2 = TimestampRulesFilter(
+            transcribeToken: 100,
+            translateToken: 101,
+            noTimestampsToken: 2,
+            timeTokenBegin: 4,
+            endToken: 3,
+            sampleBegin: 2,
+            maxInitialTimestampIndex: nil,
+            isModelMultilingual: false
+        )
+        let logits2 = try MLMultiArray.logits([1.1, 0.2, 0.3, 0.4, 0.2, 0.1, 0.2])
+        let result2 = tokensFilter2.filterLogits(logits2, withTokens: [])
+        XCTAssertEqual(result2.data(for: 2), [-.infinity, -.infinity, -.infinity, -.infinity, 0.2, 0.1, 0.2])
+    }
+
+    func testTimestampRulesFilterMultilingual() throws {
+        // NOTE: for multilingual models we supress tokens only after transcribe or translate token
+        let tokensFilter1 = TimestampRulesFilter(
+            transcribeToken: 100,
+            translateToken: 101,
+            noTimestampsToken: 2,
+            timeTokenBegin: 4,
+            endToken: 3,
+            sampleBegin: 2,
+            maxInitialTimestampIndex: nil,
+            isModelMultilingual: true
+        )
+        let logits1 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2])
+        let result1 = tokensFilter1.filterLogits(logits1, withTokens: [])
+        XCTAssertEqual(result1.data(for: 2), [1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2])
+        
+        let tokensFilter2 = TimestampRulesFilter(
+            transcribeToken: 100,
+            translateToken: 101,
+            noTimestampsToken: 2,
+            timeTokenBegin: 4,
+            endToken: 3,
+            sampleBegin: 2,
+            maxInitialTimestampIndex: nil,
+            isModelMultilingual: true
+        )
+        let logits2 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2])
+        let result2 = tokensFilter2.filterLogits(logits2, withTokens: [100])
+        XCTAssertEqual(result2.data(for: 2), [1.1, 5.2, -.infinity, 0.4, 0.2, 0.1, 0.2])
+
+        let tokensFilter3 = TimestampRulesFilter(
+            transcribeToken: 100,
+            translateToken: 101,
+            noTimestampsToken: 2,
+            timeTokenBegin: 4,
+            endToken: 3,
+            sampleBegin: 2,
+            maxInitialTimestampIndex: nil,
+            isModelMultilingual: true
+        )
+        let logits3 = try MLMultiArray.logits([1.1, 0.2, 0.3, 0.4, 0.2, 0.1, 0.2])
+        let result3 = tokensFilter3.filterLogits(logits3, withTokens: [101])
+        XCTAssertEqual(result3.data(for: 2), [-.infinity, -.infinity, -.infinity, -.infinity, 0.2, 0.1, 0.2])
     }
 
     // MARK: - Word Timestamp Tests
