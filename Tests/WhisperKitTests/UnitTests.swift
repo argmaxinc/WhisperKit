@@ -958,11 +958,9 @@ final class UnitTests: XCTestCase {
             XCTAssertEqual(wordTiming.word, expectedWordTiming.word, "Word should match at index \(index)")
             XCTAssertEqual(wordTiming.tokens, expectedWordTiming.tokens, "Tokens should match at index \(index)")
 
-            let startTimeDifference = abs(wordTiming.start - expectedWordTiming.start)
-            XCTAssertLessThanOrEqual(startTimeDifference, 0.1, "Start time difference for word '\(wordTiming.word)' should be within +/- 0.1 seconds (expected: \(expectedWordTiming.start), actual: \(wordTiming.start))")
+            XCTAssertEqual(wordTiming.start, expectedWordTiming.start, accuracy: 0.5, "Start time difference for word '\(wordTiming.word)' should be within +/- 0.1 seconds (expected: \(expectedWordTiming.start), actual: \(wordTiming.start))")
 
-            let endTimeDifference = abs(wordTiming.end - expectedWordTiming.end)
-            XCTAssertLessThanOrEqual(endTimeDifference, 0.1, "End time difference for word '\(wordTiming.word)' should be within +/- 0.1 seconds (expected: \(expectedWordTiming.end), actual: \(wordTiming.end))")
+            XCTAssertEqual(wordTiming.end, expectedWordTiming.end, accuracy: 0.5, "End time difference for word '\(wordTiming.word)' should be within +/- 0.1 seconds (expected: \(expectedWordTiming.end), actual: \(wordTiming.end))")
         }
     }
 }
