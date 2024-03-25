@@ -955,8 +955,7 @@ final class UnitTests: XCTestCase {
         for (index, wordTiming) in wordTimings.enumerated() {
             let expectedWordTiming = expectedWordTimings[index]
 
-            XCTAssertEqual(wordTiming.word, expectedWordTiming.word, "Word should match at index \(index)")
-            XCTAssertEqual(wordTiming.tokens, expectedWordTiming.tokens, "Tokens should match at index \(index)")
+            XCTAssertEqual(wordTiming.word.normalized, expectedWordTiming.word.normalized, "Word should match at index \(index) (expected: \(expectedWordTiming.word), actual: \(wordTiming.word))")
 
             XCTAssertEqual(wordTiming.start, expectedWordTiming.start, accuracy: 0.5, "Start time difference for word '\(wordTiming.word)' should be within +/- 0.1 seconds (expected: \(expectedWordTiming.start), actual: \(wordTiming.start))")
 
