@@ -355,6 +355,28 @@ final class UnitTests: XCTestCase {
         }
         XCTAssertEqual(result.text.split(separator: " ").prefix(4).joined(separator: " "), "Esta es una grabación")
     }
+    
+    func testDetectSpanish() async{
+        let targetLanguage = "es"
+        let prefillLanguage = "en"
+        let optionsNoPrefill = DecodingOptions(task: .transcribe, temperatureFallbackCount: 0, usePrefillPrompt: false)
+
+        guard let resultNoPrefill = try? await transcribe(with: .tiny, options: optionsNoPrefill, audioFile: "es_test_clip.wav") else {
+            XCTFail("Failed to transcribe")
+            return
+        }
+
+        XCTAssertEqual(resultNoPrefill.language, targetLanguage)
+        
+        let optionsPrefill = DecodingOptions(task: .transcribe, temperatureFallbackCount: 0, usePrefillPrompt: true)
+
+        guard let resultPrefill = try? await transcribe(with: .tiny, options: optionsPrefill, audioFile: "es_test_clip.wav") else {
+            XCTFail("Failed to transcribe")
+            return
+        }
+
+        XCTAssertEqual(resultPrefill.language, prefillLanguage)
+    }
 
     func testTranslateJapanese() async {
         let targetLanguage = "ja"
@@ -377,6 +399,28 @@ final class UnitTests: XCTestCase {
             return
         }
         XCTAssertEqual(result.text.prefix(3), "東京は")
+    }
+    
+    func testDetectJapanese() async{
+        let targetLanguage = "ja"
+        let prefillLanguage = "en"
+        let optionsNoPrefill = DecodingOptions(task: .transcribe, temperatureFallbackCount: 0, usePrefillPrompt: false)
+
+        guard let resultNoPrefill = try? await transcribe(with: .tiny, options: optionsNoPrefill, audioFile: "ja_test_clip.wav") else {
+            XCTFail("Failed to transcribe")
+            return
+        }
+
+        XCTAssertEqual(resultNoPrefill.language, targetLanguage)
+        
+        let optionsPrefill = DecodingOptions(task: .transcribe, temperatureFallbackCount: 0, usePrefillPrompt: true)
+
+        guard let resultPrefill = try? await transcribe(with: .tiny, options: optionsPrefill, audioFile: "ja_test_clip.wav") else {
+            XCTFail("Failed to transcribe")
+            return
+        }
+
+        XCTAssertEqual(resultPrefill.language, prefillLanguage)
     }
 
     func testNoTimestamps() async {
