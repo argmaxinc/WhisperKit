@@ -291,6 +291,7 @@ public struct DecodingOptions {
     }
 }
 
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public struct DecodingFallback {
     public var needsFallback: Bool
     public var fallbackReason: String
