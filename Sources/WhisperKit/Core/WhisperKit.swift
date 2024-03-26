@@ -436,6 +436,8 @@ public class WhisperKit: Transcriber {
 
         var options = decodeOptions ?? DecodingOptions()
         options.verbose = Logging.shared.logLevel != .none
+        
+        var detectedLanguage: String?
 
         let contentFrames = audioArray.count
         timings.inputAudioSeconds = Double(Int(contentFrames) / WhisperKit.sampleRate) - Double(decodeOptions?.clipTimestamps.first ?? 0)
@@ -670,8 +672,9 @@ public class WhisperKit: Transcriber {
                 let tokenSampler = GreedyTokenSampler(temperature: temp, eotToken: tokenizer.endToken, decodingOptions: options)
                 
                 var currentDecodingOptions = options
-                // If language is not passed and usePrefill is false, detect language and set in options
-                if options.language == nil && !options.usePrefillCache{
+                var currentDecoderInputs = decoderInputs
+                // For a multilingual model, if language is not passed and usePrefill is false, detect language and set in options
+                if modelVariant.isMultilingual, options.language == nil, !options.usePrefillPrompt {
                     let languageDecodingResult = try? await textDecoder.detectLanguage(
                         from: encoderOutput,
                         using: decoderInputs,
@@ -679,6 +682,7 @@ public class WhisperKit: Transcriber {
                         options: options,
                         temperature: temp
                     ).first
+                    detectedLanguage = languageDecodingResult?.language
                     currentDecodingOptions.language = languageDecodingResult?.language
                 }
 
@@ -845,6 +849,6 @@ public class WhisperKit: Transcriber {
 
         transcription = transcription.trimmingCharacters(in: .whitespaces)
 
-        return TranscriptionResult(text: transcription, segments: allSegments, language: "en", timings: timings)
+        return TranscriptionResult(text: transcription, segments: allSegments, language: detectedLanguage ?? "en", timings: timings)
     }
 }
