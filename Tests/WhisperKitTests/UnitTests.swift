@@ -178,7 +178,7 @@ final class UnitTests: XCTestCase {
 
         let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.endToken, decodingOptions: decodingOptions)
 
-        let encoderInput = initMLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16, initialValue: -Float16.infinity)
+        let encoderInput = initMLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16, initialValue: -FloatType.infinity)
         let decoderInputs = textDecoder.prepareDecoderInputs(withPrompt: [textDecoder.tokenizer!.startOfTranscriptToken])
 
         let inputs = try XCTUnwrap(decoderInputs, "Failed to prepare decoder inputs")
@@ -198,7 +198,7 @@ final class UnitTests: XCTestCase {
 
         let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.endToken, decodingOptions: decodingOptions)
 
-        let encoderInput = initMLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16, initialValue: -Float16.infinity)
+        let encoderInput = initMLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16, initialValue: -FloatType.infinity)
         let decoderInputs = textDecoder.prepareDecoderInputs(withPrompt: [textDecoder.tokenizer!.startOfTranscriptToken])
 
         let inputs = try XCTUnwrap(decoderInputs, "Failed to prepare decoder inputs")
