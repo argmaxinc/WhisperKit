@@ -17,7 +17,7 @@ public struct SamplingResult {
 }
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-public class GreedyTokenSampler: TokenSampling {
+open class GreedyTokenSampler: TokenSampling {
     public var temperature: FloatType
     public var eotToken: Int
     public var decodingOptions: DecodingOptions
@@ -169,7 +169,7 @@ public class GreedyTokenSampler: TokenSampling {
     }
 }
 
-public class BeamSearchTokenSampler: TokenSampling {
+open class BeamSearchTokenSampler: TokenSampling {
     public var beamSize: Int
     public var eotToken: Int
     public var patience: Float

@@ -180,15 +180,43 @@ public class WhisperKit: Transcriber {
     ) async throws -> URL {
         let hubApi = HubApi(downloadBase: downloadBase, useBackgroundSession: useBackgroundSession)
         let repo = Hub.Repo(id: repo, type: .models)
+        let modelSearchPath = "*\(variant.description)/*"
         do {
-            let modelFolder = try await hubApi.snapshot(from: repo, matching: ["*\(variant.description)/*"]) { progress in
+            Logging.debug("Searching for models matching \"\(modelSearchPath)\" in \(repo)")
+            let modelFiles = try await hubApi.getFilenames(from: repo, matching: [modelSearchPath])
+            var uniquePaths = Set(modelFiles.map { $0.components(separatedBy: "/").first! })
+
+            var variantPath: String? = nil
+
+            if uniquePaths.count == 1 {
+                variantPath = uniquePaths.first
+            } else {
+                // If the model name search returns more than one unique model folder, then prepend the default "openai" prefix from whisperkittools to disambiguate
+                Logging.debug("Multiple models found matching \"\(modelSearchPath)\"")
+                let adjustedModelSearchPath = "*openai*\(variant.description)/*"
+                Logging.debug("Searching for models matching \"\(adjustedModelSearchPath)\" in \(repo)")
+                let adjustedModelFiles = try await hubApi.getFilenames(from: repo, matching: [adjustedModelSearchPath])
+                uniquePaths = Set(adjustedModelFiles.map { $0.components(separatedBy: "/").first! })
+
+                if uniquePaths.count == 1 {
+                    variantPath = uniquePaths.first
+                }
+            }
+
+            guard let variantPath else {
+                // If there is still ambiguity, throw an error
+                throw WhisperError.modelsUnavailable("Multiple models found matching \"\(modelSearchPath)\"")
+            }
+
+            Logging.debug("Downloading model \(variantPath)...")
+            let modelFolder = try await hubApi.snapshot(from: repo, matching: [modelSearchPath]) { progress in
                 Logging.debug(progress)
                 if let callback = progressCallback {
                     callback(progress)
                 }
             }
-
-            let modelFolderName = modelFolder.appending(path: variant)
+            
+            let modelFolderName = modelFolder.appending(path: variantPath)
             return modelFolderName
         } catch {
             Logging.debug(error)
