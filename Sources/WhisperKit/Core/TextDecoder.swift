@@ -404,7 +404,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         let samplingTime = Date().timeIntervalSince(samplingStartTime)
         timings.decodingSampling += samplingTime
         
-        var detectedLanguage = tokenizer.decode(tokens: [nextToken]).dropFirst(2).dropLast(2)
+        let detectedLanguage = tokenizer.decode(tokens: [nextToken]).dropFirst(2).dropLast(2)
         var decodingResult = DecodingResult.emptyResults
         decodingResult.timings = timings
         decodingResult.language = String(detectedLanguage)
