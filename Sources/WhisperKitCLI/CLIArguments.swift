@@ -84,4 +84,7 @@ struct CLIArguments: ParsableArguments {
 
     @Flag(help: "Process audio directly from the microphone")
     var stream: Bool = false
+
+    @Flag(help: "Simulate streaming transcription using the input audio file")
+    var streamSimulated: Bool = false
 }
