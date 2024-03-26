@@ -4,8 +4,8 @@
 import AVFoundation
 import CoreML
 import Foundation
-import Tokenizers
 import Hub
+import Tokenizers
 #if canImport(UIKit)
 import UIKit
 #elseif canImport(AppKit)
@@ -200,15 +200,38 @@ public func modelSupport(for deviceName: String) -> (default: String, disabled: 
         case let model where model.hasPrefix("iPhone11"), // A12
              let model where model.hasPrefix("iPhone12"), // A13
              let model where model.hasPrefix("Watch7"): // Series 9 and Ultra 2
-            return ("base", ["small", "small.en", "large-v3_turbo", "large-v3", "large-v3_turbo_1018MB", "large-v2", "large-v2_turbo", "large-v2_turbo_1022MB", "large-v2_1050MB"])
+            return ("openai_whisper-base", ["openai_whisper-small",
+                                            "openai_whisper-small.en",
+                                            "openai_whisper-large-v2",
+                                            "openai_whisper-large-v2_949MB",
+                                            "openai_whisper-large-v2_turbo",
+                                            "openai_whisper-large-v2_turbo_955MB",
+                                            "openai_whisper-large-v3",
+                                            "openai_whisper-large-v3_947MB",
+                                            "openai_whisper-large-v3_turbo",
+                                            "openai_whisper-large-v3_turbo_954MB",
+                                            "distil-whisper_distil-large-v3",
+                                            "distil-whisper_distil-large-v3_594MB",
+                                            "distil-whisper_distil-large-v3_turbo_600MB",
+                                            "distil-whisper_distil-large-v3_turbo"])
 
         case let model where model.hasPrefix("iPhone13"): // A14
-            return ("base", ["large-v3_turbo", "large-v3", "large-v3_turbo_1018MB", "large-v2", "large-v2_turbo", "large-v2_turbo_1022MB"])
+            return ("openai_whisper-base", ["openai_whisper-large-v2",
+                                            "openai_whisper-large-v2_turbo",
+                                            "openai_whisper-large-v2_turbo_955MB",
+                                            "openai_whisper-large-v3",
+                                            "openai_whisper-large-v3_turbo",
+                                            "openai_whisper-large-v3_turbo_954MB",
+                                            "distil-whisper_distil-large-v3_turbo_600MB",
+                                            "distil-whisper_distil-large-v3_turbo"])
 
         case let model where model.hasPrefix("iPhone14"), // A15
              let model where model.hasPrefix("iPhone15"), // A16
              let model where model.hasPrefix("iPhone16"): // A17
-            return ("base", ["large-v3_turbo", "large-v3", "large-v2_turbo", "large-v2"])
+            return ("openai_whisper-base", ["openai_whisper-large-v2",
+                                            "openai_whisper-large-v2_turbo",
+                                            "openai_whisper-large-v3",
+                                            "openai_whisper-large-v3_turbo"])
 
         // Fall through to macOS checks
         default:
@@ -219,16 +242,21 @@ public func modelSupport(for deviceName: String) -> (default: String, disabled: 
     if deviceName.hasPrefix("arm64") {
         if Process.processor.contains("Apple M1") {
             // Disable turbo variants for M1
-            return ("base", ["large-v3_turbo", "large-v3_turbo_1018MB", "large-v2_turbo", "large-v2_turbo_1022MB"])
+            return ("openai_whisper-base", ["openai_whisper-large-v2_turbo",
+                                            "openai_whisper-large-v2_turbo_955MB",
+                                            "openai_whisper-large-v3_turbo",
+                                            "openai_whisper-large-v3_turbo_954MB",
+                                            "distil-whisper_distil-large-v3_turbo_600MB",
+                                            "distil-whisper_distil-large-v3_turbo"])
         } else {
             // Enable all variants for M2 or M3, none disabled
-            return ("base", [])
+            return ("openai_whisper-base", [])
         }
     }
     #endif
 
     // Unhandled device, default to base variant
-    return ("base", [""])
+    return ("openai_whisper-base", [""])
 }
 
 #if os(macOS)

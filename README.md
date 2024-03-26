@@ -26,8 +26,10 @@ Check out the demo app on [TestFlight](https://testflight.apple.com/join/LPVOyJZ
 ## Table of Contents
 
 - [Installation](#installation)
+  - [Swift Package Manager](#swift-package-manager)
   - [Prerequisites](#prerequisites)
   - [Steps](#steps)
+  - [Homebrew](#homebrew)
 - [Getting Started](#getting-started)
   - [Quick Example](#quick-example)
   - [Model Selection](#model-selection)
@@ -90,6 +92,14 @@ WhisperKit automatically downloads the recommended model for the device if not s
 ```swift
 let pipe = try? await WhisperKit(model: "large-v3")
 ```
+
+This method also supports glob search, so you can use wildcards to select a model:
+
+```swift
+let pipe = try? await WhisperKit(model: "distil*large-v3")
+```
+
+Note that the model search must return a single model from the source repo, otherwise an error will be thrown.
 
 For a list of available models, see our [HuggingFace repo](https://huggingface.co/argmaxinc/whisperkit-coreml).
 

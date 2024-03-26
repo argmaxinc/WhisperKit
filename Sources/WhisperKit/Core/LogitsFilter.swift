@@ -11,7 +11,7 @@ public protocol LogitsFiltering {
 }
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-public class SuppressTokensFilter: LogitsFiltering {
+open class SuppressTokensFilter: LogitsFiltering {
     let suppressTokens: [Int]
     private let suppressTokenIndexes: [[NSNumber]]
 
@@ -27,7 +27,7 @@ public class SuppressTokensFilter: LogitsFiltering {
 }
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-public class SuppressBlankFilter: LogitsFiltering {
+open class SuppressBlankFilter: LogitsFiltering {
     let suppressBlankTokens: [Int]
     let sampleBegin: Int
     private let suppressTokenIndexes: [[NSNumber]]
@@ -49,7 +49,7 @@ public class SuppressBlankFilter: LogitsFiltering {
 
 /// Implementation based on https://github.com/openai/whisper/blob/master/whisper/decoding.py#L441
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-public class TimestampRulesFilter: LogitsFiltering {
+open class TimestampRulesFilter: LogitsFiltering {
     let transcribeToken: Int
     let translateToken: Int
     let noTimestampsToken: Int
@@ -115,15 +115,15 @@ public class TimestampRulesFilter: LogitsFiltering {
             }
         }
 
-       if tokens.count == sampleBegin {
-           // suppress generating non-timestamp tokens at the beginning
-           logits.fillLastDimension(indexes: 0..<timeTokenBegin, with: -FloatType.infinity)
-           if let maxInitialTimestampIndex {
-               // apply the `maxInitialTimestamp` option
-               let lastAllowed = timeTokenBegin + maxInitialTimestampIndex + 1
-               logits.fillLastDimension(indexes: lastAllowed..<logits.count, with: -FloatType.infinity)
-           }
-       }
+        if tokens.count == sampleBegin {
+            // suppress generating non-timestamp tokens at the beginning
+            logits.fillLastDimension(indexes: 0..<timeTokenBegin, with: -FloatType.infinity)
+            if let maxInitialTimestampIndex {
+                // apply the `maxInitialTimestamp` option
+                let lastAllowed = timeTokenBegin + maxInitialTimestampIndex + 1
+                logits.fillLastDimension(indexes: lastAllowed..<logits.count, with: -FloatType.infinity)
+            }
+        }
 
         // if sum of probability over timestamps is above any other token, sample timestamp
         if sumOfProbabilityOverTimestampsIsAboveAnyOtherToken(logits: logits, timeTokenBegin: timeTokenBegin) {
@@ -175,14 +175,14 @@ public class TimestampRulesFilter: LogitsFiltering {
                 output: logprobs,
                 batchSize: 1
             )
-            
+
             let timeTokenCount = logits.count - timeTokenBeginOffset
             let noTimeTokenCount = timeTokenBeginOffset
             let logSumExpInputPointer = UnsafeMutableRawBufferPointer(
                 start: logprobs.data!.advanced(by: timeTokenBeginOffset * MemoryLayout<FloatType>.stride),
                 count: timeTokenCount * MemoryLayout<FloatType>.stride
             )
-            
+
             guard let logSumExpInputDescriptor = BNNSNDArrayDescriptor(
                 data: logSumExpInputPointer,
                 scalarType: FloatType.self,
@@ -191,25 +191,25 @@ public class TimestampRulesFilter: LogitsFiltering {
                 Logging.error("Cannot create `logSumExpInputDescriptor`")
                 return false
             }
-            
+
             let timestampLogProb = BNNSNDArrayDescriptor.allocateUninitialized(
                 scalarType: FloatType.self,
                 shape: .vector(1, stride: 1)
             )
             defer { timestampLogProb.deallocate() }
-            
+
             try BNNS.applyReduction(
                 .logSumExp,
                 input: logSumExpInputDescriptor,
                 output: timestampLogProb,
                 weights: nil
             )
-            
+
             let maxTextTokenLogProbInputPointer = UnsafeMutableRawBufferPointer(
                 start: logprobs.data,
                 count: noTimeTokenCount * MemoryLayout<FloatType>.stride
             )
-            
+
             guard let maxTextTokenLogProbInputDescriptor = BNNSNDArrayDescriptor(
                 data: maxTextTokenLogProbInputPointer,
                 scalarType: FloatType.self,
@@ -218,22 +218,23 @@ public class TimestampRulesFilter: LogitsFiltering {
                 Logging.error("Cannot create `maxTextTokenLogProbInputDescriptor`")
                 return false
             }
-            
+
             let maxTextTokenLogProb = BNNSNDArrayDescriptor.allocateUninitialized(
                 scalarType: FloatType.self,
                 shape: .vector(1, stride: 1)
             )
             defer { maxTextTokenLogProb.deallocate() }
-            
+
             try BNNS.applyReduction(
                 .max,
                 input: maxTextTokenLogProbInputDescriptor,
                 output: maxTextTokenLogProb,
                 weights: nil
             )
-            
+
             guard let timestampLogProbValue = timestampLogProb.makeArray(of: FloatType.self)?.first,
-                  let maxTextTokenLogProbValue = maxTextTokenLogProb.makeArray(of: FloatType.self)?.first else {
+                  let maxTextTokenLogProbValue = maxTextTokenLogProb.makeArray(of: FloatType.self)?.first
+            else {
                 Logging.error("Cannot create logProb arrays")
                 return false
             }

@@ -28,28 +28,28 @@ struct Transcribe: AsyncParsableCommand {
         guard FileManager.default.fileExists(atPath: resolvedAudioPath) else {
             throw CocoaError.error(.fileNoSuchFile)
         }
-        
+
         let task: DecodingTask
         if cliArguments.task.lowercased() == "translate" {
             task = .translate
         } else {
             task = .transcribe
         }
-        
+
         if cliArguments.verbose {
             print("Task: \(task.description.capitalized) audio at \(cliArguments.audioPath)")
         }
 
         var audioEncoderComputeUnits = cliArguments.audioEncoderComputeUnits.asMLComputeUnits
         let textDecoderComputeUnits = cliArguments.textDecoderComputeUnits.asMLComputeUnits
-        
+
         // Use gpu for audio encoder on macOS below 14
         if audioEncoderComputeUnits == .cpuAndNeuralEngine {
             if #unavailable(macOS 14.0) {
                 audioEncoderComputeUnits = .cpuAndGPU
             }
         }
-        
+
         let computeOptions = ModelComputeOptions(
             audioEncoderCompute: audioEncoderComputeUnits,
             textDecoderCompute: textDecoderComputeUnits
@@ -69,12 +69,19 @@ struct Transcribe: AsyncParsableCommand {
                 nil
             }
 
+        let modelName: String? =
+            if let modelVariant = cliArguments.model {
+                cliArguments.modelPrefix + "*" + modelVariant
+            } else {
+                nil
+            }
+
         if cliArguments.verbose {
             print("Initializing models...")
         }
 
         let whisperKit = try await WhisperKit(
-            model: cliArguments.model,
+            model: modelName,
             downloadBase: downloadModelFolder,
             modelFolder: cliArguments.modelPath,
             tokenizerFolder: downloadTokenizerFolder,
@@ -174,8 +181,15 @@ struct Transcribe: AsyncParsableCommand {
             print("Initializing models...")
         }
 
+        let modelName: String? =
+            if let modelVariant = cliArguments.model {
+                cliArguments.modelPrefix + modelVariant
+            } else {
+                nil
+            }
+
         let whisperKit = try await WhisperKit(
-            model: cliArguments.model,
+            model: modelName,
             downloadBase: downloadModelFolder,
             modelFolder: cliArguments.modelPath,
             tokenizerFolder: downloadTokenizerFolder,

@@ -9,31 +9,34 @@ struct CLIArguments: ParsableArguments {
 
     @Option(help: "Path of model files")
     var modelPath: String?
-    
+
     @Option(help: "Model to download if no modelPath is provided")
     var model: String?
-    
+
+    @Option(help: "Text to add in front of the model name to specify between different types of the same variant (values: \"openai\", \"distil\")")
+    var modelPrefix: String = "openai"
+
     @Option(help: "Path to save the downloaded model")
     var downloadModelPath: String?
-    
+
     @Option(help: "Path to save the downloaded tokenizer files")
     var downloadTokenizerPath: String?
 
     @Option(help: "Compute units for audio encoder model with {all,cpuOnly,cpuAndGPU,cpuAndNeuralEngine,random}")
     var audioEncoderComputeUnits: ComputeUnits = .cpuAndNeuralEngine
-    
+
     @Option(help: "Compute units for text decoder model with {all,cpuOnly,cpuAndGPU,cpuAndNeuralEngine,random}")
     var textDecoderComputeUnits: ComputeUnits = .cpuAndNeuralEngine
 
     @Flag(help: "Verbose mode")
     var verbose: Bool = false
-    
+
     @Option(help: "Task to perform (transcribe or translate)")
     var task: String = "transcribe"
-    
+
     @Option(help: "Language spoken in the audio")
     var language: String?
-    
+
     @Option(help: "Temperature to use for sampling")
     var temperature: Float = 0
 
