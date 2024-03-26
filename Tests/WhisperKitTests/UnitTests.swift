@@ -170,31 +170,20 @@ final class UnitTests: XCTestCase {
     }
     
     func testDecoderLogProbThresholdDecodingFallback() async throws {
-        let computeUnits = ModelComputeOptions()
         let decodingOptions = DecodingOptions(
             compressionRatioThreshold: nil,
-            logProbThreshold: -1.0,
-            firstTokenLogProbThreshold: nil
+            logProbThreshold: 100.0,
+            firstTokenLogProbThreshold: nil,
+            noSpeechThreshold: nil
         )
-        let modelPath = URL(filePath: tinyModelPath())
-
-        var audioEncoder = AudioEncoder()
-        try await audioEncoder.loadModel(
-            at: modelPath.appending(path: "AudioEncoder.mlmodelc"),
-            computeUnits: computeUnits.audioEncoderCompute
-        )
-
         var textDecoder = TextDecoder()
-        try await textDecoder.loadModel(
-            at: modelPath.appending(path: "TextDecoder.mlmodelc"),
-            computeUnits: computeUnits.textDecoderCompute
-        )
+        let modelPath = URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
         textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
 
         let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.endToken, decodingOptions: decodingOptions)
-        let audioFeatures = initMLMultiArray(shape: [1, 80, 1, 3000], dataType: .float16, initialValue: -FloatType.infinity)
-        let audioEncoderInput = try await audioEncoder.encodeFeatures(audioFeatures)
-        let encoderInput = try XCTUnwrap(audioEncoderInput)
+
+        let encoderInput = try MLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16)
         let decoderInputs = textDecoder.prepareDecoderInputs(withPrompt: [textDecoder.tokenizer!.startOfTranscriptToken])
 
         let inputs = try XCTUnwrap(decoderInputs, "Failed to prepare decoder inputs")
@@ -206,31 +195,20 @@ final class UnitTests: XCTestCase {
     }
 
     func testDecoderFirstTokenLogProbThresholdDecodingFallback() async throws {
-        let computeUnits = ModelComputeOptions()
         let decodingOptions = DecodingOptions(
             compressionRatioThreshold: nil,
             logProbThreshold: nil,
-            firstTokenLogProbThreshold: -1.0
+            firstTokenLogProbThreshold: 100.0,
+            noSpeechThreshold: nil
         )
-        let modelPath = URL(filePath: tinyModelPath())
-
-        var audioEncoder = AudioEncoder()
-        try await audioEncoder.loadModel(
-            at: modelPath.appending(path: "AudioEncoder.mlmodelc"),
-            computeUnits: computeUnits.audioEncoderCompute
-        )
-
         var textDecoder = TextDecoder()
-        try await textDecoder.loadModel(
-            at: modelPath.appending(path: "TextDecoder.mlmodelc"),
-            computeUnits: computeUnits.textDecoderCompute
-        )
+        let modelPath = URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
         textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
 
         let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.endToken, decodingOptions: decodingOptions)
-        let audioFeatures = initMLMultiArray(shape: [1, 80, 1, 3000], dataType: .float16, initialValue: -FloatType.infinity)
-        let audioEncoderInput = try await audioEncoder.encodeFeatures(audioFeatures)
-        let encoderInput = try XCTUnwrap(audioEncoderInput)
+
+        let encoderInput = try MLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16)
         let decoderInputs = textDecoder.prepareDecoderInputs(withPrompt: [textDecoder.tokenizer!.startOfTranscriptToken])
 
         let inputs = try XCTUnwrap(decoderInputs, "Failed to prepare decoder inputs")
