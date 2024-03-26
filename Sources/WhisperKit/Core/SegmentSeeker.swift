@@ -497,9 +497,9 @@ open class SegmentSeeker: SegmentSeeking {
                     continue
                 }
 
-                let start = round((timeOffset + timing.start) * 100) / 100.0
-                let end = round((timeOffset + timing.end) * 100) / 100.0
-                let probability = round(timing.probability * 100) / 100.0
+                let start = (timeOffset + timing.start).rounded(2)
+                let end = (timeOffset + timing.end).rounded(2)
+                let probability = timing.probability.rounded(2)
                 let wordTiming = WordTiming(word: timing.word,
                                             tokens: timingTokens,
                                             start: start,

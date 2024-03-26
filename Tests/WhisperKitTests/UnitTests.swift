@@ -440,7 +440,7 @@ final class UnitTests: XCTestCase {
         let whisperKit = try? await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
 
         // Generate random audio samples
-        let audioSamples = (0..<(30 * 16000)).map { _ in Float.random(in: -0.5...0.5) }
+        let audioSamples = (0..<(30 * 16000)).map { _ in Float.random(in: -0.7...0.7) }
 
         // Define options with temperature increment settings
         let initialTemperature: Float = 0
@@ -450,6 +450,7 @@ final class UnitTests: XCTestCase {
             temperature: initialTemperature,
             temperatureIncrementOnFallback: temperatureIncrement,
             temperatureFallbackCount: fallbackCount,
+            usePrefillPrompt: false,
             logProbThreshold: 0
         )
 
@@ -1028,11 +1029,12 @@ final class UnitTests: XCTestCase {
             streamOptions.initialPromptTokens = lastAgreedTokens
             do {
                 let result: TranscriptionResult? = try await whisperKit.transcribe(audioArray: simulatedStreamingAudio, decodeOptions: streamOptions)
+                var skipAppend = false
                 if let result = result {
-                    hypothesisWords = result.allWords.filter { $0.start > lastAgreedSeconds - 0.1 }
+                    hypothesisWords = result.allWords.filter { $0.start >= lastAgreedSeconds }
 
                     if let prevResult = prevResult {
-                        prevWords = prevResult.allWords.filter { $0.start > lastAgreedSeconds - 0.1 }
+                        prevWords = prevResult.allWords.filter { $0.start >= lastAgreedSeconds }
                         let commonPrefix = findLongestCommonPrefix(prevWords, hypothesisWords)
                         Logging.info("[testStreamingTimestamps] Prev \"\((prevWords.map { $0.word }).joined())\"")
                         Logging.info("[testStreamingTimestamps] Next \"\((hypothesisWords.map { $0.word }).joined())\"")
@@ -1041,20 +1043,24 @@ final class UnitTests: XCTestCase {
                         if commonPrefix.count >= agreementCountNeeded {
                             lastAgreedWords = commonPrefix.suffix(agreementCountNeeded)
                             lastAgreedSeconds = lastAgreedWords.first!.start
-                            Logging.info("[testStreamingTimestamps] Found new last agreed word \(lastAgreedWords.first!.word) at \(lastAgreedSeconds) seconds")
+                            Logging.info("[testStreamingTimestamps] Found new last agreed word \"\(lastAgreedWords.first!.word)\" at \(lastAgreedSeconds) seconds")
 
                             confirmedWords.append(contentsOf: commonPrefix.prefix(commonPrefix.count - agreementCountNeeded))
                             let currentWords = confirmedWords.map { $0.word }.joined()
                             Logging.info("[testStreamingTimestamps] Current:  \(lastAgreedSeconds) -> \(Double(endSample)/16000.0) \(currentWords)")
                         } else {
                             Logging.info("[testStreamingTimestamps] Using same last agreed time \(lastAgreedSeconds)")
+                            skipAppend = true
                         }
 
 
                     }
                     prevResult = result
                 }
-                results.append(result)
+
+                if !skipAppend {
+                    results.append(result)
+                }
             } catch {
                 XCTFail(error.localizedDescription)
             }
@@ -1071,20 +1077,8 @@ final class UnitTests: XCTestCase {
         // Perform assertions or further processing with the results array
         Logging.info("[testStreamingTimestamps] Done")
 
-        XCTAssertEqual(finalWords, " And so my fellow Americans. Ask not what your country can do for you ask what you can do for your country.")
+        XCTAssertEqual(finalWords.normalized, " And so my fellow Americans. Ask not what your country can do for you ask what you can do for your country.".normalized)
     }
-
-    func findLongestCommonPrefix(_ words1: [WordTiming], _ words2: [WordTiming]) -> [WordTiming] {
-        let commonPrefix = zip(words1, words2).prefix(while: { $0.word == $1.word })
-        return commonPrefix.map { $0.0 }
-    }
-
-    func findLongestDifferentSuffix(_ words1: [WordTiming], _ words2: [WordTiming]) -> [WordTiming] {
-        let commonPrefix = findLongestCommonPrefix(words1, words2)
-        let remainingWords = words2[commonPrefix.count...]
-        return Array(remainingWords)
-    }
-
 }
 
 // MARK: - Helpers

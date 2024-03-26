@@ -485,12 +485,8 @@ public class WhisperKit: Transcriber {
             decoderInputs.decoderKeyPaddingMask[i] = 0.0
         }
 
-        // Add initial prompt to history
-        let currentTokens = decoderInputs.initialPrompt
-        allTokens.append(contentsOf: currentTokens)
-
         Logging.debug("Prefill time: \(prefillTime)")
-        Logging.debug("Prefill prompt: \(currentTokens.map { tokenizer.convertIdToToken($0) ?? "" })")
+        Logging.debug("Prefill prompt: \(decoderInputs.initialPrompt.map { tokenizer.convertIdToToken($0) ?? "" })")
 
         // MARK: - Main decoder loop
 

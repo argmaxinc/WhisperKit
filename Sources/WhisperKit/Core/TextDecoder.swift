@@ -545,7 +545,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         var temperature = options.temperature
         if let sampler = tokenSampler as? GreedyTokenSampler {
             // Convert Float16 temperature to Float with 3 decimal places
-            temperature = round(Float(sampler.temperature) * 1000) / 1000
+            temperature = Float(sampler.temperature).rounded(3)
         }
 
         let transcript = tokenizer.decode(tokens: segmentTokens)
