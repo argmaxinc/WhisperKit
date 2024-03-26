@@ -672,7 +672,6 @@ public class WhisperKit: Transcriber {
                 let tokenSampler = GreedyTokenSampler(temperature: temp, eotToken: tokenizer.endToken, decodingOptions: options)
                 
                 var currentDecodingOptions = options
-                var currentDecoderInputs = decoderInputs
                 // For a multilingual model, if language is not passed and usePrefill is false, detect language and set in options
                 if modelVariant.isMultilingual, options.language == nil, !options.usePrefillPrompt {
                     let languageDecodingResult = try? await textDecoder.detectLanguage(
