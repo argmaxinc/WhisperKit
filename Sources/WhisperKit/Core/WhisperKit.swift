@@ -48,7 +48,7 @@ public class WhisperKit: Transcriber {
 
     /// State
     public let progress = Progress()
-    
+
     /// Configuration
     public var modelFolder: URL?
     public var tokenizerFolder: URL?
@@ -128,11 +128,9 @@ public class WhisperKit: Transcriber {
         return deviceName
     }
 
-    public static func fetchAvailableModels(from repo: String = "argmaxinc/whisperkit-coreml") async throws -> [String] {
+    public static func fetchAvailableModels(from repo: String = "argmaxinc/whisperkit-coreml", matching: [String] = ["openai_*", "distil-whisper_*"]) async throws -> [String] {
         let hubApi = HubApi()
-        // TODO: get config from the source repo
-        _ = try? await hubApi.httpGet(for: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/blob/main/config.json")!)
-        let modelFiles = try await hubApi.getFilenames(from: repo, matching: ["openai_whisper*"])
+        let modelFiles = try await hubApi.getFilenames(from: repo, matching: matching)
 
         return formatModelFiles(modelFiles)
     }
@@ -149,10 +147,7 @@ public class WhisperKit: Transcriber {
         })
 
         let availableModels = filteredVariants.map { variant -> String in
-            let parts = variant.split(separator: "_")
-            let modelInfo = parts[1].split(separator: "-").dropFirst().joined(separator: "-")
-            let additionalInfo = parts.count > 2 ? "_\(parts[2...].joined(separator: "_"))" : ""
-            return (modelInfo + additionalInfo).trimmingFromEnd(character: "/", upto: 1)
+            variant.trimmingFromEnd(character: "/", upto: 1)
         }
 
         // Sorting order based on enum
@@ -185,15 +180,42 @@ public class WhisperKit: Transcriber {
     ) async throws -> URL {
         let hubApi = HubApi(downloadBase: downloadBase, useBackgroundSession: useBackgroundSession)
         let repo = Hub.Repo(id: repo, type: .models)
+        let modelSearchPath = "*\(variant.description)/*"
         do {
-            let modelFolder = try await hubApi.snapshot(from: repo, matching: ["*\(variant.description)/*"]) { progress in
+            Logging.debug("Searching for models matching \"\(modelSearchPath)\" in \(repo)")
+            let modelFiles = try await hubApi.getFilenames(from: repo, matching: [modelSearchPath])
+            var uniquePaths = Set(modelFiles.map { $0.components(separatedBy: "/").first! })
+
+            var variantPath: String? = nil
+
+            if uniquePaths.count == 1 {
+                variantPath = uniquePaths.first
+            } else {
+                // If the model name search returns more than one unique model folder, then prepend the default "openai" prefix from whisperkittools to disambiguate
+                Logging.debug("Multiple models found matching \"\(modelSearchPath)\"")
+                let adjustedModelSearchPath = "*openai*\(variant.description)/*"
+                Logging.debug("Searching for models matching \"\(adjustedModelSearchPath)\" in \(repo)")
+                let adjustedModelFiles = try await hubApi.getFilenames(from: repo, matching: [adjustedModelSearchPath])
+                uniquePaths = Set(adjustedModelFiles.map { $0.components(separatedBy: "/").first! })
+
+                if uniquePaths.count == 1 {
+                    variantPath = uniquePaths.first
+                }
+            }
+
+            guard let variantPath else {
+                // If there is still ambiguity, throw an error
+                throw WhisperError.modelsUnavailable("Multiple models found matching \"\(modelSearchPath)\"")
+            }
+
+            Logging.debug("Downloading model \(variantPath)...")
+            let modelFolder = try await hubApi.snapshot(from: repo, matching: [modelSearchPath]) { progress in
                 Logging.debug(progress)
                 if let callback = progressCallback {
                     callback(progress)
                 }
             }
-
-            let modelFolderName = modelFolder.appending(path: "openai_whisper-\(variant)")
+            let modelFolderName = modelFolder.appending(path: variantPath)
             return modelFolderName
         } catch {
             Logging.debug(error)
@@ -490,7 +512,7 @@ public class WhisperKit: Transcriber {
 
         let startDecodeLoopTime = CFAbsoluteTimeGetCurrent()
 
-        let totalSeekDuration = seekClips.reduce(0, { return $0 + ($1.end - $1.start) })
+        let totalSeekDuration = seekClips.reduce(0) { $0 + ($1.end - $1.start) }
         progress.totalUnitCount = Int64(totalSeekDuration)
         defer { progress.completedUnitCount = progress.totalUnitCount }
         for (seekClipStart, seekClipEnd) in seekClips {
@@ -615,7 +637,7 @@ public class WhisperKit: Transcriber {
 
                 // add them to the `allSegments` list
                 allSegments.append(contentsOf: currentSegments)
-                let allCurrentTokens = currentSegments.reduce([]) { $0 + $1.tokens }
+                let allCurrentTokens = currentSegments.flatMap { $0.tokens }
                 allTokens.append(contentsOf: allCurrentTokens)
 
                 timings.decodingWindowing += Date().timeIntervalSince(windowingStart)
@@ -676,6 +698,7 @@ public class WhisperKit: Transcriber {
                     timings.decodingPredictions += decodingTimings.decodingPredictions
                     timings.totalDecodingLoops += decodingTimings.totalDecodingLoops
                     timings.decodingNonPrediction += decodingTimings.decodingNonPrediction
+                    timings.decodingFiltering += decodingTimings.decodingFiltering
                     timings.decodingSampling += decodingTimings.decodingSampling
                     timings.decodingKvCaching += decodingTimings.decodingKvCaching
                     timings.totalKVUpdateRuns += decodingTimings.totalKVUpdateRuns
@@ -768,6 +791,7 @@ public class WhisperKit: Transcriber {
             let decodingInitTime = formatTimeWithPercentage(timings.decodingInit, 1, fullPipelineDuration)
             let prefillInfo = formatTimeWithPercentage(timings.prefill, 1, fullPipelineDuration)
             let predictionsInfo = formatTimeWithPercentage(timings.decodingPredictions, totalLoops, fullPipelineDuration)
+            let filteringInfo = formatTimeWithPercentage(timings.decodingFiltering, totalLoops, fullPipelineDuration)
             let samplingInfo = formatTimeWithPercentage(timings.decodingSampling, totalLoops, fullPipelineDuration)
             let kvCachingInfo = formatTimeWithPercentage(timings.decodingKvCaching, timings.totalKVUpdateRuns, fullPipelineDuration)
             let wordTimestampInfo = formatTimeWithPercentage(timings.decodingWordTimestamps, timings.totalTimestampAlignmentRuns, fullPipelineDuration)
@@ -787,6 +811,7 @@ public class WhisperKit: Transcriber {
             Logging.info("Prefill:             \(prefillInfo)")
             Logging.info("Decoding:            \(predictionsInfo)")
             Logging.info("Non-inference:       \(nonPredTimeInfo)")
+            Logging.info("- Logit Filtering:   \(filteringInfo)")
             Logging.info("- Sampling:          \(samplingInfo)")
             Logging.info("- Kv Caching:        \(kvCachingInfo)")
             Logging.info("- Word Timestamps:   \(wordTimestampInfo)")

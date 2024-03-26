@@ -248,7 +248,7 @@ final class UnitTests: XCTestCase {
         let options = DecodingOptions(usePrefillPrompt: true, withoutTimestamps: false)
 
         let result = try? await whisperKit!.transcribe(audioArray: multiWindowSamples, decodeOptions: options)
-        XCTAssertEqual(result?.segments.count, 2, "Expected 2 segments")
+        XCTAssertEqual(result?.segments.count, 3, "Expected 3 segments")
 
         // Compare last timestamp to the length of the audio
         guard let endTimestamp = result?.segments.last!.end else {
@@ -482,7 +482,7 @@ final class UnitTests: XCTestCase {
     }
 
     func testSeekClips() async {
-        var options = DecodingOptions(clipTimestamps: [0])
+        var options = DecodingOptions(withoutTimestamps: true, clipTimestamps: [0])
 
         guard let resultFull = try? await transcribe(with: .tiny, options: options) else {
             XCTFail("Failed to transcribe")
@@ -490,7 +490,7 @@ final class UnitTests: XCTestCase {
         }
 
         let seekTime: Float = 3.0
-        options = DecodingOptions(clipTimestamps: [seekTime])
+        options = DecodingOptions(withoutTimestamps: true, clipTimestamps: [seekTime])
 
         guard let resultSeek = try? await transcribe(with: .tiny, options: options) else {
             XCTFail("Failed to transcribe")
@@ -509,13 +509,21 @@ final class UnitTests: XCTestCase {
 
     func testFillIndexesWithValue() throws {
         let logits = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
-        logits.fill(indexes: [], with: -FloatType.infinity)
+        logits.fill(indexes: [] as [[NSNumber]], with: -FloatType.infinity)
         XCTAssertEqual(logits.data(for: 2), [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
 
         let logits2 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
         let indexes2: [[NSNumber]] = [[0, 0, 0], [0, 0, 1], [0, 0, 5]]
         logits2.fill(indexes: indexes2, with: -FloatType.infinity)
         XCTAssertEqual(logits2.data(for: 2), [-.infinity, -.infinity, 0.3, 0.4, 0.5, -.infinity, 0.7])
+
+        let logits3 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+        logits3.fillLastDimension(indexes: 0..<1, with: -FloatType.infinity)
+        XCTAssertEqual(logits3.data(for: 2), [-.infinity, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+
+        let logits4 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+        logits4.fillLastDimension(indexes: 2..<5, with: -FloatType.infinity)
+        XCTAssertEqual(logits4.data(for: 2), [0.1, 0.2, -.infinity, -.infinity, -.infinity, 0.6, 0.7])
     }
 
     // MARK: - LogitsFilter Tests
@@ -574,6 +582,82 @@ final class UnitTests: XCTestCase {
         let logits2 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
         let result2 = tokensFilter2.filterLogits(logits2, withTokens: [1])
         XCTAssertEqual(result2.data(for: 2), [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+    }
+
+    func testTimestampRulesFilter() throws {
+        // NOTE: for non-multilingual models we supress tokens immediately
+        let tokensFilter1 = TimestampRulesFilter(
+            transcribeToken: 100,
+            translateToken: 101,
+            noTimestampsToken: 2,
+            timeTokenBegin: 4,
+            endToken: 3,
+            sampleBegin: 2,
+            maxInitialTimestampIndex: nil,
+            isModelMultilingual: false
+        )
+        let logits1 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2])
+        let result1 = tokensFilter1.filterLogits(logits1, withTokens: [])
+        XCTAssertEqual(result1.data(for: 2), [1.1, 5.2, -.infinity, 0.4, 0.2, 0.1, 0.2])
+
+        let tokensFilter2 = TimestampRulesFilter(
+            transcribeToken: 100,
+            translateToken: 101,
+            noTimestampsToken: 2,
+            timeTokenBegin: 4,
+            endToken: 3,
+            sampleBegin: 2,
+            maxInitialTimestampIndex: nil,
+            isModelMultilingual: false
+        )
+        let logits2 = try MLMultiArray.logits([1.1, 0.2, 0.3, 0.4, 0.2, 0.1, 0.2])
+        let result2 = tokensFilter2.filterLogits(logits2, withTokens: [])
+        XCTAssertEqual(result2.data(for: 2), [-.infinity, -.infinity, -.infinity, -.infinity, 0.2, 0.1, 0.2])
+    }
+
+    func testTimestampRulesFilterMultilingual() throws {
+        // NOTE: for multilingual models we supress tokens only after transcribe or translate token
+        let tokensFilter1 = TimestampRulesFilter(
+            transcribeToken: 100,
+            translateToken: 101,
+            noTimestampsToken: 2,
+            timeTokenBegin: 4,
+            endToken: 3,
+            sampleBegin: 2,
+            maxInitialTimestampIndex: nil,
+            isModelMultilingual: true
+        )
+        let logits1 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2])
+        let result1 = tokensFilter1.filterLogits(logits1, withTokens: [])
+        XCTAssertEqual(result1.data(for: 2), [1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2])
+        
+        let tokensFilter2 = TimestampRulesFilter(
+            transcribeToken: 100,
+            translateToken: 101,
+            noTimestampsToken: 2,
+            timeTokenBegin: 4,
+            endToken: 3,
+            sampleBegin: 2,
+            maxInitialTimestampIndex: nil,
+            isModelMultilingual: true
+        )
+        let logits2 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2])
+        let result2 = tokensFilter2.filterLogits(logits2, withTokens: [100])
+        XCTAssertEqual(result2.data(for: 2), [1.1, 5.2, -.infinity, 0.4, 0.2, 0.1, 0.2])
+
+        let tokensFilter3 = TimestampRulesFilter(
+            transcribeToken: 100,
+            translateToken: 101,
+            noTimestampsToken: 2,
+            timeTokenBegin: 4,
+            endToken: 3,
+            sampleBegin: 2,
+            maxInitialTimestampIndex: nil,
+            isModelMultilingual: true
+        )
+        let logits3 = try MLMultiArray.logits([1.1, 0.2, 0.3, 0.4, 0.2, 0.1, 0.2])
+        let result3 = tokensFilter3.filterLogits(logits3, withTokens: [101])
+        XCTAssertEqual(result3.data(for: 2), [-.infinity, -.infinity, -.infinity, -.infinity, 0.2, 0.1, 0.2])
     }
 
     // MARK: - Word Timestamp Tests
@@ -840,6 +924,54 @@ final class UnitTests: XCTestCase {
             XCTAssertEqual(mergedAlignmentTiming[i].start, expectedWordTimings[i].start, "Start time at index \(i) does not match")
             XCTAssertEqual(mergedAlignmentTiming[i].end, expectedWordTimings[i].end, "End time at index \(i) does not match")
             XCTAssertEqual(mergedAlignmentTiming[i].probability, expectedWordTimings[i].probability, "Probability at index \(i) does not match")
+        }
+    }
+
+    func testWordTimestampCorrectness() async {
+        let options = DecodingOptions(wordTimestamps: true)
+
+        guard let result = try? await transcribe(with: .tiny, options: options) else {
+            XCTFail("Failed to transcribe")
+            return
+        }
+
+        let wordTimings = result.segments.compactMap { $0.words }.flatMap { $0 }
+
+        let expectedWordTimings = [
+            WordTiming(word: " And", tokens: [400], start: 0.32, end: 0.68, probability: 0.85),
+            WordTiming(word: " so", tokens: [370], start: 0.68, end: 1.1, probability: 1.0),
+            WordTiming(word: " my", tokens: [452], start: 1.1, end: 1.36, probability: 0.51),
+            WordTiming(word: " fellow", tokens: [7177], start: 1.36, end: 1.74, probability: 0.52),
+            WordTiming(word: " Americans", tokens: [6280], start: 1.74, end: 2.26, probability: 0.82),
+            WordTiming(word: " ask", tokens: [1029], start: 2.26, end: 3.82, probability: 0.4),
+            WordTiming(word: " not", tokens: [406], start: 3.82, end: 4.56, probability: 1.0),
+            WordTiming(word: " what", tokens: [437], start: 4.56, end: 5.68, probability: 0.91),
+            WordTiming(word: " your", tokens: [428], start: 5.68, end: 5.92, probability: 0.22),
+            WordTiming(word: " country", tokens: [1941], start: 5.92, end: 6.38, probability: 0.64),
+            WordTiming(word: " can", tokens: [393], start: 6.38, end: 6.76, probability: 0.52),
+            WordTiming(word: " do", tokens: [360], start: 6.76, end: 6.98, probability: 0.85),
+            WordTiming(word: " for", tokens: [337], start: 6.98, end: 7.22, probability: 0.97),
+            WordTiming(word: " you,", tokens: [291, 11], start: 7.22, end: 8.36, probability: 0.97),
+            WordTiming(word: " ask", tokens: [1029], start: 8.36, end: 8.66, probability: 0.93),
+            WordTiming(word: " what", tokens: [437], start: 8.66, end: 8.86, probability: 0.98),
+            WordTiming(word: " you", tokens: [291], start: 8.86, end: 9.22, probability: 0.06),
+            WordTiming(word: " can", tokens: [393], start: 9.22, end: 9.44, probability: 0.58),
+            WordTiming(word: " do", tokens: [360], start: 9.44, end: 9.64, probability: 0.87),
+            WordTiming(word: " for", tokens: [337], start: 9.64, end: 9.86, probability: 0.95),
+            WordTiming(word: " your", tokens: [428], start: 9.86, end: 10.06, probability: 0.96),
+            WordTiming(word: " country.", tokens: [1941, 13], start: 10.06, end: 10.5, probability: 0.91)
+        ]
+
+        XCTAssertEqual(wordTimings.count, expectedWordTimings.count, "Number of word timings should match")
+
+        for (index, wordTiming) in wordTimings.enumerated() {
+            let expectedWordTiming = expectedWordTimings[index]
+
+            XCTAssertEqual(wordTiming.word.normalized, expectedWordTiming.word.normalized, "Word should match at index \(index) (expected: \(expectedWordTiming.word), actual: \(wordTiming.word))")
+
+            XCTAssertEqual(wordTiming.start, expectedWordTiming.start, accuracy: 0.5, "Start time difference for word '\(wordTiming.word)' should be within +/- 0.1 seconds (expected: \(expectedWordTiming.start), actual: \(wordTiming.start))")
+
+            XCTAssertEqual(wordTiming.end, expectedWordTiming.end, accuracy: 0.5, "End time difference for word '\(wordTiming.word)' should be within +/- 0.1 seconds (expected: \(expectedWordTiming.end), actual: \(wordTiming.end))")
         }
     }
 }

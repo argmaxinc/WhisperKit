@@ -57,7 +57,7 @@ struct ContentView: View {
     @State private var currentFallbacks: Int = 0
     @State private var lastBufferSize: Int = 0
     @State private var lastConfirmedSegmentEndSeconds: Float = 0
-    @State private var requiredSegmentsForConfirmation: Int = 2
+    @State private var requiredSegmentsForConfirmation: Int = 4
     @State private var bufferEnergy: [Float] = []
     @State private var confirmedSegments: [TranscriptionSegment] = []
     @State private var unconfirmedSegments: [TranscriptionSegment] = []
@@ -269,7 +269,8 @@ struct ContentView: View {
 
                     #if os(macOS)
                     Button(action: {
-                        if let folder = whisperKit?.modelFolder {
+                        let folderURL = whisperKit?.modelFolder ?? (localModels.contains(selectedModel) ? URL(fileURLWithPath: localModelPath) : nil)
+                        if let folder = folderURL {
                             NSWorkspace.shared.open(folder)
                         }
                     }, label: {
@@ -708,7 +709,7 @@ struct ContentView: View {
                 localModelPath = modelPath
                 do {
                     let downloadedModels = try FileManager.default.contentsOfDirectory(atPath: modelPath)
-                    for model in downloadedModels where !localModels.contains(model) && model.starts(with: "openai") {
+                    for model in downloadedModels where !localModels.contains(model) {
                         localModels.append(model)
                     }
                 } catch {
@@ -763,7 +764,7 @@ struct ContentView: View {
             if localModels.contains(model) && !redownload {
                 // Get local model folder URL from localModels
                 // TODO: Make this configurable in the UI
-                folder = URL(fileURLWithPath: localModelPath).appendingPathComponent("openai_whisper-\(model)")
+                folder = URL(fileURLWithPath: localModelPath).appendingPathComponent(model)
             } else {
                 // Download the model
                 folder = try await WhisperKit.download(variant: model, from: repoName, progressCallback: { progress in
@@ -833,7 +834,7 @@ struct ContentView: View {
     
     func deleteModel() {
         if localModels.contains(selectedModel) {
-            let modelFolder = URL(fileURLWithPath: localModelPath).appendingPathComponent("openai_whisper-\(selectedModel)")
+            let modelFolder = URL(fileURLWithPath: localModelPath).appendingPathComponent(selectedModel)
             
             do {
                 try FileManager.default.removeItem(at: modelFolder)

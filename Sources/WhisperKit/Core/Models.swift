@@ -15,6 +15,7 @@ public typealias FloatType = Float
 
 #if (os(macOS) || targetEnvironment(macCatalyst)) && arch(arm64)
 extension Float16: BNNSScalar {}
+extension Float16: MLShapedArrayScalar {}
 #endif
 
 // MARK: - CoreML
@@ -146,11 +147,11 @@ public struct ModelComputeOptions {
             self.prefillCompute = .cpuOnly
             return
         }
-        
+
         self.melCompute = melCompute
         self.prefillCompute = prefillCompute
         self.textDecoderCompute = textDecoderCompute
-        
+
         if #available(macOS 14.0, iOS 17.0, watchOS 10, visionOS 1, *) {
             self.audioEncoderCompute = audioEncoderCompute ?? .cpuAndNeuralEngine
         } else {
@@ -209,9 +210,10 @@ public struct DecodingCache {
 ///   - sampleLength: The maximum number of tokens to sample.
 ///   - topK: Number of candidates when sampling with non-zero temperature.
 ///   - usePrefillPrompt: If true, the prefill tokens will be forced according to task and language settings.
-///   - usePrefillPrompt: If true, the kv cache will be prefilled based on the prefill data mlmodel.
+///   - usePrefillCache: If true, the kv cache will be prefilled based on the prefill data mlmodel.
 ///   - skipSpecialTokens: Whether to skip special tokens in the output.
 ///   - withoutTimestamps: Whether to include timestamps in the transcription result.
+///   - maxInitialTimestamp: Maximal initial timestamp.
 ///   - suppressBlank: If true, blank tokens will be suppressed during decoding.
 ///   - supressTokens: List of token IDs to suppress during decoding.
 ///   - compressionRatioThreshold: If the compression ratio of the transcription text is above this value, it is too repetitive and treated as failed.
@@ -233,6 +235,7 @@ public struct DecodingOptions {
     public var skipSpecialTokens: Bool
     public var withoutTimestamps: Bool
     public var wordTimestamps: Bool
+    public var maxInitialTimestamp: Float?
     public var clipTimestamps: [Float]
     public var suppressBlank: Bool
     public var supressTokens: [Int]
@@ -253,6 +256,7 @@ public struct DecodingOptions {
                 skipSpecialTokens: Bool = false,
                 withoutTimestamps: Bool = false,
                 wordTimestamps: Bool = false,
+                maxInitialTimestamp: Float? = nil,
                 clipTimestamps: [Float] = [],
                 suppressBlank: Bool = false,
                 supressTokens: [Int]? = nil,
@@ -273,6 +277,7 @@ public struct DecodingOptions {
         self.skipSpecialTokens = skipSpecialTokens
         self.withoutTimestamps = withoutTimestamps
         self.wordTimestamps = wordTimestamps
+        self.maxInitialTimestamp = maxInitialTimestamp
         self.clipTimestamps = clipTimestamps
         self.suppressBlank = suppressBlank
         self.supressTokens = supressTokens ?? [] // nonSpeechTokens() // TODO: implement these as default
@@ -399,6 +404,7 @@ public struct TranscriptionTimings: Codable {
     public var decodingInit: TimeInterval
     public var decodingLoop: TimeInterval
     public var decodingPredictions: TimeInterval
+    public var decodingFiltering: TimeInterval
     public var decodingSampling: TimeInterval
     public var decodingFallback: TimeInterval
     public var decodingWindowing: TimeInterval
@@ -434,6 +440,7 @@ public struct TranscriptionTimings: Codable {
                 decodingInit: TimeInterval = 0,
                 decodingLoop: TimeInterval = 0,
                 decodingPredictions: TimeInterval = 0,
+                decodingFiltering: TimeInterval = 0,
                 decodingSampling: TimeInterval = 0,
                 decodingFallback: TimeInterval = 0,
                 decodingWindowing: TimeInterval = 0,
@@ -462,6 +469,7 @@ public struct TranscriptionTimings: Codable {
         self.decodingInit = decodingInit
         self.decodingLoop = decodingLoop
         self.decodingPredictions = decodingPredictions
+        self.decodingFiltering = decodingFiltering
         self.decodingSampling = decodingSampling
         self.decodingFallback = decodingFallback
         self.decodingWindowing = decodingWindowing

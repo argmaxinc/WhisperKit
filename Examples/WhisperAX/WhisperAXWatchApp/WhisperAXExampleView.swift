@@ -357,7 +357,7 @@ struct WhisperAXWatchView: View {
                 // Get local model folder URL from localModels
                 // TODO: Make this configurable in the UI
                 // TODO: Handle incomplete downloads
-                folder = URL(fileURLWithPath: localModelPath).appendingPathComponent("openai_whisper-\(model)")
+                folder = URL(fileURLWithPath: localModelPath).appendingPathComponent(model)
             } else {
                 // Download the model
                 folder = try await WhisperKit.download(variant: model, from: repoName, progressCallback: { progress in
