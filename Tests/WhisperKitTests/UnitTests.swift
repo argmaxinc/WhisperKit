@@ -171,6 +171,7 @@ final class UnitTests: XCTestCase {
     
     func testDecoderLogProbThresholdDecodingFallback() async throws {
         let decodingOptions = DecodingOptions(
+            withoutTimestamps: true,
             compressionRatioThreshold: nil,
             logProbThreshold: 100.0,
             firstTokenLogProbThreshold: nil,
@@ -196,6 +197,7 @@ final class UnitTests: XCTestCase {
 
     func testDecoderFirstTokenLogProbThresholdDecodingFallback() async throws {
         let decodingOptions = DecodingOptions(
+            withoutTimestamps: true,
             compressionRatioThreshold: nil,
             logProbThreshold: nil,
             firstTokenLogProbThreshold: 100.0,

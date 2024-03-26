@@ -309,6 +309,18 @@ extension DecodingFallback {
         compressionRatio: Float,
         avgLogProb: Float
     ) {
+        print("""
+        [DecodingFallback]
+            isFirstTokenLogProbTooLow: \(isFirstTokenLogProbTooLow),
+            noSpeechProb: \(noSpeechProb),
+            compressionRatio: \(compressionRatio),
+            avgLogProb: \(avgLogProb)
+            options:
+                noSpeechThreshold: \(String(describing: options.noSpeechThreshold))
+                compressionRatioThreshold: \(String(describing: options.compressionRatioThreshold))
+                logProbThreshold: \(String(describing: options.logProbThreshold))
+        [---]
+        """)
         // NOTE: order matters here
         if isFirstTokenLogProbTooLow {
             self.init(needsFallback: true, fallbackReason: "firstTokenLogProbThreshold")
