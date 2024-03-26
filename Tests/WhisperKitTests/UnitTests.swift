@@ -173,7 +173,7 @@ final class UnitTests: XCTestCase {
         let decodingOptions = DecodingOptions(
             withoutTimestamps: true,
             compressionRatioThreshold: nil,
-            logProbThreshold: 100.0,
+            logProbThreshold: 1000.0,
             firstTokenLogProbThreshold: nil,
             noSpeechThreshold: nil
         )
@@ -190,7 +190,7 @@ final class UnitTests: XCTestCase {
         let inputs = try XCTUnwrap(decoderInputs, "Failed to prepare decoder inputs")
         let decoderOutput = try await textDecoder.decodeText(from: encoderInput, using: inputs, sampler: tokenSampler, options: decodingOptions)
 
-        let fallback = try XCTUnwrap(decoderOutput.first?.fallback)
+        let fallback = try XCTUnwrap(decoderOutput.first?.fallback, "Fallback is `nil` \(String(describing: decoderOutput.first))")
         XCTAssertEqual(fallback.fallbackReason, "logProbThreshold")
         XCTAssertTrue(fallback.needsFallback)
     }
@@ -200,7 +200,7 @@ final class UnitTests: XCTestCase {
             withoutTimestamps: true,
             compressionRatioThreshold: nil,
             logProbThreshold: nil,
-            firstTokenLogProbThreshold: 100.0,
+            firstTokenLogProbThreshold: 1000.0,
             noSpeechThreshold: nil
         )
         var textDecoder = TextDecoder()
@@ -216,7 +216,7 @@ final class UnitTests: XCTestCase {
         let inputs = try XCTUnwrap(decoderInputs, "Failed to prepare decoder inputs")
         let decoderOutput = try await textDecoder.decodeText(from: encoderInput, using: inputs, sampler: tokenSampler, options: decodingOptions)
 
-        let fallback = try XCTUnwrap(decoderOutput.first?.fallback)
+        let fallback = try XCTUnwrap(decoderOutput.first?.fallback, "Fallback is `nil` \(String(describing: decoderOutput.first))")
         XCTAssertEqual(fallback.fallbackReason, "firstTokenLogProbThreshold")
         XCTAssertTrue(fallback.needsFallback)
     }
@@ -361,7 +361,7 @@ final class UnitTests: XCTestCase {
         let silence = [Float](repeating: 0.0, count: 30 * 16000)
         let multiWindowSamples = audioSamples + silence + audioSamples
 
-        let options = DecodingOptions(usePrefillPrompt: true, withoutTimestamps: false)
+        let options = DecodingOptions(usePrefillPrompt: true, withoutTimestamps: false, firstTokenLogProbThreshold: nil)
 
         let result = try? await whisperKit!.transcribe(audioArray: multiWindowSamples, decodeOptions: options)
         XCTAssertEqual(result?.segments.count, 3, "Expected 3 segments")
