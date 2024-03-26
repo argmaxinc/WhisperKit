@@ -125,7 +125,7 @@ struct Transcribe: AsyncParsableCommand {
         var results: [TranscriptionResult?] = []
         var prevResult: TranscriptionResult?
         var lastAgreedSeconds: Float = 0.0
-        let agreementCountNeeded = 2
+        let agreementCountNeeded = 3
         var hypothesisWords: [WordTiming] = []
         var prevWords: [WordTiming] = []
         var lastAgreedWords: [WordTiming] = []
