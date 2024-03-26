@@ -302,8 +302,9 @@ public struct DecodingFallback {
     }
 }
 
-extension DecodingFallback {
-    public init?(
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
+public extension DecodingFallback {
+    init?(
         options: DecodingOptions,
         isFirstTokenLogProbTooLow: Bool,
         noSpeechProb: Float,
@@ -328,6 +329,7 @@ extension DecodingFallback {
     }
 }
 
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public struct DecodingResult {
     public var language: String
     public var languageProbs: [String: Float]
