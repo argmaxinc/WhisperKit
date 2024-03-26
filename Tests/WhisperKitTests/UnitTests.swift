@@ -184,13 +184,13 @@ final class UnitTests: XCTestCase {
 
         let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.endToken, decodingOptions: decodingOptions)
 
-        let encoderInput = try MLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16)
+        let encoderInput = initMLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16, initialValue: FloatType(0))
         let decoderInputs = textDecoder.prepareDecoderInputs(withPrompt: [textDecoder.tokenizer!.startOfTranscriptToken])
 
         let inputs = try XCTUnwrap(decoderInputs, "Failed to prepare decoder inputs")
         let decoderOutput = try await textDecoder.decodeText(from: encoderInput, using: inputs, sampler: tokenSampler, options: decodingOptions)
 
-        let fallback = try XCTUnwrap(decoderOutput.first?.fallback, "Fallback is `nil` \(String(describing: decoderOutput.first))")
+        let fallback = try XCTUnwrap(decoderOutput.first?.fallback, "Fallback should not be `nil`")
         XCTAssertEqual(fallback.fallbackReason, "logProbThreshold")
         XCTAssertTrue(fallback.needsFallback)
     }
@@ -210,13 +210,13 @@ final class UnitTests: XCTestCase {
 
         let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.endToken, decodingOptions: decodingOptions)
 
-        let encoderInput = try MLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16)
+        let encoderInput = initMLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16, initialValue: FloatType(0))
         let decoderInputs = textDecoder.prepareDecoderInputs(withPrompt: [textDecoder.tokenizer!.startOfTranscriptToken])
 
         let inputs = try XCTUnwrap(decoderInputs, "Failed to prepare decoder inputs")
         let decoderOutput = try await textDecoder.decodeText(from: encoderInput, using: inputs, sampler: tokenSampler, options: decodingOptions)
 
-        let fallback = try XCTUnwrap(decoderOutput.first?.fallback, "Fallback is `nil` \(String(describing: decoderOutput.first))")
+        let fallback = try XCTUnwrap(decoderOutput.first?.fallback, "Fallback should not be `nil`")
         XCTAssertEqual(fallback.fallbackReason, "firstTokenLogProbThreshold")
         XCTAssertTrue(fallback.needsFallback)
     }
