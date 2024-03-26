@@ -384,7 +384,7 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
             let loopStart = Date()
 
             let isPrefill = tokenIndex < intialPromptIndex // Prefill stops at the last token of the initial prompt
-            let isFirstToken = tokenIndex == intialPromptIndex + 1
+            let isFirstToken = tokenIndex == intialPromptIndex
             // Check if current index is part of the initial prompt
             if tokenIndex <= intialPromptIndex {
                 nextToken = currentTokens[tokenIndex]
@@ -448,15 +448,19 @@ public class TextDecoder: TextDecoding, WhisperMLModel {
             let samplingTime = Date().timeIntervalSince(samplingStartTime)
             timings.decodingSampling += samplingTime
 
-            let isSegmentCompleted = sampleResult.completed || currentTokens.count >= WhisperKit.maxTokenContext
             isFirstTokenLogProbTooLow =
                 if isFirstToken, let firstTokenLogProbThreshold = options.firstTokenLogProbThreshold, nextTokenLogProb < firstTokenLogProbThreshold {
                     true
                 } else {
                     false
                 }
-            
-            if isSegmentCompleted || isFirstTokenLogProbTooLow {
+            let isSegmentCompleted = 
+                sampleResult.completed ||
+                currentTokens.count >= WhisperKit.maxTokenContext ||
+                isFirstTokenLogProbTooLow
+
+            if isSegmentCompleted {
+                // Completed segment, stop the loop
                 break
             } else {
                 // MARK: KV Caching

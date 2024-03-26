@@ -171,14 +171,14 @@ final class UnitTests: XCTestCase {
     
     func testDecoderLogProbThresholdDecodingFallback() async throws {
         var textDecoder = TextDecoder()
-        let decodingOptions = DecodingOptions(logProbThreshold: -1.0)
+        let decodingOptions = DecodingOptions(logProbThreshold: -1.0, firstTokenLogProbThreshold: nil)
         let modelPath = URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
         textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
 
         let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.endToken, decodingOptions: decodingOptions)
 
-        let encoderInput = try MLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16)
+        let encoderInput = initMLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16, initialValue: -Float16.infinity)
         let decoderInputs = textDecoder.prepareDecoderInputs(withPrompt: [textDecoder.tokenizer!.startOfTranscriptToken])
 
         let inputs = try XCTUnwrap(decoderInputs, "Failed to prepare decoder inputs")
@@ -191,14 +191,14 @@ final class UnitTests: XCTestCase {
 
     func testDecoderFirstTokenLogProbThresholdDecodingFallback() async throws {
         var textDecoder = TextDecoder()
-        let decodingOptions = DecodingOptions(firstTokenLogProbThreshold: -1.0)
+        let decodingOptions = DecodingOptions(logProbThreshold: nil, firstTokenLogProbThreshold: -1.0)
         let modelPath = URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
         textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
 
         let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.endToken, decodingOptions: decodingOptions)
 
-        let encoderInput = try MLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16)
+        let encoderInput = initMLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16, initialValue: -Float16.infinity)
         let decoderInputs = textDecoder.prepareDecoderInputs(withPrompt: [textDecoder.tokenizer!.startOfTranscriptToken])
 
         let inputs = try XCTUnwrap(decoderInputs, "Failed to prepare decoder inputs")

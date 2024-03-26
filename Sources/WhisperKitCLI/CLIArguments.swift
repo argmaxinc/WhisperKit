@@ -70,6 +70,9 @@ struct CLIArguments: ParsableArguments {
     @Option(help: "Average log probability threshold for decoding failure")
     var logprobThreshold: Float?
 
+    @Option(help: "Log probability threshold for first token decoding failure")
+    var firstTokenLogProbThreshold: Float?
+
     @Option(help: "Probability threshold to consider a segment as silence")
     var noSpeechThreshold: Float?
 

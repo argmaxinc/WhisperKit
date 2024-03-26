@@ -218,6 +218,7 @@ public struct DecodingCache {
 ///   - supressTokens: List of token IDs to suppress during decoding.
 ///   - compressionRatioThreshold: If the compression ratio of the transcription text is above this value, it is too repetitive and treated as failed.
 ///   - logProbThreshold: If the average log probability over sampled tokens is below this value, treat as failed.
+///   - firstTokenLogProbThreshold: If the log probability over the first sampled token is below this value, treat as failed.
 ///   - noSpeechThreshold: If the no speech probability is higher than this value AND the average log
 ///                        probability over sampled tokens is below `logProbThreshold`, consider the segment as silent.
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
@@ -263,7 +264,7 @@ public struct DecodingOptions {
                 supressTokens: [Int]? = nil,
                 compressionRatioThreshold: Float? = 2.4,
                 logProbThreshold: Float? = -1.0,
-                firstTokenLogProbThreshold: Float? = nil,
+                firstTokenLogProbThreshold: Float? = -0.7,
                 noSpeechThreshold: Float? = 0.6)
     {
         self.verbose = verbose
