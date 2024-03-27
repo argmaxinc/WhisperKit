@@ -37,7 +37,7 @@ public extension ResultWriting {
     }
 }
 
-public class WriteJSON: ResultWriting {
+open class WriteJSON: ResultWriting {
     public let outputDir: String
 
     public init(outputDir: String) {
@@ -66,7 +66,7 @@ public class WriteJSON: ResultWriting {
     }
 }
 
-public class WriteSRT: ResultWriting {
+open class WriteSRT: ResultWriting {
     public let outputDir: String
 
     public init(outputDir: String) {
@@ -101,7 +101,7 @@ public class WriteSRT: ResultWriting {
     }
 }
 
-public class WriteVTT: ResultWriting {
+open class WriteVTT: ResultWriting {
     public let outputDir: String
 
     public init(outputDir: String) {

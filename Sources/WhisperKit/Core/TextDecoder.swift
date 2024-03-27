@@ -236,7 +236,7 @@ public class TextDecoderContextPrefill: WhisperMLModel {
 }
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-public class TextDecoder: TextDecoding, WhisperMLModel {
+open class TextDecoder: TextDecoding, WhisperMLModel {
     public var model: MLModel?
     public var tokenizer: WhisperTokenizer?
     public var prefillData: WhisperMLModel?
