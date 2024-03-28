@@ -97,7 +97,7 @@ final class UnitTests: XCTestCase {
             "Failed to pad audio samples"
         )
         var featureExtractor = FeatureExtractor()
-        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "MelSpectrogram.mlmodelc")
+        let modelPath = URL(filePath: tinyModelPath()).appending(path: "MelSpectrogram.mlmodelc")
         try await featureExtractor.loadModel(at: modelPath, computeUnits: ModelComputeOptions().melCompute)
         let melSpectrogram = try await XCTUnwrapAsync(
             await featureExtractor.logMelSpectrogram(fromAudio: paddedSamples),
@@ -136,7 +136,7 @@ final class UnitTests: XCTestCase {
 
     func testEncoderOutput() async throws {
         var audioEncoder = AudioEncoder()
-        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "AudioEncoder.mlmodelc")
+        let modelPath = URL(filePath: tinyModelPath()).appending(path: "AudioEncoder.mlmodelc")
         try? await audioEncoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().audioEncoderCompute)
 
         let encoderInput = try MLMultiArray(shape: [1, 80, 1, 3000], dataType: .float16)
@@ -152,7 +152,7 @@ final class UnitTests: XCTestCase {
     func testDecoderOutput() async throws {
         var textDecoder = TextDecoder()
         let decodingOptions = DecodingOptions()
-        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        let modelPath = URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         await XCTAssertNoThrowAsync(
             try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute),
             "Failed to load the model"
@@ -194,7 +194,7 @@ final class UnitTests: XCTestCase {
             noSpeechThreshold: nil
         )
         var textDecoder = TextDecoder()
-        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        let modelPath = URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
         textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
 
@@ -220,7 +220,7 @@ final class UnitTests: XCTestCase {
             noSpeechThreshold: nil
         )
         var textDecoder = TextDecoder()
-        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        let modelPath = URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
         textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
 
@@ -1274,173 +1274,5 @@ final class UnitTests: XCTestCase {
         Logging.info("[testStreamingTimestamps] Done")
 
         XCTAssertEqual(finalWords.normalized, " And so my fellow Americans. Ask not what your country can do for you ask what you can do for your country.".normalized)
-    }
-}
-
-// MARK: - Helpers
-
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-extension MLMultiArray {
-    /// Create `MLMultiArray` of shape [1, 1, arr.count] and fill up the last
-    /// dimension with with values from arr.
-    static func logits(_ arr: [FloatType]) throws -> MLMultiArray {
-        let logits = try MLMultiArray(shape: [1, 1, arr.count] as [NSNumber], dataType: .float16)
-        let ptr = UnsafeMutablePointer<FloatType>(OpaquePointer(logits.dataPointer))
-        for (index, value) in arr.enumerated() {
-            let linearOffset = logits.linearOffset(for: [0, 0, index as NSNumber])
-            ptr[linearOffset] = value
-        }
-        return logits
-    }
-
-    /// Get the data from `MLMultiArray` for given dimension
-    func data(for dimension: Int) -> [FloatType] {
-        let count = shape[dimension].intValue
-        let indexes = stride(from: 0, to: count, by: 1).map { [0, 0, $0 as NSNumber] }
-        var result = [FloatType]()
-        let ptr = UnsafeMutablePointer<FloatType>(OpaquePointer(dataPointer))
-        for index in indexes {
-            let linearOffset = linearOffset(for: index as [NSNumber])
-            result.append(ptr[linearOffset])
-        }
-        return result
-    }
-}
-
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-extension XCTestCase {
-    func transcribe(with variant: ModelVariant, options: DecodingOptions, audioFile: String = "jfk.wav", file: StaticString = #file, line: UInt = #line) async throws -> TranscriptionResult? {
-        var modelPath = tinyModelPath()
-        switch variant {
-            case .largev3:
-                modelPath = largev3ModelPath()
-            default:
-                modelPath = tinyModelPath()
-        }
-        let computeOptions = ModelComputeOptions(
-            melCompute: .cpuOnly,
-            audioEncoderCompute: .cpuOnly,
-            textDecoderCompute: .cpuOnly,
-            prefillCompute: .cpuOnly
-        )
-        let whisperKit = try await WhisperKit(modelFolder: modelPath, computeOptions: computeOptions, verbose: true, logLevel: .debug)
-        trackForMemoryLeaks(on: whisperKit, file: file, line: line)
-
-        let audioComponents = audioFile.components(separatedBy: ".")
-        guard let audioFileURL = Bundle.module.path(forResource: audioComponents.first, ofType: audioComponents.last) else {
-            return nil
-        }
-
-        let result = try await whisperKit.transcribe(audioPath: audioFileURL, decodeOptions: options)
-        return result
-    }
-
-    func tinyModelPath() -> String {
-        let modelDir = "whisperkit-coreml/openai_whisper-tiny"
-        guard let modelPath = Bundle.module.urls(forResourcesWithExtension: "mlmodelc", subdirectory: modelDir)?.first?.deletingLastPathComponent().path else {
-            print("Failed to load model, ensure \"Models/\(modelDir)\" exists via Makefile command: `make download-models`")
-            return ""
-        }
-        return modelPath
-    }
-
-    func largev3ModelPath() -> String {
-        let modelDir = "whisperkit-coreml/openai_whisper-large-v3" // use faster to compile model for tests
-        guard let modelPath = Bundle.module.urls(forResourcesWithExtension: "mlmodelc", subdirectory: modelDir)?.first?.deletingLastPathComponent().path else {
-            print("Failed to load model, ensure \"Models/\(modelDir)\" exists via Makefile command: `make download-models`")
-            return ""
-        }
-        return modelPath
-    }
-
-    func largev3TurboModelPath() -> String {
-        let modelDir = "whisperkit-coreml/openai_whisper-large-v3_turbo"
-        guard let modelPath = Bundle.module.urls(forResourcesWithExtension: "mlmodelc", subdirectory: modelDir)?.first?.deletingLastPathComponent().path else {
-            print("Failed to load model, ensure \"Models/\(modelDir)\" exists via Makefile command: `make download-models`")
-            return ""
-        }
-        return modelPath
-    }
-
-    func allModelPaths() -> [String] {
-        let fileManager = FileManager.default
-        var modelPaths: [String] = []
-        let directory = "whisperkit-coreml"
-
-        do {
-            let resourceKeys: [URLResourceKey] = [.isDirectoryKey]
-            guard let baseurl = Bundle.module.resourceURL?.appendingPathComponent(directory) else {
-                print("Base URL for directory \(directory) not found.")
-                return []
-            }
-
-            let directoryContents = try fileManager.contentsOfDirectory(at: baseurl, includingPropertiesForKeys: resourceKeys, options: .skipsHiddenFiles)
-
-            for folderURL in directoryContents {
-                let resourceValues = try folderURL.resourceValues(forKeys: Set(resourceKeys))
-                if resourceValues.isDirectory == true {
-                    // Check if the directory contains actual data files, or if it contains pointer files.
-                    // As a proxy, use the MelSpectrogramc.mlmodel/coredata.bin file.
-                    let proxyFileToCheck = folderURL.appendingPathComponent("MelSpectrogram.mlmodelc/coremldata.bin")
-                    if isGitLFSPointerFile(url: proxyFileToCheck) {
-                        continue
-                    }
-                    
-                    // Check if the directory name contains the quantization pattern
-                    // Only test large quantized models
-                    let dirName = folderURL.lastPathComponent
-                    if !(dirName.contains("q") && !dirName.contains("large")) {
-                        modelPaths.append(folderURL.absoluteString)
-                    }
-                }
-            }
-        } catch {
-            print(error.localizedDescription)
-        }
-
-        return modelPaths
-    }
-    
-    // Function to check if the beginning of the file matches a Git LFS pointer pattern
-    func isGitLFSPointerFile(url: URL) -> Bool {
-        do {
-            let fileHandle = try FileHandle(forReadingFrom: url)
-            // Read the first few bytes of the file to get enough for the Git LFS pointer signature
-            let data = fileHandle.readData(ofLength: 512) // Read first 512 bytes
-            fileHandle.closeFile()
-
-            if let string = String(data: data, encoding: .utf8),
-               string.starts(with: "version https://git-lfs.github.com/") {
-                return true
-            }
-        } catch {
-            fatalError("Failed to read file: \(error)")
-        }
-        
-        return false
-    }
-
-    func trackForMemoryLeaks(on instance: AnyObject, file: StaticString = #filePath, line: UInt = #line) {
-        addTeardownBlock { [weak instance] in
-            XCTAssertNil(instance, "Detected potential memory leak", file: file, line: line)
-        }
-    }
-}
-
-extension String {
-    var normalized: String {
-        // Trim whitespace and newlines
-        let trimmedString = self.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // Convert to lowercase
-        let lowercaseString = trimmedString.lowercased()
-
-        // Remove punctuation
-        let noPunctuationString = lowercaseString.components(separatedBy: .punctuationCharacters).joined()
-
-        // Replace multiple spaces with a single space
-        let singleSpacedString = noPunctuationString.replacingOccurrences(of: " +", with: " ", options: .regularExpression)
-
-        return singleSpacedString
     }
 }
