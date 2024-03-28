@@ -881,52 +881,73 @@ public class TextDecoderCachePrefillOutput: MLFeatureProvider {
     }
 }
 
-// MARK: Tokenizer
+// MARK: SpecialTokens
 
-public extension Tokenizer {
-    var whitespaceToken: Int { convertTokenToId(" ") ?? Self.defaultWhitespaceToken }
-    var specialTokenBegin: Int { convertTokenToId("<|endoftext|>") ?? Self.defaultSpecialTokenBegin }
-    var endToken: Int { convertTokenToId("<|endoftext|>") ?? Self.defaultEndToken }
-    var startOfTranscriptToken: Int { convertTokenToId("<|startoftranscript|>") ?? Self.defaultStartOfTranscriptToken }
-    var englishToken: Int { convertTokenToId("<|en|>") ?? Self.defaultEnglishToken }
-    var transcribeToken: Int { convertTokenToId("<|transcribe|>") ?? Self.defaultTranscribeToken }
-    var translateToken: Int { convertTokenToId("<|translate|>") ?? Self.defaultTranslateToken }
-    var noSpeechToken: Int { convertTokenToId("<|nospeech|>") ?? Self.defaultNoSpeechToken }
-    var noTimestampsToken: Int { convertTokenToId("<|notimestamps|>") ?? Self.defaultNoTimestampsToken }
-    var timeTokenBegin: Int { convertTokenToId("<|0.00|>") ?? Self.defaultTimeTokenBegin }
+public struct SpecialTokens {
+    public let endToken: Int
+    public let englishToken: Int
+    public let noSpeechToken: Int
+    public let noTimestampsToken: Int
+    public let specialTokenBegin: Int
+    public let startOfTranscriptToken: Int
+    public let timeTokenBegin: Int
+    public let transcribeToken: Int
+    public let translateToken: Int
+    public let whitespaceToken: Int
 
-    /// Default values for each token, using base vocab
-    internal static var defaultWhitespaceToken: Int { 220 }
-    internal static var defaultSpecialTokenBegin: Int { 50257 }
-    internal static var defaultEndToken: Int { 50257 }
-    internal static var defaultStartOfTranscriptToken: Int { 50258 }
-    internal static var defaultEnglishToken: Int { 50259 }
-    internal static var defaultTranscribeToken: Int { 50359 }
-    internal static var defaultTranslateToken: Int { 50358 }
-    internal static var defaultNoSpeechToken: Int { 50362 }
-    internal static var defaultNoTimestampsToken: Int { 50363 }
-    internal static var defaultTimeTokenBegin: Int { 50364 }
-
-    /// Tokenizes the given text into individual words and associated tokens
-    /// - Parameter tokenIds: Array of tokens to split
-    /// - Returns: Tuple containing and array of the split words and and all tokens for each word
-    func splitToWordTokens(tokenIds: [Int]) -> (words: [String], wordTokens: [[Int]]) {
-        let decodedWords = decode(tokens: tokenIds.filter { $0 < specialTokenBegin })
-
-        // Detect language of input text
-        let recognizer = NLLanguageRecognizer()
-        recognizer.processString(decodedWords)
-        let languageCode = recognizer.dominantLanguage?.rawValue
-
-        if ["zh", "ja", "th", "lo", "my", "yue"].contains(languageCode) {
-            return splitTokensOnUnicode(tokens: tokenIds)
-        } else {
-            return splitTokensOnSpaces(tokens: tokenIds)
-        }
+    public init(
+        endToken: Int,
+        englishToken: Int,
+        noSpeechToken: Int,
+        noTimestampsToken: Int,
+        specialTokenBegin: Int,
+        startOfTranscriptToken: Int,
+        timeTokenBegin: Int,
+        transcribeToken: Int,
+        translateToken: Int,
+        whitespaceToken: Int
+    ) {
+        self.endToken = endToken
+        self.englishToken = englishToken
+        self.noSpeechToken = noSpeechToken
+        self.noTimestampsToken = noTimestampsToken
+        self.specialTokenBegin = specialTokenBegin
+        self.startOfTranscriptToken = startOfTranscriptToken
+        self.timeTokenBegin = timeTokenBegin
+        self.transcribeToken = transcribeToken
+        self.translateToken = translateToken
+        self.whitespaceToken = whitespaceToken
     }
+}
 
-    func splitTokensOnUnicode(tokens: [Int]) -> (words: [String], wordTokens: [[Int]]) {
-        let decodedFull = decode(tokens: tokens)
+public protocol WhisperTokenizer: Tokenizer {
+    var specialTokens: SpecialTokens { get }
+    
+    func splitToWordTokens(tokenIds: [Int]) -> (words: [String], wordTokens: [[Int]])
+}
+
+struct WhisperTokenizerWrapper: WhisperTokenizer {
+    let tokenizer: any Tokenizer
+    let specialTokens: SpecialTokens
+
+    init(tokenizer: any Tokenizer) {
+        self.tokenizer = tokenizer
+        self.specialTokens = SpecialTokens(
+            endToken: tokenizer.convertTokenToId("<|endoftext|>") ?? Self.defaultEndToken,
+            englishToken: tokenizer.convertTokenToId("<|en|>") ?? Self.defaultEnglishToken,
+            noSpeechToken: tokenizer.convertTokenToId("<|nospeech|>") ?? Self.defaultNoSpeechToken,
+            noTimestampsToken: tokenizer.convertTokenToId("<|notimestamps|>") ?? Self.defaultNoTimestampsToken,
+            specialTokenBegin: tokenizer.convertTokenToId("<|endoftext|>") ?? Self.defaultSpecialTokenBegin,
+            startOfTranscriptToken: tokenizer.convertTokenToId("<|startoftranscript|>") ?? Self.defaultStartOfTranscriptToken,
+            timeTokenBegin: tokenizer.convertTokenToId("<|0.00|>") ?? Self.defaultTimeTokenBegin,
+            transcribeToken: tokenizer.convertTokenToId("<|transcribe|>") ?? Self.defaultTranscribeToken,
+            translateToken: tokenizer.convertTokenToId("<|translate|>") ?? Self.defaultTranslateToken,
+            whitespaceToken: tokenizer.convertTokenToId(" ") ?? Self.defaultWhitespaceToken
+        )
+    }
+    
+    private func splitTokensOnUnicode(tokens: [Int]) -> (words: [String], wordTokens: [[Int]]) {
+        let decodedFull = tokenizer.decode(tokens: tokens)
         let replacementString = "\u{fffd}"
 
         var words: [String] = []
@@ -936,7 +957,7 @@ public extension Tokenizer {
 
         for token in tokens {
             currentTokens.append(token)
-            let decoded = decode(tokens: currentTokens)
+            let decoded = tokenizer.decode(tokens: currentTokens)
 
             var hasUnicodeInFullString = false
             if let range = decoded.range(of: replacementString) {
@@ -954,13 +975,13 @@ public extension Tokenizer {
         return (words, wordTokens)
     }
 
-    func splitTokensOnSpaces(tokens: [Int]) -> (words: [String], wordTokens: [[Int]]) {
+    private func splitTokensOnSpaces(tokens: [Int]) -> (words: [String], wordTokens: [[Int]]) {
         let (subwords, subwordTokensList) = splitTokensOnUnicode(tokens: tokens)
         var words: [String] = []
         var wordTokens: [[Int]] = []
 
         for (subword, subwordTokens) in zip(subwords, subwordTokensList) {
-            let special = subwordTokens.first! >= specialTokenBegin
+            let special = subwordTokens.first! >= specialTokens.specialTokenBegin
             let withSpace = subword.hasPrefix(" ")
             var punctuation = false
             if let strippedSubword = UnicodeScalar(subword.trimmingCharacters(in: .whitespaces)) {
@@ -978,7 +999,7 @@ public extension Tokenizer {
         return (words, wordTokens)
     }
 
-    func isPunctuation(_ text: String, tokenRange: Range<String.Index>, tag: NLTag?) -> Bool {
+    private func isPunctuation(_ text: String, tokenRange: Range<String.Index>, tag: NLTag?) -> Bool {
         let punctuationCharacters = CharacterSet.punctuationCharacters
         let token = String(text[tokenRange])
         print(token)
@@ -990,118 +1011,198 @@ public extension Tokenizer {
         return false
     }
 
-    var languages: [String: String] { [
-        "english": "en",
-        "chinese": "zh",
-        "german": "de",
-        "spanish": "es",
-        "russian": "ru",
-        "korean": "ko",
-        "french": "fr",
-        "japanese": "ja",
-        "portuguese": "pt",
-        "turkish": "tr",
-        "polish": "pl",
-        "catalan": "ca",
-        "dutch": "nl",
-        "arabic": "ar",
-        "swedish": "sv",
-        "italian": "it",
-        "indonesian": "id",
-        "hindi": "hi",
-        "finnish": "fi",
-        "vietnamese": "vi",
-        "hebrew": "he",
-        "ukrainian": "uk",
-        "greek": "el",
-        "malay": "ms",
-        "czech": "cs",
-        "romanian": "ro",
-        "danish": "da",
-        "hungarian": "hu",
-        "tamil": "ta",
-        "norwegian": "no",
-        "thai": "th",
-        "urdu": "ur",
-        "croatian": "hr",
-        "bulgarian": "bg",
-        "lithuanian": "lt",
-        "latin": "la",
-        "maori": "mi",
-        "malayalam": "ml",
-        "welsh": "cy",
-        "slovak": "sk",
-        "telugu": "te",
-        "persian": "fa",
-        "latvian": "lv",
-        "bengali": "bn",
-        "serbian": "sr",
-        "azerbaijani": "az",
-        "slovenian": "sl",
-        "kannada": "kn",
-        "estonian": "et",
-        "macedonian": "mk",
-        "breton": "br",
-        "basque": "eu",
-        "icelandic": "is",
-        "armenian": "hy",
-        "nepali": "ne",
-        "mongolian": "mn",
-        "bosnian": "bs",
-        "kazakh": "kk",
-        "albanian": "sq",
-        "swahili": "sw",
-        "galician": "gl",
-        "marathi": "mr",
-        "punjabi": "pa",
-        "sinhala": "si",
-        "khmer": "km",
-        "shona": "sn",
-        "yoruba": "yo",
-        "somali": "so",
-        "afrikaans": "af",
-        "occitan": "oc",
-        "georgian": "ka",
-        "belarusian": "be",
-        "tajik": "tg",
-        "sindhi": "sd",
-        "gujarati": "gu",
-        "amharic": "am",
-        "yiddish": "yi",
-        "lao": "lo",
-        "uzbek": "uz",
-        "faroese": "fo",
-        "haitian creole": "ht",
-        "pashto": "ps",
-        "turkmen": "tk",
-        "nynorsk": "nn",
-        "maltese": "mt",
-        "sanskrit": "sa",
-        "luxembourgish": "lb",
-        "myanmar": "my",
-        "tibetan": "bo",
-        "tagalog": "tl",
-        "malagasy": "mg",
-        "assamese": "as",
-        "tatar": "tt",
-        "hawaiian": "haw",
-        "lingala": "ln",
-        "hausa": "ha",
-        "bashkir": "ba",
-        "javanese": "jw",
-        "sundanese": "su",
-        "cantonese": "yue",
-        "burmese": "my",
-        "valencian": "ca",
-        "flemish": "nl",
-        "haitian": "ht",
-        "letzeburgesch": "lb",
-        "pushto": "ps",
-        "panjabi": "pa",
-        "moldavian": "ro",
-        "moldovan": "ro",
-        "sinhalese": "si",
-        "castilian": "es",
-        "mandarin": "zh",
-    ] }
+    /// Decodes token ids into individual words and per-word subtokens
+    /// - Parameter tokenIds: Array of tokens to decode and then split 
+    /// - Returns: Tuple containing and array of the split words and all tokens for each word
+    func splitToWordTokens(tokenIds: [Int]) -> (words: [String], wordTokens: [[Int]]) {
+        let decodedWords = tokenizer.decode(tokens: tokenIds.filter { $0 < specialTokens.specialTokenBegin })
+
+        // Detect language of input text
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(decodedWords)
+        let languageCode = recognizer.dominantLanguage?.rawValue
+
+        if ["zh", "ja", "th", "lo", "my", "yue"].contains(languageCode) {
+            return splitTokensOnUnicode(tokens: tokenIds)
+        } else {
+            return splitTokensOnSpaces(tokens: tokenIds)
+        }
+    }
+
+    var languages: [String: String] {
+        [
+            "english": "en",
+            "chinese": "zh",
+            "german": "de",
+            "spanish": "es",
+            "russian": "ru",
+            "korean": "ko",
+            "french": "fr",
+            "japanese": "ja",
+            "portuguese": "pt",
+            "turkish": "tr",
+            "polish": "pl",
+            "catalan": "ca",
+            "dutch": "nl",
+            "arabic": "ar",
+            "swedish": "sv",
+            "italian": "it",
+            "indonesian": "id",
+            "hindi": "hi",
+            "finnish": "fi",
+            "vietnamese": "vi",
+            "hebrew": "he",
+            "ukrainian": "uk",
+            "greek": "el",
+            "malay": "ms",
+            "czech": "cs",
+            "romanian": "ro",
+            "danish": "da",
+            "hungarian": "hu",
+            "tamil": "ta",
+            "norwegian": "no",
+            "thai": "th",
+            "urdu": "ur",
+            "croatian": "hr",
+            "bulgarian": "bg",
+            "lithuanian": "lt",
+            "latin": "la",
+            "maori": "mi",
+            "malayalam": "ml",
+            "welsh": "cy",
+            "slovak": "sk",
+            "telugu": "te",
+            "persian": "fa",
+            "latvian": "lv",
+            "bengali": "bn",
+            "serbian": "sr",
+            "azerbaijani": "az",
+            "slovenian": "sl",
+            "kannada": "kn",
+            "estonian": "et",
+            "macedonian": "mk",
+            "breton": "br",
+            "basque": "eu",
+            "icelandic": "is",
+            "armenian": "hy",
+            "nepali": "ne",
+            "mongolian": "mn",
+            "bosnian": "bs",
+            "kazakh": "kk",
+            "albanian": "sq",
+            "swahili": "sw",
+            "galician": "gl",
+            "marathi": "mr",
+            "punjabi": "pa",
+            "sinhala": "si",
+            "khmer": "km",
+            "shona": "sn",
+            "yoruba": "yo",
+            "somali": "so",
+            "afrikaans": "af",
+            "occitan": "oc",
+            "georgian": "ka",
+            "belarusian": "be",
+            "tajik": "tg",
+            "sindhi": "sd",
+            "gujarati": "gu",
+            "amharic": "am",
+            "yiddish": "yi",
+            "lao": "lo",
+            "uzbek": "uz",
+            "faroese": "fo",
+            "haitian creole": "ht",
+            "pashto": "ps",
+            "turkmen": "tk",
+            "nynorsk": "nn",
+            "maltese": "mt",
+            "sanskrit": "sa",
+            "luxembourgish": "lb",
+            "myanmar": "my",
+            "tibetan": "bo",
+            "tagalog": "tl",
+            "malagasy": "mg",
+            "assamese": "as",
+            "tatar": "tt",
+            "hawaiian": "haw",
+            "lingala": "ln",
+            "hausa": "ha",
+            "bashkir": "ba",
+            "javanese": "jw",
+            "sundanese": "su",
+            "cantonese": "yue",
+            "burmese": "my",
+            "valencian": "ca",
+            "flemish": "nl",
+            "haitian": "ht",
+            "letzeburgesch": "lb",
+            "pushto": "ps",
+            "panjabi": "pa",
+            "moldavian": "ro",
+            "moldovan": "ro",
+            "sinhalese": "si",
+            "castilian": "es",
+            "mandarin": "zh",
+        ]
+    }
+}
+
+extension WhisperTokenizerWrapper: Tokenizer {
+    func tokenize(text: String) -> [String] {
+        tokenizer.tokenize(text: text)
+    }
+    
+    func encode(text: String) -> [Int] {
+        tokenizer.encode(text: text)
+    }
+    
+    func decode(tokens: [Int]) -> String {
+        tokenizer.decode(tokens: tokens)
+    }
+    
+    func convertTokenToId(_ token: String) -> Int? {
+        tokenizer.convertTokenToId(token)
+    }
+    
+    func convertIdToToken(_ id: Int) -> String? {
+        tokenizer.convertIdToToken(id)
+    }
+    
+    var bosToken: String? {
+        tokenizer.bosToken
+    }
+    
+    var bosTokenId: Int? {
+        tokenizer.bosTokenId
+    }
+    
+    var eosToken: String? {
+        tokenizer.eosToken
+    }
+    
+    var eosTokenId: Int? {
+        tokenizer.eosTokenId
+    }
+    
+    var unknownToken: String? {
+        tokenizer.unknownToken
+    }
+    
+    var unknownTokenId: Int? {
+        tokenizer.unknownTokenId
+    }
+}
+
+extension WhisperTokenizerWrapper {
+    /// Default values for each token, using base vocab
+    static var defaultWhitespaceToken: Int { 220 }
+    static var defaultSpecialTokenBegin: Int { 50257 }
+    static var defaultEndToken: Int { 50257 }
+    static var defaultStartOfTranscriptToken: Int { 50258 }
+    static var defaultEnglishToken: Int { 50259 }
+    static var defaultTranscribeToken: Int { 50359 }
+    static var defaultTranslateToken: Int { 50358 }
+    static var defaultNoSpeechToken: Int { 50362 }
+    static var defaultNoTimestampsToken: Int { 50363 }
+    static var defaultTimeTokenBegin: Int { 50364 }
 }

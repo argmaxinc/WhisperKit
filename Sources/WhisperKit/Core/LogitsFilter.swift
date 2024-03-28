@@ -28,14 +28,20 @@ open class SuppressTokensFilter: LogitsFiltering {
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 open class SuppressBlankFilter: LogitsFiltering {
-    let suppressBlankTokens: [Int]
+    let specialTokens: SpecialTokens
     let sampleBegin: Int
     private let suppressTokenIndexes: [[NSNumber]]
 
-    public init(suppressBlankTokens: [Int], sampleBegin: Int) {
-        self.suppressBlankTokens = suppressBlankTokens
+    public init(
+        specialTokens: SpecialTokens,
+        sampleBegin: Int
+    ) {
+        self.specialTokens = specialTokens
         self.sampleBegin = sampleBegin
-        self.suppressTokenIndexes = suppressBlankTokens.map { [0, 0, $0 as NSNumber] }
+        self.suppressTokenIndexes = [
+            [0, 0, specialTokens.whitespaceToken as NSNumber],
+            [0, 0, specialTokens.endToken as NSNumber]
+        ]
     }
 
     public func filterLogits(_ logits: MLMultiArray, withTokens tokens: [Int]) -> MLMultiArray {
@@ -50,30 +56,18 @@ open class SuppressBlankFilter: LogitsFiltering {
 /// Implementation based on https://github.com/openai/whisper/blob/master/whisper/decoding.py#L441
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 open class TimestampRulesFilter: LogitsFiltering {
-    let transcribeToken: Int
-    let translateToken: Int
-    let noTimestampsToken: Int
-    let timeTokenBegin: Int
-    let endToken: Int
+    let specialTokens: SpecialTokens
     let sampleBegin: Int
     let maxInitialTimestampIndex: Int?
     let isModelMultilingual: Bool
 
     public init(
-        transcribeToken: Int,
-        translateToken: Int,
-        noTimestampsToken: Int,
-        timeTokenBegin: Int,
-        endToken: Int,
+        specialTokens: SpecialTokens,
         sampleBegin: Int,
         maxInitialTimestampIndex: Int?,
         isModelMultilingual: Bool
     ) {
-        self.transcribeToken = transcribeToken
-        self.translateToken = translateToken
-        self.noTimestampsToken = noTimestampsToken
-        self.timeTokenBegin = timeTokenBegin
-        self.endToken = endToken
+        self.specialTokens = specialTokens
         self.sampleBegin = sampleBegin
         self.maxInitialTimestampIndex = maxInitialTimestampIndex
         self.isModelMultilingual = isModelMultilingual
@@ -84,24 +78,24 @@ open class TimestampRulesFilter: LogitsFiltering {
             return logits
         }
         // suppress <|notimestamps|> which is handled by `withoutTimestamps`
-        logits.fill(indexes: [[0, 0, noTimestampsToken as NSNumber]], with: -FloatType.infinity)
+        logits.fill(indexes: [[0, 0, specialTokens.noTimestampsToken as NSNumber]], with: -FloatType.infinity)
 
         if tokens.count > sampleBegin {
             // timestamps have to appear in pairs, except directly before EOT; mask logits accordingly
             let sampledTokens = tokens[sampleBegin...]
-            let lastWasTimestamp = sampledTokens.count >= 1 && sampledTokens.last! >= timeTokenBegin
-            let penultimateWasTimestamp = sampledTokens.count < 2 || sampledTokens.dropLast().last! >= timeTokenBegin
+            let lastWasTimestamp = sampledTokens.count >= 1 && sampledTokens.last! >= specialTokens.timeTokenBegin
+            let penultimateWasTimestamp = sampledTokens.count < 2 || sampledTokens.dropLast().last! >= specialTokens.timeTokenBegin
             if lastWasTimestamp {
                 if penultimateWasTimestamp {
                     // has to be non-timestamp
-                    logits.fillLastDimension(indexes: timeTokenBegin..<logits.count, with: -FloatType.infinity)
+                    logits.fillLastDimension(indexes: specialTokens.timeTokenBegin..<logits.count, with: -FloatType.infinity)
                 } else {
                     // cannot be normal text tokens
-                    logits.fillLastDimension(indexes: 0..<endToken, with: -FloatType.infinity)
+                    logits.fillLastDimension(indexes: 0..<specialTokens.endToken, with: -FloatType.infinity)
                 }
             }
 
-            let timestamps = sampledTokens.filter { $0 >= timeTokenBegin }
+            let timestamps = sampledTokens.filter { $0 >= specialTokens.timeTokenBegin }
             if let lastTimestamp = timestamps.last {
                 // timestamps shouldn't decrease; forbid timestamp tokens smaller than the last
                 // also force each segment to have a nonzero length, to prevent infinite looping
@@ -111,23 +105,23 @@ open class TimestampRulesFilter: LogitsFiltering {
                     } else {
                         lastTimestamp + 1
                     }
-                logits.fillLastDimension(indexes: timeTokenBegin..<timestampLast, with: -FloatType.infinity)
+                logits.fillLastDimension(indexes: specialTokens.timeTokenBegin..<timestampLast, with: -FloatType.infinity)
             }
         }
 
-        if tokens.count == sampleBegin {
-            // suppress generating non-timestamp tokens at the beginning
-            logits.fillLastDimension(indexes: 0..<timeTokenBegin, with: -FloatType.infinity)
-            if let maxInitialTimestampIndex {
-                // apply the `maxInitialTimestamp` option
-                let lastAllowed = timeTokenBegin + maxInitialTimestampIndex + 1
-                logits.fillLastDimension(indexes: lastAllowed..<logits.count, with: -FloatType.infinity)
-            }
-        }
+       if tokens.count == sampleBegin {
+           // suppress generating non-timestamp tokens at the beginning
+           logits.fillLastDimension(indexes: 0..<specialTokens.timeTokenBegin, with: -FloatType.infinity)
+           if let maxInitialTimestampIndex {
+               // apply the `maxInitialTimestamp` option
+               let lastAllowed = specialTokens.timeTokenBegin + maxInitialTimestampIndex + 1
+               logits.fillLastDimension(indexes: lastAllowed..<logits.count, with: -FloatType.infinity)
+           }
+       }
 
         // if sum of probability over timestamps is above any other token, sample timestamp
-        if sumOfProbabilityOverTimestampsIsAboveAnyOtherToken(logits: logits, timeTokenBegin: timeTokenBegin) {
-            logits.fillLastDimension(indexes: 0..<timeTokenBegin, with: -FloatType.infinity)
+        if sumOfProbabilityOverTimestampsIsAboveAnyOtherToken(logits: logits, timeTokenBegin: specialTokens.timeTokenBegin) {
+            logits.fillLastDimension(indexes: 0..<specialTokens.timeTokenBegin, with: -FloatType.infinity)
         }
         return logits
     }
@@ -135,7 +129,7 @@ open class TimestampRulesFilter: LogitsFiltering {
     private func sampleBegin(for tokens: [Int]) -> Int? {
         if isModelMultilingual {
             // NOTE: for multilingual model we don't want to supress "<|transcribe|>" or "<|translate|>" tokens
-            if let taskTokenIndex = tokens.prefix(3).firstIndex(where: { $0 == transcribeToken || $0 == translateToken }) {
+            if let taskTokenIndex = tokens.prefix(3).firstIndex(where: { $0 == specialTokens.transcribeToken || $0 == specialTokens.translateToken }) {
                 return max(taskTokenIndex + 1, sampleBegin)
             } else {
                 return nil
@@ -243,5 +237,40 @@ open class TimestampRulesFilter: LogitsFiltering {
             Logging.error("TimestampRulesFilter error: \(error)")
             return false
         }
+    }
+}
+
+
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
+public class LanguageLogitsFilter: LogitsFiltering {
+    let allLanguageTokens: Set<Int>
+    let logitsDim: Int
+    let sampleBegin: Int
+    let nonLanguageTokenIndexes: [[NSNumber]]
+
+    public init(allLanguageTokens: [Int], logitsDim: Int, sampleBegin: Int) {
+        self.allLanguageTokens = Set(allLanguageTokens)
+        self.logitsDim = logitsDim
+        self.sampleBegin = sampleBegin
+        self.nonLanguageTokenIndexes = LanguageLogitsFilter.getNonLanguageTokenIndexes(logitsDim: self.logitsDim, allLanguageTokens: self.allLanguageTokens)
+    }
+
+    // Retain the logits that correspond to language tokens and suppress non-language tokens
+    public func filterLogits(_ logits: MLMultiArray, withTokens tokens: [Int]) -> MLMultiArray {
+        guard tokens.count == sampleBegin else{
+            return logits
+        }
+        logits.fill(indexes: nonLanguageTokenIndexes, with: -FloatType.infinity)
+        return logits
+    }
+    
+    private static func getNonLanguageTokenIndexes(logitsDim: Int, allLanguageTokens: Set<Int>) -> [[NSNumber]]{
+        var indexes: [[NSNumber]] = []
+        for i in 0..<logitsDim{
+            if !allLanguageTokens.contains(i){
+                indexes.append([0, 0, i as NSNumber])
+            }
+        }
+        return indexes
     }
 }

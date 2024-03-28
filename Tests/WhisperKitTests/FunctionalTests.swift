@@ -7,29 +7,33 @@ import XCTest
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 final class FunctionalTests: XCTestCase {
-    func testInitLarge() async {
-        let modelPath = largev3ModelPath()
-        let whisperKit = try? await WhisperKit(modelFolder: modelPath, logLevel: .error)
-        XCTAssertNotNil(whisperKit)
+    func testInitLarge() async throws {
+        try await XCTAssertNoThrowAsync(
+            await WhisperKit(modelFolder: largev3ModelPath(), logLevel: .error)
+        )
     }
 
     func testOutputAll() async throws {
-        let modelPaths = allModelPaths()
+        let modelPaths = try allModelPaths()
 
         for modelPath in modelPaths {
             let modelName = modelPath.split(separator: "/").last!
             print("[Integration] Testing model \(modelName)")
-            guard let audioFilePath = Bundle.module.path(forResource: "jfk", ofType: "wav") else {
-                XCTFail("Audio file not found")
-                return
-            }
+            let audioFilePath = try XCTUnwrap(
+                Bundle.module.path(forResource: "jfk", ofType: "wav"),
+                "Audio file not found"
+            )
 
-            let whisperKit = try await WhisperKit(modelFolder: modelPath, verbose: true, logLevel: .debug)
+            let whisperKit = try await WhisperKit(
+                modelFolder: modelPath,
+                verbose: true,
+                logLevel: .debug
+            )
 
-            guard let transcriptionResult = try await whisperKit.transcribe(audioPath: audioFilePath) else {
-                XCTFail("Transcription failed")
-                return
-            }
+            let transcriptionResult = try await XCTUnwrapAsync(
+                await whisperKit.transcribe(audioPath: audioFilePath),
+                "Transcription failed"
+            )
 
             print("[Integration] \(transcriptionResult.text)")
             XCTAssertEqual(
@@ -41,27 +45,27 @@ final class FunctionalTests: XCTestCase {
     }
 
     func testRealTimeFactorTiny() async throws {
-        let modelPath = tinyModelPath()
+        let modelPath = try tinyModelPath()
 
         let metrics: [XCTMetric] = [XCTMemoryMetric(), XCTStorageMetric(), XCTClockMetric()]
 
         let measureOptions = XCTMeasureOptions.default
         measureOptions.iterationCount = 5
 
-        guard let audioFilePath = Bundle.module.path(forResource: "jfk", ofType: "wav") else {
-            XCTFail("Audio file not found")
-            return
-        }
+        let audioFilePath = try XCTUnwrap(
+            Bundle.module.path(forResource: "jfk", ofType: "wav"),
+            "Audio file not found"
+        )
 
         let whisperKit = try await WhisperKit(modelFolder: modelPath)
 
         measure(metrics: metrics, options: measureOptions) {
             let dispatchSemaphore = DispatchSemaphore(value: 0)
             Task {
-                guard let transcriptionResult = try await whisperKit.transcribe(audioPath: audioFilePath) else {
-                    XCTFail("Transcription failed")
-                    return
-                }
+                let transcriptionResult = try await XCTUnwrapAsync(
+                    await whisperKit.transcribe(audioPath: audioFilePath),
+                    "Transcription failed"
+                )
                 XCTAssertGreaterThan(transcriptionResult.text.count, 0)
                 dispatchSemaphore.signal()
             }
@@ -70,27 +74,27 @@ final class FunctionalTests: XCTestCase {
     }
 
     func testRealTimeFactorLarge() async throws {
-        let modelPath = largev3ModelPath()
+        let modelPath = try largev3ModelPath()
 
         let metrics: [XCTMetric] = [XCTMemoryMetric(), XCTStorageMetric(), XCTClockMetric()]
 
         let measureOptions = XCTMeasureOptions.default
         measureOptions.iterationCount = 5
 
-        guard let audioFilePath = Bundle.module.path(forResource: "jfk", ofType: "wav") else {
-            XCTFail("Audio file not found")
-            return
-        }
+        let audioFilePath = try XCTUnwrap(
+            Bundle.module.path(forResource: "jfk", ofType: "wav"),
+            "Audio file not found"
+        )
 
         let whisperKit = try await WhisperKit(modelFolder: modelPath, verbose: false)
 
         measure(metrics: metrics, options: measureOptions) {
             let dispatchSemaphore = DispatchSemaphore(value: 0)
             Task {
-                guard let transcriptionResult = try await whisperKit.transcribe(audioPath: audioFilePath) else {
-                    XCTFail("Transcription failed")
-                    return
-                }
+                let transcriptionResult = try await XCTUnwrapAsync(
+                    await whisperKit.transcribe(audioPath: audioFilePath),
+                    "Transcription failed"
+                )
                 XCTAssertGreaterThan(transcriptionResult.text.count, 0)
                 dispatchSemaphore.signal()
             }
@@ -98,45 +102,39 @@ final class FunctionalTests: XCTestCase {
         }
     }
 
-    func testBaseImplementation() {
-        guard let audioFilePath = Bundle.module.path(forResource: "jfk", ofType: "wav") else {
-            XCTFail("Audio file not found")
-            return
-        }
+    func testBaseImplementation() throws {
+        let audioFilePath = try XCTUnwrap(
+            Bundle.module.path(forResource: "jfk", ofType: "wav"),
+            "Audio file not found"
+        )
 
         let dispatchSemaphore = DispatchSemaphore(value: 0)
 
         Task {
-            let pipe = try? await WhisperKit(model: "large-v3")
-            let transcription = try? await pipe!.transcribe(audioPath: audioFilePath)?.text
-            XCTAssertGreaterThan(transcription!.count, 0)
+            let whisperKit = try await XCTUnwrapAsync(await WhisperKit(model: "large-v3"))
+            let transcriptionResult = try await XCTUnwrapAsync(
+                await whisperKit.transcribe(audioPath: audioFilePath),
+                "Transcription failed"
+            )
+            XCTAssertGreaterThan(transcriptionResult.text.count, 0)
             dispatchSemaphore.signal()
         }
 
         dispatchSemaphore.wait()
     }
 
-    func testAsyncImplementation() async {
-        guard let audioFilePath = Bundle.module.path(forResource: "jfk", ofType: "wav") else {
-            XCTFail("Audio file not found")
-            return
-        }
+    func testAsyncImplementation() async throws {
+        let audioFilePath = try XCTUnwrap(
+            Bundle.module.path(forResource: "jfk", ofType: "wav"),
+            "Audio file not found"
+        )
+        let whisperKit = try await WhisperKit(model: "large-v3")
+        let transcriptionResult = try await XCTUnwrapAsync(
+            await whisperKit.transcribe(audioPath: audioFilePath),
+            "Transcription failed"
+        )
 
-        let pipe = try? await WhisperKit(model: "large-v3")
-        let transcription = try? await pipe!.transcribe(audioPath: audioFilePath)?.text
-        XCTAssertGreaterThan(transcription!.count, 0)
-    }
-
-    func testAsyncThrowingImplementation() async throws {
-        guard let audioFilePath = Bundle.module.path(forResource: "jfk", ofType: "wav") else {
-            XCTFail("Audio file not found")
-            return
-        }
-
-        let pipe = try await WhisperKit(model: "large-v3")
-        let transcription = try await pipe.transcribe(audioPath: audioFilePath)?.text
-
-        XCTAssertGreaterThan(transcription!.count, 0)
+        XCTAssertGreaterThan(transcriptionResult.text.count, 0)
     }
 
     func testModelSearchPathLarge() async throws {
