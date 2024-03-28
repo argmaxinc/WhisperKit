@@ -21,7 +21,7 @@ public class WhisperKit: Transcriber {
     public var modelVariant: ModelVariant = .tiny
     public var modelState: ModelState = .unloaded
     public var modelCompute: ModelComputeOptions
-    public var tokenizer: Tokenizer?
+    public var tokenizer: WhisperTokenizer?
 
     /// Protocols
     public var audioProcessor: any AudioProcessing
@@ -333,21 +333,20 @@ public class WhisperKit: Transcriber {
         }
 
         // Check model dimensions to assign appropriate tokenizer
-        if let logitsDim = textDecoder.logitsSize,
-           let encoderDim = audioEncoder.embedSize
-        {
-            modelVariant = detectVariant(logitsDim: logitsDim, encoderDim: encoderDim)
-            Logging.debug("Loading tokenizer for \(modelVariant)")
-            tokenizer = try await loadTokenizer(
-                for: modelVariant,
-                tokenizerFolder: tokenizerFolder,
-                useBackgroundSession: useBackgroundDownloadSession
-            )
-            textDecoder.tokenizer = tokenizer
-            Logging.debug("Loaded tokenizer")
-        } else {
-            Logging.error("Could not load tokenizer")
+        guard let logitsDim = textDecoder.logitsSize, let encoderDim = audioEncoder.embedSize else {
+            throw WhisperError.tokenizerUnavailable()
         }
+        textDecoder.isModelMultilingual = isModelMultilingual(logitsDim: logitsDim)
+        modelVariant = detectVariant(logitsDim: logitsDim, encoderDim: encoderDim)
+        Logging.debug("Loading tokenizer for \(modelVariant)")
+        let tokenizer = try await loadTokenizer(
+            for: modelVariant,
+            tokenizerFolder: tokenizerFolder,
+            useBackgroundSession: useBackgroundDownloadSession
+        )
+        self.tokenizer = tokenizer
+        textDecoder.tokenizer = tokenizer
+        Logging.debug("Loaded tokenizer")
 
         modelState = .loaded
 
@@ -437,6 +436,8 @@ public class WhisperKit: Transcriber {
 
         var options = decodeOptions ?? DecodingOptions()
         options.verbose = Logging.shared.logLevel != .none
+        
+        var detectedLanguage: String?
 
         let contentFrames = audioArray.count
         timings.inputAudioSeconds = Double(Int(contentFrames) / WhisperKit.sampleRate) - Double(decodeOptions?.clipTimestamps.first ?? 0)
@@ -454,7 +455,7 @@ public class WhisperKit: Transcriber {
         }
 
         let startDecoderInit = CFAbsoluteTimeGetCurrent()
-        decoderInputs = textDecoder.prepareDecoderInputs(withPrompt: [tokenizer.startOfTranscriptToken])
+        decoderInputs = textDecoder.prepareDecoderInputs(withPrompt: [tokenizer.specialTokens.startOfTranscriptToken])
         guard var decoderInputs = decoderInputs else {
             throw WhisperError.prefillFailed("Unable to prepare decoder inputs")
         }
@@ -467,7 +468,7 @@ public class WhisperKit: Transcriber {
         let prefillStartTime = CFAbsoluteTimeGetCurrent()
         var prefilledCacheSize = 0
         if options.usePrefillPrompt {
-            guard let prefilledInputs = try? await textDecoder.prefillDecoderInputs(decoderInputs, withOptions: options, multilingual: modelVariant.isMultilingual) else {
+            guard let prefilledInputs = try? await textDecoder.prefillDecoderInputs(decoderInputs, withOptions: options) else {
                 throw WhisperError.prefillFailed()
             }
             decoderInputs = prefilledInputs
@@ -577,8 +578,8 @@ public class WhisperKit: Transcriber {
                     currentSeek: seek,
                     segmentSize: segmentSize,
                     sampleRate: WhisperKit.sampleRate,
-                    timeToken: tokenizer.timeTokenBegin,
-                    specialToken: tokenizer.specialTokenBegin,
+                    timeToken: tokenizer.specialTokens.timeTokenBegin,
+                    specialToken: tokenizer.specialTokens.specialTokenBegin,
                     tokenizer: tokenizer
                 )
 
@@ -665,13 +666,27 @@ public class WhisperKit: Transcriber {
                 Logging.info("Decoding Temperature: \(temp)")
                 let decodeWithFallbackStart = Date()
 
-                let tokenSampler = GreedyTokenSampler(temperature: temp, eotToken: tokenizer.endToken, decodingOptions: options)
+                let tokenSampler = GreedyTokenSampler(temperature: temp, eotToken: tokenizer.specialTokens.endToken, decodingOptions: options)
+                
+                var currentDecodingOptions = options
+                // For a multilingual model, if language is not passed and usePrefill is false, detect language and set in options
+                if modelVariant.isMultilingual, options.language == nil, !options.usePrefillPrompt {
+                    let languageDecodingResult = try? await textDecoder.detectLanguage(
+                        from: encoderOutput,
+                        using: decoderInputs,
+                        sampler: tokenSampler,
+                        options: options,
+                        temperature: temp
+                    ).first
+                    detectedLanguage = languageDecodingResult?.language
+                    currentDecodingOptions.language = languageDecodingResult?.language
+                }
 
                 decodingResult = try await textDecoder.decodeText(
                     from: encoderOutput,
                     using: decoderInputs,
                     sampler: tokenSampler,
-                    options: options,
+                    options: currentDecodingOptions,
                     callback: callback
                 ).first
 
@@ -691,39 +706,15 @@ public class WhisperKit: Transcriber {
 
                 // MARK: Fallback checks
 
-                var needsFallback = false
-                var fallbackReason = ""
-                if let result = decodingResult {
-                    if let threshold = options.compressionRatioThreshold,
-                       result.compressionRatio > threshold
-                    {
-                        needsFallback = true // too repetitive
-                        fallbackReason = "compressionRatioThreshold"
-                    }
-
-                    if let threshold = options.logProbThreshold,
-                       result.avgLogProb < threshold
-                    {
-                        needsFallback = true // average log probablity too low (model is not confident enough)
-                        fallbackReason = "logProbThreshold"
-                    }
-
-                    if let threshold = options.noSpeechThreshold,
-                       result.noSpeechProb > threshold
-                    {
-                        needsFallback = false // silence
-                    }
-                }
-
-                if !needsFallback {
-                    break
-                } else {
+                if let fallback = decodingResult?.fallback, fallback.needsFallback {
                     // Reset decoder inputs for fallback
                     fallbackCount = Double(i)
                     timings.decodingFallback += Date().timeIntervalSince(decodeWithFallbackStart)
                     timings.totalDecodingFallbacks = fallbackCount
                     resetDecoderInputs()
-                    Logging.info("Fallback #\(fallbackCount + 1) (\(fallbackReason))")
+                    Logging.info("Fallback #\(fallbackCount + 1) (\(fallback.fallbackReason))")
+                } else {
+                    break
                 }
             }
 
@@ -825,11 +816,11 @@ public class WhisperKit: Transcriber {
             Logging.debug(line)
         }
 
-        let wordTokens = allTokens.filter { $0 < tokenizer.specialTokenBegin }
+        let wordTokens = allTokens.filter { $0 < tokenizer.specialTokens.specialTokenBegin }
         transcription = tokenizer.decode(tokens: wordTokens)
 
         transcription = transcription.trimmingCharacters(in: .whitespaces)
 
-        return TranscriptionResult(text: transcription, segments: allSegments, language: "en", timings: timings)
+        return TranscriptionResult(text: transcription, segments: allSegments, language: detectedLanguage ?? "en", timings: timings)
     }
 }

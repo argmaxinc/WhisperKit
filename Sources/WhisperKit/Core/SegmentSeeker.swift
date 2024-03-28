@@ -17,13 +17,13 @@ public protocol SegmentSeeking {
         sampleRate: Int,
         timeToken: Int,
         specialToken: Int,
-        tokenizer: Tokenizer
+        tokenizer: WhisperTokenizer
     ) -> (Int, [TranscriptionSegment]?)
 
     func addWordTimestamps(
         segments: [TranscriptionSegment],
         alignmentWeights: MLMultiArray,
-        tokenizer: Tokenizer,
+        tokenizer: WhisperTokenizer,
         seek: Int,
         segmentSize: Int,
         prependPunctuations: String,
@@ -50,7 +50,7 @@ open class SegmentSeeker: SegmentSeeking {
         sampleRate: Int,
         timeToken: Int,
         specialToken: Int,
-        tokenizer: Tokenizer
+        tokenizer: WhisperTokenizer
     ) -> (Int, [TranscriptionSegment]?) {
         // check if we need to skip this segment entirely
         // if so, reset currentSegments, continue to next window, otherwise:
@@ -120,7 +120,7 @@ open class SegmentSeeker: SegmentSeeking {
                 let endTimestampSeconds = Float(timestampTokens.last! - timeToken) * secondsPerTimeToken
 
                 // Decode segment text
-                let wordTokens = slicedTokens.filter { $0 < tokenizer.specialTokenBegin }
+                let wordTokens = slicedTokens.filter { $0 < tokenizer.specialTokens.specialTokenBegin }
                 let slicedTextTokens = options.skipSpecialTokens ? wordTokens : slicedTokens
                 let sliceText = tokenizer.decode(tokens: slicedTextTokens)
 
@@ -164,7 +164,7 @@ open class SegmentSeeker: SegmentSeeking {
             }
 
             // Decode segment text
-            let wordTokens = decodingResult.tokens.filter { $0 < tokenizer.specialTokenBegin }
+            let wordTokens = decodingResult.tokens.filter { $0 < tokenizer.specialTokens.specialTokenBegin }
             let segmentTextTokens = options.skipSpecialTokens ? wordTokens : decodingResult.tokens
             let segmentText = tokenizer.decode(tokens: segmentTextTokens)
 
@@ -323,7 +323,7 @@ open class SegmentSeeker: SegmentSeeking {
         wordTokenIds: [Int],
         alignmentWeights: MLMultiArray,
         tokenLogProbs: [Float],
-        tokenizer: Tokenizer,
+        tokenizer: WhisperTokenizer,
         timings: TranscriptionTimings? = nil
     ) throws -> [WordTiming] {
         // TODO: Use accelerate framework for these two, they take roughly the same time
@@ -392,7 +392,7 @@ open class SegmentSeeker: SegmentSeeking {
     public func addWordTimestamps(
         segments: [TranscriptionSegment],
         alignmentWeights: MLMultiArray,
-        tokenizer: Tokenizer,
+        tokenizer: WhisperTokenizer,
         seek: Int,
         segmentSize: Int,
         prependPunctuations: String,
@@ -485,14 +485,14 @@ open class SegmentSeeker: SegmentSeeking {
 
         for segment in segments {
             var savedTokens = 0
-            let textTokens = segment.tokens.filter { $0 < tokenizer.specialTokenBegin }
+            let textTokens = segment.tokens.filter { $0 < tokenizer.specialTokens.specialTokenBegin }
             var wordsInSegment = [WordTiming]()
 
             for timing in mergedAlignment[wordIndex...] where savedTokens < textTokens.count {
                 wordIndex += 1
 
                 // Remove special tokens and retokenize if needed
-                let timingTokens = timing.tokens.filter { $0 < tokenizer.specialTokenBegin }
+                let timingTokens = timing.tokens.filter { $0 < tokenizer.specialTokens.specialTokenBegin }
                 if timingTokens.isEmpty {
                     continue
                 }

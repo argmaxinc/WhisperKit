@@ -268,6 +268,7 @@ struct Transcribe: AsyncParsableCommand {
             supressTokens: cliArguments.supressTokens,
             compressionRatioThreshold: cliArguments.compressionRatioThreshold ?? 2.4,
             logProbThreshold: cliArguments.logprobThreshold ?? -1.0,
+            firstTokenLogProbThreshold: cliArguments.firstTokenLogProbThreshold,
             noSpeechThreshold: cliArguments.noSpeechThreshold ?? 0.6
         )
     }

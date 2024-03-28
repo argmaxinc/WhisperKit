@@ -8,7 +8,7 @@ jobs:
   homebrew:
     runs-on: ubuntu-latest
     steps:
-      - uses: mislav/bump-homebrew-formula-action@v3
+      - uses: argmaxinc/bump-homebrew-formula-action@v3
         with:
           formula-name: whisperkit-cli
         env:
