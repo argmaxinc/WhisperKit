@@ -1028,6 +1028,7 @@ struct ContentView: View {
             verbose: false,
             task: task,
             language: languageCode,
+            temperatureStart: temperatureStart,
             temperatureFallbackCount: 3, // limit fallbacks for realtime
             sampleLength: Int(sampleLength), // reduced sample length for realtime
             usePrefillPrompt: enablePromptPrefill,
