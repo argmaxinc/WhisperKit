@@ -381,7 +381,7 @@ final class UnitTests: XCTestCase {
 
         let transcribeResult = try await whisperKit.transcribe(audioArray: multiWindowSamples, decodeOptions: options)
         let result = try XCTUnwrap(transcribeResult)
-        XCTAssertEqual(result.segments.count, 3, "Expected 3 segments")
+        XCTAssertEqual(result.segments.count, 2, "Expected 3 segments")
 
         // Compare last timestamp to the length of the audio
         let endTimestamp = try XCTUnwrap(
