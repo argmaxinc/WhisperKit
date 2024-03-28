@@ -74,9 +74,11 @@ open class TimestampRulesFilter: LogitsFiltering {
     }
 
     public func filterLogits(_ logits: MLMultiArray, withTokens tokens: [Int]) -> MLMultiArray {
-        guard let sampleBegin = sampleBegin(for: tokens) else {
+        guard let sampleBegin = sampleBegin(for: tokens),
+              sampleBegin > tokens.count else {
             return logits
         }
+        
         // suppress <|notimestamps|> which is handled by `withoutTimestamps`
         logits.fill(indexes: [[0, 0, specialTokens.noTimestampsToken as NSNumber]], with: -FloatType.infinity)
 
@@ -109,15 +111,17 @@ open class TimestampRulesFilter: LogitsFiltering {
             }
         }
 
-       if tokens.count == sampleBegin {
-           // suppress generating non-timestamp tokens at the beginning
-           logits.fillLastDimension(indexes: 0..<specialTokens.timeTokenBegin, with: -FloatType.infinity)
-           if let maxInitialTimestampIndex {
-               // apply the `maxInitialTimestamp` option
-               let lastAllowed = specialTokens.timeTokenBegin + maxInitialTimestampIndex + 1
-               logits.fillLastDimension(indexes: lastAllowed..<logits.count, with: -FloatType.infinity)
-           }
-       }
+        // TODO: Allow model to predict initial timestamp
+        // Currently initial timestamp is forced to <|0.00|> every time
+//       if tokens.count == sampleBegin {
+//           // suppress generating non-timestamp tokens at the beginning
+//           logits.fillLastDimension(indexes: 0..<specialTokens.timeTokenBegin, with: -FloatType.infinity)
+//           if let maxInitialTimestampIndex {
+//               // apply the `maxInitialTimestamp` option
+//               let lastAllowed = specialTokens.timeTokenBegin + maxInitialTimestampIndex + 1
+//               logits.fillLastDimension(indexes: lastAllowed..<logits.count, with: -FloatType.infinity)
+//           }
+//       }
 
         // if sum of probability over timestamps is above any other token, sample timestamp
         if sumOfProbabilityOverTimestampsIsAboveAnyOtherToken(logits: logits, timeTokenBegin: specialTokens.timeTokenBegin) {
@@ -242,7 +246,7 @@ open class TimestampRulesFilter: LogitsFiltering {
 
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-public class LanguageLogitsFilter: LogitsFiltering {
+open class LanguageLogitsFilter: LogitsFiltering {
     let allLanguageTokens: Set<Int>
     let logitsDim: Int
     let sampleBegin: Int

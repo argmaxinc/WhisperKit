@@ -424,7 +424,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         // Single loop variables
         var timings = TranscriptionTimings()
         let prefilledIndex = decoderInputs.cacheLength[0].intValue
-        let intialPromptIndex = decoderInputs.initialPrompt.count - 1
+        let intialPromptIndex = decoderInputs.initialPrompt.count
         var currentTokens: [Int] = decoderInputs.initialPrompt
         var nextToken: Int = decoderInputs.initialPrompt.last!
         var logProbs: [Float] = Array(repeating: 0, count: prefilledIndex + 1)
@@ -477,8 +477,8 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
 
             // Check if current index is part of the initial prompt
             isPrefill = false
-            if tokenIndex <= intialPromptIndex {
-                isPrefill = tokenIndex < intialPromptIndex // Prefill stops at the last token of the initial prompt
+            if tokenIndex < intialPromptIndex {
+                isPrefill = tokenIndex < intialPromptIndex - 1 // Prefill stops at the last token of the initial prompt
                 let prefillToken = currentTokens[tokenIndex]
                 nextToken = prefillToken
                 Logging.debug("Forcing token \(nextToken) at index \(tokenIndex) from initial prompt")
