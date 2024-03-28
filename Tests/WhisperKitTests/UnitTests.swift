@@ -194,14 +194,14 @@ final class UnitTests: XCTestCase {
             noSpeechThreshold: nil
         )
         var textDecoder = TextDecoder()
-        let modelPath = URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
         textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
 
-        let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.endToken, decodingOptions: decodingOptions)
+        let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.specialTokens.endToken, decodingOptions: decodingOptions)
 
         let encoderInput = initMLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16, initialValue: FloatType(0))
-        let decoderInputs = textDecoder.prepareDecoderInputs(withPrompt: [textDecoder.tokenizer!.startOfTranscriptToken])
+        let decoderInputs = textDecoder.prepareDecoderInputs(withPrompt: [textDecoder.tokenizer!.specialTokens.startOfTranscriptToken])
 
         let inputs = try XCTUnwrap(decoderInputs, "Failed to prepare decoder inputs")
         let decoderOutput = try await textDecoder.decodeText(from: encoderInput, using: inputs, sampler: tokenSampler, options: decodingOptions)
@@ -220,14 +220,14 @@ final class UnitTests: XCTestCase {
             noSpeechThreshold: nil
         )
         var textDecoder = TextDecoder()
-        let modelPath = URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
         textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
 
-        let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.endToken, decodingOptions: decodingOptions)
+        let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.specialTokens.endToken, decodingOptions: decodingOptions)
 
         let encoderInput = initMLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16, initialValue: FloatType(0))
-        let decoderInputs = textDecoder.prepareDecoderInputs(withPrompt: [textDecoder.tokenizer!.startOfTranscriptToken])
+        let decoderInputs = textDecoder.prepareDecoderInputs(withPrompt: [textDecoder.tokenizer!.specialTokens.startOfTranscriptToken])
 
         let inputs = try XCTUnwrap(decoderInputs, "Failed to prepare decoder inputs")
         let decoderOutput = try await textDecoder.decodeText(from: encoderInput, using: inputs, sampler: tokenSampler, options: decodingOptions)
