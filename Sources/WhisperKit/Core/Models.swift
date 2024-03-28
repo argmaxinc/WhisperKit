@@ -218,6 +218,7 @@ public struct DecodingCache {
 ///   - supressTokens: List of token IDs to suppress during decoding.
 ///   - compressionRatioThreshold: If the compression ratio of the transcription text is above this value, it is too repetitive and treated as failed.
 ///   - logProbThreshold: If the average log probability over sampled tokens is below this value, treat as failed.
+///   - firstTokenLogProbThreshold: If the log probability over the first sampled token is below this value, treat as failed.
 ///   - noSpeechThreshold: If the no speech probability is higher than this value AND the average log
 ///                        probability over sampled tokens is below `logProbThreshold`, consider the segment as silent.
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
@@ -241,6 +242,7 @@ public struct DecodingOptions {
     public var supressTokens: [Int]
     public var compressionRatioThreshold: Float?
     public var logProbThreshold: Float?
+    public var firstTokenLogProbThreshold: Float?
     public var noSpeechThreshold: Float?
 
     public init(verbose: Bool = false,
@@ -262,6 +264,7 @@ public struct DecodingOptions {
                 supressTokens: [Int]? = nil,
                 compressionRatioThreshold: Float? = 2.4,
                 logProbThreshold: Float? = -1.0,
+                firstTokenLogProbThreshold: Float? = -0.7,
                 noSpeechThreshold: Float? = 0.6)
     {
         self.verbose = verbose
@@ -283,10 +286,50 @@ public struct DecodingOptions {
         self.supressTokens = supressTokens ?? [] // nonSpeechTokens() // TODO: implement these as default
         self.compressionRatioThreshold = compressionRatioThreshold
         self.logProbThreshold = logProbThreshold
+        self.firstTokenLogProbThreshold = firstTokenLogProbThreshold
         self.noSpeechThreshold = noSpeechThreshold
     }
 }
 
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
+public struct DecodingFallback {
+    public var needsFallback: Bool
+    public var fallbackReason: String
+    
+    public init(needsFallback: Bool, fallbackReason: String) {
+        self.needsFallback = needsFallback
+        self.fallbackReason = fallbackReason
+    }
+}
+
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
+public extension DecodingFallback {
+    init?(
+        options: DecodingOptions,
+        isFirstTokenLogProbTooLow: Bool,
+        noSpeechProb: Float,
+        compressionRatio: Float,
+        avgLogProb: Float
+    ) {
+        // NOTE: order matters here
+        if isFirstTokenLogProbTooLow {
+            self.init(needsFallback: true, fallbackReason: "firstTokenLogProbThreshold")
+        } else if let threshold = options.noSpeechThreshold, noSpeechProb > threshold {
+            // silence detected
+            self.init(needsFallback: false, fallbackReason: "silence")
+        } else if let threshold = options.compressionRatioThreshold, compressionRatio > threshold {
+            // too repetitive
+            self.init(needsFallback: true, fallbackReason: "compressionRatioThreshold")
+        } else if let threshold = options.logProbThreshold, avgLogProb < threshold {
+            // average log probablity too low (model is not confident enough)
+            self.init(needsFallback: true, fallbackReason: "logProbThreshold")
+        } else {
+            return nil
+        }
+    }
+}
+
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public struct DecodingResult {
     public var language: String
     public var languageProbs: [String: Float]
@@ -299,6 +342,7 @@ public struct DecodingResult {
     public var compressionRatio: Float
     public var cache: DecodingCache?
     public var timings: TranscriptionTimings?
+    public var fallback: DecodingFallback?
 
     public static var emptyResults: DecodingResult {
         return DecodingResult(language: "",
@@ -311,7 +355,8 @@ public struct DecodingResult {
                               temperature: 0.0,
                               compressionRatio: 0.0,
                               cache: nil,
-                              timings: nil)
+                              timings: nil,
+                              fallback: nil)
     }
 }
 

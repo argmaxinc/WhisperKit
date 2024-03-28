@@ -429,7 +429,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         var nextToken: Int = decoderInputs.initialPrompt.last!
         var logProbs: [Float] = Array(repeating: 0, count: prefilledIndex + 1)
 
-        guard let tokenizer = tokenizer else {
+        guard let tokenizer else {
             // Tokenizer required for decoding
             throw WhisperError.tokenizerUnavailable()
         }
@@ -470,17 +470,17 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
 
         let loopCount = min(options.sampleLength, WhisperKit.maxTokenContext)
         Logging.debug("Running main loop for a maximum of \(loopCount) iterations, starting at index \(prefilledIndex)")
-        var isPrefill: Bool
         var hasAlignment = false
+        var isFirstTokenLogProbTooLow = false
         for tokenIndex in prefilledIndex..<loopCount {
             let loopStart = Date()
 
+            let isPrefill = tokenIndex < intialPromptIndex - 1 // Prefill stops at the last token of the initial prompt
+            let isFirstToken = tokenIndex == prefilledIndex
+          
             // Check if current index is part of the initial prompt
-            isPrefill = false
-            if tokenIndex < intialPromptIndex {
-                isPrefill = tokenIndex < intialPromptIndex - 1 // Prefill stops at the last token of the initial prompt
-                let prefillToken = currentTokens[tokenIndex]
-                nextToken = prefillToken
+            if tokenIndex <= intialPromptIndex {
+                nextToken = currentTokens[tokenIndex]
                 Logging.debug("Forcing token \(nextToken) at index \(tokenIndex) from initial prompt")
             }
 
@@ -535,12 +535,24 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             let sampleResult = tokenSampler.update(tokens: currentTokens, logits: logits, logProbs: logProbs)
 
             nextToken = sampleResult.tokens.last!
+            let nextTokenLogProb = sampleResult.logProbs.last!
             logProbs = sampleResult.logProbs
 
             let samplingTime = Date().timeIntervalSince(samplingStartTime)
             timings.decodingSampling += samplingTime
 
-            if sampleResult.completed || currentTokens.count >= WhisperKit.maxTokenContext {
+            isFirstTokenLogProbTooLow =
+                if isFirstToken, let firstTokenLogProbThreshold = options.firstTokenLogProbThreshold, nextTokenLogProb < firstTokenLogProbThreshold {
+                    true
+                } else {
+                    false
+                }
+            let isSegmentCompleted = 
+                sampleResult.completed ||
+                currentTokens.count >= WhisperKit.maxTokenContext ||
+                isFirstTokenLogProbTooLow
+
+            if isSegmentCompleted {
                 // Completed segment, stop the loop
                 break
             } else {
@@ -639,8 +651,17 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             // Convert Float16 temperature to Float with 3 decimal places
             temperature = round(Float(sampler.temperature) * 1000) / 1000
         }
+        let noSpeechProb: Float = 0 // TODO: implement no speech prob
 
         let transcript = tokenizer.decode(tokens: segmentTokens)
+        
+        let decodingFallback = DecodingFallback(
+            options: options,
+            isFirstTokenLogProbTooLow: isFirstTokenLogProbTooLow,
+            noSpeechProb: noSpeechProb,
+            compressionRatio: compressionRatio,
+            avgLogProb: avgLogProbs
+        )
 
         let decodingResult = DecodingResult(
             language: options.language ?? "en",
@@ -649,13 +670,13 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             tokenLogProbs: tokenProbs,
             text: transcript,
             avgLogProb: avgLogProbs,
-            noSpeechProb: 0, // TODO: implement no speech prob
+            noSpeechProb: noSpeechProb,
             temperature: temperature,
             compressionRatio: compressionRatio,
             cache: cache,
-            timings: timings
+            timings: timings,
+            fallback: decodingFallback
         )
-
         return [decodingResult]
     }
 
