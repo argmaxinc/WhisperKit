@@ -33,6 +33,14 @@ public protocol TextDecoding {
         options decoderOptions: DecodingOptions,
         callback: ((TranscriptionProgress) -> Bool?)?
     ) async throws -> [DecodingResult]
+    
+    func detectLanguage(
+        from encoderOutput: MLMultiArray,
+        using decoderInputs: DecodingInputs,
+        sampler tokenSampler: TokenSampling,
+        options: DecodingOptions,
+        temperature: FloatType
+    ) async throws -> [DecodingResult]
 
     static func updateKVCache(
         keyTensor: MLMultiArray,
@@ -308,14 +316,100 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
     public func detectLanguage(
         from encoderOutput: MLMultiArray,
         using decoderInputs: DecodingInputs,
-        options decoderOptions: DecodingOptions,
+        sampler tokenSampler: TokenSampling,
+        options: DecodingOptions,
         temperature: FloatType
-    ) -> [DecodingResult] {
-        // TODO: implement
-        // predict logits for 1 iteration with sot
+    ) async throws -> [DecodingResult] {
+        // Predict logits for 1 iteration with sot
         // 1. LanguageLogitsFilter for only language tokens
         // 2. GreedyTokenSampler for most likely language
-        return []
+        var timings = TranscriptionTimings()
+        let prefilledIndex = decoderInputs.cacheLength[0].intValue
+        let currentTokens: [Int] = decoderInputs.initialPrompt
+        var nextToken: Int = decoderInputs.initialPrompt.last!
+        var logProbs: [Float] = Array(repeating: 0, count: prefilledIndex + 1)
+
+        guard let tokenizer = tokenizer else {
+            // Tokenizer required for decoding
+            throw WhisperError.tokenizerUnavailable()
+        }
+        
+        guard let logitsSize = logitsSize else {
+            throw WhisperError.modelsUnavailable("Failed to read logits size from model")
+        }
+
+        // Logits filters
+        var logitsFilters: [any LogitsFiltering] = []
+        let allLanguageTokens:[Int] = tokenizer.languages.compactMap {tokenizer.convertTokenToId("<|\($0)|>")}
+        
+        // language filter
+        logitsFilters.append(
+            LanguageLogitsFilter(
+                allLanguageTokens: allLanguageTokens,
+                logitsDim: logitsSize,
+                sampleBegin: prefilledIndex)
+        )
+        Logging.debug("prefilled Index is \(prefilledIndex)")
+
+        let tokenIndex = 0
+        let prefillToken = currentTokens[tokenIndex]
+        nextToken = prefillToken
+        Logging.debug("Forcing token \(nextToken) at index \(tokenIndex) from initial prompt")
+        
+        
+        // Set the current token as model input
+        decoderInputs.inputIds[0] = NSNumber(value: nextToken)
+        decoderInputs.cacheLength[0] = NSNumber(value: tokenIndex)
+        
+        // MARK: Decoding Inference
+        
+        // Predict next token
+        let inferenceTime = Date()
+        
+        let predictedLogits = try await self.predictLogits(
+            inputIds: decoderInputs.inputIds,
+            cacheLength: decoderInputs.cacheLength,
+            keyCache: decoderInputs.keyCache,
+            valueCache: decoderInputs.valueCache,
+            kvCacheUpdateMask: decoderInputs.kvCacheUpdateMask,
+            encoderOutputEmbeds: encoderOutput,
+            decoderKeyPaddingMask: decoderInputs.decoderKeyPaddingMask
+        )
+        Logging.debug("Predicted logits")
+        guard let decoderOutput = predictedLogits else {
+            Logging.error("Unable to decode logits")
+            throw WhisperError.decodingLogitsFailed()
+        }
+        
+        let decodingInferenceTime = Date().timeIntervalSince(inferenceTime)
+        timings.decodingPredictions += decodingInferenceTime
+        
+        // MARK: Non-inference
+        
+        // Update predicted token as current
+        var logits = decoderOutput.logits!
+        for filter in logitsFilters {
+            logits = filter.filterLogits(logits, withTokens: currentTokens)
+        }
+        
+        // MARK: Sampling
+        
+        let samplingStartTime = Date()
+        
+        let sampleResult = tokenSampler.update(tokens: currentTokens, logits: logits, logProbs: logProbs)
+        
+        nextToken = sampleResult.tokens.last!
+        logProbs = sampleResult.logProbs
+        
+        let samplingTime = Date().timeIntervalSince(samplingStartTime)
+        timings.decodingSampling += samplingTime
+        
+        let detectedLanguage = tokenizer.decode(tokens: [nextToken]).dropFirst(2).dropLast(2)
+        var decodingResult = DecodingResult.emptyResults
+        decodingResult.timings = timings
+        decodingResult.language = String(detectedLanguage)
+        return [decodingResult]
+        
     }
 
     public func decodeText(

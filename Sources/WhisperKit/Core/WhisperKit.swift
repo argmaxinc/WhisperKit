@@ -436,6 +436,8 @@ public class WhisperKit: Transcriber {
 
         var options = decodeOptions ?? DecodingOptions()
         options.verbose = Logging.shared.logLevel != .none
+        
+        var detectedLanguage: String?
 
         let contentFrames = audioArray.count
         timings.inputAudioSeconds = Double(Int(contentFrames) / WhisperKit.sampleRate) - Double(decodeOptions?.clipTimestamps.first ?? 0)
@@ -668,12 +670,26 @@ public class WhisperKit: Transcriber {
                 let decodeWithFallbackStart = Date()
 
                 let tokenSampler = GreedyTokenSampler(temperature: temp, eotToken: tokenizer.endToken, decodingOptions: options)
+                
+                var currentDecodingOptions = options
+                // For a multilingual model, if language is not passed and usePrefill is false, detect language and set in options
+                if modelVariant.isMultilingual, options.language == nil, !options.usePrefillPrompt {
+                    let languageDecodingResult = try? await textDecoder.detectLanguage(
+                        from: encoderOutput,
+                        using: decoderInputs,
+                        sampler: tokenSampler,
+                        options: options,
+                        temperature: temp
+                    ).first
+                    detectedLanguage = languageDecodingResult?.language
+                    currentDecodingOptions.language = languageDecodingResult?.language
+                }
 
                 decodingResult = try await textDecoder.decodeText(
                     from: encoderOutput,
                     using: decoderInputs,
                     sampler: tokenSampler,
-                    options: options,
+                    options: currentDecodingOptions,
                     callback: callback
                 ).first
 
@@ -696,21 +712,21 @@ public class WhisperKit: Transcriber {
                 var needsFallback = false
                 var fallbackReason = ""
                 if let result = decodingResult {
-                    if let threshold = options.compressionRatioThreshold,
+                    if let threshold = currentDecodingOptions.compressionRatioThreshold,
                        result.compressionRatio > threshold
                     {
                         needsFallback = true // too repetitive
                         fallbackReason = "compressionRatioThreshold"
                     }
 
-                    if let threshold = options.logProbThreshold,
+                    if let threshold = currentDecodingOptions.logProbThreshold,
                        result.avgLogProb < threshold
                     {
                         needsFallback = true // average log probablity too low (model is not confident enough)
                         fallbackReason = "logProbThreshold"
                     }
 
-                    if let threshold = options.noSpeechThreshold,
+                    if let threshold = currentDecodingOptions.noSpeechThreshold,
                        result.noSpeechProb > threshold
                     {
                         needsFallback = false // silence
@@ -832,6 +848,6 @@ public class WhisperKit: Transcriber {
 
         transcription = transcription.trimmingCharacters(in: .whitespaces)
 
-        return TranscriptionResult(text: transcription, segments: allSegments, language: "en", timings: timings)
+        return TranscriptionResult(text: transcription, segments: allSegments, language: detectedLanguage ?? "en", timings: timings)
     }
 }
