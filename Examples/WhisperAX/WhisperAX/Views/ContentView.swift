@@ -40,7 +40,7 @@ struct ContentView: View {
     @AppStorage("enableSpecialCharacters") private var enableSpecialCharacters: Bool = false
     @AppStorage("enableEagerDecoder") private var enableEagerDecoder: Bool = false
     @AppStorage("temperatureStart") private var temperatureStart: Double = 0
-    @AppStorage("fallbackCount") private var fallbackCount: Double = 3
+    @AppStorage("fallbackCount") private var fallbackCount: Double = 5
     @AppStorage("compressionCheckWindow") private var compressionCheckWindow: Double = 20
     @AppStorage("sampleLength") private var sampleLength: Double = 224
     @AppStorage("silenceThreshold") private var silenceThreshold: Double = 0.3
