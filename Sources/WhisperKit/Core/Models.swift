@@ -417,18 +417,18 @@ public extension TranscriptionResult {
 }
 
 public struct TranscriptionSegment: Hashable, Codable {
-    public var id: Int
-    public var seek: Int
-    public var start: Float
-    public var end: Float
-    public var text: String
-    public var tokens: [Int]
-    public var tokenLogProbs: [[Int: Float]]
-    public var temperature: Float
-    public var avgLogprob: Float
-    public var compressionRatio: Float
-    public var noSpeechProb: Float
-    public var words: [WordTiming]?
+    public var id: Int = 0
+    public var seek: Int = 0
+    public var start: Float = 0.0
+    public var end: Float = 0.0
+    public var text: String = ""
+    public var tokens: [Int] = []
+    public var tokenLogProbs: [[Int: Float]] = [[:]]
+    public var temperature: Float = 1.0
+    public var avgLogprob: Float = 0.0
+    public var compressionRatio: Float = 1.0
+    public var noSpeechProb: Float = 0.0
+    public var words: [WordTiming]? = nil
 }
 
 public struct WordTiming: Hashable, Codable {

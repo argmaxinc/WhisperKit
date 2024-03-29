@@ -38,13 +38,14 @@ struct ContentView: View {
     @AppStorage("enablePromptPrefill") private var enablePromptPrefill: Bool = true
     @AppStorage("enableCachePrefill") private var enableCachePrefill: Bool = true
     @AppStorage("enableSpecialCharacters") private var enableSpecialCharacters: Bool = false
-    @AppStorage("enableEagerDecoder") private var enableEagerDecoder: Bool = false
+    @AppStorage("enableEagerDecoding") private var enableEagerDecoding: Bool = false
     @AppStorage("temperatureStart") private var temperatureStart: Double = 0
     @AppStorage("fallbackCount") private var fallbackCount: Double = 5
     @AppStorage("compressionCheckWindow") private var compressionCheckWindow: Double = 20
     @AppStorage("sampleLength") private var sampleLength: Double = 224
     @AppStorage("silenceThreshold") private var silenceThreshold: Double = 0.3
     @AppStorage("useVAD") private var useVAD: Bool = true
+    @AppStorage("tokenConfirmationsNeeded") private var tokenConfirmationsNeeded: Double = 2
 
     @State private var loadingProgressValue: Float = 0.0
     @State private var specializationProgressRatio: Float = 0.7
@@ -62,6 +63,15 @@ struct ContentView: View {
     @State private var confirmedSegments: [TranscriptionSegment] = []
     @State private var unconfirmedSegments: [TranscriptionSegment] = []
     @State private var unconfirmedText: [String] = []
+
+    // TODO: cleanup
+    @State private var results: [TranscriptionResult?] = []
+    @State private var prevResult: TranscriptionResult?
+    @State private var lastAgreedSeconds: Float = 0.0
+    @State private var prevWords: [WordTiming] = []
+    @State private var hypothesisWords: [WordTiming] = []
+    @State private var lastAgreedWords: [WordTiming] = []
+    @State private var confirmedWords: [WordTiming] = []
 
     @State private var showAdvancedOptions: Bool = false
     @State private var transcriptionTask: Task<Void, Never>? = nil
@@ -99,6 +109,14 @@ struct ContentView: View {
         bufferEnergy = []
         confirmedSegments = []
         unconfirmedSegments = []
+
+        results = []
+        prevResult = nil
+        lastAgreedSeconds = 0.0
+        prevWords = []
+        hypothesisWords = []
+        lastAgreedWords = []
+        confirmedWords = []
     }
 
     var body: some View {
@@ -180,33 +198,50 @@ struct ContentView: View {
             .scrollIndicators(.never)
             ScrollView {
                 VStack(alignment: .leading) {
-                    ForEach(Array(confirmedSegments.enumerated()), id: \.element) { _, segment in
-                        let timestampText = enableTimestamps ? "[\(String(format: "%.2f", segment.start)) --> \(String(format: "%.2f", segment.end))]" : ""
-                        Text(timestampText + segment.text)
+                    if enableEagerDecoding {
+//                        let timestampText = enableTimestamps ? "[\(String(format: "%.2f", segment.start)) --> \(String(format: "%.2f", segment.end))]" : ""
+                        let currentWords = confirmedWords.map { $0.word }.joined()
+                        let hypothesis = (lastAgreedWords + findLongestDifferentSuffix(prevWords, hypothesisWords)).map { $0.word }.joined()
+
+                        Text("\(Text(currentWords).fontWeight(.bold)) \(Text(hypothesis).fontWeight(.light))")
                             .font(.headline)
-                            .fontWeight(.bold)
-                            .tint(.green)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        Text("\(currentText)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        ForEach(Array(confirmedSegments.enumerated()), id: \.element) { _, segment in
+                            let timestampText = enableTimestamps ? "[\(String(format: "%.2f", segment.start)) --> \(String(format: "%.2f", segment.end))]" : ""
+                            Text(timestampText + segment.text)
+                                .font(.headline)
+                                .fontWeight(.bold)
+                                .tint(.green)
+                                .multilineTextAlignment(.leading)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        ForEach(Array(unconfirmedSegments.enumerated()), id: \.element) { _, segment in
+                            let timestampText = enableTimestamps ? "[\(String(format: "%.2f", segment.start)) --> \(String(format: "%.2f", segment.end))]" : ""
+                            Text(timestampText + segment.text)
+                                .font(.headline)
+                                .fontWeight(.light)
+                                .multilineTextAlignment(.leading)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        Text("\(unconfirmedText.joined(separator: "\n"))")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Text("\(currentText)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                             .multilineTextAlignment(.leading)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    ForEach(Array(unconfirmedSegments.enumerated()), id: \.element) { _, segment in
-                        let timestampText = enableTimestamps ? "[\(String(format: "%.2f", segment.start)) --> \(String(format: "%.2f", segment.end))]" : ""
-                        Text(timestampText + segment.text)
-                            .font(.headline)
-                            .fontWeight(.light)
-                            .multilineTextAlignment(.leading)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    Text("\(unconfirmedText.joined(separator: "\n"))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Text("\(currentText)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -327,6 +362,7 @@ struct ContentView: View {
     }
 
     // MARK: - Controls
+
     var audioDevicesView: some View {
         Group {
             #if os(macOS)
@@ -658,6 +694,28 @@ struct ContentView: View {
                 }
             }
             .padding(.horizontal)
+
+            Section(header: Text("Experimental")) {
+                HStack {
+                    Text("Eager Streaming Mode")
+                    InfoButton("When Eager Streaming Mode is on, the transcription will be updated more frequently, but with potentially less accurate results.")
+                    Spacer()
+                    Toggle("", isOn: $enableEagerDecoding)
+                }
+                .padding(.horizontal)
+                .padding(.top)
+
+                VStack {
+                    Text("Token Confirmations")
+                    HStack {
+                        Slider(value: $tokenConfirmationsNeeded, in: 1...10, step: 1)
+                        Text(tokenConfirmationsNeeded.formatted(.number))
+                            .frame(width: 30)
+                        InfoButton("Controls the number of consecutive tokens required to agree between decoder loops before considering them as confirmed in the streaming process.")
+                    }
+                }
+                .padding(.horizontal)
+            }
         }
         .navigationTitle("Decoding Options")
         .toolbar(content: {
@@ -1073,6 +1131,119 @@ struct ContentView: View {
         return transcription
     }
 
+    func transcribeEagerMode(_ samples: [Float]) async throws -> TranscriptionResult? {
+        guard let whisperKit = whisperKit else { return nil }
+
+        let languageCode = whisperKit.tokenizer?.languages[selectedLanguage] ?? "en"
+        let task: DecodingTask = selectedTask == "transcribe" ? .transcribe : .translate
+
+        let options = DecodingOptions(
+            verbose: false,
+            task: task,
+            language: languageCode,
+            temperature: Float(temperatureStart),
+            temperatureFallbackCount: Int(fallbackCount),
+            sampleLength: Int(sampleLength),
+            usePrefillPrompt: enablePromptPrefill,
+            usePrefillCache: enableCachePrefill,
+            skipSpecialTokens: !enableSpecialCharacters,
+            withoutTimestamps: !enableTimestamps,
+            wordTimestamps: true // required for eager mode
+        )
+
+
+        // Early stopping checks
+        let decodingCallback: ((TranscriptionProgress) -> Bool?) = { progress in
+            DispatchQueue.main.async {
+                let fallbacks = Int(progress.timings.totalDecodingFallbacks)
+                if progress.text.count < currentText.count {
+                    if fallbacks == self.currentFallbacks {
+//                        self.unconfirmedText.append(currentText)
+                    } else {
+                        print("Fallback occured: \(fallbacks)")
+                    }
+                }
+                self.currentText = progress.text
+                self.currentFallbacks = fallbacks
+            }
+            // Check early stopping
+            let currentTokens = progress.tokens
+            let checkWindow = Int(compressionCheckWindow)
+            if currentTokens.count > checkWindow {
+                let checkTokens: [Int] = currentTokens.suffix(checkWindow)
+                let compressionRatio = compressionRatio(of: checkTokens)
+                if compressionRatio > options.compressionRatioThreshold! {
+                    return false
+                }
+            }
+            if progress.avgLogprob! < options.logProbThreshold! {
+                return false
+            }
+
+            return nil
+        }
+
+        Logging.info("[testStreamingTimestamps] \(lastAgreedSeconds)-\(Double(samples.count)/16000.0) seconds")
+
+        let streamingAudio = samples
+        var streamOptions = options
+        streamOptions.clipTimestamps = [lastAgreedSeconds]
+        let lastAgreedTokens = lastAgreedWords.flatMap { $0.tokens }
+        streamOptions.prefixTokens = lastAgreedTokens
+        do {
+            let result: TranscriptionResult? = try await whisperKit.transcribe(audioArray: streamingAudio, decodeOptions: streamOptions, callback: decodingCallback)
+//            await MainActor.run {
+                var skipAppend = false
+                if let result = result {
+                    hypothesisWords = result.allWords.filter { $0.start >= lastAgreedSeconds }
+
+                    if let prevResult = prevResult {
+
+                        prevWords = prevResult.allWords.filter { $0.start >= lastAgreedSeconds }
+                        let commonPrefix = findLongestCommonPrefix(prevWords, hypothesisWords)
+                        Logging.info("[EagerMode] Prev \"\((prevWords.map { $0.word }).joined())\"")
+                        Logging.info("[EagerMode] Next \"\((hypothesisWords.map { $0.word }).joined())\"")
+                        Logging.info("[EagerMode] Found common prefix \"\((commonPrefix.map { $0.word }).joined())\"")
+
+                        if commonPrefix.count >= Int(tokenConfirmationsNeeded) {
+                            lastAgreedWords = commonPrefix.suffix(Int(tokenConfirmationsNeeded))
+                            lastAgreedSeconds = lastAgreedWords.first!.start
+                            Logging.info("[EagerMode] Found new last agreed word \"\(lastAgreedWords.first!.word)\" at \(lastAgreedSeconds) seconds")
+
+                            confirmedWords.append(contentsOf: commonPrefix.prefix(commonPrefix.count - Int(tokenConfirmationsNeeded)))
+                            let currentWords = confirmedWords.map { $0.word }.joined()
+                            Logging.info("[EagerMode] Current:  \(lastAgreedSeconds) -> \(Double(samples.count)/16000.0) \(currentWords)")
+                        } else {
+                            Logging.info("[EagerMode] Using same last agreed time \(lastAgreedSeconds)")
+                            skipAppend = true
+                        }
+
+
+                    }
+                    prevResult = result
+                }
+
+                if !skipAppend {
+                    results.append(result)
+                }
+//            }
+        } catch {
+            Logging.error("[EagerMode] Error: \(error)")
+        }
+
+//        await MainActor.run {
+//            // Accept the final hypothesis because it is the last of the available audio
+//            let final = lastAgreedWords + findLongestDifferentSuffix(prevWords, hypothesisWords)
+//            confirmedWords.append(contentsOf: final)
+//
+//            let finalWords = confirmedWords.map { $0.word }.joined()
+//        }
+
+        let mergedResult = mergeTranscriptionResults(results, confirmedWords: confirmedWords)
+
+        return mergedResult
+    }
+
     // MARK: Streaming Logic
 
     func realtimeLoop() {
@@ -1157,49 +1328,53 @@ struct ContentView: View {
             }
         }
 
-        // Run transcribe
-        lastBufferSize = currentBuffer.count
+        if enableEagerDecoding {
+            let transcription = try await transcribeEagerMode(Array(currentBuffer))
+        } else {
+            // Run transcribe
+            lastBufferSize = currentBuffer.count
 
-        let transcription = try await transcribeAudioSamples(Array(currentBuffer))
+            let transcription = try await transcribeAudioSamples(Array(currentBuffer))
 
-        // We need to run this next part on the main thread
-        await MainActor.run {
-            currentText = ""
-            unconfirmedText = []
-            guard let segments = transcription?.segments else {
-                return
-            }
-
-            self.tokensPerSecond = transcription?.timings?.tokensPerSecond ?? 0
-            self.realTimeFactor = transcription?.timings?.realTimeFactor ?? 0
-            self.firstTokenTime = transcription?.timings?.firstTokenTime ?? 0
-            self.pipelineStart = transcription?.timings?.pipelineStart ?? 0
-            self.currentLag = transcription?.timings?.decodingLoop ?? 0
-
-            // Logic for moving segments to confirmedSegments
-            if segments.count > requiredSegmentsForConfirmation {
-                // Calculate the number of segments to confirm
-                let numberOfSegmentsToConfirm = segments.count - requiredSegmentsForConfirmation
-
-                // Confirm the required number of segments
-                let confirmedSegmentsArray = Array(segments.prefix(numberOfSegmentsToConfirm))
-                let remainingSegments = Array(segments.suffix(requiredSegmentsForConfirmation))
-
-                // Update lastConfirmedSegmentEnd based on the last confirmed segment
-                if let lastConfirmedSegment = confirmedSegmentsArray.last, lastConfirmedSegment.end > lastConfirmedSegmentEndSeconds {
-                    lastConfirmedSegmentEndSeconds = lastConfirmedSegment.end
-
-                    // Add confirmed segments to the confirmedSegments array
-                    if !self.confirmedSegments.contains(confirmedSegmentsArray) {
-                        self.confirmedSegments.append(contentsOf: confirmedSegmentsArray)
-                    }
+            // We need to run this next part on the main thread
+            await MainActor.run {
+                currentText = ""
+                unconfirmedText = []
+                guard let segments = transcription?.segments else {
+                    return
                 }
 
-                // Update transcriptions to reflect the remaining segments
-                self.unconfirmedSegments = remainingSegments
-            } else {
-                // Handle the case where segments are fewer or equal to required
-                self.unconfirmedSegments = segments
+                self.tokensPerSecond = transcription?.timings?.tokensPerSecond ?? 0
+                self.realTimeFactor = transcription?.timings?.realTimeFactor ?? 0
+                self.firstTokenTime = transcription?.timings?.firstTokenTime ?? 0
+                self.pipelineStart = transcription?.timings?.pipelineStart ?? 0
+                self.currentLag = transcription?.timings?.decodingLoop ?? 0
+
+                // Logic for moving segments to confirmedSegments
+                if segments.count > requiredSegmentsForConfirmation {
+                    // Calculate the number of segments to confirm
+                    let numberOfSegmentsToConfirm = segments.count - requiredSegmentsForConfirmation
+
+                    // Confirm the required number of segments
+                    let confirmedSegmentsArray = Array(segments.prefix(numberOfSegmentsToConfirm))
+                    let remainingSegments = Array(segments.suffix(requiredSegmentsForConfirmation))
+
+                    // Update lastConfirmedSegmentEnd based on the last confirmed segment
+                    if let lastConfirmedSegment = confirmedSegmentsArray.last, lastConfirmedSegment.end > lastConfirmedSegmentEndSeconds {
+                        lastConfirmedSegmentEndSeconds = lastConfirmedSegment.end
+
+                        // Add confirmed segments to the confirmedSegments array
+                        if !self.confirmedSegments.contains(confirmedSegmentsArray) {
+                            self.confirmedSegments.append(contentsOf: confirmedSegmentsArray)
+                        }
+                    }
+
+                    // Update transcriptions to reflect the remaining segments
+                    self.unconfirmedSegments = remainingSegments
+                } else {
+                    // Handle the case where segments are fewer or equal to required
+                    self.unconfirmedSegments = segments
+                }
             }
         }
     }
