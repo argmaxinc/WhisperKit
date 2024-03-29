@@ -144,13 +144,26 @@ public extension TextDecoding {
             // withoutTimestamps true in order to disable timestamps
             let timestampsToken = options.withoutTimestamps ? tokenizer.specialTokens.noTimestampsToken : tokenizer.specialTokens.timeTokenBegin
             prefillTokens.append(timestampsToken)
-            prefillTokens.append(contentsOf: options.initialPromptTokens)
+
+            // Add prompt tokens
+            if let promptTokens = options.promptTokens {
+                let maxPromptLen = (WhisperKit.maxTokenContext / 2) - 1
+                let trimmedPromptTokens = Array(promptTokens.suffix(maxPromptLen))
+                prefillTokens = [tokenizer.specialTokens.startOfPreviousToken] + trimmedPromptTokens + prefillTokens
+            }
+
+            // Add prefix tokens
+            if let prefixTokens = options.prefixTokens {
+                let trimmedPrefixTokens = Array(prefixTokens.suffix(WhisperKit.maxTokenContext / 2))
+                prefillTokens.append(contentsOf: trimmedPrefixTokens)
+            }
         }
 
         prefilledDecoderInputs.initialPrompt = prefillTokens
 
         if options?.usePrefillCache ?? false,
-           prefillData != nil
+           prefillData != nil,
+           options?.promptTokens == nil // TODO: allow prefill cache to be used with prompt tokens, currently breaks if it starts at non-zero index
         {
             // Prefilling kv cache data requires non-nil task and language tokens, set defaults if not provided
             // Task tokens are remapped to 0->transcribe and 1->translate for the prefill lookup table
@@ -169,7 +182,7 @@ public extension TextDecoding {
                                       keySlice: prefilledDecoderInputs.prefillKeyCache,
                                       valueTensor: prefilledDecoderInputs.valueCache,
                                       valueSlice: prefilledDecoderInputs.prefillValueCache,
-                                      insertAtIndex: 0)
+                                      insertAtIndex: prefillTokens.firstIndex(of: tokenizer.specialTokens.startOfTranscriptToken) ?? 0)
             prefilledDecoderInputs.cacheLength[0] = prefilledDecoderInputs.prefillKeyCache.shape[3]
         }
 
@@ -639,15 +652,21 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         let finalSamplingResult = tokenSampler.finalize(tokens: currentTokens, logProbs: logProbs)
         let segmentTokens = finalSamplingResult.tokens
         let segmentLogProbs = finalSamplingResult.logProbs
-        let sumLogProbs = segmentLogProbs.reduce(0, +)
-        let avgLogProbs = sumLogProbs / Float(segmentLogProbs.count)
+
+        let startIndex = segmentTokens.firstIndex(of: tokenizer.specialTokens.startOfTranscriptToken) ?? 0
+        let endIndex = segmentTokens.firstIndex(of: tokenizer.specialTokens.endToken) ?? segmentTokens.count
+        let filteredTokens = Array(segmentTokens[startIndex...endIndex])
+        let filteredLogProbs = Array(segmentLogProbs[startIndex...endIndex])
+
+        let sumLogProbs = filteredLogProbs.reduce(0, +)
+        let avgLogProbs = sumLogProbs / Float(filteredLogProbs.count)
 
         var tokenProbs = [[Int: Float]]()
-        for (index, token) in segmentTokens.enumerated() {
-            tokenProbs.append([token: segmentLogProbs[index]])
+        for (index, token) in filteredTokens.enumerated() {
+            tokenProbs.append([token: filteredLogProbs[index]])
         }
 
-        let wordTokens = segmentTokens.filter { $0 < tokenizer.specialTokens.specialTokenBegin }
+        let wordTokens = filteredTokens.filter { $0 < tokenizer.specialTokens.specialTokenBegin }
         let compressionRatio = compressionRatio(of: wordTokens)
 
         var temperature = options.temperature
@@ -655,10 +674,11 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             // Convert Float16 temperature to Float with 3 decimal places
             temperature = Float(sampler.temperature).rounded(3)
         }
+
         let noSpeechProb: Float = 0 // TODO: implement no speech prob
 
-        let transcript = tokenizer.decode(tokens: segmentTokens)
-        
+        let transcript = tokenizer.decode(tokens: filteredTokens)
+
         let decodingFallback = DecodingFallback(
             options: options,
             isFirstTokenLogProbTooLow: isFirstTokenLogProbTooLow,
@@ -670,7 +690,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         let decodingResult = DecodingResult(
             language: options.language ?? "en",
             languageProbs: [options.language ?? "en": 1.0],
-            tokens: segmentTokens,
+            tokens: filteredTokens,
             tokenLogProbs: tokenProbs,
             text: transcript,
             avgLogProb: avgLogProbs,
@@ -681,6 +701,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             timings: timings,
             fallback: decodingFallback
         )
+
         return [decodingResult]
     }
 

@@ -49,7 +49,14 @@ struct Transcribe: AsyncParsableCommand {
             print("Models initialized")
         }
 
-        let options = decodingOptions(task: task)
+        var options = decodingOptions(task: task)
+        if let promptText = cliArguments.prompt, let tokenizer = whisperKit.tokenizer  {
+            options.promptTokens = tokenizer.encode(text: " " + promptText.trimmingCharacters(in: .whitespaces)).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
+        }
+
+        if let prefixText = cliArguments.prefix, let tokenizer = whisperKit.tokenizer {
+            options.prefixTokens = tokenizer.encode(text: " " + prefixText.trimmingCharacters(in: .whitespaces)).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
+        }
 
         let transcribeResult = try await whisperKit.transcribe(
             audioPath: resolvedAudioPath,
@@ -143,7 +150,7 @@ struct Transcribe: AsyncParsableCommand {
             var streamOptions = options
             streamOptions.clipTimestamps = [lastAgreedSeconds]
             let lastAgreedTokens = lastAgreedWords.flatMap { $0.tokens }
-            streamOptions.initialPromptTokens = lastAgreedTokens
+            streamOptions.prefixTokens = lastAgreedTokens
             do {
                 let result: TranscriptionResult? = try await whisperKit.transcribe(audioArray: simulatedStreamingAudio, decodeOptions: streamOptions)
                 var skipAppend = false
@@ -247,6 +254,7 @@ struct Transcribe: AsyncParsableCommand {
             computeOptions: computeOptions,
             verbose: cliArguments.verbose,
             logLevel: .debug,
+            load: true,
             useBackgroundDownloadSession: false
         )
     }

@@ -609,6 +609,7 @@ final class UnitTests: XCTestCase {
             await whisperKit.transcribe(audioArray: audioSamples, decodeOptions: options),
             "Failed to transcribe"
         )
+        
         XCTAssertTrue(result.segments.first!.tokens.contains(whisperKit.tokenizer!.specialTokens.noSpeechToken))
     }
 
@@ -675,6 +676,37 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(resultSeek.segments.first?.start, seekTime, "Seek segment should have the input start time")
         XCTAssertNotEqual(resultFull.segments.first?.start, resultSeek.segments.first?.start, "Segments should have the different start times")
         XCTAssertEqual(resultFull.segments.first?.end, resultSeek.segments.first?.end, "Segments should have the same end time")
+    }
+
+    func testPromptTokens() async throws {
+        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let promptText = " prompt to encourage output without any punctuation and without capitalizing americans as if it was already normalized"
+        let tokenizer = whisperKit.tokenizer!
+        let promptTokens = tokenizer.encode(text: promptText).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
+        let options = DecodingOptions(skipSpecialTokens: true, promptTokens: promptTokens)
+
+        let result = try await XCTUnwrapAsync(
+            await transcribe(with: .tiny, options: options),
+            "Failed to transcribe"
+        )
+
+        XCTAssertEqual(result.segments.first?.text, " and so my fellow americans ask not what your country can do for you ask what you can do for your country.")
+    }
+
+    func testPrefixTokens() async throws {
+        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        // Prefix to encourage output without any punctuation and without capitalizing americans as if it was already normalized
+        let prefixText = " and so my fellow americans"
+        let tokenizer = whisperKit.tokenizer!
+        let prefixTokens = tokenizer.encode(text: prefixText).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
+        let options = DecodingOptions(skipSpecialTokens: true, prefixTokens: prefixTokens)
+
+        let result = try await XCTUnwrapAsync(
+            await transcribe(with: .tiny, options: options),
+            "Failed to transcribe"
+        )
+
+        XCTAssertEqual(result.segments.first?.text, " and so my fellow americans ask not what your country can do for you ask what you can do for your country.")
     }
 
     // MARK: - Utils Tests
@@ -1164,7 +1196,7 @@ final class UnitTests: XCTestCase {
 
     func testStreamingTimestamps() async throws {
         let options = DecodingOptions(usePrefillPrompt: true, wordTimestamps: true)
-        let audioFile = "ted_60.m4a"
+        let audioFile = "jfk.wav"
         let modelPath = try tinyModelPath()
 
         let whisperKit = try await WhisperKit(modelFolder: modelPath,/* computeOptions: computeOptions,*/ verbose: true, logLevel: .debug)
@@ -1202,7 +1234,7 @@ final class UnitTests: XCTestCase {
             var streamOptions = options
             streamOptions.clipTimestamps = [lastAgreedSeconds]
             let lastAgreedTokens = lastAgreedWords.flatMap { $0.tokens }
-            streamOptions.initialPromptTokens = lastAgreedTokens
+            streamOptions.prefixTokens = lastAgreedTokens
             do {
                 let result: TranscriptionResult? = try await whisperKit.transcribe(audioArray: simulatedStreamingAudio, decodeOptions: streamOptions)
                 var skipAppend = false
