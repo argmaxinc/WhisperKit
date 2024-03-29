@@ -40,7 +40,7 @@ struct ContentView: View {
     @AppStorage("enableSpecialCharacters") private var enableSpecialCharacters: Bool = false
     @AppStorage("enableEagerDecoder") private var enableEagerDecoder: Bool = false
     @AppStorage("temperatureStart") private var temperatureStart: Double = 0
-    @AppStorage("fallbackCount") private var fallbackCount: Double = 4
+    @AppStorage("fallbackCount") private var fallbackCount: Double = 5
     @AppStorage("compressionCheckWindow") private var compressionCheckWindow: Double = 20
     @AppStorage("sampleLength") private var sampleLength: Double = 224
     @AppStorage("silenceThreshold") private var silenceThreshold: Double = 0.3
@@ -1028,9 +1028,9 @@ struct ContentView: View {
             verbose: false,
             task: task,
             language: languageCode,
-            temperatureStart: temperatureStart,
-            temperatureFallbackCount: 3, // limit fallbacks for realtime
-            sampleLength: Int(sampleLength), // reduced sample length for realtime
+            temperature: Float(temperatureStart),
+            temperatureFallbackCount: Int(fallbackCount),
+            sampleLength: Int(sampleLength),
             usePrefillPrompt: enablePromptPrefill,
             usePrefillCache: enableCachePrefill,
             skipSpecialTokens: !enableSpecialCharacters,
