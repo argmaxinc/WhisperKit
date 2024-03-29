@@ -97,7 +97,7 @@ final class UnitTests: XCTestCase {
             "Failed to pad audio samples"
         )
         var featureExtractor = FeatureExtractor()
-        let modelPath = URL(filePath: tinyModelPath()).appending(path: "MelSpectrogram.mlmodelc")
+        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "MelSpectrogram.mlmodelc")
         try await featureExtractor.loadModel(at: modelPath, computeUnits: ModelComputeOptions().melCompute)
         let melSpectrogram = try await XCTUnwrapAsync(
             await featureExtractor.logMelSpectrogram(fromAudio: paddedSamples),
@@ -136,7 +136,7 @@ final class UnitTests: XCTestCase {
 
     func testEncoderOutput() async throws {
         var audioEncoder = AudioEncoder()
-        let modelPath = URL(filePath: tinyModelPath()).appending(path: "AudioEncoder.mlmodelc")
+        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "AudioEncoder.mlmodelc")
         try? await audioEncoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().audioEncoderCompute)
 
         let encoderInput = try MLMultiArray(shape: [1, 80, 1, 3000], dataType: .float16)
@@ -152,7 +152,7 @@ final class UnitTests: XCTestCase {
     func testDecoderOutput() async throws {
         var textDecoder = TextDecoder()
         let decodingOptions = DecodingOptions()
-        let modelPath = URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         await XCTAssertNoThrowAsync(
             try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute),
             "Failed to load the model"
@@ -194,7 +194,7 @@ final class UnitTests: XCTestCase {
             noSpeechThreshold: nil
         )
         var textDecoder = TextDecoder()
-        let modelPath = URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
         textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
 
@@ -220,7 +220,7 @@ final class UnitTests: XCTestCase {
             noSpeechThreshold: nil
         )
         var textDecoder = TextDecoder()
-        let modelPath = URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
         textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
 
@@ -1164,33 +1164,13 @@ final class UnitTests: XCTestCase {
 
     func testStreamingTimestamps() async throws {
         let options = DecodingOptions(usePrefillPrompt: true, wordTimestamps: true)
-//        let audioFile = "ted_60.m4a"
-        let audioFile = "jfk.wav"
-        let modelPath = tinyModelPath()
-//        let modelPath = largev3ModelPath()
-//        let computeOptions = ModelComputeOptions(
-//            melCompute: .cpuOnly,
-//            audioEncoderCompute: .cpuOnly,
-//            textDecoderCompute: .cpuOnly,
-//            prefillCompute: .cpuOnly
-//        )
+        let audioFile = "ted_60.m4a"
+        let modelPath = try tinyModelPath()
 
         let whisperKit = try await WhisperKit(modelFolder: modelPath,/* computeOptions: computeOptions,*/ verbose: true, logLevel: .debug)
 
         // Get the current decoderState from the textDecoder
         let textDecoder = whisperKit.textDecoder as! TextDecoder
-//        var decodingState = textDecoder.decodingState
-
-
-        // Create a new DecodingInputs instance if decoderState is nil
-//        if decodingState == nil {
-//            let decodingInputs = textDecoder.prepareDecoderInputs(withPrompt: [whisperKit.tokenizer!.startOfTranscriptToken])!
-//            decodingState = DecodingState(
-//                decodingInputs: decodingInputs,
-//                currentTokens: decodingInputs.initialPrompt,
-//                logProbs: Array(repeating: 0, count: decodingInputs.initialPrompt.count)
-//            )
-//        }
 
         let startTime = Date()
         let audioComponents = audioFile.components(separatedBy: ".")
