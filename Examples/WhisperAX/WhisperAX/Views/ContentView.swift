@@ -21,6 +21,8 @@ struct ContentView: View {
     // TODO: Make this configurable in the UI
     @State var modelStorage: String = "huggingface/models/argmaxinc/whisperkit-coreml"
 
+    // MARK: Model management
+
     @State private var modelState: ModelState = .unloaded
     @State private var localModels: [String] = []
     @State private var localModelPath: String = ""
@@ -47,6 +49,8 @@ struct ContentView: View {
     @AppStorage("useVAD") private var useVAD: Bool = true
     @AppStorage("tokenConfirmationsNeeded") private var tokenConfirmationsNeeded: Double = 2
 
+    // MARK: Standard properties
+
     @State private var loadingProgressValue: Float = 0.0
     @State private var specializationProgressRatio: Float = 0.7
     @State private var isFilePickerPresented = false
@@ -64,18 +68,23 @@ struct ContentView: View {
     @State private var unconfirmedSegments: [TranscriptionSegment] = []
     @State private var unconfirmedText: [String] = []
 
-    // TODO: cleanup
-    @State private var results: [TranscriptionResult?] = []
+
+    // MARK: Eager mode properties
+
+    @State private var eagerResults: [TranscriptionResult?] = []
     @State private var prevResult: TranscriptionResult?
     @State private var lastAgreedSeconds: Float = 0.0
     @State private var prevWords: [WordTiming] = []
-    @State private var hypothesisWords: [WordTiming] = []
     @State private var lastAgreedWords: [WordTiming] = []
     @State private var confirmedWords: [WordTiming] = []
+    @State private var confirmedText: String = ""
+    @State private var hypothesisWords: [WordTiming] = []
+    @State private var hypothesisText: String = ""
+
+    // MARK: UI properties
 
     @State private var showAdvancedOptions: Bool = false
     @State private var transcriptionTask: Task<Void, Never>? = nil
-
     @State private var selectedCategoryId: MenuItem.ID?
     private var menu = [
         MenuItem(name: "Transcribe", image: "book.pages"),
@@ -110,7 +119,7 @@ struct ContentView: View {
         confirmedSegments = []
         unconfirmedSegments = []
 
-        results = []
+        eagerResults = []
         prevResult = nil
         lastAgreedSeconds = 0.0
         prevWords = []
@@ -199,11 +208,8 @@ struct ContentView: View {
             ScrollView {
                 VStack(alignment: .leading) {
                     if enableEagerDecoding {
-//                        let timestampText = enableTimestamps ? "[\(String(format: "%.2f", segment.start)) --> \(String(format: "%.2f", segment.end))]" : ""
-                        let currentWords = confirmedWords.map { $0.word }.joined()
-                        let hypothesis = (lastAgreedWords + findLongestDifferentSuffix(prevWords, hypothesisWords)).map { $0.word }.joined()
-
-                        Text("\(Text(currentWords).fontWeight(.bold)) \(Text(hypothesis).fontWeight(.light))")
+                        let timestampText = enableTimestamps ? "[\(String(format: "%.2f", eagerResults.first??.segments.first?.start ?? 0)) --> \(String(format: "%.2f", eagerResults.last??.segments.last?.end ?? 0))]" : ""
+                        Text("\(Text(confirmedText).fontWeight(.bold)) \(Text(hypothesisText).fontWeight(.light))")
                             .font(.headline)
                             .multilineTextAlignment(.leading)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -753,7 +759,7 @@ struct ContentView: View {
         }
     }
 
-    // MARK: Logic
+    // MARK: - Logic
 
     func fetchModels() {
         availableModels = [selectedModel]
@@ -1048,7 +1054,7 @@ struct ContentView: View {
         }
     }
 
-    // MARK: Transcribe Logic
+    // MARK: - Transcribe Logic
 
     func transcribeCurrentFile(path: String) async throws {
         guard let audioFileBuffer = AudioProcessor.loadAudio(fromPath: path) else {
@@ -1129,119 +1135,6 @@ struct ContentView: View {
 
         let transcription = try await whisperKit.transcribe(audioArray: samples, decodeOptions: options, callback: decodingCallback)
         return transcription
-    }
-
-    func transcribeEagerMode(_ samples: [Float]) async throws -> TranscriptionResult? {
-        guard let whisperKit = whisperKit else { return nil }
-
-        let languageCode = whisperKit.tokenizer?.languages[selectedLanguage] ?? "en"
-        let task: DecodingTask = selectedTask == "transcribe" ? .transcribe : .translate
-
-        let options = DecodingOptions(
-            verbose: false,
-            task: task,
-            language: languageCode,
-            temperature: Float(temperatureStart),
-            temperatureFallbackCount: Int(fallbackCount),
-            sampleLength: Int(sampleLength),
-            usePrefillPrompt: enablePromptPrefill,
-            usePrefillCache: enableCachePrefill,
-            skipSpecialTokens: !enableSpecialCharacters,
-            withoutTimestamps: !enableTimestamps,
-            wordTimestamps: true // required for eager mode
-        )
-
-
-        // Early stopping checks
-        let decodingCallback: ((TranscriptionProgress) -> Bool?) = { progress in
-            DispatchQueue.main.async {
-                let fallbacks = Int(progress.timings.totalDecodingFallbacks)
-                if progress.text.count < currentText.count {
-                    if fallbacks == self.currentFallbacks {
-//                        self.unconfirmedText.append(currentText)
-                    } else {
-                        print("Fallback occured: \(fallbacks)")
-                    }
-                }
-                self.currentText = progress.text
-                self.currentFallbacks = fallbacks
-            }
-            // Check early stopping
-            let currentTokens = progress.tokens
-            let checkWindow = Int(compressionCheckWindow)
-            if currentTokens.count > checkWindow {
-                let checkTokens: [Int] = currentTokens.suffix(checkWindow)
-                let compressionRatio = compressionRatio(of: checkTokens)
-                if compressionRatio > options.compressionRatioThreshold! {
-                    return false
-                }
-            }
-            if progress.avgLogprob! < options.logProbThreshold! {
-                return false
-            }
-
-            return nil
-        }
-
-        Logging.info("[testStreamingTimestamps] \(lastAgreedSeconds)-\(Double(samples.count)/16000.0) seconds")
-
-        let streamingAudio = samples
-        var streamOptions = options
-        streamOptions.clipTimestamps = [lastAgreedSeconds]
-        let lastAgreedTokens = lastAgreedWords.flatMap { $0.tokens }
-        streamOptions.prefixTokens = lastAgreedTokens
-        do {
-            let result: TranscriptionResult? = try await whisperKit.transcribe(audioArray: streamingAudio, decodeOptions: streamOptions, callback: decodingCallback)
-//            await MainActor.run {
-                var skipAppend = false
-                if let result = result {
-                    hypothesisWords = result.allWords.filter { $0.start >= lastAgreedSeconds }
-
-                    if let prevResult = prevResult {
-
-                        prevWords = prevResult.allWords.filter { $0.start >= lastAgreedSeconds }
-                        let commonPrefix = findLongestCommonPrefix(prevWords, hypothesisWords)
-                        Logging.info("[EagerMode] Prev \"\((prevWords.map { $0.word }).joined())\"")
-                        Logging.info("[EagerMode] Next \"\((hypothesisWords.map { $0.word }).joined())\"")
-                        Logging.info("[EagerMode] Found common prefix \"\((commonPrefix.map { $0.word }).joined())\"")
-
-                        if commonPrefix.count >= Int(tokenConfirmationsNeeded) {
-                            lastAgreedWords = commonPrefix.suffix(Int(tokenConfirmationsNeeded))
-                            lastAgreedSeconds = lastAgreedWords.first!.start
-                            Logging.info("[EagerMode] Found new last agreed word \"\(lastAgreedWords.first!.word)\" at \(lastAgreedSeconds) seconds")
-
-                            confirmedWords.append(contentsOf: commonPrefix.prefix(commonPrefix.count - Int(tokenConfirmationsNeeded)))
-                            let currentWords = confirmedWords.map { $0.word }.joined()
-                            Logging.info("[EagerMode] Current:  \(lastAgreedSeconds) -> \(Double(samples.count)/16000.0) \(currentWords)")
-                        } else {
-                            Logging.info("[EagerMode] Using same last agreed time \(lastAgreedSeconds)")
-                            skipAppend = true
-                        }
-
-
-                    }
-                    prevResult = result
-                }
-
-                if !skipAppend {
-                    results.append(result)
-                }
-//            }
-        } catch {
-            Logging.error("[EagerMode] Error: \(error)")
-        }
-
-//        await MainActor.run {
-//            // Accept the final hypothesis because it is the last of the available audio
-//            let final = lastAgreedWords + findLongestDifferentSuffix(prevWords, hypothesisWords)
-//            confirmedWords.append(contentsOf: final)
-//
-//            let finalWords = confirmedWords.map { $0.word }.joined()
-//        }
-
-        let mergedResult = mergeTranscriptionResults(results, confirmedWords: confirmedWords)
-
-        return mergedResult
     }
 
     // MARK: Streaming Logic
@@ -1328,12 +1221,14 @@ struct ContentView: View {
             }
         }
 
-        if enableEagerDecoding {
-            let transcription = try await transcribeEagerMode(Array(currentBuffer))
-        } else {
-            // Run transcribe
-            lastBufferSize = currentBuffer.count
+        // Store this for next iterations VAD
+        lastBufferSize = currentBuffer.count
 
+        if enableEagerDecoding {
+            // Run realtime transcribe using word timestamps for segmentation
+            try await transcribeEagerMode(Array(currentBuffer))
+        } else {
+            // Run realtime transcribe using timestamp tokens directly
             let transcription = try await transcribeAudioSamples(Array(currentBuffer))
 
             // We need to run this next part on the main thread
@@ -1377,6 +1272,116 @@ struct ContentView: View {
                 }
             }
         }
+    }
+
+    func transcribeEagerMode(_ samples: [Float]) async throws -> TranscriptionResult? {
+        guard let whisperKit = whisperKit else { return nil }
+
+        let languageCode = whisperKit.tokenizer?.languages[selectedLanguage] ?? "en"
+        let task: DecodingTask = selectedTask == "transcribe" ? .transcribe : .translate
+
+        let options = DecodingOptions(
+            verbose: false,
+            task: task,
+            language: languageCode,
+            temperature: Float(temperatureStart),
+            temperatureFallbackCount: Int(fallbackCount),
+            sampleLength: Int(sampleLength),
+            usePrefillPrompt: enablePromptPrefill,
+            usePrefillCache: enableCachePrefill,
+            skipSpecialTokens: !enableSpecialCharacters,
+            withoutTimestamps: !enableTimestamps,
+            wordTimestamps: true // required for eager mode
+        )
+
+        // Early stopping checks
+        let decodingCallback: ((TranscriptionProgress) -> Bool?) = { progress in
+            DispatchQueue.main.async {
+                let fallbacks = Int(progress.timings.totalDecodingFallbacks)
+                if progress.text.count < currentText.count {
+                    if fallbacks == self.currentFallbacks {
+                        //                        self.unconfirmedText.append(currentText)
+                    } else {
+                        print("Fallback occured: \(fallbacks)")
+                    }
+                }
+                self.currentText = progress.text
+                self.currentFallbacks = fallbacks
+            }
+            // Check early stopping
+            let currentTokens = progress.tokens
+            let checkWindow = Int(compressionCheckWindow)
+            if currentTokens.count > checkWindow {
+                let checkTokens: [Int] = currentTokens.suffix(checkWindow)
+                let compressionRatio = compressionRatio(of: checkTokens)
+                if compressionRatio > options.compressionRatioThreshold! {
+                    return false
+                }
+            }
+            if progress.avgLogprob! < options.logProbThreshold! {
+                return false
+            }
+
+            return nil
+        }
+
+        Logging.info("[testStreamingTimestamps] \(lastAgreedSeconds)-\(Double(samples.count)/16000.0) seconds")
+
+        let streamingAudio = samples
+        var streamOptions = options
+        streamOptions.clipTimestamps = [lastAgreedSeconds]
+        let lastAgreedTokens = lastAgreedWords.flatMap { $0.tokens }
+        streamOptions.prefixTokens = lastAgreedTokens
+        do {
+            let result: TranscriptionResult? = try await whisperKit.transcribe(audioArray: streamingAudio, decodeOptions: streamOptions, callback: decodingCallback)
+            await MainActor.run {
+                var skipAppend = false
+                if let result = result {
+                    hypothesisWords = result.allWords.filter { $0.start >= lastAgreedSeconds }
+
+                    if let prevResult = prevResult {
+                        prevWords = prevResult.allWords.filter { $0.start >= lastAgreedSeconds }
+                        let commonPrefix = findLongestCommonPrefix(prevWords, hypothesisWords)
+                        Logging.info("[EagerMode] Prev \"\((prevWords.map { $0.word }).joined())\"")
+                        Logging.info("[EagerMode] Next \"\((hypothesisWords.map { $0.word }).joined())\"")
+                        Logging.info("[EagerMode] Found common prefix \"\((commonPrefix.map { $0.word }).joined())\"")
+
+                        if commonPrefix.count >= Int(tokenConfirmationsNeeded) { // avoid repeating the same words
+                            lastAgreedWords = commonPrefix.suffix(Int(tokenConfirmationsNeeded))
+                            lastAgreedSeconds = lastAgreedWords.first!.start
+                            Logging.info("[EagerMode] Found new last agreed word \"\(lastAgreedWords.first!.word)\" at \(lastAgreedSeconds) seconds")
+
+                            confirmedWords.append(contentsOf: commonPrefix.prefix(commonPrefix.count - Int(tokenConfirmationsNeeded)))
+                            let currentWords = confirmedWords.map { $0.word }.joined()
+                            Logging.info("[EagerMode] Current:  \(lastAgreedSeconds) -> \(Double(samples.count) / 16000.0) \(currentWords)")
+                        } else {
+                            Logging.info("[EagerMode] Using same last agreed time \(lastAgreedSeconds)")
+                            skipAppend = true
+                        }
+                    }
+                    prevResult = result
+                }
+
+                if !skipAppend {
+                    eagerResults.append(result)
+                }
+            }
+        } catch {
+            Logging.error("[EagerMode] Error: \(error)")
+        }
+
+        await MainActor.run {
+            let finalWords = confirmedWords.map { $0.word }.joined()
+            confirmedText = finalWords
+
+            // Accept the final hypothesis because it is the last of the available audio
+            let lastHypothesis = lastAgreedWords + findLongestDifferentSuffix(prevWords, hypothesisWords)
+            hypothesisText = lastHypothesis.map { $0.word }.joined()
+        }
+
+        let mergedResult = mergeTranscriptionResults(eagerResults, confirmedWords: confirmedWords)
+
+        return mergedResult
     }
 }
 
