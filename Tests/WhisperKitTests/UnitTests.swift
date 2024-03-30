@@ -1201,9 +1201,6 @@ final class UnitTests: XCTestCase {
 
         let whisperKit = try await WhisperKit(modelFolder: modelPath,/* computeOptions: computeOptions,*/ verbose: true, logLevel: .debug)
 
-        // Get the current decoderState from the textDecoder
-        let textDecoder = whisperKit.textDecoder as! TextDecoder
-
         let startTime = Date()
         let audioComponents = audioFile.components(separatedBy: ".")
         guard let audioFileURL = Bundle.module.path(forResource: audioComponents.first, ofType: audioComponents.last) else {
