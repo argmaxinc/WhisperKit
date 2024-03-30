@@ -1369,7 +1369,7 @@ struct ContentView: View {
             return nil
         }
 
-        Logging.info("[testStreamingTimestamps] \(lastAgreedSeconds)-\(Double(samples.count)/16000.0) seconds")
+        Logging.info("[EagerMode] \(lastAgreedSeconds)-\(Double(samples.count)/16000.0) seconds")
 
         let streamingAudio = samples
         var streamOptions = options
@@ -1390,7 +1390,7 @@ struct ContentView: View {
                         Logging.info("[EagerMode] Next \"\((hypothesisWords.map { $0.word }).joined())\"")
                         Logging.info("[EagerMode] Found common prefix \"\((commonPrefix.map { $0.word }).joined())\"")
 
-                        if commonPrefix.count >= Int(tokenConfirmationsNeeded) { // avoid repeating the same words
+                        if commonPrefix.count >= Int(tokenConfirmationsNeeded) {
                             lastAgreedWords = commonPrefix.suffix(Int(tokenConfirmationsNeeded))
                             lastAgreedSeconds = lastAgreedWords.first!.start
                             Logging.info("[EagerMode] Found new last agreed word \"\(lastAgreedWords.first!.word)\" at \(lastAgreedSeconds) seconds")

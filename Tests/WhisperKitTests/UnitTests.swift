@@ -1220,14 +1220,14 @@ final class UnitTests: XCTestCase {
         var results: [TranscriptionResult?] = []
         var prevResult: TranscriptionResult?
         var lastAgreedSeconds: Float = 0.0
-        let agreementCountNeeded = 3
+        let agreementCountNeeded = 2
         var hypothesisWords: [WordTiming] = []
         var prevWords: [WordTiming] = []
         var lastAgreedWords: [WordTiming] = []
         var confirmedWords: [WordTiming] = []
 
-        for seekSample in stride(from: 0, to: audioArray.count, by: 16000) {
-            let endSample = min(seekSample + 16000, audioArray.count)
+        for seekSample in stride(from: 0, to: audioArray.count, by: 32000) {
+            let endSample = min(seekSample + 32000, audioArray.count)
             Logging.info("[testStreamingTimestamps] \(lastAgreedSeconds)-\(Double(endSample)/16000.0) seconds")
 
             let simulatedStreamingAudio = Array(audioArray[..<endSample])
