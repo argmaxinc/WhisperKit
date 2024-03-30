@@ -41,6 +41,7 @@ struct ContentView: View {
     @AppStorage("enableCachePrefill") private var enableCachePrefill: Bool = true
     @AppStorage("enableSpecialCharacters") private var enableSpecialCharacters: Bool = false
     @AppStorage("enableEagerDecoding") private var enableEagerDecoding: Bool = false
+    @AppStorage("enableDecoderPreview") private var enableDecoderPreview: Bool = true
     @AppStorage("temperatureStart") private var temperatureStart: Double = 0
     @AppStorage("fallbackCount") private var fallbackCount: Double = 5
     @AppStorage("compressionCheckWindow") private var compressionCheckWindow: Double = 20
@@ -64,6 +65,7 @@ struct ContentView: View {
     @State private var lastConfirmedSegmentEndSeconds: Float = 0
     @State private var requiredSegmentsForConfirmation: Int = 4
     @State private var bufferEnergy: [Float] = []
+    @State private var bufferSeconds: Double = 0
     @State private var confirmedSegments: [TranscriptionSegment] = []
     @State private var unconfirmedSegments: [TranscriptionSegment] = []
     @State private var unconfirmedText: [String] = []
@@ -116,6 +118,7 @@ struct ContentView: View {
         lastConfirmedSegmentEndSeconds = 0
         requiredSegmentsForConfirmation = 2
         bufferEnergy = []
+        bufferSeconds = 0
         confirmedSegments = []
         unconfirmedSegments = []
 
@@ -123,9 +126,11 @@ struct ContentView: View {
         prevResult = nil
         lastAgreedSeconds = 0.0
         prevWords = []
-        hypothesisWords = []
         lastAgreedWords = []
         confirmedWords = []
+        confirmedText = ""
+        hypothesisWords = []
+        hypothesisText = ""
     }
 
     var body: some View {
@@ -208,17 +213,19 @@ struct ContentView: View {
             ScrollView {
                 VStack(alignment: .leading) {
                     if enableEagerDecoding {
-                        let timestampText = enableTimestamps ? "[\(String(format: "%.2f", eagerResults.first??.segments.first?.start ?? 0)) --> \(String(format: "%.2f", eagerResults.last??.segments.last?.end ?? 0))]" : ""
-                        Text("\(Text(confirmedText).fontWeight(.bold)) \(Text(hypothesisText).fontWeight(.light))")
+                        let timestampText = (enableTimestamps && eagerResults.first != nil) ? "[\(String(format: "%.2f", eagerResults.first??.segments.first?.start ?? 0)) --> \(String(format: "%.2f", lastAgreedSeconds))]" : ""
+                        Text("\(timestampText) \(Text(confirmedText).fontWeight(.bold))\(Text(hypothesisText).fontWeight(.bold).foregroundColor(.gray))")
                             .font(.headline)
                             .multilineTextAlignment(.leading)
                             .frame(maxWidth: .infinity, alignment: .leading)
 
-                        Text("\(currentText)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.leading)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if enableDecoderPreview {
+                            Text("\(currentText)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.leading)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     } else {
                         ForEach(Array(confirmedSegments.enumerated()), id: \.element) { _, segment in
                             let timestampText = enableTimestamps ? "[\(String(format: "%.2f", segment.start)) --> \(String(format: "%.2f", segment.end))]" : ""
@@ -284,7 +291,7 @@ struct ContentView: View {
                             ForEach(availableModels, id: \.self) { model in
                                 HStack {
                                     let modelIcon = localModels.contains { $0 == model.description } ? "checkmark.circle" : "arrow.down.circle.dotted"
-                                    Text("\(Image(systemName: modelIcon)) \(model.description)").tag(model.description)
+                                    Text("\(Image(systemName: modelIcon)) \(model.description.components(separatedBy: "_").dropFirst().joined(separator: " "))").tag(model.description)
                                 }
                             }
                         }
@@ -457,37 +464,46 @@ struct ContentView: View {
                                 .frame(minWidth: 0, maxWidth: .infinity)
                                 .padding()
 
-                                Button(action: {
-                                    withAnimation {
-                                        toggleRecording(shouldLoop: false)
+                                ZStack {
+                                    Button(action: {
+                                        withAnimation {
+                                            toggleRecording(shouldLoop: false)
+                                        }
+                                    }) {
+                                        if !isRecording {
+                                            Text("RECORD")
+                                                .font(.headline)
+                                                .foregroundColor(color)
+                                                .padding()
+                                                .cornerRadius(40)
+                                                .frame(minWidth: 70, minHeight: 70)
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 40)
+                                                        .stroke(color, lineWidth: 4)
+                                                )
+                                        } else {
+                                            Image(systemName: "stop.circle.fill")
+                                                .resizable()
+                                                .scaledToFit()
+                                                .frame(width: 70, height: 70)
+                                                .padding()
+                                                .foregroundColor(modelState != .loaded ? .gray : .red)
+                                        }
                                     }
-                                }) {
-                                    if !isRecording {
-                                        Text("RECORD")
-                                            .font(.headline)
-                                            .foregroundColor(color)
-                                            .padding()
-                                            .cornerRadius(40)
-                                            .frame(minWidth: 70, minHeight: 70)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 40)
-                                                    .stroke(color, lineWidth: 4)
-                                            )
-                                    } else {
-                                        Image(systemName: "stop.circle.fill")
-                                            .resizable()
-                                            .scaledToFit()
-                                            .frame(width: 70, height: 70)
-                                            .padding()
-                                            .foregroundColor(modelState != .loaded ? .gray : .red)
+                                    .lineLimit(1)
+                                    .contentTransition(.symbolEffect(.replace))
+                                    .buttonStyle(BorderlessButtonStyle())
+                                    .disabled(modelState != .loaded)
+                                    .frame(minWidth: 0, maxWidth: .infinity)
+                                    .padding()
+
+                                    if isRecording {
+                                        Text("\(String(format: "%.1f", bufferSeconds)) s")
+                                            .font(.caption)
+                                            .foregroundColor(.gray)
+                                            .offset(x: 80, y: 0)
                                     }
                                 }
-                                .lineLimit(1)
-                                .contentTransition(.symbolEffect(.replace))
-                                .buttonStyle(BorderlessButtonStyle())
-                                .disabled(modelState != .loaded)
-                                .frame(minWidth: 0, maxWidth: .infinity)
-                                .padding()
                             }
                         }
                     case "Stream":
@@ -518,7 +534,7 @@ struct ContentView: View {
                                 }
                             }
 
-                            HStack {
+                            ZStack {
                                 Button {
                                     withAnimation {
                                         toggleRecording(shouldLoop: true)
@@ -535,6 +551,13 @@ struct ContentView: View {
                                 .buttonStyle(BorderlessButtonStyle())
                                 .disabled(modelState != .loaded)
                                 .frame(minWidth: 0, maxWidth: .infinity)
+
+                                if isRecording {
+                                    Text("\(String(format: "%.1f", bufferSeconds)) s")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                        .offset(x: 80, y: 0)
+                                }
                             }
                         }
                     default:
@@ -628,6 +651,14 @@ struct ContentView: View {
                 InfoButton("Toggling this will include/exclude special characters in the transcription text.")
                 Spacer()
                 Toggle("", isOn: $enableSpecialCharacters)
+            }
+            .padding(.horizontal)
+
+            HStack {
+                Text("Show Decoder Preview")
+                InfoButton("Toggling this will show a small preview of the decoder output in the UI under the transcribe. This can be useful for debugging.")
+                Spacer()
+                Toggle("", isOn: $enableDecoderPreview)
             }
             .padding(.horizontal)
 
@@ -1022,6 +1053,7 @@ struct ContentView: View {
                 try? audioProcessor.startRecordingLive(inputDeviceID: deviceId) { _ in
                     DispatchQueue.main.async {
                         bufferEnergy = whisperKit?.audioProcessor.relativeEnergy ?? []
+                        bufferSeconds = Double(whisperKit?.audioProcessor.audioSamples.count ?? 0) / Double(WhisperKit.sampleRate)
                     }
                 }
 
@@ -1226,7 +1258,14 @@ struct ContentView: View {
 
         if enableEagerDecoding {
             // Run realtime transcribe using word timestamps for segmentation
-            try await transcribeEagerMode(Array(currentBuffer))
+            let transcription = try await transcribeEagerMode(Array(currentBuffer))
+            await MainActor.run {
+                self.tokensPerSecond = transcription?.timings?.tokensPerSecond ?? 0
+                self.realTimeFactor = transcription?.timings?.realTimeFactor ?? 0
+                self.firstTokenTime = transcription?.timings?.firstTokenTime ?? 0
+                self.pipelineStart = transcription?.timings?.pipelineStart ?? 0
+                self.currentLag = transcription?.timings?.decodingLoop ?? 0
+            }
         } else {
             // Run realtime transcribe using timestamp tokens directly
             let transcription = try await transcribeAudioSamples(Array(currentBuffer))
@@ -1276,6 +1315,11 @@ struct ContentView: View {
 
     func transcribeEagerMode(_ samples: [Float]) async throws -> TranscriptionResult? {
         guard let whisperKit = whisperKit else { return nil }
+
+        guard whisperKit.textDecoder.supportsWordTimestamps else {
+            confirmedText = "Eager mode requires word timestamps, which are not supported by the current model: \(selectedModel)."
+            return nil
+        }
 
         let languageCode = whisperKit.tokenizer?.languages[selectedLanguage] ?? "en"
         let task: DecodingTask = selectedTask == "transcribe" ? .transcribe : .translate
@@ -1333,10 +1377,10 @@ struct ContentView: View {
         let lastAgreedTokens = lastAgreedWords.flatMap { $0.tokens }
         streamOptions.prefixTokens = lastAgreedTokens
         do {
-            let result: TranscriptionResult? = try await whisperKit.transcribe(audioArray: streamingAudio, decodeOptions: streamOptions, callback: decodingCallback)
+            let transcription: TranscriptionResult? = try await whisperKit.transcribe(audioArray: streamingAudio, decodeOptions: streamOptions, callback: decodingCallback)
             await MainActor.run {
                 var skipAppend = false
-                if let result = result {
+                if let result = transcription {
                     hypothesisWords = result.allWords.filter { $0.start >= lastAgreedSeconds }
 
                     if let prevResult = prevResult {
@@ -1363,7 +1407,7 @@ struct ContentView: View {
                 }
 
                 if !skipAppend {
-                    eagerResults.append(result)
+                    eagerResults.append(transcription)
                 }
             }
         } catch {
