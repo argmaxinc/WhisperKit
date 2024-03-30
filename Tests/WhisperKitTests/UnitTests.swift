@@ -609,13 +609,16 @@ final class UnitTests: XCTestCase {
             await whisperKit.transcribe(audioArray: audioSamples, decodeOptions: options),
             "Failed to transcribe"
         )
+        
         XCTAssertTrue(result.segments.first!.tokens.contains(whisperKit.tokenizer!.specialTokens.noSpeechToken))
     }
 
     func testTemperatureIncrement() async throws {
         let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        
         // Generate random audio samples
-        let audioSamples = (0..<(30 * 16000)).map { _ in Float.random(in: -0.5...0.5) }
+        let audioSamples = (0..<(30 * 16000)).map { _ in Float.random(in: -0.7...0.7) }
+
         // Define options with temperature increment settings
         let initialTemperature: Float = 0
         let temperatureIncrement: Float = 0.1
@@ -624,6 +627,7 @@ final class UnitTests: XCTestCase {
             temperature: initialTemperature,
             temperatureIncrementOnFallback: temperatureIncrement,
             temperatureFallbackCount: fallbackCount,
+            usePrefillPrompt: false,
             logProbThreshold: 0
         )
 
@@ -672,6 +676,37 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(resultSeek.segments.first?.start, seekTime, "Seek segment should have the input start time")
         XCTAssertNotEqual(resultFull.segments.first?.start, resultSeek.segments.first?.start, "Segments should have the different start times")
         XCTAssertEqual(resultFull.segments.first?.end, resultSeek.segments.first?.end, "Segments should have the same end time")
+    }
+
+    func testPromptTokens() async throws {
+        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let promptText = " prompt to encourage output without any punctuation and without capitalizing americans as if it was already normalized"
+        let tokenizer = whisperKit.tokenizer!
+        let promptTokens = tokenizer.encode(text: promptText).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
+        let options = DecodingOptions(skipSpecialTokens: true, promptTokens: promptTokens)
+
+        let result = try await XCTUnwrapAsync(
+            await transcribe(with: .tiny, options: options),
+            "Failed to transcribe"
+        )
+
+        XCTAssertEqual(result.segments.first?.text, " and so my fellow americans ask not what your country can do for you ask what you can do for your country.")
+    }
+
+    func testPrefixTokens() async throws {
+        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        // Prefix to encourage output without any punctuation and without capitalizing americans as if it was already normalized
+        let prefixText = " and so my fellow americans"
+        let tokenizer = whisperKit.tokenizer!
+        let prefixTokens = tokenizer.encode(text: prefixText).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
+        let options = DecodingOptions(skipSpecialTokens: true, prefixTokens: prefixTokens)
+
+        let result = try await XCTUnwrapAsync(
+            await transcribe(with: .tiny, options: options),
+            "Failed to transcribe"
+        )
+
+        XCTAssertEqual(result.segments.first?.text, " and so my fellow americans ask not what your country can do for you ask what you can do for your country.")
     }
 
     // MARK: - Utils Tests
@@ -1155,5 +1190,98 @@ final class UnitTests: XCTestCase {
 
             XCTAssertEqual(wordTiming.end, expectedWordTiming.end, accuracy: 0.5, "End time difference for word '\(wordTiming.word)' should be within +/- 0.1 seconds (expected: \(expectedWordTiming.end), actual: \(wordTiming.end))")
         }
+    }
+
+    // MARK: - Streaming Timestamp Tests
+
+    func testStreamingTimestamps() async throws {
+        let options = DecodingOptions(usePrefillPrompt: true, wordTimestamps: true)
+        let audioFile = "jfk.wav"
+        let modelPath = try tinyModelPath()
+
+        let whisperKit = try await WhisperKit(modelFolder: modelPath,/* computeOptions: computeOptions,*/ verbose: true, logLevel: .debug)
+
+        let startTime = Date()
+        let audioComponents = audioFile.components(separatedBy: ".")
+        guard let audioFileURL = Bundle.module.path(forResource: audioComponents.first, ofType: audioComponents.last) else {
+            XCTFail("Audio file not found")
+            return
+        }
+        guard let audioBuffer = AudioProcessor.loadAudio(fromPath: audioFileURL) else {
+            XCTFail("Failed to load audio buffer")
+            return
+        }
+        let audioArray = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
+
+
+        var results: [TranscriptionResult?] = []
+        var prevResult: TranscriptionResult?
+        var lastAgreedSeconds: Float = 0.0
+        let agreementCountNeeded = 2
+        var hypothesisWords: [WordTiming] = []
+        var prevWords: [WordTiming] = []
+        var lastAgreedWords: [WordTiming] = []
+        var confirmedWords: [WordTiming] = []
+
+        for seekSample in stride(from: 0, to: audioArray.count, by: 32000) {
+            let endSample = min(seekSample + 32000, audioArray.count)
+            Logging.info("[testStreamingTimestamps] \(lastAgreedSeconds)-\(Double(endSample)/16000.0) seconds")
+
+            let simulatedStreamingAudio = Array(audioArray[..<endSample])
+            var streamOptions = options
+            streamOptions.clipTimestamps = [lastAgreedSeconds]
+            let lastAgreedTokens = lastAgreedWords.flatMap { $0.tokens }
+            streamOptions.prefixTokens = lastAgreedTokens
+            do {
+                let result: TranscriptionResult? = try await whisperKit.transcribe(audioArray: simulatedStreamingAudio, decodeOptions: streamOptions)
+                var skipAppend = false
+                if let result = result {
+                    hypothesisWords = result.allWords.filter { $0.start >= lastAgreedSeconds }
+
+                    if let prevResult = prevResult {
+                        prevWords = prevResult.allWords.filter { $0.start >= lastAgreedSeconds }
+                        let commonPrefix = findLongestCommonPrefix(prevWords, hypothesisWords)
+                        Logging.info("[testStreamingTimestamps] Prev \"\((prevWords.map { $0.word }).joined())\"")
+                        Logging.info("[testStreamingTimestamps] Next \"\((hypothesisWords.map { $0.word }).joined())\"")
+                        Logging.info("[testStreamingTimestamps] Found common prefix \"\((commonPrefix.map { $0.word }).joined())\"")
+
+                        if commonPrefix.count >= agreementCountNeeded {
+                            lastAgreedWords = commonPrefix.suffix(agreementCountNeeded)
+                            lastAgreedSeconds = lastAgreedWords.first!.start
+                            Logging.info("[testStreamingTimestamps] Found new last agreed word \"\(lastAgreedWords.first!.word)\" at \(lastAgreedSeconds) seconds")
+
+                            confirmedWords.append(contentsOf: commonPrefix.prefix(commonPrefix.count - agreementCountNeeded))
+                            let currentWords = confirmedWords.map { $0.word }.joined()
+                            Logging.info("[testStreamingTimestamps] Current:  \(lastAgreedSeconds) -> \(Double(endSample)/16000.0) \(currentWords)")
+                        } else {
+                            Logging.info("[testStreamingTimestamps] Using same last agreed time \(lastAgreedSeconds)")
+                            skipAppend = true
+                        }
+
+
+                    }
+                    prevResult = result
+                }
+
+                if !skipAppend {
+                    results.append(result)
+                }
+            } catch {
+                XCTFail(error.localizedDescription)
+            }
+        }
+
+        // Accept the final hypothesis because it is the last of the available audio
+        let final = lastAgreedWords + findLongestDifferentSuffix(prevWords, hypothesisWords)
+        confirmedWords.append(contentsOf: final)
+
+        let finalWords = confirmedWords.map { $0.word }.joined()
+        Logging.info("[testStreamingTimestamps] Current: \(finalWords)")
+        Logging.info("[testStreamingTimestamps] Time taken: \(Date().timeIntervalSince(startTime)) seconds")
+
+        // Perform assertions or further processing with the results array
+        Logging.info("[testStreamingTimestamps] Done")
+
+        XCTAssertEqual(finalWords.normalized, " And so my fellow Americans. Ask not what your country can do for you ask what you can do for your country.".normalized)
     }
 }

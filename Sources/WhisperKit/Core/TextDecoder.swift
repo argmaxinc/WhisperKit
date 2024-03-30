@@ -10,6 +10,7 @@ public protocol TextDecoding {
     var tokenizer: WhisperTokenizer? { get set }
     var prefillData: WhisperMLModel? { get set }
     var isModelMultilingual: Bool { get set }
+    var supportsWordTimestamps: Bool { get }
     var logitsSize: Int? { get }
     var kvCacheEmbedDim: Int? { get }
     var kvCacheMaxSequenceLength: Int? { get }
@@ -128,26 +129,42 @@ public extension TextDecoding {
         var taskToken: Int = tokenizer.specialTokens.transcribeToken
 
         // Multilingual models require language and task tokens
-        if let options = options, isModelMultilingual {
-            // Set languageToken
-            let languageTokenString = "<|\(options.language ?? "en")|>"
-            languageToken = tokenizer.convertTokenToId(languageTokenString) ?? tokenizer.specialTokens.englishToken
-            prefillTokens.append(languageToken)
+        if let options = options {
+            if isModelMultilingual {
+                // Set languageToken
+                let languageTokenString = "<|\(options.language ?? "en")|>"
+                languageToken = tokenizer.convertTokenToId(languageTokenString) ?? tokenizer.specialTokens.englishToken
+                prefillTokens.append(languageToken)
 
-            // Set taskToken
-            let taskTokenString = "<|\(options.task)|>"
-            taskToken = tokenizer.convertTokenToId(taskTokenString) ?? tokenizer.specialTokens.transcribeToken
-            prefillTokens.append(taskToken)
+                // Set taskToken
+                let taskTokenString = "<|\(options.task)|>"
+                taskToken = tokenizer.convertTokenToId(taskTokenString) ?? tokenizer.specialTokens.transcribeToken
+                prefillTokens.append(taskToken)
+            }
+
+            // withoutTimestamps true in order to disable timestamps
+            let timestampsToken = options.withoutTimestamps ? tokenizer.specialTokens.noTimestampsToken : tokenizer.specialTokens.timeTokenBegin
+            prefillTokens.append(timestampsToken)
+
+            // Add prompt tokens
+            if let promptTokens = options.promptTokens {
+                let maxPromptLen = (WhisperKit.maxTokenContext / 2) - 1
+                let trimmedPromptTokens = Array(promptTokens.suffix(maxPromptLen))
+                prefillTokens = [tokenizer.specialTokens.startOfPreviousToken] + trimmedPromptTokens + prefillTokens
+            }
+
+            // Add prefix tokens
+            if let prefixTokens = options.prefixTokens {
+                let trimmedPrefixTokens = Array(prefixTokens.suffix(WhisperKit.maxTokenContext / 2))
+                prefillTokens.append(contentsOf: trimmedPrefixTokens)
+            }
         }
-
-        let timestampsToken = options?.withoutTimestamps ?? false ? tokenizer.specialTokens.noTimestampsToken : tokenizer.specialTokens.timeTokenBegin // withoutTimestamps must be non-nil and true in order to disable it
-        prefillTokens.append(timestampsToken)
 
         prefilledDecoderInputs.initialPrompt = prefillTokens
 
-        if let options = options,
-           options.usePrefillCache,
-           prefillData != nil
+        if options?.usePrefillCache ?? false,
+           prefillData != nil,
+           options?.promptTokens == nil // TODO: allow prefill cache to be used with prompt tokens, currently breaks if it starts at non-zero index
         {
             // Prefilling kv cache data requires non-nil task and language tokens, set defaults if not provided
             // Task tokens are remapped to 0->transcribe and 1->translate for the prefill lookup table
@@ -166,7 +183,7 @@ public extension TextDecoding {
                                       keySlice: prefilledDecoderInputs.prefillKeyCache,
                                       valueTensor: prefilledDecoderInputs.valueCache,
                                       valueSlice: prefilledDecoderInputs.prefillValueCache,
-                                      insertAtIndex: 0)
+                                      insertAtIndex: prefillTokens.firstIndex(of: tokenizer.specialTokens.startOfTranscriptToken) ?? 0)
             prefilledDecoderInputs.cacheLength[0] = prefilledDecoderInputs.prefillKeyCache.shape[3]
         }
 
@@ -249,6 +266,10 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
     public var tokenizer: WhisperTokenizer?
     public var prefillData: WhisperMLModel?
     public var isModelMultilingual: Bool = false
+
+    public var supportsWordTimestamps: Bool {
+        return getModelOutputDimention(model, named: "alignment_heads_weights", position: 0) != nil
+    }
 
     public var logitsSize: Int? {
         return getModelOutputDimention(model, named: "logits", position: 2)
@@ -427,7 +448,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         let intialPromptIndex = decoderInputs.initialPrompt.count
         var currentTokens: [Int] = decoderInputs.initialPrompt
         var nextToken: Int = decoderInputs.initialPrompt.last!
-        var logProbs: [Float] = Array(repeating: 0, count: prefilledIndex + 1)
+        var logProbs: [Float] = Array(repeating: 0, count: currentTokens.count)
 
         guard let tokenizer else {
             // Tokenizer required for decoding
@@ -468,7 +489,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
 
         // MARK: Main loop
 
-        let loopCount = min(options.sampleLength, WhisperKit.maxTokenContext)
+        let loopCount = min(options.sampleLength, WhisperKit.maxTokenContext - 1)
         Logging.debug("Running main loop for a maximum of \(loopCount) iterations, starting at index \(prefilledIndex)")
         var hasAlignment = false
         var isFirstTokenLogProbTooLow = false
@@ -549,7 +570,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
                 }
             let isSegmentCompleted = 
                 sampleResult.completed ||
-                currentTokens.count >= WhisperKit.maxTokenContext ||
+                currentTokens.count >= WhisperKit.maxTokenContext - 1 ||
                 isFirstTokenLogProbTooLow
 
             if isSegmentCompleted {
@@ -561,6 +582,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
                 if !isPrefill {
                     // Found the next token, store it
                     currentTokens.append(nextToken)
+                    logProbs.append(nextTokenLogProb)
                 }
 
                 // Update KV cache for this token
@@ -635,26 +657,33 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         let finalSamplingResult = tokenSampler.finalize(tokens: currentTokens, logProbs: logProbs)
         let segmentTokens = finalSamplingResult.tokens
         let segmentLogProbs = finalSamplingResult.logProbs
-        let sumLogProbs = segmentLogProbs.reduce(0, +)
-        let avgLogProbs = sumLogProbs / Float(segmentLogProbs.count)
+
+        let startIndex = segmentTokens.firstIndex(of: tokenizer.specialTokens.startOfTranscriptToken) ?? 0
+        let endIndex = segmentTokens.firstIndex(of: tokenizer.specialTokens.endToken) ?? segmentTokens.count
+        let filteredTokens = Array(segmentTokens[startIndex...endIndex])
+        let filteredLogProbs = Array(segmentLogProbs[startIndex...endIndex])
+
+        let sumLogProbs = filteredLogProbs.reduce(0, +)
+        let avgLogProbs = sumLogProbs / Float(filteredLogProbs.count)
 
         var tokenProbs = [[Int: Float]]()
-        for (index, token) in segmentTokens.enumerated() {
-            tokenProbs.append([token: segmentLogProbs[index]])
+        for (index, token) in filteredTokens.enumerated() {
+            tokenProbs.append([token: filteredLogProbs[index]])
         }
 
-        let wordTokens = segmentTokens.filter { $0 < tokenizer.specialTokens.specialTokenBegin }
+        let wordTokens = filteredTokens.filter { $0 < tokenizer.specialTokens.specialTokenBegin }
         let compressionRatio = compressionRatio(of: wordTokens)
 
         var temperature = options.temperature
         if let sampler = tokenSampler as? GreedyTokenSampler {
             // Convert Float16 temperature to Float with 3 decimal places
-            temperature = round(Float(sampler.temperature) * 1000) / 1000
+            temperature = Float(sampler.temperature).rounded(3)
         }
+
         let noSpeechProb: Float = 0 // TODO: implement no speech prob
 
-        let transcript = tokenizer.decode(tokens: segmentTokens)
-        
+        let transcript = tokenizer.decode(tokens: filteredTokens)
+
         let decodingFallback = DecodingFallback(
             options: options,
             isFirstTokenLogProbTooLow: isFirstTokenLogProbTooLow,
@@ -666,7 +695,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         let decodingResult = DecodingResult(
             language: options.language ?? "en",
             languageProbs: [options.language ?? "en": 1.0],
-            tokens: segmentTokens,
+            tokens: filteredTokens,
             tokenLogProbs: tokenProbs,
             text: transcript,
             avgLogProb: avgLogProbs,
@@ -677,6 +706,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             timings: timings,
             fallback: decodingFallback
         )
+
         return [decodingResult]
     }
 
@@ -689,12 +719,13 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
                 decoderInputs.inputIds[0].floatValue
             )
         )
-        Logging.debug("Key Cache | Val Cache | Update Mask | Decoder Mask | Position")
+        Logging.debug("Key Cache | Val Cache | Align Cache | Update Mask | Decoder Mask | Position")
 
-        for i in 0..<prefillSize + 4 {
-            let formattedString = String(format: "%9.6f | %9.6f | %11.0f | %12.0f | %d",
+        for i in 0..<min(prefillSize + 4, WhisperKit.maxTokenContext) {
+            let formattedString = String(format: "%9.6f | %9.6f | %9.6f | %11.0f | %12.0f | %d",
                                          decoderInputs.keyCache[i].floatValue,
                                          decoderInputs.valueCache[i].floatValue,
+                                         decoderInputs.alignmentWeights[i*1500].floatValue,
                                          decoderInputs.kvCacheUpdateMask[i].floatValue,
                                          decoderInputs.decoderKeyPaddingMask[i].floatValue,
                                          i)

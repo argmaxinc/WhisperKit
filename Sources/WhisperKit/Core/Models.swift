@@ -152,7 +152,7 @@ public struct ModelComputeOptions {
         self.prefillCompute = prefillCompute
         self.textDecoderCompute = textDecoderCompute
 
-        if #available(macOS 14.0, iOS 17.0, watchOS 10, visionOS 1, *) {
+        if #available(macOS 14.0, iOS 17.0, watchOS 10, *) {
             self.audioEncoderCompute = audioEncoderCompute ?? .cpuAndNeuralEngine
         } else {
             self.audioEncoderCompute = audioEncoderCompute ?? .cpuAndGPU
@@ -213,7 +213,11 @@ public struct DecodingCache {
 ///   - usePrefillCache: If true, the kv cache will be prefilled based on the prefill data mlmodel.
 ///   - skipSpecialTokens: Whether to skip special tokens in the output.
 ///   - withoutTimestamps: Whether to include timestamps in the transcription result.
+///   - wordTimestamps: Whether to include word-level timestamps in the transcription result.
 ///   - maxInitialTimestamp: Maximal initial timestamp.
+///   - clipTimestamps: Array of timestamps (in seconds) to split the audio into segments for transcription.
+///   - promptTokens: Array of token IDs to use as the conditioning prompt for the decoder. These are prepended to the prefill tokens.
+///   - prefixTokens: Array of token IDs to use as the initial prefix for the decoder. These are appended to the prefill tokens.
 ///   - suppressBlank: If true, blank tokens will be suppressed during decoding.
 ///   - supressTokens: List of token IDs to suppress during decoding.
 ///   - compressionRatioThreshold: If the compression ratio of the transcription text is above this value, it is too repetitive and treated as failed.
@@ -238,6 +242,8 @@ public struct DecodingOptions {
     public var wordTimestamps: Bool
     public var maxInitialTimestamp: Float?
     public var clipTimestamps: [Float]
+    public var promptTokens: [Int]?
+    public var prefixTokens: [Int]?
     public var suppressBlank: Bool
     public var supressTokens: [Int]
     public var compressionRatioThreshold: Float?
@@ -260,6 +266,8 @@ public struct DecodingOptions {
                 wordTimestamps: Bool = false,
                 maxInitialTimestamp: Float? = nil,
                 clipTimestamps: [Float] = [],
+                promptTokens: [Int]? = nil,
+                prefixTokens: [Int]? = nil,
                 suppressBlank: Bool = false,
                 supressTokens: [Int]? = nil,
                 compressionRatioThreshold: Float? = 2.4,
@@ -282,6 +290,8 @@ public struct DecodingOptions {
         self.wordTimestamps = wordTimestamps
         self.maxInitialTimestamp = maxInitialTimestamp
         self.clipTimestamps = clipTimestamps
+        self.promptTokens = promptTokens
+        self.prefixTokens = prefixTokens
         self.suppressBlank = suppressBlank
         self.supressTokens = supressTokens ?? [] // nonSpeechTokens() // TODO: implement these as default
         self.compressionRatioThreshold = compressionRatioThreshold
@@ -400,19 +410,25 @@ public struct TranscriptionResult: Codable {
     public var timings: TranscriptionTimings?
 }
 
+public extension TranscriptionResult {
+    var allWords: [WordTiming] {
+        return segments.compactMap { $0.words }.flatMap { $0 }
+    }
+}
+
 public struct TranscriptionSegment: Hashable, Codable {
-    public var id: Int
-    public var seek: Int
-    public var start: Float
-    public var end: Float
-    public var text: String
-    public var tokens: [Int]
-    public var tokenLogProbs: [[Int: Float]]
-    public var temperature: Float
-    public var avgLogprob: Float
-    public var compressionRatio: Float
-    public var noSpeechProb: Float
-    public var words: [WordTiming]?
+    public var id: Int = 0
+    public var seek: Int = 0
+    public var start: Float = 0.0
+    public var end: Float = 0.0
+    public var text: String = ""
+    public var tokens: [Int] = []
+    public var tokenLogProbs: [[Int: Float]] = [[:]]
+    public var temperature: Float = 1.0
+    public var avgLogprob: Float = 0.0
+    public var compressionRatio: Float = 1.0
+    public var noSpeechProb: Float = 0.0
+    public var words: [WordTiming]? = nil
 }
 
 public struct WordTiming: Hashable, Codable {
@@ -889,6 +905,7 @@ public struct SpecialTokens {
     public let noSpeechToken: Int
     public let noTimestampsToken: Int
     public let specialTokenBegin: Int
+    public let startOfPreviousToken: Int
     public let startOfTranscriptToken: Int
     public let timeTokenBegin: Int
     public let transcribeToken: Int
@@ -901,6 +918,7 @@ public struct SpecialTokens {
         noSpeechToken: Int,
         noTimestampsToken: Int,
         specialTokenBegin: Int,
+        startOfPreviousToken: Int,
         startOfTranscriptToken: Int,
         timeTokenBegin: Int,
         transcribeToken: Int,
@@ -912,6 +930,7 @@ public struct SpecialTokens {
         self.noSpeechToken = noSpeechToken
         self.noTimestampsToken = noTimestampsToken
         self.specialTokenBegin = specialTokenBegin
+        self.startOfPreviousToken = startOfPreviousToken
         self.startOfTranscriptToken = startOfTranscriptToken
         self.timeTokenBegin = timeTokenBegin
         self.transcribeToken = transcribeToken
@@ -938,6 +957,7 @@ struct WhisperTokenizerWrapper: WhisperTokenizer {
             noSpeechToken: tokenizer.convertTokenToId("<|nospeech|>") ?? Self.defaultNoSpeechToken,
             noTimestampsToken: tokenizer.convertTokenToId("<|notimestamps|>") ?? Self.defaultNoTimestampsToken,
             specialTokenBegin: tokenizer.convertTokenToId("<|endoftext|>") ?? Self.defaultSpecialTokenBegin,
+            startOfPreviousToken: tokenizer.convertTokenToId("<|startofprev|>") ?? Self.defaultStartOfPreviousToken,
             startOfTranscriptToken: tokenizer.convertTokenToId("<|startoftranscript|>") ?? Self.defaultStartOfTranscriptToken,
             timeTokenBegin: tokenizer.convertTokenToId("<|0.00|>") ?? Self.defaultTimeTokenBegin,
             transcribeToken: tokenizer.convertTokenToId("<|transcribe|>") ?? Self.defaultTranscribeToken,
@@ -1200,6 +1220,7 @@ extension WhisperTokenizerWrapper {
     static var defaultWhitespaceToken: Int { 220 }
     static var defaultSpecialTokenBegin: Int { 50257 }
     static var defaultEndToken: Int { 50257 }
+    static var defaultStartOfPreviousToken: Int { 50361 }
     static var defaultStartOfTranscriptToken: Int { 50258 }
     static var defaultEnglishToken: Int { 50259 }
     static var defaultTranscribeToken: Int { 50359 }

@@ -215,6 +215,7 @@ public class WhisperKit: Transcriber {
                     callback(progress)
                 }
             }
+            
             let modelFolderName = modelFolder.appending(path: variantPath)
             return modelFolderName
         } catch {
@@ -476,8 +477,7 @@ public class WhisperKit: Transcriber {
         let prefillTime = CFAbsoluteTimeGetCurrent() - prefillStartTime
         timings.prefill = prefillTime
 
-        // Add initial prompt to history
-        let currentTokens = decoderInputs.initialPrompt
+
 
         // Setup masks based on prefill values
         prefilledCacheSize += 1 // Add 1 for initial masked cache update
@@ -486,10 +486,8 @@ public class WhisperKit: Transcriber {
             decoderInputs.decoderKeyPaddingMask[i] = 0.0
         }
 
-        allTokens.append(contentsOf: currentTokens)
-
         Logging.debug("Prefill time: \(prefillTime)")
-        Logging.debug("Prefill prompt: \(currentTokens.map { tokenizer.convertIdToToken($0) ?? "" })")
+        Logging.debug("Prefill prompt: \(decoderInputs.initialPrompt.map { tokenizer.convertIdToToken($0) ?? "" })")
 
         // MARK: - Main decoder loop
 

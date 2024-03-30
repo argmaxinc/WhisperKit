@@ -64,6 +64,12 @@ struct CLIArguments: ParsableArguments {
     @Flag(help: "Add timestamps for each word in the output")
     var wordTimestamps: Bool = false
 
+    @Option(help: "Force prefix text when decoding")
+    var prefix: String?
+
+    @Option(help: "Condition on this text when decoding")
+    var prompt: String?
+
     @Argument(help: "Supress given tokens in the output")
     var supressTokens: [Int] = []
 
@@ -87,4 +93,7 @@ struct CLIArguments: ParsableArguments {
 
     @Flag(help: "Process audio directly from the microphone")
     var stream: Bool = false
+
+    @Flag(help: "Simulate streaming transcription using the input audio file")
+    var streamSimulated: Bool = false
 }
