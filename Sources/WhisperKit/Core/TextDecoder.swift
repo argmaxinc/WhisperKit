@@ -10,6 +10,7 @@ public protocol TextDecoding {
     var tokenizer: WhisperTokenizer? { get set }
     var prefillData: WhisperMLModel? { get set }
     var isModelMultilingual: Bool { get set }
+    var supportsWordTimestamps: Bool { get }
     var logitsSize: Int? { get }
     var kvCacheEmbedDim: Int? { get }
     var kvCacheMaxSequenceLength: Int? { get }
@@ -265,6 +266,10 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
     public var tokenizer: WhisperTokenizer?
     public var prefillData: WhisperMLModel?
     public var isModelMultilingual: Bool = false
+
+    public var supportsWordTimestamps: Bool {
+        return getModelOutputDimention(model, named: "alignment_heads_weights", position: 0) != nil
+    }
 
     public var logitsSize: Int? {
         return getModelOutputDimention(model, named: "logits", position: 2)
