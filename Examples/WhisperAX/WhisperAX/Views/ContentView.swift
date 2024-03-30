@@ -1335,7 +1335,8 @@ struct ContentView: View {
             usePrefillCache: enableCachePrefill,
             skipSpecialTokens: !enableSpecialCharacters,
             withoutTimestamps: !enableTimestamps,
-            wordTimestamps: true // required for eager mode
+            wordTimestamps: true, // required for eager mode
+            firstTokenLogProbThreshold: -1.5 // higher threshold to prevent fallbacks from running to often
         )
 
         // Early stopping checks

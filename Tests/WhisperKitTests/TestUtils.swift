@@ -205,24 +205,6 @@ extension XCTestCase {
     }
 }
 
-extension String {
-    var normalized: String {
-        // Trim whitespace and newlines
-        let trimmedString = self.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // Convert to lowercase
-        let lowercaseString = trimmedString.lowercased()
-
-        // Remove punctuation
-        let noPunctuationString = lowercaseString.components(separatedBy: .punctuationCharacters).joined()
-
-        // Replace multiple spaces with a single space
-        let singleSpacedString = noPunctuationString.replacingOccurrences(of: " +", with: " ", options: .regularExpression)
-
-        return singleSpacedString
-    }
-}
-
 extension SpecialTokens {
     static func `default`(
         endToken: Int = 0,

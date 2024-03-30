@@ -104,6 +104,24 @@ extension Float {
     }
 }
 
+extension String {
+    var normalized: String {
+        // Trim whitespace and newlines
+        let trimmedString = self.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Convert to lowercase
+        let lowercaseString = trimmedString.lowercased()
+
+        // Remove punctuation
+        let noPunctuationString = lowercaseString.components(separatedBy: .punctuationCharacters).joined()
+
+        // Replace multiple spaces with a single space
+        let singleSpacedString = noPunctuationString.replacingOccurrences(of: " +", with: " ", options: .regularExpression)
+
+        return singleSpacedString
+    }
+}
+
 // MARK: - Helpers
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
@@ -361,7 +379,7 @@ public func formatSegments(_ segments: [TranscriptionSegment], withTimestamps: B
 }
 
 public func findLongestCommonPrefix(_ words1: [WordTiming], _ words2: [WordTiming]) -> [WordTiming] {
-    let commonPrefix = zip(words1, words2).prefix(while: { $0.word == $1.word })
+    let commonPrefix = zip(words1, words2).prefix(while: { $0.word.normalized == $1.word.normalized })
     return commonPrefix.map { $0.1 }
 }
 
