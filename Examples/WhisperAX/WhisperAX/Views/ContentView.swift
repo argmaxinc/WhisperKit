@@ -57,10 +57,13 @@ struct ContentView: View {
     @State private var isFilePickerPresented = false
     @State private var firstTokenTime: TimeInterval = 0
     @State private var pipelineStart: TimeInterval = 0
-    @State private var realTimeFactor: TimeInterval = 0
+    @State private var effectiveRealTimeFactor: TimeInterval = 0
+    @State private var totalInferenceTime: TimeInterval = 0
     @State private var tokensPerSecond: TimeInterval = 0
     @State private var currentLag: TimeInterval = 0
     @State private var currentFallbacks: Int = 0
+    @State private var currentEncodingLoops: Int = 0
+    @State private var currentDecodingLoops: Int = 0
     @State private var lastBufferSize: Int = 0
     @State private var lastConfirmedSegmentEndSeconds: Float = 0
     @State private var requiredSegmentsForConfirmation: Int = 4
@@ -110,10 +113,13 @@ struct ContentView: View {
 
         firstTokenTime = 0
         pipelineStart = 0
-        realTimeFactor = 0
+        effectiveRealTimeFactor = 0
+        totalInferenceTime = 0
         tokensPerSecond = 0
         currentLag = 0
         currentFallbacks = 0
+        currentEncodingLoops = 0
+        currentDecodingLoops = 0
         lastBufferSize = 0
         lastConfirmedSegmentEndSeconds = 0
         requiredSegmentsForConfirmation = 2
@@ -225,6 +231,7 @@ struct ContentView: View {
                                 .foregroundColor(.secondary)
                                 .multilineTextAlignment(.leading)
                                 .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.top)
                         }
                     } else {
                         ForEach(Array(confirmedSegments.enumerated()), id: \.element) { _, segment in
@@ -240,20 +247,23 @@ struct ContentView: View {
                             let timestampText = enableTimestamps ? "[\(String(format: "%.2f", segment.start)) --> \(String(format: "%.2f", segment.end))]" : ""
                             Text(timestampText + segment.text)
                                 .font(.headline)
-                                .fontWeight(.light)
+                                .fontWeight(.bold)
+                                .foregroundColor(.gray)
                                 .multilineTextAlignment(.leading)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        Text("\(unconfirmedText.joined(separator: "\n"))")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.leading)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Text("\(currentText)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.leading)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if enableDecoderPreview {
+                            Text("\(unconfirmedText.joined(separator: "\n"))")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.leading)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            Text("\(currentText)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.leading)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
                 }
             }
@@ -552,6 +562,14 @@ struct ContentView: View {
                                 .disabled(modelState != .loaded)
                                 .frame(minWidth: 0, maxWidth: .infinity)
 
+                                VStack {
+                                    Text("Encoder runs: \(currentEncodingLoops)")
+                                        .font(.caption)
+                                    Text("Decoder runs: \(currentDecodingLoops)")
+                                        .font(.caption)
+                                }
+                                .offset(x: -120, y: 0)
+
                                 if isRecording {
                                     Text("\(String(format: "%.1f", bufferSeconds)) s")
                                         .font(.caption)
@@ -602,7 +620,7 @@ struct ContentView: View {
             .padding(.top)
 
             HStack {
-                Text(realTimeFactor.formatted(.number.precision(.fractionLength(3))) + " RTF")
+                Text(effectiveRealTimeFactor.formatted(.number.precision(.fractionLength(3))) + " RTF")
                     .font(.system(.body))
                     .lineLimit(1)
                 Spacer()
@@ -1104,7 +1122,8 @@ struct ContentView: View {
             }
 
             self.tokensPerSecond = transcription?.timings?.tokensPerSecond ?? 0
-            self.realTimeFactor = transcription?.timings?.realTimeFactor ?? 0
+            self.effectiveRealTimeFactor = transcription?.timings?.realTimeFactor ?? 0
+            self.currentEncodingLoops = Int(transcription?.timings?.totalEncodingRuns ?? 0)
             self.firstTokenTime = transcription?.timings?.firstTokenTime ?? 0
             self.pipelineStart = transcription?.timings?.pipelineStart ?? 0
             self.currentLag = transcription?.timings?.decodingLoop ?? 0
@@ -1147,6 +1166,7 @@ struct ContentView: View {
                 }
                 self.currentText = progress.text
                 self.currentFallbacks = fallbacks
+                self.currentDecodingLoops += 1
             }
             // Check early stopping
             let currentTokens = progress.tokens
@@ -1261,10 +1281,14 @@ struct ContentView: View {
             let transcription = try await transcribeEagerMode(Array(currentBuffer))
             await MainActor.run {
                 self.tokensPerSecond = transcription?.timings?.tokensPerSecond ?? 0
-                self.realTimeFactor = transcription?.timings?.realTimeFactor ?? 0
                 self.firstTokenTime = transcription?.timings?.firstTokenTime ?? 0
                 self.pipelineStart = transcription?.timings?.pipelineStart ?? 0
                 self.currentLag = transcription?.timings?.decodingLoop ?? 0
+                self.currentEncodingLoops = Int(transcription?.timings?.totalEncodingRuns ?? 0)
+
+                let totalAudio = Double(currentBuffer.count) / Double(WhisperKit.sampleRate)
+                self.totalInferenceTime = transcription?.timings?.fullPipeline ?? 0
+                self.effectiveRealTimeFactor = Double(totalInferenceTime) / totalAudio
             }
         } else {
             // Run realtime transcribe using timestamp tokens directly
@@ -1279,10 +1303,14 @@ struct ContentView: View {
                 }
 
                 self.tokensPerSecond = transcription?.timings?.tokensPerSecond ?? 0
-                self.realTimeFactor = transcription?.timings?.realTimeFactor ?? 0
                 self.firstTokenTime = transcription?.timings?.firstTokenTime ?? 0
                 self.pipelineStart = transcription?.timings?.pipelineStart ?? 0
                 self.currentLag = transcription?.timings?.decodingLoop ?? 0
+                self.currentEncodingLoops += Int(transcription?.timings?.totalEncodingRuns ?? 0)
+
+                let totalAudio = Double(currentBuffer.count) / Double(WhisperKit.sampleRate)
+                self.totalInferenceTime += transcription?.timings?.fullPipeline ?? 0
+                self.effectiveRealTimeFactor = Double(totalInferenceTime) / totalAudio
 
                 // Logic for moving segments to confirmedSegments
                 if segments.count > requiredSegmentsForConfirmation {
@@ -1352,6 +1380,7 @@ struct ContentView: View {
                 }
                 self.currentText = progress.text
                 self.currentFallbacks = fallbacks
+                self.currentDecodingLoops += 1
             }
             // Check early stopping
             let currentTokens = progress.tokens
