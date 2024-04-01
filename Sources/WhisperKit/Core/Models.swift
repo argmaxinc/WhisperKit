@@ -272,7 +272,7 @@ public struct DecodingOptions {
                 supressTokens: [Int]? = nil,
                 compressionRatioThreshold: Float? = 2.4,
                 logProbThreshold: Float? = -1.0,
-                firstTokenLogProbThreshold: Float? = -0.7,
+                firstTokenLogProbThreshold: Float? = -1.5,
                 noSpeechThreshold: Float? = 0.6)
     {
         self.verbose = verbose
