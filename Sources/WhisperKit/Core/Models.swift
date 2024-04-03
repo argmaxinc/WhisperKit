@@ -250,6 +250,7 @@ public struct DecodingOptions {
     public var logProbThreshold: Float?
     public var firstTokenLogProbThreshold: Float?
     public var noSpeechThreshold: Float?
+    public var concurrentWorkerCount: Int
 
     public init(verbose: Bool = false,
                 task: DecodingTask = .transcribe,
@@ -273,7 +274,8 @@ public struct DecodingOptions {
                 compressionRatioThreshold: Float? = 2.4,
                 logProbThreshold: Float? = -1.0,
                 firstTokenLogProbThreshold: Float? = -1.5,
-                noSpeechThreshold: Float? = 0.6)
+                noSpeechThreshold: Float? = 0.6,
+                concurrentWorkerCount: Int = 0)
     {
         self.verbose = verbose
         self.task = task
@@ -298,6 +300,7 @@ public struct DecodingOptions {
         self.logProbThreshold = logProbThreshold
         self.firstTokenLogProbThreshold = firstTokenLogProbThreshold
         self.noSpeechThreshold = noSpeechThreshold
+        self.concurrentWorkerCount = concurrentWorkerCount
     }
 }
 

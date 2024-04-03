@@ -8,15 +8,23 @@ import Foundation
 import Hub
 import TensorUtils
 import Tokenizers
+import OSLog
+
+private let logger = Logger(
+    subsystem: "com.argmax.whisperkit.WhisperAX",
+    category: "WhisperKit"
+)
+private let signposter = OSSignposter(logger: logger)
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public protocol Transcriber {
+    func transcribe(audioPaths: [String], decodeOptions: DecodingOptions?, callback: TranscriptionCallback) async -> [String: Result<TranscriptionResult, Swift.Error>]
     func transcribe(audioPath: String, decodeOptions: DecodingOptions?, callback: TranscriptionCallback) async throws -> TranscriptionResult?
     func transcribe(audioArray: [Float], decodeOptions: DecodingOptions?, callback: TranscriptionCallback) async throws -> TranscriptionResult?
 }
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-public class WhisperKit: Transcriber {
+public actor WhisperKit: Transcriber {
     /// Models
     public var modelVariant: ModelVariant = .tiny
     public var modelState: ModelState = .unloaded
@@ -44,7 +52,7 @@ public class WhisperKit: Transcriber {
     public var melOutput: MLMultiArray?
     public var encoderOutput: MLMultiArray?
     public var decoderInputs: DecodingInputs?
-    public var currentTimings: TranscriptionTimings?
+    public var currentTimings: TranscriptionTimings
 
     /// State
     public let progress = Progress()
@@ -328,7 +336,7 @@ public class WhisperKit: Transcriber {
 
         if prewarmMode {
             modelState = .prewarmed
-            currentTimings?.modelLoading = CFAbsoluteTimeGetCurrent() - modelLoadStart
+            currentTimings.modelLoading = CFAbsoluteTimeGetCurrent() - modelLoadStart
             return
         }
 
@@ -350,7 +358,7 @@ public class WhisperKit: Transcriber {
 
         modelState = .loaded
 
-        currentTimings?.modelLoading = CFAbsoluteTimeGetCurrent() - modelLoadStart
+        currentTimings.modelLoading = CFAbsoluteTimeGetCurrent() - modelLoadStart
 
         Logging.info("Loaded models for whisper size: \(modelVariant)")
     }
@@ -371,11 +379,11 @@ public class WhisperKit: Transcriber {
 
     public func clearState() {
         audioProcessor.stopRecording()
-        currentTimings = nil
+        currentTimings = TranscriptionTimings()
     }
 
     deinit {
-        clearState()
+        audioProcessor.stopRecording()
     }
 
     /// Pass in your own logging callback here
@@ -385,18 +393,50 @@ public class WhisperKit: Transcriber {
 
     // MARK: - Transcribe audio file
 
-    public func transcribe(audioPath: String,
-                           decodeOptions: DecodingOptions? = nil,
-                           callback: TranscriptionCallback = nil) async throws -> TranscriptionResult?
-    {
-        if currentTimings == nil {
-            currentTimings = TranscriptionTimings()
+    public func transcribe(
+        audioPaths: [String],
+        decodeOptions: DecodingOptions? = nil,
+        callback: TranscriptionCallback = nil
+    ) async -> [String: Result<TranscriptionResult, Swift.Error>] {
+        var result = [String: Result<TranscriptionResult, Swift.Error>]()
+        let concurrentWorkerCount = decodeOptions?.concurrentWorkerCount ?? 0
+        let chunkedAudioPaths = concurrentWorkerCount == 0 ? [audioPaths] : audioPaths.chunked(into: concurrentWorkerCount)
+        for audioPathGroup in chunkedAudioPaths {
+            let partialResult = await withTaskGroup(of: [String: Result<TranscriptionResult, Swift.Error>].self) { taskGroup in
+                for audioPath in audioPathGroup {
+                    taskGroup.addTask { [weak self] in
+                        do {
+                            guard let transcribeResult = try await self?.transcribe(audioPath: audioPath, decodeOptions: decodeOptions, callback: callback) else {
+                                return [:]
+                            }
+                            return [audioPath: .success(transcribeResult)]
+                        } catch {
+                            return [audioPath: .failure(error)]
+                        }
+                    }
+                }
+                var batchResult = [String: Result<TranscriptionResult, Swift.Error>]()
+                for await result in taskGroup {
+                    batchResult.merge(result) { $1 }
+                }
+                return batchResult
+            }
+            result.merge(partialResult) { $1 }
         }
+        return result
+    }
+
+    public func transcribe(
+        audioPath: String,
+        decodeOptions: DecodingOptions? = nil,
+        callback: TranscriptionCallback = nil
+    ) async throws -> TranscriptionResult? {
+        currentTimings = TranscriptionTimings()
 
         // Process input audio file into audio samples
         let loadAudioStart = Date()
         guard let audioBuffer = AudioProcessor.loadAudio(fromPath: audioPath) else {
-            return TranscriptionResult(text: "", segments: [], language: "")
+            return nil
         }
         let loadTime = Date().timeIntervalSince(loadAudioStart)
 
@@ -404,7 +444,7 @@ public class WhisperKit: Transcriber {
         let audioArray = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
         let convertTime = Date().timeIntervalSince(convertAudioStart)
 
-        currentTimings?.audioLoading = loadTime + convertTime
+        currentTimings.audioLoading = loadTime + convertTime
         Logging.debug("Audio loading time: \(loadTime)")
         Logging.debug("Audio convert time: \(convertTime)")
 
@@ -418,20 +458,23 @@ public class WhisperKit: Transcriber {
 
     // MARK: - Transcribe audio samples
 
-    public func transcribe(audioArray: [Float],
-                           decodeOptions: DecodingOptions? = nil,
-                           callback: TranscriptionCallback = nil) async throws -> TranscriptionResult?
-    {
+    public func transcribe(
+        audioArray: [Float],
+        decodeOptions: DecodingOptions? = nil,
+        callback: TranscriptionCallback = nil
+    ) async throws -> TranscriptionResult? {
         progress.completedUnitCount = 0
-        if currentTimings == nil {
-            currentTimings = TranscriptionTimings()
-        }
+        currentTimings = TranscriptionTimings()
 
         if self.modelState != .loaded {
             try await loadModels()
         }
 
-        var timings = currentTimings!
+        let signpostId = signposter.makeSignpostID()
+        let interval = signposter.beginInterval("TranscribeAudio", id: signpostId)
+        defer { signposter.endInterval("TranscribeAudio", interval) }
+
+        var timings = currentTimings
         timings.pipelineStart = CFAbsoluteTimeGetCurrent()
 
         var options = decodeOptions ?? DecodingOptions()
@@ -655,6 +698,10 @@ public class WhisperKit: Transcriber {
             decodingOptions options: DecodingOptions,
             callback: TranscriptionCallback = nil
         ) async throws -> DecodingResult? {
+            let signpostId = signposter.makeSignpostID()
+            let interval = signposter.beginInterval("Decode", id: signpostId)
+            defer { signposter.endInterval("Decode", interval) }
+
             // Fallback `options.temperatureFallbackCount` times with increasing temperatures, starting at `options.temperature`
             let temperatures = (0...options.temperatureFallbackCount).map { FloatType(options.temperature) + FloatType($0) * FloatType(options.temperatureIncrementOnFallback) }
 

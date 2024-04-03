@@ -26,9 +26,11 @@ struct Transcribe: AsyncParsableCommand {
     }
 
     private func transcribe() async throws {
-        let resolvedAudioPath = resolveAbsolutePath(cliArguments.audioPath)
-        guard FileManager.default.fileExists(atPath: resolvedAudioPath) else {
-            throw CocoaError.error(.fileNoSuchFile)
+        let resolvedAudioPaths = cliArguments.audioPath.map { resolveAbsolutePath($0) }
+        for resolvedAudioPath in resolvedAudioPaths {
+            guard FileManager.default.fileExists(atPath: resolvedAudioPath) else {
+                throw CocoaError.error(.fileNoSuchFile)
+            }
         }
 
         let task: DecodingTask
@@ -50,20 +52,27 @@ struct Transcribe: AsyncParsableCommand {
         }
 
         var options = decodingOptions(task: task)
-        if let promptText = cliArguments.prompt, let tokenizer = whisperKit.tokenizer  {
+        if let promptText = cliArguments.prompt, let tokenizer = await whisperKit.tokenizer  {
             options.promptTokens = tokenizer.encode(text: " " + promptText.trimmingCharacters(in: .whitespaces)).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
         }
 
-        if let prefixText = cliArguments.prefix, let tokenizer = whisperKit.tokenizer {
+        if let prefixText = cliArguments.prefix, let tokenizer = await whisperKit.tokenizer {
             options.prefixTokens = tokenizer.encode(text: " " + prefixText.trimmingCharacters(in: .whitespaces)).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
         }
 
-        let transcribeResult = try await whisperKit.transcribe(
-            audioPath: resolvedAudioPath,
+        let transcribeResult = await whisperKit.transcribe(
+            audioPaths: resolvedAudioPaths,
             decodeOptions: options
         )
 
-        processTranscriptionResult(transcribeResult)
+        for (audioPath, result) in transcribeResult {
+            switch result {
+            case .success(let transcribeResult):
+                processTranscriptionResult(audioPath: audioPath, transcribeResult: transcribeResult)
+            case .failure(let error):
+                print("Error when transcribing \(audioPath): \(error)")
+            }
+        }
     }
 
     private func transcribeStream() async throws {
@@ -80,7 +89,7 @@ struct Transcribe: AsyncParsableCommand {
 
         let decodingOptions = decodingOptions(task: .transcribe)
 
-        let audioStreamTranscriber = AudioStreamTranscriber(
+        let audioStreamTranscriber = await AudioStreamTranscriber(
             audioProcessor: whisperKit.audioProcessor,
             transcriber: whisperKit,
             decodingOptions: decodingOptions
@@ -106,13 +115,16 @@ struct Transcribe: AsyncParsableCommand {
     }
 
     private func transcribeStreamSimulated() async throws {
-        let resolvedAudioPath = resolveAbsolutePath(cliArguments.audioPath)
+        guard let audioPath = cliArguments.audioPath.first else {
+            throw CocoaError.error(.fileNoSuchFile)
+        }
+        let resolvedAudioPath = resolveAbsolutePath(audioPath)
         guard FileManager.default.fileExists(atPath: resolvedAudioPath) else {
             throw CocoaError.error(.fileNoSuchFile)
         }
 
         if cliArguments.verbose {
-            print("Task: simulated stream transcription, using audio file at \(cliArguments.audioPath)")
+            print("Task: simulated stream transcription, using audio file at \(audioPath)")
             print("Initializing models...")
         }
 
@@ -206,7 +218,7 @@ struct Transcribe: AsyncParsableCommand {
 
         let mergedResult = mergeTranscriptionResults(results, confirmedWords: confirmedWords)
 
-        processTranscriptionResult(mergedResult)
+        processTranscriptionResult(audioPath: audioPath, transcribeResult: mergedResult)
     }
 
     private func setupWhisperKit() async throws -> WhisperKit {
@@ -277,15 +289,19 @@ struct Transcribe: AsyncParsableCommand {
             compressionRatioThreshold: cliArguments.compressionRatioThreshold ?? 2.4,
             logProbThreshold: cliArguments.logprobThreshold ?? -1.0,
             firstTokenLogProbThreshold: cliArguments.firstTokenLogProbThreshold,
-            noSpeechThreshold: cliArguments.noSpeechThreshold ?? 0.6
+            noSpeechThreshold: cliArguments.noSpeechThreshold ?? 0.6,
+            concurrentWorkerCount: cliArguments.concurrentWorkerCount
         )
     }
 
-    private func processTranscriptionResult(_ transcribeResult: TranscriptionResult?) {
+    private func processTranscriptionResult(
+        audioPath: String,
+        transcribeResult: TranscriptionResult?
+    ) {
         let transcription = transcribeResult?.text ?? "Transcription failed"
 
         if cliArguments.report, let result = transcribeResult {
-            let audioFileName = URL(fileURLWithPath: cliArguments.audioPath).lastPathComponent.components(separatedBy: ".").first!
+            let audioFileName = URL(fileURLWithPath: audioPath).lastPathComponent.components(separatedBy: ".").first!
 
             // Write SRT (SubRip Subtitle Format) for the transcription
             let srtReportWriter = WriteSRT(outputDir: cliArguments.reportPath)

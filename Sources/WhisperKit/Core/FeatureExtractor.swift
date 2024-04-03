@@ -6,6 +6,13 @@ import AVFoundation
 import CoreGraphics
 import CoreML
 import Foundation
+import OSLog
+
+private let logger = Logger(
+    subsystem: "com.argmax.whisperkit.WhisperAX",
+    category: "FeatureExtractor"
+)
+private let signposter = OSSignposter(logger: logger)
 
 public protocol FeatureExtracting {
     var melCount: Int? { get }
@@ -27,20 +34,18 @@ open class FeatureExtractor: FeatureExtracting, WhisperMLModel {
     }
 
     public func logMelSpectrogram(fromAudio inputAudio: MLMultiArray) async throws -> MLMultiArray? {
-        let modelInputs = MelSpectrogramInput(audio: inputAudio)
-
-        guard let model = model else {
-            return nil
+        guard let model else {
+            throw WhisperError.modelsUnavailable()
         }
-
         try Task.checkCancellation()
 
+        let signpostId = signposter.makeSignpostID()
+        let interval = signposter.beginInterval("ExtractAudioFeatures", id: signpostId)
+        defer { signposter.endInterval("ExtractAudioFeatures", interval) }
+
+        let modelInputs = MelSpectrogramInput(audio: inputAudio)
         let outputFeatures = try await model.asyncPrediction(from: modelInputs, options: MLPredictionOptions())
-
         let output = MelSpectrogramOutput(features: outputFeatures)
-
-        let encodedFeatures = output.melspectrogramFeatures
-
-        return encodedFeatures
+        return output.melspectrogramFeatures
     }
 }

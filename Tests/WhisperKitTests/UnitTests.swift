@@ -609,8 +609,10 @@ final class UnitTests: XCTestCase {
             await whisperKit.transcribe(audioArray: audioSamples, decodeOptions: options),
             "Failed to transcribe"
         )
-        
-        XCTAssertTrue(result.segments.first!.tokens.contains(whisperKit.tokenizer!.specialTokens.noSpeechToken))
+
+        let tokenizer = try await XCTUnwrapAsync(await whisperKit.tokenizer)
+
+        XCTAssertTrue(result.segments.first!.tokens.contains(tokenizer.specialTokens.noSpeechToken))
     }
 
     func testTemperatureIncrement() async throws {
@@ -681,7 +683,7 @@ final class UnitTests: XCTestCase {
     func testPromptTokens() async throws {
         let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
         let promptText = " prompt to encourage output without any punctuation and without capitalizing americans as if it was already normalized"
-        let tokenizer = whisperKit.tokenizer!
+        let tokenizer = try await XCTUnwrapAsync(await whisperKit.tokenizer)
         let promptTokens = tokenizer.encode(text: promptText).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
         let options = DecodingOptions(skipSpecialTokens: true, promptTokens: promptTokens)
 
@@ -697,7 +699,7 @@ final class UnitTests: XCTestCase {
         let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
         // Prefix to encourage output without any punctuation and without capitalizing americans as if it was already normalized
         let prefixText = " and so my fellow americans"
-        let tokenizer = whisperKit.tokenizer!
+        let tokenizer = try await XCTUnwrapAsync(await whisperKit.tokenizer)
         let prefixTokens = tokenizer.encode(text: prefixText).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
         let options = DecodingOptions(skipSpecialTokens: true, prefixTokens: prefixTokens)
 

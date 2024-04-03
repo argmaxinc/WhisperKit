@@ -2,6 +2,13 @@
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
 import CoreML
+import OSLog
+
+private let logger = Logger(
+    subsystem: "com.argmax.whisperkit.WhisperAX",
+    category: "AudioEncoding"
+)
+private let signposter = OSSignposter(logger: logger)
 
 /// AudioEncoding protocol defines the requirements for an audio encoding implementation.
 public protocol AudioEncoding {
@@ -38,20 +45,18 @@ public class AudioEncoder: AudioEncoding, WhisperMLModel {
 
     public func encodeFeatures(_ features: MLMultiArray) async throws -> MLMultiArray? {
         // Make sure features is shape MultiArray (Float32 1 × {80,128} × 3000)
-        let modelInputs = AudioEncoderInput(melspectrogram_features: features)
-
-        guard let model = model else {
+        guard let model else {
             throw WhisperError.modelsUnavailable()
         }
-
         try Task.checkCancellation()
 
+        let signpostId = signposter.makeSignpostID()
+        let interval = signposter.beginInterval("EncodeAudio", id: signpostId)
+        defer { signposter.endInterval("EncodeAudio", interval) }
+
+        let modelInputs = AudioEncoderInput(melspectrogram_features: features)
         let outputFeatures = try await model.asyncPrediction(from: modelInputs, options: MLPredictionOptions())
-
         let output = AudioEncoderOutput(features: outputFeatures)
-
-        let encodedFeatures = output.encoder_output_embeds
-
-        return encodedFeatures
+        return output.encoder_output_embeds
     }
 }
