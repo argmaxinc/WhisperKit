@@ -138,13 +138,13 @@ func memoryFootprint() -> UInt64 {
     return usedMB
 }
 
-func writeToFile(text: String) throws {
+func writeToFile(text: String, append: Bool = false, fileName: String) throws {
     // File URL where you want to write the output
-    var fileURL = URL(fileURLWithPath: "./output.json")
+    var fileURL = URL(fileURLWithPath: "./\(fileName)")
     var dataToWrite = text.data(using: .utf8)
     if FileManager.default.fileExists(atPath: fileURL.path) {
         if let fileHandle = try? FileHandle(forWritingTo: fileURL) {
-//            fileHandle.seekToEndOfFile()
+            if append{fileHandle.seekToEndOfFile()}
             if let data = dataToWrite{
                 fileHandle.write(data)
             }

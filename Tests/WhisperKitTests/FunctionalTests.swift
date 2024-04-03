@@ -219,7 +219,7 @@ final class FunctionalTests: XCTestCase {
         memoryStats.preTranscribeMemory = Float(preTranscribeMemory)
         memoryStats.postTranscribeMemory = Float(memoryFootprint())
         let testInfo = TestInfo(
-            device: ProcessInfo.processInfo.hostName,
+            device: WhisperKit.deviceName(),
             audioFile: audioFilePath,
             model: "tiny",
             date: startTime.formatted(Date.ISO8601FormatStyle().dateSeparator(.dash)),
@@ -227,7 +227,7 @@ final class FunctionalTests: XCTestCase {
         )
         let json = RegressionStats(testInfo: testInfo, memoryStats: memoryStats, latencyStats: latencyStats)
         do{
-            try writeToFile(text: json.jsonData().prettyPrintedJSONString as! String)
+            try writeToFile(text: json.jsonData().prettyPrintedJSONString as! String, fileName: "output.json")
         }
         catch{
             XCTFail("Failed with error: \(error)")
