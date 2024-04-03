@@ -1040,4 +1040,18 @@ final class UnitTests: XCTestCase {
             XCTAssertEqual(wordTiming.end, expectedWordTiming.end, accuracy: 0.5, "End time difference for word '\(wordTiming.word)' should be within +/- 0.1 seconds (expected: \(expectedWordTiming.end), actual: \(wordTiming.end))")
         }
     }
+    
+    func testWERCalculations(){
+        let hypothesis = ["hello world", "good night moon"]
+        let references = ["hello world", "good night moon"]
+        XCTAssertEqual(process_words(reference: references, hypothesis: hypothesis), 0.0)
+        
+        let hypothesis1 = ["this is the prediction", "there is an other sample"]
+        let references1 = ["this is the reference", "there is another one"]
+        XCTAssertEqual(process_words(reference: references1, hypothesis: hypothesis1), 0.5)
+        
+        let hypothesis2 = ["hello world", "good night moon"]
+        let references2 = ["hi everyone", "have a great day"]
+        XCTAssertEqual(process_words(reference: references2, hypothesis: hypothesis2), 1.0)
+    }
 }
