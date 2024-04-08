@@ -11,7 +11,7 @@ import Tokenizers
 import OSLog
 
 private let logger = Logger(
-    subsystem: "com.argmax.whisperkit.WhisperAX",
+    subsystem: Constants.Logging.subsystem,
     category: "WhisperKit"
 )
 private let signposter = OSSignposter(logger: logger)
@@ -19,6 +19,7 @@ private let signposter = OSSignposter(logger: logger)
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public protocol Transcriber {
     func transcribe(audioPaths: [String], decodeOptions: DecodingOptions?, callback: TranscriptionCallback) async -> [String: Result<TranscriptionResult, Swift.Error>]
+    func transcribe(audioArrays: [[Float]], decodeOptions: DecodingOptions?, callback: TranscriptionCallback) async -> [Result<TranscriptionResult, Swift.Error>]
     func transcribe(audioPath: String, decodeOptions: DecodingOptions?, callback: TranscriptionCallback) async throws -> TranscriptionResult?
     func transcribe(audioArray: [Float], decodeOptions: DecodingOptions?, callback: TranscriptionCallback) async throws -> TranscriptionResult?
 }
@@ -401,9 +402,9 @@ public actor WhisperKit: Transcriber {
         var result = [String: Result<TranscriptionResult, Swift.Error>]()
         let concurrentWorkerCount = decodeOptions?.concurrentWorkerCount ?? 0
         let chunkedAudioPaths = concurrentWorkerCount == 0 ? [audioPaths] : audioPaths.chunked(into: concurrentWorkerCount)
-        for audioPathGroup in chunkedAudioPaths {
+        for chunkedAudioPath in chunkedAudioPaths {
             let partialResult = await withTaskGroup(of: [String: Result<TranscriptionResult, Swift.Error>].self) { taskGroup in
-                for audioPath in audioPathGroup {
+                for audioPath in chunkedAudioPath {
                     taskGroup.addTask { [weak self] in
                         do {
                             guard let transcribeResult = try await self?.transcribe(audioPath: audioPath, decodeOptions: decodeOptions, callback: callback) else {
@@ -422,6 +423,40 @@ public actor WhisperKit: Transcriber {
                 return batchResult
             }
             result.merge(partialResult) { $1 }
+        }
+        return result
+    }
+
+    public func transcribe(
+        audioArrays: [[Float]],
+        decodeOptions: DecodingOptions? = nil,
+        callback: TranscriptionCallback = nil
+    ) async -> [Result<TranscriptionResult, Swift.Error>] {
+        var result = [Result<TranscriptionResult, Swift.Error>]()
+        let concurrentWorkerCount = decodeOptions?.concurrentWorkerCount ?? 0
+        let chunkedAudioArrays = concurrentWorkerCount == 0 ? [audioArrays] : audioArrays.chunked(into: concurrentWorkerCount)
+        for chunkedAudioArray in chunkedAudioArrays {
+            let partialResult = await withTaskGroup(of: [(index: Int, result: Result<TranscriptionResult, Swift.Error>)].self) { taskGroup -> [Result<TranscriptionResult, Swift.Error>] in
+                for (index, audioArray) in chunkedAudioArray.enumerated() {
+                    taskGroup.addTask { [weak self] in
+                        do {
+                            guard let transcribeResult = try await self?.transcribe(audioArray: audioArray, decodeOptions: decodeOptions, callback: callback) else {
+                                return []
+                            }
+                            return [(index: index, result: .success(transcribeResult))]
+                        } catch {
+                            return [(index: index, result: .failure(error))]
+                        }
+                    }
+                }
+                var batchResult = [(index: Int, result: Result<TranscriptionResult, Swift.Error>)]()
+                for await result in taskGroup {
+                    batchResult.append(contentsOf: result)
+                }
+                batchResult.sort(by: { $0.index < $1.index })
+                return batchResult.map { $0.result }
+            }
+            result.append(contentsOf: partialResult)
         }
         return result
     }

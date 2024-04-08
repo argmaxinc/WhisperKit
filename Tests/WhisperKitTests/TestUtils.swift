@@ -234,3 +234,20 @@ extension SpecialTokens {
         )
     }
 }
+
+extension Result {
+    var isSuccess: Bool {
+        switch self {
+        case .success:
+            return true
+        case .failure:
+            return false
+        }
+    }
+}
+
+extension Result where Success == TranscriptionResult {
+    func normalizedText(prefix: Int) throws -> String {
+        try get().text.normalized.split(separator: " ").prefix(prefix).joined(separator: " ")
+    }
+}

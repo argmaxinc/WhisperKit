@@ -732,6 +732,17 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(logits4.data(for: 2), [0.1, 0.2, -.infinity, -.infinity, -.infinity, 0.6, 0.7])
     }
 
+    func testChunkedArray() {
+        XCTAssertEqual([Int]().chunked(into: 1), [])
+        XCTAssertEqual([1, 2, 3, 4].chunked(into: 1), [[1], [2], [3], [4]])
+
+        XCTAssertEqual([Int]().chunked(into: 10), [])
+        XCTAssertEqual([1, 2, 3, 4].chunked(into: 10), [[1, 2, 3, 4]])
+
+        XCTAssertEqual([Int]().chunked(into: 3), [])
+        XCTAssertEqual([1, 2, 3, 4].chunked(into: 3), [[1, 2, 3], [4]])
+    }
+
     // MARK: - LogitsFilter Tests
 
     func testSuppressTokensFilter() throws {

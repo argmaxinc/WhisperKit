@@ -9,7 +9,7 @@ import Foundation
 import OSLog
 
 private let logger = Logger(
-    subsystem: "com.argmax.whisperkit.WhisperAX",
+    subsystem: Constants.Logging.subsystem,
     category: "FeatureExtractor"
 )
 private let signposter = OSSignposter(logger: logger)

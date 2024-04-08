@@ -566,3 +566,10 @@ public class Logging {
         }
     }
 }
+
+
+enum Constants {
+    enum Logging {
+        static let subsystem = "com.argmax.whisperkit.Whisper"
+    }
+}
