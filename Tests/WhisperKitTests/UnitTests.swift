@@ -34,10 +34,10 @@ final class UnitTests: XCTestCase {
             Bundle.module.path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
-        let audioBuffer = AudioProcessor.loadAudio(fromPath: audioFilePath)
+        let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
         XCTAssertNotNil(audioBuffer, "Failed to load audio file at path: \(audioFilePath)")
-        XCTAssertEqual(audioBuffer!.format.sampleRate, 16000)
-        XCTAssertEqual(audioBuffer!.format.channelCount, 1)
+        XCTAssertEqual(audioBuffer.format.sampleRate, 16000)
+        XCTAssertEqual(audioBuffer.format.channelCount, 1)
     }
 
     func testAudioPad() {
@@ -368,11 +368,7 @@ final class UnitTests: XCTestCase {
             Bundle.module.path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
-        let audioBuffer = try XCTUnwrap(
-            AudioProcessor.loadAudio(fromPath: audioFilePath),
-            "Failed to load audio buffer"
-        )
-
+        let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
         let audioSamples = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
         let silence = [Float](repeating: 0.0, count: 30 * 16000)
         let multiWindowSamples = audioSamples + silence + audioSamples
@@ -610,7 +606,7 @@ final class UnitTests: XCTestCase {
             "Failed to transcribe"
         )
 
-        let tokenizer = try await XCTUnwrapAsync(await whisperKit.tokenizer)
+        let tokenizer = try XCTUnwrap(whisperKit.tokenizer)
 
         XCTAssertTrue(result.segments.first!.tokens.contains(tokenizer.specialTokens.noSpeechToken))
     }
@@ -683,7 +679,7 @@ final class UnitTests: XCTestCase {
     func testPromptTokens() async throws {
         let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
         let promptText = " prompt to encourage output without any punctuation and without capitalizing americans as if it was already normalized"
-        let tokenizer = try await XCTUnwrapAsync(await whisperKit.tokenizer)
+        let tokenizer = try XCTUnwrap(whisperKit.tokenizer)
         let promptTokens = tokenizer.encode(text: promptText).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
         let options = DecodingOptions(skipSpecialTokens: true, promptTokens: promptTokens)
 
@@ -699,7 +695,7 @@ final class UnitTests: XCTestCase {
         let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
         // Prefix to encourage output without any punctuation and without capitalizing americans as if it was already normalized
         let prefixText = " and so my fellow americans"
-        let tokenizer = try await XCTUnwrapAsync(await whisperKit.tokenizer)
+        let tokenizer = try XCTUnwrap(whisperKit.tokenizer)
         let prefixTokens = tokenizer.encode(text: prefixText).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
         let options = DecodingOptions(skipSpecialTokens: true, prefixTokens: prefixTokens)
 
@@ -1220,10 +1216,7 @@ final class UnitTests: XCTestCase {
             XCTFail("Audio file not found")
             return
         }
-        guard let audioBuffer = AudioProcessor.loadAudio(fromPath: audioFileURL) else {
-            XCTFail("Failed to load audio buffer")
-            return
-        }
+        let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFileURL)
         let audioArray = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
 
 

@@ -52,11 +52,11 @@ struct Transcribe: AsyncParsableCommand {
         }
 
         var options = decodingOptions(task: task)
-        if let promptText = cliArguments.prompt, let tokenizer = await whisperKit.tokenizer  {
+        if let promptText = cliArguments.prompt, let tokenizer = whisperKit.tokenizer  {
             options.promptTokens = tokenizer.encode(text: " " + promptText.trimmingCharacters(in: .whitespaces)).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
         }
 
-        if let prefixText = cliArguments.prefix, let tokenizer = await whisperKit.tokenizer {
+        if let prefixText = cliArguments.prefix, let tokenizer = whisperKit.tokenizer {
             options.prefixTokens = tokenizer.encode(text: " " + prefixText.trimmingCharacters(in: .whitespaces)).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
         }
 
@@ -65,7 +65,7 @@ struct Transcribe: AsyncParsableCommand {
             decodeOptions: options
         )
 
-        for (audioPath, result) in transcribeResult {
+        for (audioPath, result) in zip(resolvedAudioPaths, transcribeResult) {
             switch result {
             case .success(let transcribeResult):
                 processTranscriptionResult(audioPath: audioPath, transcribeResult: transcribeResult)
@@ -89,9 +89,9 @@ struct Transcribe: AsyncParsableCommand {
 
         let decodingOptions = decodingOptions(task: .transcribe)
 
-        let audioStreamTranscriber = await AudioStreamTranscriber(
+        let audioStreamTranscriber = AudioStreamTranscriber(
             audioProcessor: whisperKit.audioProcessor,
-            transcriber: whisperKit,
+            transcribe: whisperKit.transcribe,
             decodingOptions: decodingOptions
         ) { oldState, newState in
             guard oldState.currentText != newState.currentText ||
@@ -134,11 +134,7 @@ struct Transcribe: AsyncParsableCommand {
             print("Models initialized")
         }
 
-        guard let audioBuffer = AudioProcessor.loadAudio(fromPath: resolvedAudioPath) else {
-            print("Failed to load audio buffer")
-            return
-        }
-
+        let audioBuffer = try AudioProcessor.loadAudio(fromPath: resolvedAudioPath)
         let audioArray = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
 
         var results: [TranscriptionResult?] = []

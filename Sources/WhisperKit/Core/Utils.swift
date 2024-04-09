@@ -6,6 +6,7 @@ import CoreML
 import Foundation
 import Hub
 import Tokenizers
+import os.signpost
 #if canImport(UIKit)
 import UIKit
 #elseif canImport(AppKit)
@@ -96,7 +97,6 @@ public extension WhisperKit {
     }
 }
 
-
 extension Float {
     func rounded(_ decimalPlaces: Int) -> Float {
         let divisor = pow(10.0, Float(decimalPlaces))
@@ -119,14 +119,6 @@ extension String {
         let singleSpacedString = noPunctuationString.replacingOccurrences(of: " +", with: " ", options: .regularExpression)
 
         return singleSpacedString
-    }
-}
-
-extension Array {
-    func chunked(into size: Int) -> [[Element]] {
-        return stride(from: 0, to: count, by: size).map {
-            Array(self[$0 ..< Swift.min($0 + size, count)])
-        }
     }
 }
 
@@ -567,9 +559,20 @@ public class Logging {
     }
 }
 
+extension Logging {
+    static func beginSignpost(
+        _ intervalName: StaticString,
+        signposter: OSSignposter
+    ) -> OSSignpostIntervalState {
+        let signpostId = signposter.makeSignpostID()
+        return signposter.beginInterval(intervalName, id: signpostId)
+    }
 
-enum Constants {
-    enum Logging {
-        static let subsystem = "com.argmax.whisperkit.Whisper"
+    static func endSignpost(
+        _ intervalName: StaticString,
+        interval: OSSignpostIntervalState,
+        signposter: OSSignposter
+    ) {
+        signposter.endInterval(intervalName, interval)
     }
 }

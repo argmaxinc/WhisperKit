@@ -50,9 +50,8 @@ public class AudioEncoder: AudioEncoding, WhisperMLModel {
         }
         try Task.checkCancellation()
 
-        let signpostId = signposter.makeSignpostID()
-        let interval = signposter.beginInterval("EncodeAudio", id: signpostId)
-        defer { signposter.endInterval("EncodeAudio", interval) }
+        let interval = Logging.beginSignpost("EncodeAudio", signposter: signposter)
+        defer { Logging.endSignpost("EncodeAudio", interval: interval, signposter: signposter) }
 
         let modelInputs = AudioEncoderInput(melspectrogram_features: features)
         let outputFeatures = try await model.asyncPrediction(from: modelInputs, options: MLPredictionOptions())

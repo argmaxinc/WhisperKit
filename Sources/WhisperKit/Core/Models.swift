@@ -373,13 +373,14 @@ public struct DecodingResult {
     }
 }
 
-enum WhisperError: Error, LocalizedError {
+enum WhisperError: Error, LocalizedError, Equatable {
     case tokenizerUnavailable(String = "Tokenizer is unavailable")
     case modelsUnavailable(String = "Models are unavailable")
     case prefillFailed(String = "Prefill failed")
     case audioProcessingFailed(String = "Audio processing failed")
     case decodingLogitsFailed(String = "Unable to decode logits from the model output")
     case segmentingFailed(String = "Creating segments failed")
+    case loadAudioFailed(String = "Load audio failed")
 
     var errorDescription: String? {
         switch self {
@@ -399,6 +400,9 @@ enum WhisperError: Error, LocalizedError {
                 Logging.error(message)
                 return message
             case let .segmentingFailed(message):
+                Logging.error(message)
+                return message
+            case let .loadAudioFailed(message):
                 Logging.error(message)
                 return message
         }
@@ -1231,4 +1235,22 @@ extension WhisperTokenizerWrapper {
     static var defaultNoSpeechToken: Int { 50362 }
     static var defaultNoTimestampsToken: Int { 50363 }
     static var defaultTimeTokenBegin: Int { 50364 }
+}
+
+// MARK: - Constants
+
+enum Constants {
+    enum Logging {
+        static let subsystem = "com.argmax.whisperkit.Whisper"
+    }
+}
+
+// MARK: - Extensions
+
+extension Array {
+    func chunked(into size: Int) -> [[Element]] {
+        return stride(from: 0, to: count, by: size).map {
+            Array(self[$0 ..< Swift.min($0 + size, count)])
+        }
+    }
 }

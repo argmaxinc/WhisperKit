@@ -21,6 +21,9 @@ public extension AudioStreamTranscriber {
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public typealias AudioStreamTranscriberCallback = (AudioStreamTranscriber.State, AudioStreamTranscriber.State) -> Void
 
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
+public typealias AudioStreamTranscribe = ([Float], DecodingOptions?, TranscriptionCallback) async throws -> TranscriptionResult?
+
 /// Responsible for streaming audio from the microphone, processing it, and transcribing it in real-time.
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public actor AudioStreamTranscriber {
@@ -37,12 +40,12 @@ public actor AudioStreamTranscriber {
     private let silenceThreshold: Float
     private let compressionCheckWindow: Int
     private let audioProcessor: any AudioProcessing
-    private let transcriber: any Transcriber
+    private let transcribe: AudioStreamTranscribe
     private let decodingOptions: DecodingOptions
 
     public init(
         audioProcessor: any AudioProcessing,
-        transcriber: any Transcriber,
+        transcribe: @escaping AudioStreamTranscribe,
         decodingOptions: DecodingOptions,
         requiredSegmentsForConfirmation: Int = 2,
         silenceThreshold: Float = 0.3,
@@ -51,7 +54,7 @@ public actor AudioStreamTranscriber {
         stateChangeCallback: AudioStreamTranscriberCallback?
     ) {
         self.audioProcessor = audioProcessor
-        self.transcriber = transcriber
+        self.transcribe = transcribe
         self.decodingOptions = decodingOptions
         self.requiredSegmentsForConfirmation = requiredSegmentsForConfirmation
         self.silenceThreshold = silenceThreshold
@@ -198,7 +201,7 @@ public actor AudioStreamTranscriber {
         var options = decodingOptions
         options.clipTimestamps = [state.lastConfirmedSegmentEndSeconds]
         let checkWindow = compressionCheckWindow
-        return try await transcriber.transcribe(audioArray: samples, decodeOptions: options) { [weak self] progress in
+        return try await transcribe(samples, options) { [weak self] progress in
             Task { [weak self] in
                 await self?.onProgressCallback(progress)
             }

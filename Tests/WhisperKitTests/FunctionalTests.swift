@@ -159,18 +159,48 @@ final class FunctionalTests: XCTestCase {
         )
 
         XCTAssertEqual(transcriptionResults.count, 3)
-        XCTAssertTrue(transcriptionResults.allSatisfy { $0.value.isSuccess })
+        XCTAssertTrue(transcriptionResults.allSatisfy { $0.isSuccess })
         XCTAssertEqual(
-            try transcriptionResults[audioPaths[0]]?.normalizedText(prefix: 5),
+            try transcriptionResults[0].normalizedText(prefix: 5),
             "and so my fellow americans"
         )
         XCTAssertEqual(
-            try transcriptionResults[audioPaths[1]]?.normalizedText(prefix: 2),
+            try transcriptionResults[1].normalizedText(prefix: 2),
             "this is"
         )
         XCTAssertEqual(
-            try transcriptionResults[audioPaths[2]]?.normalizedText(prefix: 1),
+            try transcriptionResults[2].normalizedText(prefix: 1),
             "tokyo"
+        )
+    }
+
+    func testBatchTranscribeAudioPathsWithErrors() async throws {
+        let audioPaths = [
+            "/path/to/file1.wav",
+            try XCTUnwrap(
+                Bundle.module.path(forResource: "jfk", ofType: "wav"),
+                "Audio file not found"
+            ),
+            "/path/to/file2.wav"
+        ]
+        let whisperKit = try await WhisperKit(modelFolder: try tinyModelPath())
+        let transcriptionResults = try await XCTUnwrapAsync(
+            await whisperKit.transcribe(audioPaths: audioPaths),
+            "Transcription failed"
+        )
+
+        XCTAssertEqual(transcriptionResults.count, 3)
+        XCTAssertEqual(
+            transcriptionResults[0].whisperError(),
+            .loadAudioFailed("Resource path does not exist /path/to/file1.wav")
+        )
+        XCTAssertEqual(
+            try transcriptionResults[1].normalizedText(prefix: 5),
+            "and so my fellow americans"
+        )
+        XCTAssertEqual(
+            transcriptionResults[2].whisperError(),
+            .loadAudioFailed("Resource path does not exist /path/to/file2.wav")
         )
     }
 
@@ -189,8 +219,8 @@ final class FunctionalTests: XCTestCase {
                 "Audio file not found"
             )
         ]
-        let audioArrays = audioPaths
-            .compactMap { AudioProcessor.loadAudio(fromPath: $0) }
+        let audioArrays = try audioPaths
+            .map { try AudioProcessor.loadAudio(fromPath: $0) }
             .map { AudioProcessor.convertBufferToArray(buffer: $0) }
 
         let whisperKit = try await WhisperKit(modelFolder: try tinyModelPath())

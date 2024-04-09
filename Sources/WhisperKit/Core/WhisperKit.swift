@@ -17,15 +17,7 @@ private let logger = Logger(
 private let signposter = OSSignposter(logger: logger)
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-public protocol Transcriber {
-    func transcribe(audioPaths: [String], decodeOptions: DecodingOptions?, callback: TranscriptionCallback) async -> [String: Result<TranscriptionResult, Swift.Error>]
-    func transcribe(audioArrays: [[Float]], decodeOptions: DecodingOptions?, callback: TranscriptionCallback) async -> [Result<TranscriptionResult, Swift.Error>]
-    func transcribe(audioPath: String, decodeOptions: DecodingOptions?, callback: TranscriptionCallback) async throws -> TranscriptionResult?
-    func transcribe(audioArray: [Float], decodeOptions: DecodingOptions?, callback: TranscriptionCallback) async throws -> TranscriptionResult?
-}
-
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-public actor WhisperKit: Transcriber {
+open class WhisperKit {
     /// Models
     public var modelVariant: ModelVariant = .tiny
     public var modelState: ModelState = .unloaded
@@ -392,40 +384,34 @@ public actor WhisperKit: Transcriber {
         Logging.shared.loggingCallback = callback
     }
 
-    // MARK: - Transcribe audio file
+    // MARK: - Transcribe multiple audio files
 
     public func transcribe(
         audioPaths: [String],
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
-    ) async -> [String: Result<TranscriptionResult, Swift.Error>] {
-        var result = [String: Result<TranscriptionResult, Swift.Error>]()
-        let concurrentWorkerCount = decodeOptions?.concurrentWorkerCount ?? 0
-        let chunkedAudioPaths = concurrentWorkerCount == 0 ? [audioPaths] : audioPaths.chunked(into: concurrentWorkerCount)
-        for chunkedAudioPath in chunkedAudioPaths {
-            let partialResult = await withTaskGroup(of: [String: Result<TranscriptionResult, Swift.Error>].self) { taskGroup in
-                for audioPath in chunkedAudioPath {
-                    taskGroup.addTask { [weak self] in
-                        do {
-                            guard let transcribeResult = try await self?.transcribe(audioPath: audioPath, decodeOptions: decodeOptions, callback: callback) else {
-                                return [:]
-                            }
-                            return [audioPath: .success(transcribeResult)]
-                        } catch {
-                            return [audioPath: .failure(error)]
-                        }
-                    }
-                }
-                var batchResult = [String: Result<TranscriptionResult, Swift.Error>]()
-                for await result in taskGroup {
-                    batchResult.merge(result) { $1 }
-                }
-                return batchResult
+    ) async -> [Result<TranscriptionResult, Swift.Error>] {
+        let loadedAudioResult = await AudioProcessor.loadAudio(at: audioPaths)
+        let transcribeResult = await transcribe(
+            audioArrays: loadedAudioResult.compactMap { try? $0.get() },
+            decodeOptions: decodeOptions,
+            callback: callback
+        )
+        var result = [Result<TranscriptionResult, Swift.Error>]()
+        var transcribeResultIndex = 0
+        for audioResult in loadedAudioResult {
+            switch audioResult {
+            case .success:
+                result.append(transcribeResult[transcribeResultIndex])
+                transcribeResultIndex += 1
+            case .failure(let error):
+                result.append(.failure(error))
             }
-            result.merge(partialResult) { $1 }
         }
         return result
     }
+
+    // MARK: - Transcribe multiple audio samples
 
     public func transcribe(
         audioArrays: [[Float]],
@@ -461,6 +447,8 @@ public actor WhisperKit: Transcriber {
         return result
     }
 
+    // MARK: - Transcribe audio file
+
     public func transcribe(
         audioPath: String,
         decodeOptions: DecodingOptions? = nil,
@@ -470,9 +458,7 @@ public actor WhisperKit: Transcriber {
 
         // Process input audio file into audio samples
         let loadAudioStart = Date()
-        guard let audioBuffer = AudioProcessor.loadAudio(fromPath: audioPath) else {
-            return nil
-        }
+        let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioPath)
         let loadTime = Date().timeIntervalSince(loadAudioStart)
 
         let convertAudioStart = Date()
@@ -505,9 +491,8 @@ public actor WhisperKit: Transcriber {
             try await loadModels()
         }
 
-        let signpostId = signposter.makeSignpostID()
-        let interval = signposter.beginInterval("TranscribeAudio", id: signpostId)
-        defer { signposter.endInterval("TranscribeAudio", interval) }
+        let interval = Logging.beginSignpost("TranscribeAudio", signposter: signposter)
+        defer { Logging.endSignpost("TranscribeAudio", interval: interval, signposter: signposter) }
 
         var timings = currentTimings
         timings.pipelineStart = CFAbsoluteTimeGetCurrent()
@@ -733,9 +718,8 @@ public actor WhisperKit: Transcriber {
             decodingOptions options: DecodingOptions,
             callback: TranscriptionCallback = nil
         ) async throws -> DecodingResult? {
-            let signpostId = signposter.makeSignpostID()
-            let interval = signposter.beginInterval("Decode", id: signpostId)
-            defer { signposter.endInterval("Decode", interval) }
+            let interval = Logging.beginSignpost("Decode", signposter: signposter)
+            defer { Logging.endSignpost("Decode", interval: interval, signposter: signposter) }
 
             // Fallback `options.temperatureFallbackCount` times with increasing temperatures, starting at `options.temperature`
             let temperatures = (0...options.temperatureFallbackCount).map { FloatType(options.temperature) + FloatType($0) * FloatType(options.temperatureIncrementOnFallback) }

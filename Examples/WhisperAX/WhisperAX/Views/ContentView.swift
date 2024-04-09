@@ -1107,10 +1107,7 @@ struct ContentView: View {
     // MARK: - Transcribe Logic
 
     func transcribeCurrentFile(path: String) async throws {
-        guard let audioFileBuffer = AudioProcessor.loadAudio(fromPath: path) else {
-            return
-        }
-
+        let audioFileBuffer = try AudioProcessor.loadAudio(fromPath: path)
         let audioFileSamples = AudioProcessor.convertBufferToArray(buffer: audioFileBuffer)
         let transcription = try await transcribeAudioSamples(audioFileSamples)
 

@@ -39,9 +39,8 @@ open class FeatureExtractor: FeatureExtracting, WhisperMLModel {
         }
         try Task.checkCancellation()
 
-        let signpostId = signposter.makeSignpostID()
-        let interval = signposter.beginInterval("ExtractAudioFeatures", id: signpostId)
-        defer { signposter.endInterval("ExtractAudioFeatures", interval) }
+        let interval = Logging.beginSignpost("ExtractAudioFeatures", signposter: signposter)
+        defer { Logging.endSignpost("ExtractAudioFeatures", interval: interval, signposter: signposter) }
 
         let modelInputs = MelSpectrogramInput(audio: inputAudio)
         let outputFeatures = try await model.asyncPrediction(from: modelInputs, options: MLPredictionOptions())

@@ -244,6 +244,15 @@ extension Result {
             return false
         }
     }
+
+    func whisperError() -> WhisperError? {
+        switch self {
+        case .success:
+            return nil
+        case .failure(let error):
+            return error as? WhisperError
+        }
+    }
 }
 
 extension Result where Success == TranscriptionResult {
