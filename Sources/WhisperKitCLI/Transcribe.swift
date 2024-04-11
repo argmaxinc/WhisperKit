@@ -82,6 +82,9 @@ struct Transcribe: AsyncParsableCommand {
         }
 
         let whisperKit = try await setupWhisperKit()
+        guard let tokenizer = whisperKit.tokenizer else {
+            throw WhisperError.tokenizerUnavailable()
+        }
 
         if cliArguments.verbose {
             print("Models initialized")
@@ -90,8 +93,13 @@ struct Transcribe: AsyncParsableCommand {
         let decodingOptions = decodingOptions(task: .transcribe)
 
         let audioStreamTranscriber = AudioStreamTranscriber(
+            maxTokenContext: WhisperKit.maxTokenContext,
+            audioEncoder: whisperKit.audioEncoder,
+            featureExtractor: whisperKit.featureExtractor,
+            segmentSeeker: whisperKit.segmentSeeker,
+            textDecoder: whisperKit.textDecoder,
+            tokenizer: tokenizer,
             audioProcessor: whisperKit.audioProcessor,
-            transcribe: whisperKit.transcribe,
             decodingOptions: decodingOptions
         ) { oldState, newState in
             guard oldState.currentText != newState.currentText ||
