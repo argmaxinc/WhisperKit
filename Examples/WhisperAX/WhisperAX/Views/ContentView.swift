@@ -1069,9 +1069,7 @@ struct ContentView: View {
 
                 // There is no built-in microphone
                 if deviceId == nil {
-                    let error = WhisperError.microphoneUnavailable()
-                    Logging.error(error)
-                    throw error
+                   throw WhisperError.microphoneUnavailable()
                 }
                 #endif
 
