@@ -1066,8 +1066,8 @@ struct ContentView: View {
                    let device = devices.first(where: {$0.name == selectedAudioInput}) {
                     deviceId = device.id
                 }
-                // There is no built-in microphone for mac mini / studio
-                // Or use AVCaptureDevice.DiscoverySession to do more checks
+
+                // There is no built-in microphone
                 if deviceId == nil {
                     let error = WhisperError.microphoneUnavailable()
                     print(error)
