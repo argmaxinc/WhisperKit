@@ -583,12 +583,12 @@ final class UnitTests: XCTestCase {
         // To detect language only, set `sampleLength` to 1 and no prefill prompt
         let optionsDetectOnly = DecodingOptions(task: .transcribe, temperatureFallbackCount: 0, sampleLength: 1, detectLanguage: true)
 
-        let resultNoPrefill = try await XCTUnwrapAsync(
+        let result = try await XCTUnwrapAsync(
             await whisperKit.transcribe(audioPath: audioFilePath, decodeOptions: optionsDetectOnly),
             "Failed to transcribe"
         )
 
-        XCTAssertEqual(resultNoPrefill.language, targetLanguage)
+        XCTAssertEqual(result.language, targetLanguage)
     }
 
     func testDetectJapaneseOptions() async throws {
