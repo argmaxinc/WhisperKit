@@ -477,8 +477,6 @@ public class WhisperKit: Transcriber {
         let prefillTime = CFAbsoluteTimeGetCurrent() - prefillStartTime
         timings.prefill = prefillTime
 
-
-
         // Setup masks based on prefill values
         prefilledCacheSize += 1 // Add 1 for initial masked cache update
         decoderInputs.kvCacheUpdateMask[prefilledCacheSize - 1] = 1.0
@@ -543,6 +541,7 @@ public class WhisperKit: Transcriber {
                     Logging.error("Mel output is nil")
                     return nil
                 }
+                self.melOutput = melOutput
                 let melTime = Date().timeIntervalSince(melStart)
                 timings.logmels += melTime
                 timings.totalLogmelRuns += 1
@@ -552,6 +551,7 @@ public class WhisperKit: Transcriber {
                     Logging.error("Encoder output is nil")
                     return nil
                 }
+                self.encoderOutput = encoderOutput
                 let encoderTime = Date().timeIntervalSince(encoderStart)
                 timings.encoding += encoderTime
                 timings.totalEncodingRuns += 1
@@ -599,7 +599,7 @@ public class WhisperKit: Transcriber {
                         segmentSize: segmentSize,
                         prependPunctuations: "\"'“¿([{-",
                         appendPunctuations: "\"'.。,，!！?？:：”)]}、",
-                        lastSpeechTimestamp: currentSegments?.last?.end ?? 0,
+                        lastSpeechTimestamp: Float(Double(previousSeek) / Double(WhisperKit.sampleRate)),
                         options: options,
                         timings: timings
                     )
@@ -658,7 +658,7 @@ public class WhisperKit: Transcriber {
             // Fallback `options.temperatureFallbackCount` times with increasing temperatures, starting at `options.temperature`
             let temperatures = (0...options.temperatureFallbackCount).map { FloatType(options.temperature) + FloatType($0) * FloatType(options.temperatureIncrementOnFallback) }
 
-            Logging.debug("Decoding with tempeartures \(temperatures)")
+            Logging.debug("Decoding with temperatures \(temperatures)")
 
             var decodingResult: DecodingResult?
 
@@ -669,8 +669,8 @@ public class WhisperKit: Transcriber {
                 let tokenSampler = GreedyTokenSampler(temperature: temp, eotToken: tokenizer.specialTokens.endToken, decodingOptions: options)
                 
                 var currentDecodingOptions = options
-                // For a multilingual model, if language is not passed and usePrefill is false, detect language and set in options
-                if modelVariant.isMultilingual, options.language == nil, !options.usePrefillPrompt {
+                // For a multilingual model, if language is not passed and detectLanguage is true, detect language and set in options
+                if modelVariant.isMultilingual, options.language == nil, options.detectLanguage {
                     let languageDecodingResult = try? await textDecoder.detectLanguage(
                         from: encoderOutput,
                         using: decoderInputs,
@@ -678,8 +678,20 @@ public class WhisperKit: Transcriber {
                         options: options,
                         temperature: temp
                     ).first
-                    detectedLanguage = languageDecodingResult?.language
+
+                    // Update the language decoding options
                     currentDecodingOptions.language = languageDecodingResult?.language
+                    detectedLanguage = languageDecodingResult?.language
+
+                    // Update prompt and KV Cache if needed
+                    if options.usePrefillPrompt {
+                        guard let prefilledInputs = try? await textDecoder.prefillDecoderInputs(decoderInputs, withOptions: currentDecodingOptions) else {
+                            throw WhisperError.prefillFailed()
+                        }
+                        decoderInputs = prefilledInputs
+                    }
+
+                    Logging.debug("Prefill prompt updated to: \(decoderInputs.initialPrompt.map { tokenizer.convertIdToToken($0) ?? "" })")
                 }
 
                 decodingResult = try await textDecoder.decodeText(
@@ -689,6 +701,11 @@ public class WhisperKit: Transcriber {
                     options: currentDecodingOptions,
                     callback: callback
                 ).first
+
+                // Use the predicted language if it was not detected ahead of time
+                if detectedLanguage == nil {
+                    detectedLanguage = decodingResult?.language
+                }
 
                 // Update timings from the decoder main loop
                 if let decodingTimings = decodingResult?.timings {
