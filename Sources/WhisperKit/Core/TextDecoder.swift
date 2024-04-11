@@ -710,7 +710,6 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
 
         let transcript = tokenizer.decode(tokens: filteredTokens)
 
-        print(tokenProbs)
         let decodingFallback = DecodingFallback(
             options: options,
             isFirstTokenLogProbTooLow: isFirstTokenLogProbTooLow,

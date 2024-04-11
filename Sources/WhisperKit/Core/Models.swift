@@ -1027,7 +1027,6 @@ struct WhisperTokenizerWrapper: WhisperTokenizer {
     private func isPunctuation(_ text: String, tokenRange: Range<String.Index>, tag: NLTag?) -> Bool {
         let punctuationCharacters = CharacterSet.punctuationCharacters
         let token = String(text[tokenRange])
-        print(token)
         if let tag = tag, tag == .punctuation {
             return true
         } else if token.unicodeScalars.allSatisfy({ punctuationCharacters.contains($0) }) {
