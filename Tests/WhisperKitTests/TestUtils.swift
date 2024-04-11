@@ -107,7 +107,7 @@ extension XCTestCase {
         audioFile: String = "jfk.wav",
         file: StaticString = #file,
         line: UInt = #line
-    ) async throws -> TranscriptionResult? {
+    ) async throws -> [TranscriptionResult] {
         let modelPath: String
         switch variant {
             case .largev3:
@@ -255,8 +255,20 @@ extension Result {
     }
 }
 
-extension Result where Success == TranscriptionResult {
+extension Result where Success == [TranscriptionResult] {
     func normalizedText(prefix: Int) throws -> String {
         try get().text.normalized.split(separator: " ").prefix(prefix).joined(separator: " ")
+    }
+}
+
+extension Collection where Element == TranscriptionResult {
+    var text: String {
+        map(\.text).joined(separator: " ")
+    }
+}
+
+extension Collection where Element == TranscriptionResult {
+    var segments: [TranscriptionSegment] {
+        flatMap(\.segments)
     }
 }

@@ -187,6 +187,28 @@ public struct DecodingInputs {
     var decoderKeyPaddingMask: MLMultiArray
     var prefillKeyCache: MLMultiArray
     var prefillValueCache: MLMultiArray
+
+    func reset(prefilledCacheSize: Int, maxTokenContext: Int) {
+        // NOTE: Because we have a mask on the kvcache,
+        // we can simply shift the masks without touching the data,
+        // it will be overwritten by the new data without impact on the output
+        cacheLength[0] = NSNumber(value: prefilledCacheSize - 1)
+
+        // Store token history and
+        // Reset masks to prepare for next window
+        for i in 0..<maxTokenContext {
+            if i <= prefilledCacheSize - 1 {
+                // Inside overlap window
+                decoderKeyPaddingMask[i] = 0
+                kvCacheUpdateMask[i - 1] = 0
+                kvCacheUpdateMask[i] = 1
+            } else {
+                // Padding
+                decoderKeyPaddingMask[i] = -10000
+                kvCacheUpdateMask[i] = 0
+            }
+        }
+    }
 }
 
 public struct DecodingCache {
@@ -381,6 +403,9 @@ enum WhisperError: Error, LocalizedError, Equatable {
     case decodingLogitsFailed(String = "Unable to decode logits from the model output")
     case segmentingFailed(String = "Creating segments failed")
     case loadAudioFailed(String = "Load audio failed")
+    case prepareDecoderInputsFailed(String = "Prepare decoder inputs failed")
+    case transcriptionFailed(String = "Transcription failed")
+    case decodingFailed(String = "Decoding failed")
 
     var errorDescription: String? {
         switch self {
@@ -405,6 +430,15 @@ enum WhisperError: Error, LocalizedError, Equatable {
             case let .loadAudioFailed(message):
                 Logging.error(message)
                 return message
+            case let .prepareDecoderInputsFailed(message):
+                Logging.error(message)
+                return message
+            case let .transcriptionFailed(message):
+                Logging.error(message)
+                return message
+            case let .decodingFailed(message):
+                Logging.error(message)
+                return message
         }
     }
 }
@@ -412,9 +446,76 @@ enum WhisperError: Error, LocalizedError, Equatable {
 /// Structs
 public struct TranscriptionResult: Codable {
     public var text: String
+    public var totalTokens: Int
     public var segments: [TranscriptionSegment]
     public var language: String
-    public var timings: TranscriptionTimings?
+    public var timings: TranscriptionTimings
+
+    func logSegments() {
+        for segment in segments {
+            let start = segment.start
+            let end = segment.end
+            let text = segment.text
+            let line = "[\(formatTimestamp(start)) --> \(formatTimestamp(end))] \(text)"
+            Logging.debug(line)
+        }
+    }
+
+    func logTimings() {
+        let decodeLoopTime = timings.decodingLoop
+        let totalLoops = timings.totalDecodingLoops
+        let timeToFirstToken = timings.firstTokenTime - timings.pipelineStart
+        let tokensPerSecond = timings.tokensPerSecond
+        let rtf = timings.realTimeFactor
+
+        let fullPipelineDuration = timings.fullPipeline * 1000 // Convert to milliseconds
+
+        let audioLoadTime = formatTimeWithPercentage(timings.audioLoading, 1, fullPipelineDuration)
+        let audioProcTime = formatTimeWithPercentage(timings.audioProcessing, timings.totalAudioProcessingRuns, fullPipelineDuration)
+        let logmelsTime = formatTimeWithPercentage(timings.logmels, timings.totalLogmelRuns, fullPipelineDuration)
+        let encodingTime = formatTimeWithPercentage(timings.encoding, timings.totalEncodingRuns, fullPipelineDuration)
+        let decodingInitTime = formatTimeWithPercentage(timings.decodingInit, 1, fullPipelineDuration)
+        let prefillInfo = formatTimeWithPercentage(timings.prefill, 1, fullPipelineDuration)
+        let predictionsInfo = formatTimeWithPercentage(timings.decodingPredictions, totalLoops, fullPipelineDuration)
+        let filteringInfo = formatTimeWithPercentage(timings.decodingFiltering, totalLoops, fullPipelineDuration)
+        let samplingInfo = formatTimeWithPercentage(timings.decodingSampling, totalLoops, fullPipelineDuration)
+        let kvCachingInfo = formatTimeWithPercentage(timings.decodingKvCaching, timings.totalKVUpdateRuns, fullPipelineDuration)
+        let wordTimestampInfo = formatTimeWithPercentage(timings.decodingWordTimestamps, timings.totalTimestampAlignmentRuns, fullPipelineDuration)
+        let nonPredTimeInfo = formatTimeWithPercentage(timings.decodingNonPrediction, totalLoops, fullPipelineDuration)
+        let windowingInfo = formatTimeWithPercentage(timings.decodingWindowing - timings.decodingWordTimestamps, timings.totalDecodingWindows, fullPipelineDuration)
+        let fallbackInfo = formatTimeWithPercentage(timings.decodingFallback, timings.totalDecodingFallbacks, fullPipelineDuration)
+        let decodingLoopInfo = formatTimeWithPercentage(timings.decodingLoop, totalLoops, fullPipelineDuration)
+
+        // Logging
+        Logging.info("---- Transcription Timings ----")
+
+        Logging.info("Audio Load:          \(audioLoadTime)")
+        Logging.info("Audio Processing:    \(audioProcTime)")
+        Logging.info("Mels:                \(logmelsTime)")
+        Logging.info("Encoding:            \(encodingTime)")
+        Logging.info("Matrices Init:       \(decodingInitTime)")
+        Logging.info("Prefill:             \(prefillInfo)")
+        Logging.info("Decoding:            \(predictionsInfo)")
+        Logging.info("Non-inference:       \(nonPredTimeInfo)")
+        Logging.info("- Logit Filtering:   \(filteringInfo)")
+        Logging.info("- Sampling:          \(samplingInfo)")
+        Logging.info("- Kv Caching:        \(kvCachingInfo)")
+        Logging.info("- Word Timestamps:   \(wordTimestampInfo)")
+        Logging.info("- Windowing:         \(windowingInfo)")
+        Logging.info("Fallbacks:           \(fallbackInfo)")
+        Logging.info("Decoding Full Loop:  \(decodingLoopInfo)")
+        Logging.info("-------------------------------")
+
+        // Summary statistics
+        Logging.info("Model Load Time:     \(String(format: "%.2f", timings.modelLoading)) seconds")
+        Logging.info("Inference Duration:  \(String(format: "%.2f", timings.fullPipeline)) seconds")
+        Logging.info("- Decoding Loop:     \(String(format: "%.2f", decodeLoopTime)) seconds")
+        Logging.info("Time to first token: \(String(format: "%.2f", timeToFirstToken)) seconds")
+        Logging.info("Total Tokens:        \(totalTokens)")
+        Logging.info("Tokens per Second:   \(String(format: "%.2f", tokensPerSecond)) tok/s")
+        Logging.info("Real Time Factor:    \(String(format: "%.2f", rtf))")
+        Logging.info("Fallbacks:           \(timings.totalDecodingFallbacks)")
+    }
 }
 
 public extension TranscriptionResult {

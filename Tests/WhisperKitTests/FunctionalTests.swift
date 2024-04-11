@@ -35,9 +35,11 @@ final class FunctionalTests: XCTestCase {
                 "Transcription failed"
             )
 
-            print("[Integration] \(transcriptionResult.text)")
+            let transcriptionResultText = transcriptionResult.text
+
+            print("[Integration] \(transcriptionResultText)")
             XCTAssertEqual(
-                transcriptionResult.text.normalized,
+                transcriptionResultText.normalized,
                 " And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.".normalized,
                 "Transcription result does not match expected result for model \(modelName)"
             )
@@ -66,7 +68,8 @@ final class FunctionalTests: XCTestCase {
                     await whisperKit.transcribe(audioPath: audioFilePath),
                     "Transcription failed"
                 )
-                XCTAssertGreaterThan(transcriptionResult.text.count, 0)
+                let transcriptionResultText = transcriptionResult.map(\.text).joined(separator: " ")
+                XCTAssertGreaterThan(transcriptionResultText.count, 0)
                 dispatchSemaphore.signal()
             }
             dispatchSemaphore.wait()
@@ -253,26 +256,17 @@ final class FunctionalTests: XCTestCase {
 
         var pipe = try await WhisperKit(model: "large-v3", verbose: true, logLevel: .debug)
 
-        guard let transcriptionResult = try await pipe.transcribe(audioPath: audioFilePath) else {
-            XCTFail("Transcription failed")
-            return
-        }
-        XCTAssertGreaterThan(transcriptionResult.text.count, 0)
+        let transcriptionResult1 = try await pipe.transcribe(audioPath: audioFilePath)
+        XCTAssertFalse(transcriptionResult1.text.isEmpty)
 
         pipe = try await WhisperKit(model: "distil*large-v3", verbose: true, logLevel: .debug)
 
-        guard let transcriptionResult = try await pipe.transcribe(audioPath: audioFilePath) else {
-            XCTFail("Transcription failed")
-            return
-        }
-        XCTAssertGreaterThan(transcriptionResult.text.count, 0)
+        let transcriptionResult2 = try await pipe.transcribe(audioPath: audioFilePath)
+        XCTAssertFalse(transcriptionResult2.text.isEmpty)
 
         pipe = try await WhisperKit(model: "distil-whisper_distil-large-v3", verbose: true, logLevel: .debug)
 
-        guard let transcriptionResult = try await pipe.transcribe(audioPath: audioFilePath) else {
-            XCTFail("Transcription failed")
-            return
-        }
-        XCTAssertGreaterThan(transcriptionResult.text.count, 0)
+        let transcriptionResult3 = try await pipe.transcribe(audioPath: audioFilePath)
+        XCTAssertFalse(transcriptionResult3.text.isEmpty)
     }
 }

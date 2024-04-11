@@ -535,7 +535,7 @@ struct WhisperAXWatchView: View {
         }
 
         let transcription = try await whisperKit.transcribe(audioArray: samples, decodeOptions: options, callback: decodingCallback)
-        return transcription
+        return transcription.first
     }
 
     // MARK: Streaming Logic

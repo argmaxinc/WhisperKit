@@ -68,7 +68,7 @@ struct Transcribe: AsyncParsableCommand {
         for (audioPath, result) in zip(resolvedAudioPaths, transcribeResult) {
             switch result {
             case .success(let transcribeResult):
-                processTranscriptionResult(audioPath: audioPath, transcribeResult: transcribeResult)
+                processTranscriptionResult(audioPath: audioPath, transcribeResult: transcribeResult.first)
             case .failure(let error):
                 print("Error when transcribing \(audioPath): \(error)")
             }
@@ -160,7 +160,7 @@ struct Transcribe: AsyncParsableCommand {
             let lastAgreedTokens = lastAgreedWords.flatMap { $0.tokens }
             streamOptions.prefixTokens = lastAgreedTokens
             do {
-                let result: TranscriptionResult? = try await whisperKit.transcribe(audioArray: simulatedStreamingAudio, decodeOptions: streamOptions)
+                let result: TranscriptionResult? = try await whisperKit.transcribe(audioArray: simulatedStreamingAudio, decodeOptions: streamOptions).first
                 var skipAppend = false
                 if let result = result, let _ = result.segments.first?.words {
                     hypothesisWords = result.allWords.filter { $0.start >= lastAgreedSeconds }
