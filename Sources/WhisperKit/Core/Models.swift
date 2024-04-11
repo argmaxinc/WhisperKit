@@ -395,7 +395,7 @@ public struct DecodingResult {
     }
 }
 
-enum WhisperError: Error, LocalizedError, Equatable {
+public enum WhisperError: Error, LocalizedError, Equatable {
     case tokenizerUnavailable(String = "Tokenizer is unavailable")
     case modelsUnavailable(String = "Models are unavailable")
     case prefillFailed(String = "Prefill failed")
@@ -406,8 +406,9 @@ enum WhisperError: Error, LocalizedError, Equatable {
     case prepareDecoderInputsFailed(String = "Prepare decoder inputs failed")
     case transcriptionFailed(String = "Transcription failed")
     case decodingFailed(String = "Decoding failed")
+    case microphoneUnavailable(String = "No available microphone to record or stream")
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
             case let .tokenizerUnavailable(message):
                 Logging.error(message)
@@ -437,6 +438,9 @@ enum WhisperError: Error, LocalizedError, Equatable {
                 Logging.error(message)
                 return message
             case let .decodingFailed(message):
+                Logging.error(message)
+                return message
+            case let .microphoneUnavailable(message):
                 Logging.error(message)
                 return message
         }

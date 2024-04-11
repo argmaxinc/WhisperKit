@@ -1066,6 +1066,11 @@ struct ContentView: View {
                    let device = devices.first(where: {$0.name == selectedAudioInput}) {
                     deviceId = device.id
                 }
+
+                // There is no built-in microphone
+                if deviceId == nil {
+                   throw WhisperError.microphoneUnavailable()
+                }
                 #endif
 
                 try? audioProcessor.startRecordingLive(inputDeviceID: deviceId) { _ in
