@@ -86,6 +86,8 @@ open class SegmentSeeker: SegmentSeeking {
         // check if single or double timestamp ending
         let lastThreeTokens = isTimestampToken.suffix(3)
         let singleTimestampEnding = lastThreeTokens == [false, true, false]
+        let noTimestampEnding = lastThreeTokens == [false, false, false]
+
 
         // find all end indexes of time token pairs
         var sliceIndexes = [Int]()
@@ -104,6 +106,8 @@ open class SegmentSeeker: SegmentSeeking {
             if singleTimestampEnding {
                 let singleTimestampEndingIndex = isTimestampToken.lastIndex(where: { $0 })!
                 sliceIndexes.append(singleTimestampEndingIndex + 1)
+            } else if noTimestampEnding {
+                sliceIndexes.append(currentTokens.count)
             }
 
             var lastSliceStart = 0
@@ -138,10 +142,14 @@ open class SegmentSeeker: SegmentSeeking {
             }
 
             // Seek to the last timestamp in the segment
-            let lastTimestampToken = currentTokens[lastSliceStart] - timeToken
-            let lastTimestampSeconds = Float(lastTimestampToken) * secondsPerTimeToken
-            let lastTimestampSamples = Int(lastTimestampSeconds * Float(sampleRate))
-            seek += lastTimestampSamples
+            if !noTimestampEnding {
+                let lastTimestampToken = currentTokens[lastSliceStart] - timeToken
+                let lastTimestampSeconds = Float(lastTimestampToken) * secondsPerTimeToken
+                let lastTimestampSamples = Int(lastTimestampSeconds * Float(sampleRate))
+                seek += lastTimestampSamples
+            } else {
+                seek += segmentSize
+            }
         } else {
             // Model is not giving any consecutive timestamps, so lump all the current tokens together
             var durationSeconds = Float(segmentSize) / Float(sampleRate)
@@ -274,41 +282,50 @@ open class SegmentSeeker: SegmentSeeking {
     }
 
     func mergePunctuations(alignment: [WordTiming], prepended: String, appended: String) -> [WordTiming] {
-        var mergedAlignment = [WordTiming]()
+        var prependedAlignment = [WordTiming]()
+        var appendedAlignment = [WordTiming]()
 
         // Include the first word if it's not a prepended punctuation
         if !alignment.isEmpty && !prepended.contains(alignment[0].word.trimmingCharacters(in: .whitespaces)) {
-            mergedAlignment.append(alignment[0])
+            prependedAlignment.append(alignment[0])
         }
 
         // Merge prepended punctuations
         for i in 1..<alignment.count {
-            let currentWord = alignment[i]
-            if i > 1, currentWord.word.starts(with: " "), prepended.contains(currentWord.word.trimmingCharacters(in: .whitespaces)) {
-                mergedAlignment[mergedAlignment.count - 1].word += currentWord.word
-                mergedAlignment[mergedAlignment.count - 1].tokens += currentWord.tokens
-                mergedAlignment[mergedAlignment.count - 1].end = currentWord.end
+            var currentWord = alignment[i]
+            let previousWord = alignment[i - 1]
+            if previousWord.word.starts(with: " "), prepended.contains(previousWord.word.trimmingCharacters(in: .whitespaces)) {
+                currentWord.word = previousWord.word + currentWord.word
+                currentWord.tokens = previousWord.tokens + currentWord.tokens
+                currentWord.start = min(previousWord.start, currentWord.start)
+                prependedAlignment[prependedAlignment.count - 1] = currentWord
             } else {
-                mergedAlignment.append(currentWord)
+                prependedAlignment.append(currentWord)
             }
+        }
+
+        // Include the first word always for append checks
+        if !prependedAlignment.isEmpty {
+            appendedAlignment.append(prependedAlignment[0])
         }
 
         // Merge appended punctuations
-        var i = 0
-        while i < mergedAlignment.count {
-            var shouldSkipNextWord = false
-            if i < mergedAlignment.count - 1, appended.contains(mergedAlignment[i + 1].word) {
-                mergedAlignment[i].word += mergedAlignment[i + 1].word
-                mergedAlignment[i].tokens += mergedAlignment[i + 1].tokens
-                mergedAlignment[i].end = mergedAlignment[i + 1].end
-                shouldSkipNextWord = true
+        for i in 1..<prependedAlignment.count {
+            let currentWord = prependedAlignment[i]
+            var previousWord = prependedAlignment[i - 1]
+            if !previousWord.word.hasSuffix(" "), appended.contains(currentWord.word.trimmingCharacters(in: .whitespaces)) {
+                previousWord.word = previousWord.word + currentWord.word
+                previousWord.tokens = previousWord.tokens + currentWord.tokens
+                previousWord.end = max(previousWord.end, currentWord.end)
+                appendedAlignment[appendedAlignment.count - 1] = previousWord
+            } else {
+                appendedAlignment.append(currentWord)
             }
-
-            i += shouldSkipNextWord ? 2 : 1
         }
 
         // Filter out the empty word timings and punctuation words that have been merged
-        return mergedAlignment.filter { !$0.word.isEmpty && !appended.contains($0.word) && !prepended.contains($0.word) }
+        let mergedAlignment = appendedAlignment.filter { !$0.word.isEmpty && !appended.contains($0.word) && !prepended.contains($0.word) }
+        return mergedAlignment
     }
 
     func findAlignment(
@@ -489,9 +506,9 @@ open class SegmentSeeker: SegmentSeeking {
                     continue
                 }
 
-                let start = round((timeOffset + timing.start) * 100) / 100.0
-                let end = round((timeOffset + timing.end) * 100) / 100.0
-                let probability = round(timing.probability * 100) / 100.0
+                let start = (timeOffset + timing.start).rounded(2)
+                let end = (timeOffset + timing.end).rounded(2)
+                let probability = timing.probability.rounded(2)
                 let wordTiming = WordTiming(word: timing.word,
                                             tokens: timingTokens,
                                             start: start,

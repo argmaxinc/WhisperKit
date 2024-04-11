@@ -205,24 +205,6 @@ extension XCTestCase {
     }
 }
 
-extension String {
-    var normalized: String {
-        // Trim whitespace and newlines
-        let trimmedString = self.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // Convert to lowercase
-        let lowercaseString = trimmedString.lowercased()
-
-        // Remove punctuation
-        let noPunctuationString = lowercaseString.components(separatedBy: .punctuationCharacters).joined()
-
-        // Replace multiple spaces with a single space
-        let singleSpacedString = noPunctuationString.replacingOccurrences(of: " +", with: " ", options: .regularExpression)
-
-        return singleSpacedString
-    }
-}
-
 extension SpecialTokens {
     static func `default`(
         endToken: Int = 0,
@@ -230,6 +212,7 @@ extension SpecialTokens {
         noSpeechToken: Int = 0,
         noTimestampsToken: Int = 0,
         specialTokenBegin: Int = 0,
+        startOfPreviousToken: Int = 0,
         startOfTranscriptToken: Int = 0,
         timeTokenBegin: Int = 0,
         transcribeToken: Int = 0,
@@ -242,6 +225,7 @@ extension SpecialTokens {
             noSpeechToken: noSpeechToken,
             noTimestampsToken: noTimestampsToken,
             specialTokenBegin: specialTokenBegin,
+            startOfPreviousToken: startOfPreviousToken,
             startOfTranscriptToken: startOfTranscriptToken,
             timeTokenBegin: timeTokenBegin,
             transcribeToken: transcribeToken,

@@ -12,7 +12,7 @@ import UIKit
 import AppKit
 #endif
 
-// MARK: - Helpers
+// MARK: - Extensions
 
 extension MLMultiArray {
     /// Calculate the linear offset by summing the products of each dimension’s index with the dimension’s stride.
@@ -63,6 +63,66 @@ extension MLModel {
         }
     }
 }
+
+#if os(macOS)
+// From: https://stackoverflow.com/a/71726663
+extension Process {
+    static func stringFromTerminal(command: String) -> String {
+        let task = Process()
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.launchPath = "/bin/bash"
+        task.arguments = ["-c", "sysctl -n " + command]
+        task.launch()
+        return String(bytes: pipe.fileHandleForReading.availableData, encoding: .utf8) ?? ""
+    }
+
+    static let processor = stringFromTerminal(command: "machdep.cpu.brand_string")
+    static let cores = stringFromTerminal(command: "machdep.cpu.core_count")
+    static let threads = stringFromTerminal(command: "machdep.cpu.thread_count")
+    static let vendor = stringFromTerminal(command: "machdep.cpu.vendor")
+    static let family = stringFromTerminal(command: "machdep.cpu.family")
+}
+#endif
+
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
+public extension WhisperKit {
+    static var isRunningOnSimulator: Bool {
+#if targetEnvironment(simulator)
+        return true
+#else
+        return false
+#endif
+    }
+}
+
+
+extension Float {
+    func rounded(_ decimalPlaces: Int) -> Float {
+        let divisor = pow(10.0, Float(decimalPlaces))
+        return (self * divisor).rounded() / divisor
+    }
+}
+
+extension String {
+    var normalized: String {
+        // Trim whitespace and newlines
+        let trimmedString = self.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Convert to lowercase
+        let lowercaseString = trimmedString.lowercased()
+
+        // Remove punctuation
+        let noPunctuationString = lowercaseString.components(separatedBy: .punctuationCharacters).joined()
+
+        // Replace multiple spaces with a single space
+        let singleSpacedString = noPunctuationString.replacingOccurrences(of: " +", with: " ", options: .regularExpression)
+
+        return singleSpacedString
+    }
+}
+
+// MARK: - Helpers
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 func initMLMultiArray(shape: [NSNumber], dataType: MLMultiArrayDataType, initialValue: Any) -> MLMultiArray {
@@ -259,38 +319,6 @@ public func modelSupport(for deviceName: String) -> (default: String, disabled: 
     return ("openai_whisper-base", [""])
 }
 
-#if os(macOS)
-// From: https://stackoverflow.com/a/71726663
-extension Process {
-    static func stringFromTerminal(command: String) -> String {
-        let task = Process()
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.launchPath = "/bin/bash"
-        task.arguments = ["-c", "sysctl -n " + command]
-        task.launch()
-        return String(bytes: pipe.fileHandleForReading.availableData, encoding: .utf8) ?? ""
-    }
-
-    static let processor = stringFromTerminal(command: "machdep.cpu.brand_string")
-    static let cores = stringFromTerminal(command: "machdep.cpu.core_count")
-    static let threads = stringFromTerminal(command: "machdep.cpu.thread_count")
-    static let vendor = stringFromTerminal(command: "machdep.cpu.vendor")
-    static let family = stringFromTerminal(command: "machdep.cpu.family")
-}
-#endif
-
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-public extension WhisperKit {
-    static var isRunningOnSimulator: Bool {
-        #if targetEnvironment(simulator)
-        return true
-        #else
-        return false
-        #endif
-    }
-}
-
 public func resolveAbsolutePath(_ inputPath: String) -> String {
     let fileManager = FileManager.default
 
@@ -348,6 +376,73 @@ public func formatSegments(_ segments: [TranscriptionSegment], withTimestamps: B
         lines.append(line)
     }
     return lines
+}
+
+public func findLongestCommonPrefix(_ words1: [WordTiming], _ words2: [WordTiming]) -> [WordTiming] {
+    let commonPrefix = zip(words1, words2).prefix(while: { $0.word.normalized == $1.word.normalized })
+    return commonPrefix.map { $0.1 }
+}
+
+public func findLongestDifferentSuffix(_ words1: [WordTiming], _ words2: [WordTiming]) -> [WordTiming] {
+    let commonPrefix = findLongestCommonPrefix(words1, words2)
+    let remainingWords = words2[commonPrefix.count...]
+    return Array(remainingWords)
+}
+
+public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirmedWords: [WordTiming]) -> TranscriptionResult {
+    let validResults = results.compactMap { $0 }
+    let language = validResults.first?.language ?? "en"
+
+    var mergedSegments: [TranscriptionSegment] = []
+    let mergedText = confirmedWords.map { $0.word }.joined()
+
+    for result in validResults {
+        mergedSegments.append(contentsOf: result.segments)
+    }
+
+    var mergedTimings = TranscriptionTimings(
+        modelLoading: validResults.map { $0.timings?.modelLoading ?? 0 }.max() ?? 0,
+        audioLoading: validResults.map { $0.timings?.audioLoading ?? 0 }.reduce(0, +),
+        audioProcessing: validResults.map { $0.timings?.audioProcessing ?? 0 }.reduce(0, +),
+        logmels: validResults.map { $0.timings?.logmels ?? 0 }.reduce(0, +),
+        encoding: validResults.map { $0.timings?.encoding ?? 0 }.reduce(0, +),
+        prefill: validResults.map { $0.timings?.prefill ?? 0 }.reduce(0, +),
+        decodingInit: validResults.map { $0.timings?.decodingInit ?? 0 }.reduce(0, +),
+        decodingLoop: validResults.map { $0.timings?.decodingLoop ?? 0 }.reduce(0, +),
+        decodingPredictions: validResults.map { $0.timings?.decodingPredictions ?? 0 }.reduce(0, +),
+        decodingFiltering: validResults.map { $0.timings?.decodingFiltering ?? 0 }.reduce(0, +),
+        decodingSampling: validResults.map { $0.timings?.decodingSampling ?? 0 }.reduce(0, +),
+        decodingFallback: validResults.map { $0.timings?.decodingFallback ?? 0 }.reduce(0, +),
+        decodingWindowing: validResults.map { $0.timings?.decodingWindowing ?? 0 }.reduce(0, +),
+        decodingKvCaching: validResults.map { $0.timings?.decodingKvCaching ?? 0 }.reduce(0, +),
+        decodingTimestampAlignment: validResults.map { $0.timings?.decodingWordTimestamps ?? 0 }.reduce(0, +),
+        decodingNonPrediction: validResults.map { $0.timings?.decodingNonPrediction ?? 0 }.reduce(0, +),
+        totalAudioProcessingRuns: validResults.map { $0.timings?.totalAudioProcessingRuns ?? 0 }.reduce(0, +),
+        totalLogmelRuns: validResults.map { $0.timings?.totalLogmelRuns ?? 0 }.reduce(0, +),
+        totalEncodingRuns: validResults.map { $0.timings?.totalEncodingRuns ?? 0 }.reduce(0, +),
+        totalDecodingLoops: validResults.map { $0.timings?.totalDecodingLoops ?? 0 }.reduce(0, +),
+        totalKVUpdateRuns: validResults.map { $0.timings?.totalKVUpdateRuns ?? 0 }.reduce(0, +),
+        totalTimestampAlignmentRuns: validResults.map { $0.timings?.totalTimestampAlignmentRuns ?? 0 }.reduce(0, +),
+        totalDecodingFallbacks: validResults.map { $0.timings?.totalDecodingFallbacks ?? 0 }.reduce(0, +),
+        totalDecodingWindows: validResults.map { $0.timings?.totalDecodingWindows ?? 0 }.reduce(0, +),
+        fullPipeline: validResults.map { $0.timings?.fullPipeline ?? 0 }.reduce(0, +)
+    )
+
+    mergedTimings.inputAudioSeconds = validResults.map { $0.timings?.inputAudioSeconds ?? 0 }.reduce(0, +)
+
+    // Average first token times
+    if let pipelineStart = validResults.first?.timings?.pipelineStart {
+        let averageFirstTokenTime = validResults.map { (($0.timings?.firstTokenTime ?? 0) - ($0.timings?.pipelineStart ?? 0)) }.reduce(0, +) / Double(validResults.count)
+        mergedTimings.pipelineStart = pipelineStart
+        mergedTimings.firstTokenTime = pipelineStart + averageFirstTokenTime
+    }
+
+    return TranscriptionResult(
+        text: mergedText,
+        segments: mergedSegments,
+        language: language,
+        timings: mergedTimings
+    )
 }
 
 func timeit(operation: () -> Void) -> TimeInterval {

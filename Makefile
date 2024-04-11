@@ -13,10 +13,12 @@ setup:
 	@echo "Setting up environment..."
 	@which $(PIP_COMMAND)
 	@which $(PYTHON_COMMAND)
-	@$(PIP_COMMAND) install -U huggingface_hub
 	@echo "Checking for Homebrew..."
 	@which brew > /dev/null || (echo "Error: Homebrew is not installed. Install it form here https://brew.sh and try again" && exit 1)
 	@echo "Homebrew is installed."
+	@echo "Checking for huggingface-cli..."
+	@which huggingface-cli > /dev/null || (echo "Installing huggingface-cli..." && brew install huggingface-cli)
+	@echo "huggingface-cli is installed."
 	@echo "Checking for git-lfs..."
 	@which git-lfs > /dev/null || (echo "Installing git-lfs..." && brew install git-lfs)
 	@echo "git-lfs is installed."

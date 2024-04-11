@@ -152,7 +152,7 @@ public struct ModelComputeOptions {
         self.prefillCompute = prefillCompute
         self.textDecoderCompute = textDecoderCompute
 
-        if #available(macOS 14.0, iOS 17.0, watchOS 10, visionOS 1, *) {
+        if #available(macOS 14.0, iOS 17.0, watchOS 10, *) {
             self.audioEncoderCompute = audioEncoderCompute ?? .cpuAndNeuralEngine
         } else {
             self.audioEncoderCompute = audioEncoderCompute ?? .cpuAndGPU
@@ -213,11 +213,16 @@ public struct DecodingCache {
 ///   - usePrefillCache: If true, the kv cache will be prefilled based on the prefill data mlmodel.
 ///   - skipSpecialTokens: Whether to skip special tokens in the output.
 ///   - withoutTimestamps: Whether to include timestamps in the transcription result.
+///   - wordTimestamps: Whether to include word-level timestamps in the transcription result.
 ///   - maxInitialTimestamp: Maximal initial timestamp.
+///   - clipTimestamps: Array of timestamps (in seconds) to split the audio into segments for transcription.
+///   - promptTokens: Array of token IDs to use as the conditioning prompt for the decoder. These are prepended to the prefill tokens.
+///   - prefixTokens: Array of token IDs to use as the initial prefix for the decoder. These are appended to the prefill tokens.
 ///   - suppressBlank: If true, blank tokens will be suppressed during decoding.
 ///   - supressTokens: List of token IDs to suppress during decoding.
 ///   - compressionRatioThreshold: If the compression ratio of the transcription text is above this value, it is too repetitive and treated as failed.
 ///   - logProbThreshold: If the average log probability over sampled tokens is below this value, treat as failed.
+///   - firstTokenLogProbThreshold: If the log probability over the first sampled token is below this value, treat as failed.
 ///   - noSpeechThreshold: If the no speech probability is higher than this value AND the average log
 ///                        probability over sampled tokens is below `logProbThreshold`, consider the segment as silent.
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
@@ -237,10 +242,13 @@ public struct DecodingOptions {
     public var wordTimestamps: Bool
     public var maxInitialTimestamp: Float?
     public var clipTimestamps: [Float]
+    public var promptTokens: [Int]?
+    public var prefixTokens: [Int]?
     public var suppressBlank: Bool
     public var supressTokens: [Int]
     public var compressionRatioThreshold: Float?
     public var logProbThreshold: Float?
+    public var firstTokenLogProbThreshold: Float?
     public var noSpeechThreshold: Float?
 
     public init(verbose: Bool = false,
@@ -258,10 +266,13 @@ public struct DecodingOptions {
                 wordTimestamps: Bool = false,
                 maxInitialTimestamp: Float? = nil,
                 clipTimestamps: [Float] = [],
+                promptTokens: [Int]? = nil,
+                prefixTokens: [Int]? = nil,
                 suppressBlank: Bool = false,
                 supressTokens: [Int]? = nil,
                 compressionRatioThreshold: Float? = 2.4,
                 logProbThreshold: Float? = -1.0,
+                firstTokenLogProbThreshold: Float? = -1.5,
                 noSpeechThreshold: Float? = 0.6)
     {
         self.verbose = verbose
@@ -279,14 +290,56 @@ public struct DecodingOptions {
         self.wordTimestamps = wordTimestamps
         self.maxInitialTimestamp = maxInitialTimestamp
         self.clipTimestamps = clipTimestamps
+        self.promptTokens = promptTokens
+        self.prefixTokens = prefixTokens
         self.suppressBlank = suppressBlank
         self.supressTokens = supressTokens ?? [] // nonSpeechTokens() // TODO: implement these as default
         self.compressionRatioThreshold = compressionRatioThreshold
         self.logProbThreshold = logProbThreshold
+        self.firstTokenLogProbThreshold = firstTokenLogProbThreshold
         self.noSpeechThreshold = noSpeechThreshold
     }
 }
 
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
+public struct DecodingFallback {
+    public var needsFallback: Bool
+    public var fallbackReason: String
+    
+    public init(needsFallback: Bool, fallbackReason: String) {
+        self.needsFallback = needsFallback
+        self.fallbackReason = fallbackReason
+    }
+}
+
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
+public extension DecodingFallback {
+    init?(
+        options: DecodingOptions,
+        isFirstTokenLogProbTooLow: Bool,
+        noSpeechProb: Float,
+        compressionRatio: Float,
+        avgLogProb: Float
+    ) {
+        // NOTE: order matters here
+        if isFirstTokenLogProbTooLow {
+            self.init(needsFallback: true, fallbackReason: "firstTokenLogProbThreshold")
+        } else if let threshold = options.noSpeechThreshold, noSpeechProb > threshold {
+            // silence detected
+            self.init(needsFallback: false, fallbackReason: "silence")
+        } else if let threshold = options.compressionRatioThreshold, compressionRatio > threshold {
+            // too repetitive
+            self.init(needsFallback: true, fallbackReason: "compressionRatioThreshold")
+        } else if let threshold = options.logProbThreshold, avgLogProb < threshold {
+            // average log probablity too low (model is not confident enough)
+            self.init(needsFallback: true, fallbackReason: "logProbThreshold")
+        } else {
+            return nil
+        }
+    }
+}
+
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public struct DecodingResult {
     public var language: String
     public var languageProbs: [String: Float]
@@ -299,6 +352,7 @@ public struct DecodingResult {
     public var compressionRatio: Float
     public var cache: DecodingCache?
     public var timings: TranscriptionTimings?
+    public var fallback: DecodingFallback?
 
     public static var emptyResults: DecodingResult {
         return DecodingResult(language: "",
@@ -311,19 +365,21 @@ public struct DecodingResult {
                               temperature: 0.0,
                               compressionRatio: 0.0,
                               cache: nil,
-                              timings: nil)
+                              timings: nil,
+                              fallback: nil)
     }
 }
 
-enum WhisperError: Error, LocalizedError {
+public enum WhisperError: Error, LocalizedError {
     case tokenizerUnavailable(String = "Tokenizer is unavailable")
     case modelsUnavailable(String = "Models are unavailable")
     case prefillFailed(String = "Prefill failed")
     case audioProcessingFailed(String = "Audio processing failed")
     case decodingLogitsFailed(String = "Unable to decode logits from the model output")
     case segmentingFailed(String = "Creating segments failed")
+    case microphoneUnavailable(String = "No available microphone to record or stream")
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
             case let .tokenizerUnavailable(message):
                 Logging.error(message)
@@ -343,6 +399,9 @@ enum WhisperError: Error, LocalizedError {
             case let .segmentingFailed(message):
                 Logging.error(message)
                 return message
+            case let .microphoneUnavailable(message):
+                Logging.error(message)
+                return message
         }
     }
 }
@@ -355,19 +414,25 @@ public struct TranscriptionResult: Codable {
     public var timings: TranscriptionTimings?
 }
 
+public extension TranscriptionResult {
+    var allWords: [WordTiming] {
+        return segments.compactMap { $0.words }.flatMap { $0 }
+    }
+}
+
 public struct TranscriptionSegment: Hashable, Codable {
-    public var id: Int
-    public var seek: Int
-    public var start: Float
-    public var end: Float
-    public var text: String
-    public var tokens: [Int]
-    public var tokenLogProbs: [[Int: Float]]
-    public var temperature: Float
-    public var avgLogprob: Float
-    public var compressionRatio: Float
-    public var noSpeechProb: Float
-    public var words: [WordTiming]?
+    public var id: Int = 0
+    public var seek: Int = 0
+    public var start: Float = 0.0
+    public var end: Float = 0.0
+    public var text: String = ""
+    public var tokens: [Int] = []
+    public var tokenLogProbs: [[Int: Float]] = [[:]]
+    public var temperature: Float = 1.0
+    public var avgLogprob: Float = 0.0
+    public var compressionRatio: Float = 1.0
+    public var noSpeechProb: Float = 0.0
+    public var words: [WordTiming]? = nil
 }
 
 public struct WordTiming: Hashable, Codable {
@@ -844,6 +909,7 @@ public struct SpecialTokens {
     public let noSpeechToken: Int
     public let noTimestampsToken: Int
     public let specialTokenBegin: Int
+    public let startOfPreviousToken: Int
     public let startOfTranscriptToken: Int
     public let timeTokenBegin: Int
     public let transcribeToken: Int
@@ -856,6 +922,7 @@ public struct SpecialTokens {
         noSpeechToken: Int,
         noTimestampsToken: Int,
         specialTokenBegin: Int,
+        startOfPreviousToken: Int,
         startOfTranscriptToken: Int,
         timeTokenBegin: Int,
         transcribeToken: Int,
@@ -867,6 +934,7 @@ public struct SpecialTokens {
         self.noSpeechToken = noSpeechToken
         self.noTimestampsToken = noTimestampsToken
         self.specialTokenBegin = specialTokenBegin
+        self.startOfPreviousToken = startOfPreviousToken
         self.startOfTranscriptToken = startOfTranscriptToken
         self.timeTokenBegin = timeTokenBegin
         self.transcribeToken = transcribeToken
@@ -893,6 +961,7 @@ struct WhisperTokenizerWrapper: WhisperTokenizer {
             noSpeechToken: tokenizer.convertTokenToId("<|nospeech|>") ?? Self.defaultNoSpeechToken,
             noTimestampsToken: tokenizer.convertTokenToId("<|notimestamps|>") ?? Self.defaultNoTimestampsToken,
             specialTokenBegin: tokenizer.convertTokenToId("<|endoftext|>") ?? Self.defaultSpecialTokenBegin,
+            startOfPreviousToken: tokenizer.convertTokenToId("<|startofprev|>") ?? Self.defaultStartOfPreviousToken,
             startOfTranscriptToken: tokenizer.convertTokenToId("<|startoftranscript|>") ?? Self.defaultStartOfTranscriptToken,
             timeTokenBegin: tokenizer.convertTokenToId("<|0.00|>") ?? Self.defaultTimeTokenBegin,
             transcribeToken: tokenizer.convertTokenToId("<|transcribe|>") ?? Self.defaultTranscribeToken,
@@ -1155,6 +1224,7 @@ extension WhisperTokenizerWrapper {
     static var defaultWhitespaceToken: Int { 220 }
     static var defaultSpecialTokenBegin: Int { 50257 }
     static var defaultEndToken: Int { 50257 }
+    static var defaultStartOfPreviousToken: Int { 50361 }
     static var defaultStartOfTranscriptToken: Int { 50258 }
     static var defaultEnglishToken: Int { 50259 }
     static var defaultTranscribeToken: Int { 50359 }

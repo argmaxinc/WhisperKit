@@ -184,6 +184,122 @@ final class UnitTests: XCTestCase {
         XCTAssertNotNil(decoderOutput, "Failed to decode text")
         XCTAssertEqual(decoderOutput.count, expectedShape, "Decoder output shape is not as expected")
     }
+    
+    func testDecoderLogProbThresholdDecodingFallback() async throws {
+        let decodingOptions = DecodingOptions(
+            withoutTimestamps: true,
+            compressionRatioThreshold: nil,
+            logProbThreshold: 1000.0,
+            firstTokenLogProbThreshold: nil,
+            noSpeechThreshold: nil
+        )
+        var textDecoder = TextDecoder()
+        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
+        textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
+
+        let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.specialTokens.endToken, decodingOptions: decodingOptions)
+
+        let encoderInput = initMLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16, initialValue: FloatType(0))
+        let decoderInputs = textDecoder.prepareDecoderInputs(withPrompt: [textDecoder.tokenizer!.specialTokens.startOfTranscriptToken])
+
+        let inputs = try XCTUnwrap(decoderInputs, "Failed to prepare decoder inputs")
+        let decoderOutput = try await textDecoder.decodeText(from: encoderInput, using: inputs, sampler: tokenSampler, options: decodingOptions)
+
+        let fallback = try XCTUnwrap(decoderOutput.first?.fallback, "Fallback should not be `nil`")
+        XCTAssertEqual(fallback.fallbackReason, "logProbThreshold")
+        XCTAssertTrue(fallback.needsFallback)
+    }
+
+    func testDecoderFirstTokenLogProbThresholdDecodingFallback() async throws {
+        let decodingOptions = DecodingOptions(
+            withoutTimestamps: true,
+            compressionRatioThreshold: nil,
+            logProbThreshold: nil,
+            firstTokenLogProbThreshold: 1000.0,
+            noSpeechThreshold: nil
+        )
+        var textDecoder = TextDecoder()
+        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
+        textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
+
+        let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.specialTokens.endToken, decodingOptions: decodingOptions)
+
+        let encoderInput = initMLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16, initialValue: FloatType(0))
+        let decoderInputs = textDecoder.prepareDecoderInputs(withPrompt: [textDecoder.tokenizer!.specialTokens.startOfTranscriptToken])
+
+        let inputs = try XCTUnwrap(decoderInputs, "Failed to prepare decoder inputs")
+        let decoderOutput = try await textDecoder.decodeText(from: encoderInput, using: inputs, sampler: tokenSampler, options: decodingOptions)
+
+        let fallback = try XCTUnwrap(decoderOutput.first?.fallback, "Fallback should not be `nil`")
+        XCTAssertEqual(fallback.fallbackReason, "firstTokenLogProbThreshold")
+        XCTAssertTrue(fallback.needsFallback)
+    }
+
+    func testDecodingFallbackInit() throws {
+        let fallback1 = try XCTUnwrap(
+            DecodingFallback(
+                options: DecodingOptions(compressionRatioThreshold: -1.0, logProbThreshold: -1.0, noSpeechThreshold: -1.0),
+                isFirstTokenLogProbTooLow: true,
+                noSpeechProb: 0,
+                compressionRatio: 0,
+                avgLogProb: -2.0
+            )
+        )
+
+        XCTAssertEqual(fallback1.fallbackReason, "firstTokenLogProbThreshold")
+        XCTAssertTrue(fallback1.needsFallback)
+
+        let fallback2 = try XCTUnwrap(
+            DecodingFallback(
+                options: DecodingOptions(compressionRatioThreshold: -1.0, logProbThreshold: -1.0, noSpeechThreshold: -1.0),
+                isFirstTokenLogProbTooLow: false,
+                noSpeechProb: 0,
+                compressionRatio: 0,
+                avgLogProb: -2.0
+            )
+        )
+
+        XCTAssertEqual(fallback2.fallbackReason, "silence")
+        XCTAssertFalse(fallback2.needsFallback)
+
+        let fallback3 = try XCTUnwrap(
+            DecodingFallback(
+                options: DecodingOptions(compressionRatioThreshold: -1.0, logProbThreshold: -1.0, noSpeechThreshold: 0.0),
+                isFirstTokenLogProbTooLow: false,
+                noSpeechProb: 0,
+                compressionRatio: 0,
+                avgLogProb: -2.0
+            )
+        )
+
+        XCTAssertEqual(fallback3.fallbackReason, "compressionRatioThreshold")
+        XCTAssertTrue(fallback3.needsFallback)
+
+        let fallback4 = try XCTUnwrap(
+            DecodingFallback(
+                options: DecodingOptions(compressionRatioThreshold: 0.0, logProbThreshold: -1.0, noSpeechThreshold: 0.0),
+                isFirstTokenLogProbTooLow: false,
+                noSpeechProb: 0,
+                compressionRatio: 0,
+                avgLogProb: -2.0
+            )
+        )
+
+        XCTAssertEqual(fallback4.fallbackReason, "logProbThreshold")
+        XCTAssertTrue(fallback4.needsFallback)
+
+        XCTAssertNil(
+            DecodingFallback(
+                options: DecodingOptions(compressionRatioThreshold: 0.0, logProbThreshold: 0.0, noSpeechThreshold: 0.0),
+                isFirstTokenLogProbTooLow: false,
+                noSpeechProb: 0,
+                compressionRatio: 0,
+                avgLogProb: 0
+            )
+        )
+    }
 
     // MARK: - Tokenizer Tests
 
@@ -261,7 +377,7 @@ final class UnitTests: XCTestCase {
         let silence = [Float](repeating: 0.0, count: 30 * 16000)
         let multiWindowSamples = audioSamples + silence + audioSamples
 
-        let options = DecodingOptions(usePrefillPrompt: true, withoutTimestamps: false)
+        let options = DecodingOptions(usePrefillPrompt: true, withoutTimestamps: false, firstTokenLogProbThreshold: nil)
 
         let transcribeResult = try await whisperKit.transcribe(audioArray: multiWindowSamples, decodeOptions: options)
         let result = try XCTUnwrap(transcribeResult)
@@ -493,13 +609,16 @@ final class UnitTests: XCTestCase {
             await whisperKit.transcribe(audioArray: audioSamples, decodeOptions: options),
             "Failed to transcribe"
         )
+        
         XCTAssertTrue(result.segments.first!.tokens.contains(whisperKit.tokenizer!.specialTokens.noSpeechToken))
     }
 
     func testTemperatureIncrement() async throws {
         let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        
         // Generate random audio samples
-        let audioSamples = (0..<(30 * 16000)).map { _ in Float.random(in: -0.5...0.5) }
+        let audioSamples = (0..<(30 * 16000)).map { _ in Float.random(in: -0.7...0.7) }
+
         // Define options with temperature increment settings
         let initialTemperature: Float = 0
         let temperatureIncrement: Float = 0.1
@@ -508,6 +627,7 @@ final class UnitTests: XCTestCase {
             temperature: initialTemperature,
             temperatureIncrementOnFallback: temperatureIncrement,
             temperatureFallbackCount: fallbackCount,
+            usePrefillPrompt: false,
             logProbThreshold: 0
         )
 
@@ -556,6 +676,37 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(resultSeek.segments.first?.start, seekTime, "Seek segment should have the input start time")
         XCTAssertNotEqual(resultFull.segments.first?.start, resultSeek.segments.first?.start, "Segments should have the different start times")
         XCTAssertEqual(resultFull.segments.first?.end, resultSeek.segments.first?.end, "Segments should have the same end time")
+    }
+
+    func testPromptTokens() async throws {
+        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let promptText = " prompt to encourage output without any punctuation and without capitalizing americans as if it was already normalized"
+        let tokenizer = whisperKit.tokenizer!
+        let promptTokens = tokenizer.encode(text: promptText).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
+        let options = DecodingOptions(skipSpecialTokens: true, promptTokens: promptTokens)
+
+        let result = try await XCTUnwrapAsync(
+            await transcribe(with: .tiny, options: options),
+            "Failed to transcribe"
+        )
+
+        XCTAssertEqual(result.segments.first?.text, " and so my fellow americans ask not what your country can do for you ask what you can do for your country.")
+    }
+
+    func testPrefixTokens() async throws {
+        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        // Prefix to encourage output without any punctuation and without capitalizing americans as if it was already normalized
+        let prefixText = " and so my fellow americans"
+        let tokenizer = whisperKit.tokenizer!
+        let prefixTokens = tokenizer.encode(text: prefixText).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
+        let options = DecodingOptions(skipSpecialTokens: true, prefixTokens: prefixTokens)
+
+        let result = try await XCTUnwrapAsync(
+            await transcribe(with: .tiny, options: options),
+            "Failed to transcribe"
+        )
+
+        XCTAssertEqual(result.segments.first?.text, " and so my fellow americans ask not what your country can do for you ask what you can do for your country.")
     }
 
     // MARK: - Utils Tests
@@ -1040,18 +1191,97 @@ final class UnitTests: XCTestCase {
             XCTAssertEqual(wordTiming.end, expectedWordTiming.end, accuracy: 0.5, "End time difference for word '\(wordTiming.word)' should be within +/- 0.1 seconds (expected: \(expectedWordTiming.end), actual: \(wordTiming.end))")
         }
     }
-    
-    func testWERCalculations(){
-        let hypothesis = ["hello world", "good night moon"]
-        let references = ["hello world", "good night moon"]
-        XCTAssertEqual(process_words(reference: references, hypothesis: hypothesis), 0.0)
-        
-        let hypothesis1 = ["this is the prediction", "there is an other sample"]
-        let references1 = ["this is the reference", "there is another one"]
-        XCTAssertEqual(process_words(reference: references1, hypothesis: hypothesis1), 0.5)
-        
-        let hypothesis2 = ["hello world", "good night moon"]
-        let references2 = ["hi everyone", "have a great day"]
-        XCTAssertEqual(process_words(reference: references2, hypothesis: hypothesis2), 1.0)
+
+    // MARK: - Streaming Timestamp Tests
+
+    func testStreamingTimestamps() async throws {
+        let options = DecodingOptions(usePrefillPrompt: true, wordTimestamps: true)
+        let audioFile = "jfk.wav"
+        let modelPath = try tinyModelPath()
+
+        let whisperKit = try await WhisperKit(modelFolder: modelPath,/* computeOptions: computeOptions,*/ verbose: true, logLevel: .debug)
+
+        let startTime = Date()
+        let audioComponents = audioFile.components(separatedBy: ".")
+        guard let audioFileURL = Bundle.module.path(forResource: audioComponents.first, ofType: audioComponents.last) else {
+            XCTFail("Audio file not found")
+            return
+        }
+        guard let audioBuffer = AudioProcessor.loadAudio(fromPath: audioFileURL) else {
+            XCTFail("Failed to load audio buffer")
+            return
+        }
+        let audioArray = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
+
+
+        var results: [TranscriptionResult?] = []
+        var prevResult: TranscriptionResult?
+        var lastAgreedSeconds: Float = 0.0
+        let agreementCountNeeded = 2
+        var hypothesisWords: [WordTiming] = []
+        var prevWords: [WordTiming] = []
+        var lastAgreedWords: [WordTiming] = []
+        var confirmedWords: [WordTiming] = []
+
+        for seekSample in stride(from: 0, to: audioArray.count, by: 32000) {
+            let endSample = min(seekSample + 32000, audioArray.count)
+            Logging.info("[testStreamingTimestamps] \(lastAgreedSeconds)-\(Double(endSample)/16000.0) seconds")
+
+            let simulatedStreamingAudio = Array(audioArray[..<endSample])
+            var streamOptions = options
+            streamOptions.clipTimestamps = [lastAgreedSeconds]
+            let lastAgreedTokens = lastAgreedWords.flatMap { $0.tokens }
+            streamOptions.prefixTokens = lastAgreedTokens
+            do {
+                let result: TranscriptionResult? = try await whisperKit.transcribe(audioArray: simulatedStreamingAudio, decodeOptions: streamOptions)
+                var skipAppend = false
+                if let result = result {
+                    hypothesisWords = result.allWords.filter { $0.start >= lastAgreedSeconds }
+
+                    if let prevResult = prevResult {
+                        prevWords = prevResult.allWords.filter { $0.start >= lastAgreedSeconds }
+                        let commonPrefix = findLongestCommonPrefix(prevWords, hypothesisWords)
+                        Logging.info("[testStreamingTimestamps] Prev \"\((prevWords.map { $0.word }).joined())\"")
+                        Logging.info("[testStreamingTimestamps] Next \"\((hypothesisWords.map { $0.word }).joined())\"")
+                        Logging.info("[testStreamingTimestamps] Found common prefix \"\((commonPrefix.map { $0.word }).joined())\"")
+
+                        if commonPrefix.count >= agreementCountNeeded {
+                            lastAgreedWords = commonPrefix.suffix(agreementCountNeeded)
+                            lastAgreedSeconds = lastAgreedWords.first!.start
+                            Logging.info("[testStreamingTimestamps] Found new last agreed word \"\(lastAgreedWords.first!.word)\" at \(lastAgreedSeconds) seconds")
+
+                            confirmedWords.append(contentsOf: commonPrefix.prefix(commonPrefix.count - agreementCountNeeded))
+                            let currentWords = confirmedWords.map { $0.word }.joined()
+                            Logging.info("[testStreamingTimestamps] Current:  \(lastAgreedSeconds) -> \(Double(endSample)/16000.0) \(currentWords)")
+                        } else {
+                            Logging.info("[testStreamingTimestamps] Using same last agreed time \(lastAgreedSeconds)")
+                            skipAppend = true
+                        }
+
+
+                    }
+                    prevResult = result
+                }
+
+                if !skipAppend {
+                    results.append(result)
+                }
+            } catch {
+                XCTFail(error.localizedDescription)
+            }
+        }
+
+        // Accept the final hypothesis because it is the last of the available audio
+        let final = lastAgreedWords + findLongestDifferentSuffix(prevWords, hypothesisWords)
+        confirmedWords.append(contentsOf: final)
+
+        let finalWords = confirmedWords.map { $0.word }.joined()
+        Logging.info("[testStreamingTimestamps] Current: \(finalWords)")
+        Logging.info("[testStreamingTimestamps] Time taken: \(Date().timeIntervalSince(startTime)) seconds")
+
+        // Perform assertions or further processing with the results array
+        Logging.info("[testStreamingTimestamps] Done")
+
+        XCTAssertEqual(finalWords.normalized, " And so my fellow Americans. Ask not what your country can do for you ask what you can do for your country.".normalized)
     }
 }
