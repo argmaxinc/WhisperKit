@@ -621,7 +621,9 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
                 }
 
                 // Prepare results
-                let currentTranscript = tokenizer.decode(tokens: currentTokens)
+                let wordTokens = currentTokens.filter { $0 < tokenizer.specialTokens.specialTokenBegin }
+                let slicedTextTokens = options.skipSpecialTokens ? wordTokens : currentTokens
+                let currentTranscript = tokenizer.decode(tokens: slicedTextTokens)
                 let averageLogProb = logProbs.reduce(0, +) / Float(logProbs.count)
                 let compressionRatio = compressionRatio(of: currentTokens)
 
