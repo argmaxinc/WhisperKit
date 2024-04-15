@@ -1,4 +1,5 @@
 import Foundation
+import WhisperKit
 
 // MARK: - RegressionStats
 class RegressionStats: JSONCodable {
@@ -23,13 +24,15 @@ class TestInfo: JSONCodable {
     let model: String
     let date: String
     let timeElapsedInSeconds: TimeInterval
+    let timings: TranscriptionTimings?
     
-    init(device: String, audioFile: String, model: String, date: String, timeElapsedInSeconds: TimeInterval) {
+    init(device: String, audioFile: String, model: String, date: String, timeElapsedInSeconds: TimeInterval, timings: TranscriptionTimings?) {
         self.device = device
         self.audioFile = audioFile
         self.model = model
         self.date = date
         self.timeElapsedInSeconds = timeElapsedInSeconds
+        self.timings = timings
     }
 }
 
@@ -72,6 +75,9 @@ class LatencyStats: Stats{
         fatalError("init(from:) has not been implemented")
     }
     
+    func calculate(from total: Double, runs: Int) -> Double{
+        return runs > 0 ? total / Double(runs) : -1
+    }
 }
 
 class MemoryStats: Stats{
@@ -86,6 +92,20 @@ class MemoryStats: Stats{
     
     required init(from decoder: any Decoder) throws {
         fatalError("init(from:) has not been implemented")
+    }
+    
+    // Implement the encode(to:) method
+    override func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try super.encode(to: encoder)
+        try container.encode(preTranscribeMemory, forKey: .preTranscribeMemory)
+        try container.encode(postTranscribeMemory, forKey: .postTranscribeMemory)
+    }
+    
+    // Coding keys for MemoryStats properties
+    enum CodingKeys: String, CodingKey {
+        case preTranscribeMemory
+        case postTranscribeMemory
     }
 }
 
@@ -114,43 +134,30 @@ extension Data {
 }
 
 // MARK: - Memory Footprint
-func memoryFootprint() -> UInt64 {
-    // The `TASK_VM_INFO_COUNT` and `TASK_VM_INFO_REV1_COUNT` macros are too
-    // complex for the Swift C importer, so we have to define them ourselves.
-    let TASK_VM_INFO_COUNT = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
-    guard let offset = MemoryLayout.offset(of: \task_vm_info_data_t.min_address) else {return 0}
-    let TASK_VM_INFO_REV1_COUNT = mach_msg_type_number_t(offset / MemoryLayout<integer_t>.size)
-    var info = task_vm_info_data_t()
-    var count = TASK_VM_INFO_COUNT
-    let kr = withUnsafeMutablePointer(to: &info) { infoPtr in
-        infoPtr.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { intPtr in
-            task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), intPtr, &count)
-        }
-    }
-    guard
-        kr == KERN_SUCCESS,
-        count >= TASK_VM_INFO_REV1_COUNT
-    else { return 0}
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
+class SystemMemoryChecker: NSObject{
     
-    let usedBytes = Float(info.phys_footprint)
-    let usedBytesInt: UInt64 = UInt64(usedBytes)
-    let usedMB = usedBytesInt / 1024 / 1024
-    return usedMB
-}
-
-func writeToFile(text: String, append: Bool = false, fileName: String) throws {
-    // File URL where you want to write the output
-    var fileURL = URL(fileURLWithPath: "./\(fileName)")
-    var dataToWrite = text.data(using: .utf8)
-    if FileManager.default.fileExists(atPath: fileURL.path) {
-        if let fileHandle = try? FileHandle(forWritingTo: fileURL) {
-            if append{fileHandle.seekToEndOfFile()}
-            if let data = dataToWrite{
-                fileHandle.write(data)
+    func getMemoryUsed() -> UInt64 {
+        // The `TASK_VM_INFO_COUNT` and `TASK_VM_INFO_REV1_COUNT` macros are too
+        // complex for the Swift C importer, so we have to define them ourselves.
+        let TASK_VM_INFO_COUNT = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
+        guard let offset = MemoryLayout.offset(of: \task_vm_info_data_t.min_address) else {return 0}
+        let TASK_VM_INFO_REV1_COUNT = mach_msg_type_number_t(offset / MemoryLayout<integer_t>.size)
+        var info = task_vm_info_data_t()
+        var count = TASK_VM_INFO_COUNT
+        let kr = withUnsafeMutablePointer(to: &info) { infoPtr in
+            infoPtr.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { intPtr in
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), intPtr, &count)
             }
-            fileHandle.closeFile()
         }
-    }else {
-        try dataToWrite?.write(to: fileURL)
+        guard
+            kr == KERN_SUCCESS,
+            count >= TASK_VM_INFO_REV1_COUNT
+        else { return 0}
+        
+        let usedBytes = Float(info.phys_footprint)
+        let usedBytesInt: UInt64 = UInt64(usedBytes)
+        let usedMB = usedBytesInt / 1024 / 1024
+        return usedMB
     }
 }
