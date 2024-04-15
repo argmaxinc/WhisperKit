@@ -342,15 +342,15 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         // 1. LanguageLogitsFilter for only language tokens
         // 2. GreedyTokenSampler for most likely language
         var timings = TranscriptionTimings()
-        let prefilledIndex = decoderInputs.cacheLength[0].intValue
-        let currentTokens: [Int] = decoderInputs.initialPrompt
-        var nextToken: Int = decoderInputs.initialPrompt.last!
-        var logProbs: [Float] = Array(repeating: 0, count: prefilledIndex + 1)
 
         guard let tokenizer = tokenizer else {
             // Tokenizer required for decoding
             throw WhisperError.tokenizerUnavailable()
         }
+
+        let prefilledIndex = 0
+        let currentTokens: [Int] = [tokenizer.specialTokens.startOfTranscriptToken]
+        var logProbs: [Float] = Array(repeating: 0, count: prefilledIndex + 1)
         
         guard let logitsSize = logitsSize else {
             throw WhisperError.modelsUnavailable("Failed to read logits size from model")
@@ -358,8 +358,8 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
 
         // Logits filters
         var logitsFilters: [any LogitsFiltering] = []
-        let allLanguageTokens:[Int] = tokenizer.languages.compactMap {tokenizer.convertTokenToId("<|\($0)|>")}
-        
+        let allLanguageTokens: [Int] = tokenizer.allLanguageTokens
+
         // language filter
         logitsFilters.append(
             LanguageLogitsFilter(
@@ -367,14 +367,11 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
                 logitsDim: logitsSize,
                 sampleBegin: prefilledIndex)
         )
-        Logging.debug("prefilled Index is \(prefilledIndex)")
 
         let tokenIndex = 0
         let prefillToken = currentTokens[tokenIndex]
-        nextToken = prefillToken
-        Logging.debug("Forcing token \(nextToken) at index \(tokenIndex) from initial prompt")
-        
-        
+        var nextToken = prefillToken
+
         // Set the current token as model input
         decoderInputs.inputIds[0] = NSNumber(value: nextToken)
         decoderInputs.cacheLength[0] = NSNumber(value: tokenIndex)
@@ -384,6 +381,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         // Predict next token
         let inferenceTime = Date()
         
+        Logging.debug("Detecting language...")
         let predictedLogits = try await self.predictLogits(
             inputIds: decoderInputs.inputIds,
             cacheLength: decoderInputs.cacheLength,
@@ -393,7 +391,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             encoderOutputEmbeds: encoderOutput,
             decoderKeyPaddingMask: decoderInputs.decoderKeyPaddingMask
         )
-        Logging.debug("Predicted logits")
+
         guard let decoderOutput = predictedLogits else {
             Logging.error("Unable to decode logits")
             throw WhisperError.decodingLogitsFailed()
@@ -426,8 +424,8 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         var decodingResult = DecodingResult.emptyResults
         decodingResult.timings = timings
         decodingResult.language = String(detectedLanguage)
+        Logging.debug("Detected language: \(detectedLanguage)")
         return decodingResult
-        
     }
 
     public func decodeText(
@@ -495,9 +493,9 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             let isFirstToken = tokenIndex == prefilledIndex
           
             // Check if current index is part of the initial prompt
-            if tokenIndex <= intialPromptIndex {
+            if tokenIndex < intialPromptIndex {
                 nextToken = currentTokens[tokenIndex]
-                Logging.debug("Forcing token \(nextToken) at index \(tokenIndex) from initial prompt")
+                Logging.debug("Forcing prompt tokenIndex: \(tokenIndex), token: \(nextToken), text: \(tokenizer.decode(tokens: [nextToken]))")
             }
 
             // Set the current token as model input
@@ -614,12 +612,14 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
                 }
 
                 // Prepare results
-                let currentTranscript = tokenizer.decode(tokens: currentTokens)
+                let wordTokens = currentTokens.filter { $0 < tokenizer.specialTokens.specialTokenBegin }
+                let slicedTextTokens = options.skipSpecialTokens ? wordTokens : currentTokens
+                let currentTranscript = tokenizer.decode(tokens: slicedTextTokens)
                 let averageLogProb = logProbs.reduce(0, +) / Float(logProbs.count)
                 let compressionRatio = compressionRatio(of: currentTokens)
 
                 let result = TranscriptionProgress(timings: timings, text: currentTranscript, tokens: currentTokens, avgLogprob: averageLogProb, compressionRatio: compressionRatio)
-                Logging.debug("tokenIndex: \(tokenIndex), token: \(nextToken), word: \(tokenizer.decode(tokens: [nextToken]))")
+                Logging.debug("Predicted next tokenIndex: \(tokenIndex + 1), token: \(nextToken), text: \(tokenizer.decode(tokens: [nextToken]))")
 
                 // Call the callback if it is provided
                 if let shouldContinue = callback?(result) {
@@ -676,6 +676,31 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
 
         let noSpeechProb: Float = 0 // TODO: implement no speech prob
 
+        // If language is still nil here, check language can be inferred from tokens
+        var language = options.language ?? "en"
+        var languageProbs = [String: Float]()
+        if options.language == nil {
+            let allLanguageTokens: [Int] = tokenizer.allLanguageTokens
+
+            // Find the first token that is a recognized language token
+            if let predictedLanguageIndex = filteredTokens.firstIndex(where: { allLanguageTokens.contains($0) }),
+               predictedLanguageIndex < tokenProbs.count {
+                let predictedLanguageToken = filteredTokens[predictedLanguageIndex]
+                // Decode the predicted language token to get the language
+                language = tokenizer.decode(tokens: [predictedLanguageToken]).trimmingCharacters(in: CharacterSet(charactersIn: "<|>"))
+
+                // Fetch the corresponding probability for the predicted language
+                let probsDict = tokenProbs[predictedLanguageIndex]
+                languageProbs[language] = probsDict[predictedLanguageToken] ?? 0.0
+            } else {
+                // Set default values if no language token is found
+                languageProbs[language] = 0.0
+            }
+        } else {
+            // If language is provided, set the logprob to 0.0
+            languageProbs[language] = 0.0
+        }
+
         let transcript = tokenizer.decode(tokens: filteredTokens)
 
         let decodingFallback = DecodingFallback(
@@ -687,8 +712,8 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         )
 
         return DecodingResult(
-            language: options.language ?? "en",
-            languageProbs: [options.language ?? "en": 1.0],
+            language: language,
+            languageProbs: languageProbs,
             tokens: filteredTokens,
             tokenLogProbs: tokenProbs,
             text: transcript,

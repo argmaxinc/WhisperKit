@@ -138,12 +138,12 @@ open class SegmentSeeker: SegmentSeeking {
                     noSpeechProb: decodingResult.noSpeechProb
                 )
                 currentSegments.append(newSegment)
-                lastSliceStart = currentSliceEnd - (singleTimestampEnding ? 1 : 0)
+                lastSliceStart = currentSliceEnd
             }
 
             // Seek to the last timestamp in the segment
             if !noTimestampEnding {
-                let lastTimestampToken = currentTokens[lastSliceStart] - timeToken
+                let lastTimestampToken = currentTokens[lastSliceStart - (singleTimestampEnding ? 1 : 0)] - timeToken
                 let lastTimestampSeconds = Float(lastTimestampToken) * secondsPerTimeToken
                 let lastTimestampSamples = Int(lastTimestampSeconds * Float(sampleRate))
                 seek += lastTimestampSamples
@@ -294,10 +294,12 @@ open class SegmentSeeker: SegmentSeeking {
         for i in 1..<alignment.count {
             var currentWord = alignment[i]
             let previousWord = alignment[i - 1]
-            if previousWord.word.starts(with: " "), prepended.contains(previousWord.word.trimmingCharacters(in: .whitespaces)) {
+            // Check if the previous word starts with a whitespace character and is part of the prepended punctuations
+            if let firstChar = previousWord.word.unicodeScalars.first,
+               CharacterSet.whitespaces.contains(firstChar),
+                prepended.contains(previousWord.word.trimmingCharacters(in: .whitespaces)) {
                 currentWord.word = previousWord.word + currentWord.word
                 currentWord.tokens = previousWord.tokens + currentWord.tokens
-                currentWord.start = min(previousWord.start, currentWord.start)
                 prependedAlignment[prependedAlignment.count - 1] = currentWord
             } else {
                 prependedAlignment.append(currentWord)
@@ -316,7 +318,6 @@ open class SegmentSeeker: SegmentSeeking {
             if !previousWord.word.hasSuffix(" "), appended.contains(currentWord.word.trimmingCharacters(in: .whitespaces)) {
                 previousWord.word = previousWord.word + currentWord.word
                 previousWord.tokens = previousWord.tokens + currentWord.tokens
-                previousWord.end = max(previousWord.end, currentWord.end)
                 appendedAlignment[appendedAlignment.count - 1] = previousWord
             } else {
                 appendedAlignment.append(currentWord)
@@ -535,17 +536,17 @@ open class SegmentSeeker: SegmentSeeking {
                         wordsInSegment[0].end = boundary
                         wordsInSegment[1].start = boundary
                     }
-                    wordsInSegment[0].start = max(0, firstWord.end - maxDuration)
+                    wordsInSegment[0].start = max(lastSpeechTimestamp, firstWord.end - maxDuration)
                 }
 
-                // Prefer segment-level start timestamp
+                // Prefer segment-level start timestamp if the first word is too long.
                 if segment.start < firstWord.end && segment.start - 0.5 > firstWord.start {
                     wordsInSegment[0].start = max(0, min(firstWord.end - constrainedMedianDuration, segment.start))
                 } else {
                     updatedSegment.start = firstWord.start
                 }
 
-                // Prefer segment-level end timestamp
+                // Prefer segment-level end timestamp if the last word is too long.
                 if updatedSegment.end > lastWord.start && segment.end + 0.5 < lastWord.end {
                     wordsInSegment[wordsInSegment.count - 1].end = max(lastWord.start + constrainedMedianDuration, segment.end)
                 } else {

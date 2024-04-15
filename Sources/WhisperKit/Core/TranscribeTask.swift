@@ -203,7 +203,7 @@ final class TranscribeTask {
                         segmentSize: segmentSize,
                         prependPunctuations: "\"'“¿([{-",
                         appendPunctuations: "\"'.。,，!！?？:：”)]}、",
-                        lastSpeechTimestamp: currentSegments?.last?.end ?? 0,
+                        lastSpeechTimestamp: Float(Double(previousSeek) / Double(WhisperKit.sampleRate)),
                         options: options,
                         timings: timings
                     )
@@ -265,7 +265,7 @@ final class TranscribeTask {
             // Fallback `options.temperatureFallbackCount` times with increasing temperatures, starting at `options.temperature`
             let temperatures = (0...options.temperatureFallbackCount).map { FloatType(options.temperature) + FloatType($0) * FloatType(options.temperatureIncrementOnFallback) }
 
-            Logging.debug("Decoding with tempeartures \(temperatures)")
+            Logging.debug("Decoding with temperatures \(temperatures)")
 
             var decodingResult: DecodingResult?
 
@@ -276,8 +276,8 @@ final class TranscribeTask {
                 let tokenSampler = GreedyTokenSampler(temperature: temp, eotToken: tokenizer.specialTokens.endToken, decodingOptions: options)
 
                 var currentDecodingOptions = options
-                // For a multilingual model, if language is not passed and usePrefill is false, detect language and set in options
-                if textDecoder.isModelMultilingual, options.language == nil, !options.usePrefillPrompt {
+                // For a multilingual model, if language is not passed and detectLanguage is true, detect language and set in options
+                if textDecoder.isModelMultilingual, options.language == nil, options.detectLanguage {
                     let languageDecodingResult = try? await textDecoder.detectLanguage(
                         from: encoderOutput,
                         using: decoderInputs,
@@ -285,8 +285,17 @@ final class TranscribeTask {
                         options: options,
                         temperature: temp
                     )
-                    detectedLanguage = languageDecodingResult?.language
+
+                    // Update the language decoding options
                     currentDecodingOptions.language = languageDecodingResult?.language
+                    detectedLanguage = languageDecodingResult?.language
+
+                    // Update prompt and KV Cache if needed
+                    if options.usePrefillPrompt {
+                        decoderInputs = try await textDecoder.prefillDecoderInputs(decoderInputs, withOptions: currentDecodingOptions)
+                    }
+
+                    Logging.debug("Prefill prompt updated to: \(decoderInputs.initialPrompt.map { tokenizer.convertIdToToken($0) ?? "" })")
                 }
 
                 decodingResult = try await textDecoder.decodeText(
@@ -296,6 +305,11 @@ final class TranscribeTask {
                     options: currentDecodingOptions,
                     callback: callback
                 )
+
+                // Use the predicted language if it was not detected ahead of time
+                if detectedLanguage == nil {
+                    detectedLanguage = decodingResult?.language
+                }
 
                 // Update timings from the decoder main loop
                 if let decodingTimings = decodingResult?.timings {
