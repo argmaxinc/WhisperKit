@@ -906,160 +906,10 @@ public class TextDecoderCachePrefillOutput: MLFeatureProvider {
     }
 }
 
-// MARK: SpecialTokens
+// MARK: Languages
 
-public struct SpecialTokens {
-    public let endToken: Int
-    public let englishToken: Int
-    public let noSpeechToken: Int
-    public let noTimestampsToken: Int
-    public let specialTokenBegin: Int
-    public let startOfPreviousToken: Int
-    public let startOfTranscriptToken: Int
-    public let timeTokenBegin: Int
-    public let transcribeToken: Int
-    public let translateToken: Int
-    public let whitespaceToken: Int
-
-    public init(
-        endToken: Int,
-        englishToken: Int,
-        noSpeechToken: Int,
-        noTimestampsToken: Int,
-        specialTokenBegin: Int,
-        startOfPreviousToken: Int,
-        startOfTranscriptToken: Int,
-        timeTokenBegin: Int,
-        transcribeToken: Int,
-        translateToken: Int,
-        whitespaceToken: Int
-    ) {
-        self.endToken = endToken
-        self.englishToken = englishToken
-        self.noSpeechToken = noSpeechToken
-        self.noTimestampsToken = noTimestampsToken
-        self.specialTokenBegin = specialTokenBegin
-        self.startOfPreviousToken = startOfPreviousToken
-        self.startOfTranscriptToken = startOfTranscriptToken
-        self.timeTokenBegin = timeTokenBegin
-        self.transcribeToken = transcribeToken
-        self.translateToken = translateToken
-        self.whitespaceToken = whitespaceToken
-    }
-}
-
-public protocol WhisperTokenizer: Tokenizer {
-    var specialTokens: SpecialTokens { get }
-    
-    func splitToWordTokens(tokenIds: [Int]) -> (words: [String], wordTokens: [[Int]])
-}
-
-struct WhisperTokenizerWrapper: WhisperTokenizer {
-    let tokenizer: any Tokenizer
-    let specialTokens: SpecialTokens
-    
-    init(tokenizer: any Tokenizer) {
-        self.tokenizer = tokenizer
-        self.specialTokens = SpecialTokens(
-            endToken: tokenizer.convertTokenToId("<|endoftext|>") ?? Self.defaultEndToken,
-            englishToken: tokenizer.convertTokenToId("<|en|>") ?? Self.defaultEnglishToken,
-            noSpeechToken: tokenizer.convertTokenToId("<|nospeech|>") ?? Self.defaultNoSpeechToken,
-            noTimestampsToken: tokenizer.convertTokenToId("<|notimestamps|>") ?? Self.defaultNoTimestampsToken,
-            specialTokenBegin: tokenizer.convertTokenToId("<|endoftext|>") ?? Self.defaultSpecialTokenBegin,
-            startOfPreviousToken: tokenizer.convertTokenToId("<|startofprev|>") ?? Self.defaultStartOfPreviousToken,
-            startOfTranscriptToken: tokenizer.convertTokenToId("<|startoftranscript|>") ?? Self.defaultStartOfTranscriptToken,
-            timeTokenBegin: tokenizer.convertTokenToId("<|0.00|>") ?? Self.defaultTimeTokenBegin,
-            transcribeToken: tokenizer.convertTokenToId("<|transcribe|>") ?? Self.defaultTranscribeToken,
-            translateToken: tokenizer.convertTokenToId("<|translate|>") ?? Self.defaultTranslateToken,
-            whitespaceToken: tokenizer.convertTokenToId(" ") ?? Self.defaultWhitespaceToken
-        )
-    }
-    
-    private func splitTokensOnUnicode(tokens: [Int]) -> (words: [String], wordTokens: [[Int]]) {
-        let decodedFull = tokenizer.decode(tokens: tokens)
-        let replacementString = "\u{fffd}"
-        
-        var words: [String] = []
-        var wordTokens: [[Int]] = []
-        var currentTokens: [Int] = []
-        var unicodeOffset = 0
-        
-        for token in tokens {
-            currentTokens.append(token)
-            let decoded = tokenizer.decode(tokens: currentTokens)
-            
-            var hasUnicodeInFullString = false
-            if let range = decoded.range(of: replacementString) {
-                hasUnicodeInFullString = decodedFull[range] == replacementString
-            }
-            
-            if !decoded.contains(replacementString) || hasUnicodeInFullString {
-                words.append(decoded)
-                wordTokens.append(currentTokens)
-                currentTokens = []
-                unicodeOffset += decoded.count
-            }
-        }
-        
-        return (words, wordTokens)
-    }
-    
-    private func splitTokensOnSpaces(tokens: [Int]) -> (words: [String], wordTokens: [[Int]]) {
-        let (subwords, subwordTokensList) = splitTokensOnUnicode(tokens: tokens)
-        var words: [String] = []
-        var wordTokens: [[Int]] = []
-        
-        for (subword, subwordTokens) in zip(subwords, subwordTokensList) {
-            let special = subwordTokens.first! >= specialTokens.specialTokenBegin
-            let withSpace = subword.hasPrefix(" ")
-            var punctuation = false
-            if let strippedSubword = UnicodeScalar(subword.trimmingCharacters(in: .whitespaces)) {
-                punctuation = CharacterSet.punctuationCharacters.contains(strippedSubword)
-            }
-            if special || withSpace || punctuation || words.isEmpty {
-                words.append(subword)
-                wordTokens.append(subwordTokens)
-            } else {
-                words[words.count - 1] += subword
-                wordTokens[words.count - 1].append(contentsOf: subwordTokens)
-            }
-        }
-        
-        return (words, wordTokens)
-    }
-    
-    private func isPunctuation(_ text: String, tokenRange: Range<String.Index>, tag: NLTag?) -> Bool {
-        let punctuationCharacters = CharacterSet.punctuationCharacters
-        let token = String(text[tokenRange])
-        if let tag = tag, tag == .punctuation {
-            return true
-        } else if token.unicodeScalars.allSatisfy({ punctuationCharacters.contains($0) }) {
-            return true
-        }
-        return false
-    }
-    
-    /// Decodes token ids into individual words and per-word subtokens
-    /// - Parameter tokenIds: Array of tokens to decode and then split
-    /// - Returns: Tuple containing and array of the split words and all tokens for each word
-    func splitToWordTokens(tokenIds: [Int]) -> (words: [String], wordTokens: [[Int]]) {
-        let decodedWords = tokenizer.decode(tokens: tokenIds.filter { $0 < specialTokens.specialTokenBegin })
-        
-        // Detect language of input text
-        let recognizer = NLLanguageRecognizer()
-        recognizer.processString(decodedWords)
-        let languageCode = recognizer.dominantLanguage?.rawValue
-        
-        if ["zh", "ja", "th", "lo", "my", "yue"].contains(languageCode) {
-            return splitTokensOnUnicode(tokens: tokenIds)
-        } else {
-            return splitTokensOnSpaces(tokens: tokenIds)
-        }
-    }
-}
-
-public extension WhisperTokenizer {
-    var languages: [String: String] {
+public extension WhisperKit {
+    static var languages: [String: String] {
         [
             "english": "en",
             "chinese": "zh",
@@ -1175,9 +1025,165 @@ public extension WhisperTokenizer {
             "mandarin": "zh",
         ]
     }
+}
 
-    var allLanguageTokens: [Int] {
-        Array(Set(self.languages.compactMap { self.convertTokenToId("<|\($0.value)|>") }).filter { $0 > self.specialTokens.specialTokenBegin })
+// MARK: SpecialTokens
+
+public struct SpecialTokens {
+    public let endToken: Int
+    public let englishToken: Int
+    public let noSpeechToken: Int
+    public let noTimestampsToken: Int
+    public let specialTokenBegin: Int
+    public let startOfPreviousToken: Int
+    public let startOfTranscriptToken: Int
+    public let timeTokenBegin: Int
+    public let transcribeToken: Int
+    public let translateToken: Int
+    public let whitespaceToken: Int
+
+    public init(
+        endToken: Int,
+        englishToken: Int,
+        noSpeechToken: Int,
+        noTimestampsToken: Int,
+        specialTokenBegin: Int,
+        startOfPreviousToken: Int,
+        startOfTranscriptToken: Int,
+        timeTokenBegin: Int,
+        transcribeToken: Int,
+        translateToken: Int,
+        whitespaceToken: Int
+    ) {
+        self.endToken = endToken
+        self.englishToken = englishToken
+        self.noSpeechToken = noSpeechToken
+        self.noTimestampsToken = noTimestampsToken
+        self.specialTokenBegin = specialTokenBegin
+        self.startOfPreviousToken = startOfPreviousToken
+        self.startOfTranscriptToken = startOfTranscriptToken
+        self.timeTokenBegin = timeTokenBegin
+        self.transcribeToken = transcribeToken
+        self.translateToken = translateToken
+        self.whitespaceToken = whitespaceToken
+    }
+}
+
+public protocol WhisperTokenizer: Tokenizer {
+    var specialTokens: SpecialTokens { get }
+    var allLanguageTokens: Set<Int> { get }
+
+    func splitToWordTokens(tokenIds: [Int]) -> (words: [String], wordTokens: [[Int]])
+}
+
+struct WhisperTokenizerWrapper: WhisperTokenizer {
+    let tokenizer: any Tokenizer
+    let specialTokens: SpecialTokens
+    let allLanguageTokens: Set<Int>
+
+    init(tokenizer: any Tokenizer) {
+        let specialTokens = SpecialTokens(
+            endToken: tokenizer.convertTokenToId("<|endoftext|>") ?? Self.defaultEndToken,
+            englishToken: tokenizer.convertTokenToId("<|en|>") ?? Self.defaultEnglishToken,
+            noSpeechToken: tokenizer.convertTokenToId("<|nospeech|>") ?? Self.defaultNoSpeechToken,
+            noTimestampsToken: tokenizer.convertTokenToId("<|notimestamps|>") ?? Self.defaultNoTimestampsToken,
+            specialTokenBegin: tokenizer.convertTokenToId("<|endoftext|>") ?? Self.defaultSpecialTokenBegin,
+            startOfPreviousToken: tokenizer.convertTokenToId("<|startofprev|>") ?? Self.defaultStartOfPreviousToken,
+            startOfTranscriptToken: tokenizer.convertTokenToId("<|startoftranscript|>") ?? Self.defaultStartOfTranscriptToken,
+            timeTokenBegin: tokenizer.convertTokenToId("<|0.00|>") ?? Self.defaultTimeTokenBegin,
+            transcribeToken: tokenizer.convertTokenToId("<|transcribe|>") ?? Self.defaultTranscribeToken,
+            translateToken: tokenizer.convertTokenToId("<|translate|>") ?? Self.defaultTranslateToken,
+            whitespaceToken: tokenizer.convertTokenToId(" ") ?? Self.defaultWhitespaceToken
+        )
+        self.tokenizer = tokenizer
+        self.specialTokens = specialTokens
+        self.allLanguageTokens = Set(
+            WhisperKit.languages
+                .compactMap { tokenizer.convertTokenToId("<|\($0.value)|>") }
+                .filter { $0 > specialTokens.specialTokenBegin }
+        )
+    }
+    
+    private func splitTokensOnUnicode(tokens: [Int]) -> (words: [String], wordTokens: [[Int]]) {
+        let decodedFull = tokenizer.decode(tokens: tokens)
+        let replacementString = "\u{fffd}"
+        
+        var words: [String] = []
+        var wordTokens: [[Int]] = []
+        var currentTokens: [Int] = []
+        var unicodeOffset = 0
+        
+        for token in tokens {
+            currentTokens.append(token)
+            let decoded = tokenizer.decode(tokens: currentTokens)
+            
+            var hasUnicodeInFullString = false
+            if let range = decoded.range(of: replacementString) {
+                hasUnicodeInFullString = decodedFull[range] == replacementString
+            }
+            
+            if !decoded.contains(replacementString) || hasUnicodeInFullString {
+                words.append(decoded)
+                wordTokens.append(currentTokens)
+                currentTokens = []
+                unicodeOffset += decoded.count
+            }
+        }
+        
+        return (words, wordTokens)
+    }
+    
+    private func splitTokensOnSpaces(tokens: [Int]) -> (words: [String], wordTokens: [[Int]]) {
+        let (subwords, subwordTokensList) = splitTokensOnUnicode(tokens: tokens)
+        var words: [String] = []
+        var wordTokens: [[Int]] = []
+        
+        for (subword, subwordTokens) in zip(subwords, subwordTokensList) {
+            let special = subwordTokens.first! >= specialTokens.specialTokenBegin
+            let withSpace = subword.hasPrefix(" ")
+            var punctuation = false
+            if let strippedSubword = UnicodeScalar(subword.trimmingCharacters(in: .whitespaces)) {
+                punctuation = CharacterSet.punctuationCharacters.contains(strippedSubword)
+            }
+            if special || withSpace || punctuation || words.isEmpty {
+                words.append(subword)
+                wordTokens.append(subwordTokens)
+            } else {
+                words[words.count - 1] += subword
+                wordTokens[words.count - 1].append(contentsOf: subwordTokens)
+            }
+        }
+        
+        return (words, wordTokens)
+    }
+    
+    private func isPunctuation(_ text: String, tokenRange: Range<String.Index>, tag: NLTag?) -> Bool {
+        let punctuationCharacters = CharacterSet.punctuationCharacters
+        let token = String(text[tokenRange])
+        if let tag = tag, tag == .punctuation {
+            return true
+        } else if token.unicodeScalars.allSatisfy({ punctuationCharacters.contains($0) }) {
+            return true
+        }
+        return false
+    }
+    
+    /// Decodes token ids into individual words and per-word subtokens
+    /// - Parameter tokenIds: Array of tokens to decode and then split
+    /// - Returns: Tuple containing and array of the split words and all tokens for each word
+    func splitToWordTokens(tokenIds: [Int]) -> (words: [String], wordTokens: [[Int]]) {
+        let decodedWords = tokenizer.decode(tokens: tokenIds.filter { $0 < specialTokens.specialTokenBegin })
+        
+        // Detect language of input text
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(decodedWords)
+        let languageCode = recognizer.dominantLanguage?.rawValue
+        
+        if ["zh", "ja", "th", "lo", "my", "yue"].contains(languageCode) {
+            return splitTokensOnUnicode(tokens: tokenIds)
+        } else {
+            return splitTokensOnSpaces(tokens: tokenIds)
+        }
     }
 }
 

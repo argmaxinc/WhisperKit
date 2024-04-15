@@ -15,6 +15,14 @@ struct Transcribe: AsyncParsableCommand {
     @OptionGroup
     var cliArguments: CLIArguments
 
+    mutating func validate() throws {
+        if let language = cliArguments.language {
+            if !WhisperKit.languages.values.contains(language) {
+                throw ValidationError("Invalid language code \"\(language)\". Supported languages: \(WhisperKit.languages.values)")
+            }
+        }
+    }
+
     mutating func run() async throws {
         if cliArguments.stream {
             try await transcribeStream()

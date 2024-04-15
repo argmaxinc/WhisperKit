@@ -363,12 +363,11 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
 
         // Logits filters
         var logitsFilters: [any LogitsFiltering] = []
-        let allLanguageTokens: [Int] = tokenizer.allLanguageTokens
 
         // language filter
         logitsFilters.append(
             LanguageLogitsFilter(
-                allLanguageTokens: allLanguageTokens,
+                allLanguageTokens: tokenizer.allLanguageTokens,
                 logitsDim: logitsSize,
                 sampleBegin: prefilledIndex)
         )
@@ -689,10 +688,8 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         var language = options.language ?? "en"
         var languageProbs = [String: Float]()
         if options.language == nil {
-            let allLanguageTokens: [Int] = tokenizer.allLanguageTokens
-
             // Find the first token that is a recognized language token
-            if let predictedLanguageIndex = filteredTokens.firstIndex(where: { allLanguageTokens.contains($0) }),
+            if let predictedLanguageIndex = filteredTokens.firstIndex(where: { tokenizer.allLanguageTokens.contains($0) }),
                predictedLanguageIndex < tokenProbs.count {
                 let predictedLanguageToken = filteredTokens[predictedLanguageIndex]
                 // Decode the predicted language token to get the language
