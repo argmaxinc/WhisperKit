@@ -17,8 +17,8 @@ struct Transcribe: AsyncParsableCommand {
 
     mutating func validate() throws {
         if let language = cliArguments.language {
-            if !WhisperKit.languages.values.contains(language) {
-                throw ValidationError("Invalid language code \"\(language)\". Supported languages: \(WhisperKit.languages.values)")
+            if !Constants.languages.values.contains(language) {
+                throw ValidationError("Invalid language code \"\(language)\". Supported languages: \(Constants.languages.values)")
             }
         }
     }
