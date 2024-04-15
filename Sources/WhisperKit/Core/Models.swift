@@ -152,7 +152,7 @@ public struct ModelComputeOptions {
         self.prefillCompute = prefillCompute
         self.textDecoderCompute = textDecoderCompute
 
-        if #available(macOS 14.0, iOS 17.0, watchOS 10, *) {
+        if #available(macOS 14.0, iOS 17.0, *) {
             self.audioEncoderCompute = audioEncoderCompute ?? .cpuAndNeuralEngine
         } else {
             self.audioEncoderCompute = audioEncoderCompute ?? .cpuAndGPU
@@ -211,6 +211,7 @@ public struct DecodingCache {
 ///   - topK: Number of candidates when sampling with non-zero temperature.
 ///   - usePrefillPrompt: If true, the prefill tokens will be forced according to task and language settings.
 ///   - usePrefillCache: If true, the kv cache will be prefilled based on the prefill data mlmodel.
+///   - detectLanguage: Use this in conjuntion with `usePrefillPrompt: true` to detect the language of the input audio.
 ///   - skipSpecialTokens: Whether to skip special tokens in the output.
 ///   - withoutTimestamps: Whether to include timestamps in the transcription result.
 ///   - wordTimestamps: Whether to include word-level timestamps in the transcription result.
@@ -237,6 +238,7 @@ public struct DecodingOptions {
     public var topK: Int
     public var usePrefillPrompt: Bool
     public var usePrefillCache: Bool
+    public var detectLanguage: Bool
     public var skipSpecialTokens: Bool
     public var withoutTimestamps: Bool
     public var wordTimestamps: Bool
@@ -261,6 +263,7 @@ public struct DecodingOptions {
                 topK: Int = 5,
                 usePrefillPrompt: Bool = true,
                 usePrefillCache: Bool = true,
+                detectLanguage: Bool? = nil,
                 skipSpecialTokens: Bool = false,
                 withoutTimestamps: Bool = false,
                 wordTimestamps: Bool = false,
@@ -285,6 +288,7 @@ public struct DecodingOptions {
         self.topK = topK
         self.usePrefillPrompt = usePrefillPrompt
         self.usePrefillCache = usePrefillCache
+        self.detectLanguage = detectLanguage ?? !usePrefillPrompt // If prefill is false, detect language by default
         self.skipSpecialTokens = skipSpecialTokens
         self.withoutTimestamps = withoutTimestamps
         self.wordTimestamps = wordTimestamps
@@ -407,6 +411,7 @@ public enum WhisperError: Error, LocalizedError {
 }
 
 /// Structs
+
 public struct TranscriptionResult: Codable {
     public var text: String
     public var segments: [TranscriptionSegment]
@@ -1026,7 +1031,6 @@ struct WhisperTokenizerWrapper: WhisperTokenizer {
     private func isPunctuation(_ text: String, tokenRange: Range<String.Index>, tag: NLTag?) -> Bool {
         let punctuationCharacters = CharacterSet.punctuationCharacters
         let token = String(text[tokenRange])
-        print(token)
         if let tag = tag, tag == .punctuation {
             return true
         } else if token.unicodeScalars.allSatisfy({ punctuationCharacters.contains($0) }) {
@@ -1170,6 +1174,10 @@ public extension WhisperTokenizer {
             "castilian": "es",
             "mandarin": "zh",
         ]
+    }
+
+    var allLanguageTokens: [Int] {
+        Array(Set(self.languages.compactMap { self.convertTokenToId("<|\($0.value)|>") }).filter { $0 > self.specialTokens.specialTokenBegin })
     }
 }
 
