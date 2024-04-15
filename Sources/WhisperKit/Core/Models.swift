@@ -950,17 +950,18 @@ public struct SpecialTokens {
 
 public protocol WhisperTokenizer: Tokenizer {
     var specialTokens: SpecialTokens { get }
-    
+    var allLanguageTokens: Set<Int> { get }
+
     func splitToWordTokens(tokenIds: [Int]) -> (words: [String], wordTokens: [[Int]])
 }
 
 struct WhisperTokenizerWrapper: WhisperTokenizer {
     let tokenizer: any Tokenizer
     let specialTokens: SpecialTokens
-    
+    let allLanguageTokens: Set<Int>
+
     init(tokenizer: any Tokenizer) {
-        self.tokenizer = tokenizer
-        self.specialTokens = SpecialTokens(
+        let specialTokens = SpecialTokens(
             endToken: tokenizer.convertTokenToId("<|endoftext|>") ?? Self.defaultEndToken,
             englishToken: tokenizer.convertTokenToId("<|en|>") ?? Self.defaultEnglishToken,
             noSpeechToken: tokenizer.convertTokenToId("<|nospeech|>") ?? Self.defaultNoSpeechToken,
@@ -972,6 +973,13 @@ struct WhisperTokenizerWrapper: WhisperTokenizer {
             transcribeToken: tokenizer.convertTokenToId("<|transcribe|>") ?? Self.defaultTranscribeToken,
             translateToken: tokenizer.convertTokenToId("<|translate|>") ?? Self.defaultTranslateToken,
             whitespaceToken: tokenizer.convertTokenToId(" ") ?? Self.defaultWhitespaceToken
+        )
+        self.tokenizer = tokenizer
+        self.specialTokens = specialTokens
+        self.allLanguageTokens = Set(
+            Constants.languages
+                .compactMap { tokenizer.convertTokenToId("<|\($0.value)|>") }
+                .filter { $0 > specialTokens.specialTokenBegin }
         )
     }
     
@@ -1058,8 +1066,71 @@ struct WhisperTokenizerWrapper: WhisperTokenizer {
     }
 }
 
-public extension WhisperTokenizer {
-    var languages: [String: String] {
+extension WhisperTokenizerWrapper: Tokenizer {
+    func tokenize(text: String) -> [String] {
+        tokenizer.tokenize(text: text)
+    }
+    
+    func encode(text: String) -> [Int] {
+        tokenizer.encode(text: text)
+    }
+    
+    func decode(tokens: [Int]) -> String {
+        tokenizer.decode(tokens: tokens)
+    }
+    
+    func convertTokenToId(_ token: String) -> Int? {
+        tokenizer.convertTokenToId(token)
+    }
+    
+    func convertIdToToken(_ id: Int) -> String? {
+        tokenizer.convertIdToToken(id)
+    }
+    
+    var bosToken: String? {
+        tokenizer.bosToken
+    }
+    
+    var bosTokenId: Int? {
+        tokenizer.bosTokenId
+    }
+    
+    var eosToken: String? {
+        tokenizer.eosToken
+    }
+    
+    var eosTokenId: Int? {
+        tokenizer.eosTokenId
+    }
+    
+    var unknownToken: String? {
+        tokenizer.unknownToken
+    }
+    
+    var unknownTokenId: Int? {
+        tokenizer.unknownTokenId
+    }
+}
+
+extension WhisperTokenizerWrapper {
+    /// Default values for each token, using base vocab
+    static var defaultWhitespaceToken: Int { 220 }
+    static var defaultSpecialTokenBegin: Int { 50257 }
+    static var defaultEndToken: Int { 50257 }
+    static var defaultStartOfPreviousToken: Int { 50361 }
+    static var defaultStartOfTranscriptToken: Int { 50258 }
+    static var defaultEnglishToken: Int { 50259 }
+    static var defaultTranscribeToken: Int { 50359 }
+    static var defaultTranslateToken: Int { 50358 }
+    static var defaultNoSpeechToken: Int { 50362 }
+    static var defaultNoTimestampsToken: Int { 50363 }
+    static var defaultTimeTokenBegin: Int { 50364 }
+}
+
+// MARK: Constants
+
+public enum Constants {
+    public static let languages: [String: String] =
         [
             "english": "en",
             "chinese": "zh",
@@ -1174,70 +1245,4 @@ public extension WhisperTokenizer {
             "castilian": "es",
             "mandarin": "zh",
         ]
-    }
-
-    var allLanguageTokens: [Int] {
-        Array(Set(self.languages.compactMap { self.convertTokenToId("<|\($0.value)|>") }).filter { $0 > self.specialTokens.specialTokenBegin })
-    }
-}
-
-extension WhisperTokenizerWrapper: Tokenizer {
-    func tokenize(text: String) -> [String] {
-        tokenizer.tokenize(text: text)
-    }
-    
-    func encode(text: String) -> [Int] {
-        tokenizer.encode(text: text)
-    }
-    
-    func decode(tokens: [Int]) -> String {
-        tokenizer.decode(tokens: tokens)
-    }
-    
-    func convertTokenToId(_ token: String) -> Int? {
-        tokenizer.convertTokenToId(token)
-    }
-    
-    func convertIdToToken(_ id: Int) -> String? {
-        tokenizer.convertIdToToken(id)
-    }
-    
-    var bosToken: String? {
-        tokenizer.bosToken
-    }
-    
-    var bosTokenId: Int? {
-        tokenizer.bosTokenId
-    }
-    
-    var eosToken: String? {
-        tokenizer.eosToken
-    }
-    
-    var eosTokenId: Int? {
-        tokenizer.eosTokenId
-    }
-    
-    var unknownToken: String? {
-        tokenizer.unknownToken
-    }
-    
-    var unknownTokenId: Int? {
-        tokenizer.unknownTokenId
-    }
-}
-
-extension WhisperTokenizerWrapper {
-    /// Default values for each token, using base vocab
-    static var defaultWhitespaceToken: Int { 220 }
-    static var defaultSpecialTokenBegin: Int { 50257 }
-    static var defaultEndToken: Int { 50257 }
-    static var defaultStartOfPreviousToken: Int { 50361 }
-    static var defaultStartOfTranscriptToken: Int { 50258 }
-    static var defaultEnglishToken: Int { 50259 }
-    static var defaultTranscribeToken: Int { 50359 }
-    static var defaultTranslateToken: Int { 50358 }
-    static var defaultNoSpeechToken: Int { 50362 }
-    static var defaultNoTimestampsToken: Int { 50363 }
-    static var defaultTimeTokenBegin: Int { 50364 }
 }
