@@ -2,28 +2,29 @@ name: Development Tests
 
 on:
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request_review:
     types: [submitted]
   workflow_dispatch:
 
-concurrency: 
-  group: ${{ github.workflow }}-${{ github.ref }}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
   build-and-test:
+    name: "Build and Test"
     uses: ./.github/workflows/unit-tests.yml
     with:
-      ios-version: '17.2'
-      macos-runner: 'macos-14'
+      ios-version: "17.2"
+      macos-runner: "macos-14"
 
   check-approvals:
     runs-on: ubuntu-latest
     outputs:
-        reviews: ${{ steps.reviews.outputs.state }}
-    permissions: 
-        pull-requests: read
+      reviews: ${{ steps.reviews.outputs.state }}
+    permissions:
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,9 +41,10 @@ jobs:
           echo "state=$state" >> "$GITHUB_OUTPUT"
 
   pre-merge-tests:
+    name: "Pre-merge Tests"
     needs: [check-approvals]
     if: needs.check-approvals.outputs.reviews == 'APPROVED' || github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/unit-tests.yml
     with:
-      ios-version: '16.1'
-      macos-runner: 'macos-13-xlarge'
+      ios-version: "16.1"
+      macos-runner: "macos-13-xlarge"
