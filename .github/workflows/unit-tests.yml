@@ -12,32 +12,32 @@ on:
 
 jobs:
   unit-tests:
-    name: "${{ matrix.run-config['name'] }}"
+    name: "${{ matrix.run-config['name'] }} ${{ inputs.macos-runner }}"
     runs-on: ${{ inputs.macos-runner }}
     strategy:
       matrix:
         run-config:
           - {
               name: "macOS",
-              condition: false,
+              condition: true,
               clean-destination: "generic/platform=macOS",
               test-destination: "platform=macOS,arch=arm64",
             }
           - {
               name: "iOS",
-              condition: false,
+              condition: true,
               clean-destination: "generic/platform=iOS",
               test-destination: "platform=iOS Simulator,OS=${{ inputs.ios-version }},name=iPhone 15",
             }
           - {
               name: "watchOS",
-              condition: "${{ inputs.macos-runner == 'macos-13' }}",
+              condition: "${{ inputs.macos-runner == 'macos-14' }}",
               clean-destination: "generic/platform=watchOS",
               test-destination: "platform=watchOS Simulator,OS=10.2,name=Apple Watch Ultra 2 (49mm)",
             }
           - {
               name: "visionOS",
-              condition: "${{ inputs.macos-runner == 'macos-13' }}",
+              condition: "${{ inputs.macos-runner == 'macos-14' }}",
               clean-destination: "generic/platform=visionOS",
               test-destination: "platform=visionOS Simulator,name=Apple Vision Pro",
             }
