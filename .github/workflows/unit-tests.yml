@@ -12,20 +12,20 @@ on:
 
 jobs:
   unit-tests:
-    name: unit-tests-${{ inputs.macos-runner }}
+    name: "${{ matrix.run-config['name'] }}"
     runs-on: ${{ inputs.macos-runner }}
     strategy:
       matrix:
         run-config:
           - {
               name: "macOS",
-              condition: "true",
+              condition: true,
               clean-destination: "generic/platform=macOS",
               test-destination: "platform=macOS,arch=arm64",
             }
           - {
               name: "iOS",
-              condition: "true",
+              condition: true,
               clean-destination: "generic/platform=iOS",
               test-destination: "platform=iOS Simulator,OS=${{ inputs.ios-version }},name=iPhone 15",
             }
@@ -64,7 +64,7 @@ jobs:
           echo "Destinations for testing:"
           xcodebuild test-without-building -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -showdestinations
       - name: Build and Test - ${{ matrix.run-config['name'] }}
-        if: ${{ matrix.run-config['condition'] == 'true' }}
+        if: ${{ matrix.run-config['condition'] == true }}
         run: |
           set -o pipefail
           xcodebuild clean build-for-testing -scheme whisperkit-Package -destination '${{ matrix.run-config['clean-destination'] }}' | xcpretty
