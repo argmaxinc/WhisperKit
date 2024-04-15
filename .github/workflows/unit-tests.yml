@@ -12,7 +12,7 @@ on:
 
 jobs:
   unit-tests:
-    name: "${{ matrix.run-config['name'] }} ${{ inputs.macos-runner }}"
+    name: "${{ matrix.run-config['name'] }} on ${{ inputs.macos-runner }}"
     runs-on: ${{ inputs.macos-runner }}
     strategy:
       matrix:
