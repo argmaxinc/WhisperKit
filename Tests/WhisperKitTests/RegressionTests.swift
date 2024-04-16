@@ -28,18 +28,13 @@ final class RegressionTests: XCTestCase {
     func downloadTestAudio(completion: @escaping (Bool) -> Void) {
         Task {
             do {
-                let earnings22CompressedDataset = Hub.Repo(id: "NagaSaiAbhinay/whisperkit_tests", type: .datasets)
+                let earnings22CompressedDataset = Hub.Repo(id: "argmaxinc/whisperkit-test-data", type: .datasets)
                 let tempPath = FileManager.default.temporaryDirectory
                 let downloadBase = tempPath.appending(component: "huggingface")
                 let hubApi = HubApi(downloadBase: downloadBase)
-                var fileURL = try? await hubApi.snapshot(from: earnings22CompressedDataset, matching: ["4484146_24.mp3"])
-                fileURL = fileURL?.appending(component: "4484146_24.mp3")
-                if let url = fileURL {
-                    self.audioFileURL = fileURL
-                    completion(true)
-                } else {
-                    completion(false)
-                }
+                let fileURL = try await hubApi.snapshot(from: earnings22CompressedDataset, matching: ["4484146.mp3"])
+                self.audioFileURL = fileURL.appending(component: "4484146.mp3")
+                completion(true)
             } catch {
                 XCTFail("Async setup failed with error: \(error)")
                 completion(false)
@@ -47,26 +42,25 @@ final class RegressionTests: XCTestCase {
         }
     }
     
-    func testAndMeasureModelPerformance(model: String) async throws{
+    func testAndMeasureModelPerformance(model: String, device: String) async throws{
         let audioFilePath = try XCTUnwrap(
-            Bundle.module.path(forResource:"4484146", ofType:"wav"),
+            self.audioFileURL?.path(),
             "Audio file not found"
         )
 
         let startTime = Date()
-        let systemMemoryChecker = SystemMemoryChecker()
         let iso8601DateTimeString = ISO8601DateFormatter().string(from: Date())
         
         var currentMemoryValues = [Float]()
         var currentTPSValues = [Float]()
         
-        var memoryStats = MemoryStats(
+        let memoryStats = MemoryStats(
             measurements: [], units: "MB",
             totalNumberOfMeasurements: 0,
             preTranscribeMemory: -1,
             postTranscribeMemory: -1
         )
-        var latencyStats = LatencyStats(
+        let latencyStats = LatencyStats(
             measurements: [], units: "Tokens/Sec",
             totalNumberOfMeasurements: 0
         )
@@ -75,7 +69,7 @@ final class RegressionTests: XCTestCase {
         let callback = {
             (result:TranscriptionProgress) -> Bool in
             count += 1
-            let currentMemory = systemMemoryChecker.getMemoryUsed()
+            let currentMemory = SystemMemoryChecker.getMemoryUsed()
             let currentTPS = result.timings.tokensPerSecond
             if currentMemory != 0{
                 currentMemoryValues.append(Float(currentMemory))
@@ -94,7 +88,7 @@ final class RegressionTests: XCTestCase {
         }
         
         let whisperKit = try await WhisperKit(model: model)
-        memoryStats.preTranscribeMemory = Float(systemMemoryChecker.getMemoryUsed())
+        memoryStats.preTranscribeMemory = Float(SystemMemoryChecker.getMemoryUsed())
         
         let transcriptionResult = try await XCTUnwrapAsync(
             await whisperKit.transcribe(audioPath: audioFilePath, callback: callback),
@@ -102,19 +96,21 @@ final class RegressionTests: XCTestCase {
         )
         XCTAssert(transcriptionResult.text.isEmpty == false, "Transcription failed")
         
-        memoryStats.postTranscribeMemory = Float(systemMemoryChecker.getMemoryUsed())
+        memoryStats.postTranscribeMemory = Float(SystemMemoryChecker.getMemoryUsed())
         let testInfo = TestInfo(
-            device: WhisperKit.deviceName(),
+            device: device,
             audioFile: audioFilePath,
             model: model,
             date: startTime.formatted(Date.ISO8601FormatStyle().dateSeparator(.dash)),
             timeElapsedInSeconds: Date().timeIntervalSince(startTime),
-            timings: transcriptionResult.timings
+            timings: transcriptionResult.timings,
+            transcript: transcriptionResult.text
         )
         let json = RegressionStats(testInfo: testInfo, memoryStats: memoryStats, latencyStats: latencyStats)
         do{
-            let attachment = try XCTAttachment(data: json.jsonData())
+            let attachment = try XCTAttachment(data: json.jsonData(), uniformTypeIdentifier: "json")
             attachment.lifetime = .keepAlways
+            attachment.name = "\(device)_\(model)_\(iso8601DateTimeString).json"
             add(attachment)
         }
         catch{
@@ -122,78 +118,40 @@ final class RegressionTests: XCTestCase {
         }
     }
     
-    //MARK: Distil Whisper
-    func testDistilLargeV3PerformanceOverTime() async throws{
-        try await testAndMeasureModelPerformance(model: "distil-whisper_distil-large-v3")
-    }
-    
-    func testDistilLargeV3_594MBPerformanceOverTime() async throws{
-        try await testAndMeasureModelPerformance(model: "distil-whisper_distil-large-v3_594MB")
-    }
-    
-    func testDistilLargeV3_TurboPerformanceOverTime() async throws{
-        try await testAndMeasureModelPerformance(model: "distil-whisper_distil-large-v3_turbo")
-    }
-    
-    func testDistilLargeV3_Turbo_600MBPerformanceOverTime() async throws{
-        try await testAndMeasureModelPerformance(model: "distil-whisper_distil-large-v3_turbo_600MB")
-    }
-    
-    //MARK: Open AI Whisper
-    func testBasePerformanceOverTime() async throws{
-        try await testAndMeasureModelPerformance(model: "base")
-    }
-    
-    func testBaseEnglishPerformanceOverTime() async throws{
-        try await testAndMeasureModelPerformance(model: "base.en")
-    }
-    
-    func testLargeV2PerformanceOverTime() async throws{
-        try await testAndMeasureModelPerformance(model: "large-v2")
-    }
-    
-    func testLargeV2949PerformanceOverTime() async throws{
-        try await testAndMeasureModelPerformance(model: "large-v2_949")
-    }
-    
-    func testLargeV2TurboPerformanceOverTime() async throws{
-        try await testAndMeasureModelPerformance(model: "large-v2_turbo")
-    }
-    
-    func testLargeV2Turbo955PerformanceOverTime() async throws{
-        try await testAndMeasureModelPerformance(model: "large-v2_turbo_955")
-    }
-    
-    func testLargeV3PerformanceOverTime() async throws{
-        try await testAndMeasureModelPerformance(model: "large-v3")
-    }
-    
-    func testLargeV3947PerformanceOverTime() async throws{
-        try await testAndMeasureModelPerformance(model: "large-v3_947")
-    }
-    
-    func testLargeV3TurboPerformanceOverTime() async throws{
-        try await testAndMeasureModelPerformance(model: "large-v3_turbo")
-    }
-    
-    func testLargeV3Turbo954PerformanceOverTime() async throws{
-        try await testAndMeasureModelPerformance(model: "large-v3_turbo_954")
-    }
-    
-    func testSmallPerformanceOverTime() async throws{
-        try await testAndMeasureModelPerformance(model: "small")
-    }
-    
-    func testSmallEnglishPerformanceOverTime() async throws{
-        try await testAndMeasureModelPerformance(model: "small.en")
-    }
-    
-    func testTinyPerformanceOverTime() async throws{
-        try await testAndMeasureModelPerformance(model: "tiny")
-    }
-    
-    func testTinyEnglishPerformanceOverTime() async throws{
-        try await testAndMeasureModelPerformance(model: "tiny.en")
+    func testRegressionAndLatencyForAllModels() async throws{
+        var allModels: [String] = []
+        var failureInfo: [String:String] = [:]
+        var currentDevice = WhisperKit.deviceName()
+        let iso8601DateTimeString = ISO8601DateFormatter().string(from: Date())
+        
+        #if os(macOS) && arch(arm64)
+        currentDevice = Process.processor
+        #endif
+        
+        do{
+            allModels = try await WhisperKit.fetchAvailableModels()
+        }
+        catch{
+            XCTFail("Failed to fetch available models: \(error.localizedDescription)")
+        }
+        
+        for model in allModels{
+            do{
+                try await testAndMeasureModelPerformance(model: model, device: currentDevice)
+            }
+            catch{
+                failureInfo[model] = error.localizedDescription
+            }
+        }
+        let testReport = TestReport(device: currentDevice, modelsTested: allModels, failureInfo: failureInfo)
+        do{
+            let attachment = try XCTAttachment(data: testReport.jsonData(), uniformTypeIdentifier: "json")
+            attachment.lifetime = .keepAlways
+            attachment.name = "\(currentDevice)_summary_\(iso8601DateTimeString).json"
+            add(attachment)
+        }catch{
+            XCTFail("Failed with error: \(error)")
+        }
     }
     
 }

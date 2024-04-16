@@ -1,7 +1,7 @@
 import Foundation
 import WhisperKit
 
-// MARK: - RegressionStats
+// MARK: RegressionStats
 class RegressionStats: JSONCodable {
     let testInfo: TestInfo
     let memoryStats: MemoryStats
@@ -18,26 +18,40 @@ class RegressionStats: JSONCodable {
     }
 }
 
-// MARK: - TestInfo
+// MARK: TestInfo
 class TestInfo: JSONCodable {
     let device, audioFile: String
     let model: String
     let date: String
     let timeElapsedInSeconds: TimeInterval
     let timings: TranscriptionTimings?
+    let transcript: String?
     
-    init(device: String, audioFile: String, model: String, date: String, timeElapsedInSeconds: TimeInterval, timings: TranscriptionTimings?) {
+    init(device: String, audioFile: String, model: String, date: String, timeElapsedInSeconds: TimeInterval, timings: TranscriptionTimings?, transcript: String?) {
         self.device = device
         self.audioFile = audioFile
         self.model = model
         self.date = date
         self.timeElapsedInSeconds = timeElapsedInSeconds
         self.timings = timings
+        self.transcript = transcript
     }
 }
 
+// MARK: TestReport
+struct TestReport: JSONCodable{
+    let device: String
+    let modelsTested: [String]
+    let failureInfo: [String:String]
+    
+    init(device: String, modelsTested: [String], failureInfo: [String:String]) {
+        self.device = device
+        self.modelsTested = modelsTested
+        self.failureInfo = failureInfo
+    }
+}
 
-// MARK: - Stats
+// MARK: Stats
 class Stats: JSONCodable {
     var measurements: [Measurement]
     let units: String
@@ -65,7 +79,7 @@ class Stats: JSONCodable {
     }
 }
 
-// MARK: - Stats
+// MARK: LatencyStats
 class LatencyStats: Stats{
     override init(measurements: [Measurement] = [], units: String, totalNumberOfMeasurements: Int = 0) {
         super.init(measurements: measurements, units: units, totalNumberOfMeasurements: totalNumberOfMeasurements)
@@ -133,11 +147,11 @@ extension Data {
     }
 }
 
-// MARK: - Memory Footprint
+// MARK: - SystemMemoryChecker
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 class SystemMemoryChecker: NSObject{
     
-    func getMemoryUsed() -> UInt64 {
+    static func getMemoryUsed() -> UInt64 {
         // The `TASK_VM_INFO_COUNT` and `TASK_VM_INFO_REV1_COUNT` macros are too
         // complex for the Swift C importer, so we have to define them ourselves.
         let TASK_VM_INFO_COUNT = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
