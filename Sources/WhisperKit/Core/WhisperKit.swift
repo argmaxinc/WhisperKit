@@ -26,7 +26,6 @@ open class WhisperKit {
     public var segmentSeeker: any SegmentSeeking
 
     /// Shapes
-    public static var maxTokenContext = Int(448 / 2)
     public static var sampleRate: Int = 16000
     public static var hopLength: Int = 160
     public static var chunkLength: Int = 30 // seconds
@@ -377,9 +376,26 @@ open class WhisperKit {
         audioPaths: [String],
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
+    ) async -> [[TranscriptionResult]?] {
+        let transcribeResults: [Result<[TranscriptionResult], Swift.Error>] = await transcribe(
+            audioPaths: audioPaths,
+            decodeOptions: decodeOptions,
+            callback: callback
+        )
+        var results = [[TranscriptionResult]?]()
+        for result in transcribeResults {
+            results.append(try? result.get())
+        }
+        return results
+    }
+
+    public func transcribe(
+        audioPaths: [String],
+        decodeOptions: DecodingOptions? = nil,
+        callback: TranscriptionCallback = nil
     ) async -> [Result<[TranscriptionResult], Swift.Error>] {
         let loadedAudioResult = await AudioProcessor.loadAudio(at: audioPaths)
-        let transcribeResult = await transcribe(
+        let transcribeResults: [Result<[TranscriptionResult], Swift.Error>] = await transcribe(
             audioArrays: loadedAudioResult.compactMap { try? $0.get() },
             decodeOptions: decodeOptions,
             callback: callback
@@ -389,7 +405,7 @@ open class WhisperKit {
         for audioResult in loadedAudioResult {
             switch audioResult {
             case .success:
-                result.append(transcribeResult[transcribeResultIndex])
+                result.append(transcribeResults[transcribeResultIndex])
                 transcribeResultIndex += 1
             case .failure(let error):
                 result.append(.failure(error))
@@ -404,6 +420,23 @@ open class WhisperKit {
         audioArrays: [[Float]],
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
+    ) async -> [[TranscriptionResult]?] {
+        let transcribeResults: [Result<[TranscriptionResult], Swift.Error>] = await transcribe(
+            audioArrays: audioArrays,
+            decodeOptions: decodeOptions,
+            callback: callback
+        )
+        var results = [[TranscriptionResult]?]()
+        for result in transcribeResults {
+            results.append(try? result.get())
+        }
+        return results
+    }
+
+    public func transcribe(
+        audioArrays: [[Float]],
+        decodeOptions: DecodingOptions? = nil,
+        callback: TranscriptionCallback = nil
     ) async -> [Result<[TranscriptionResult], Swift.Error>] {
         var result = [Result<[TranscriptionResult], Swift.Error>]()
         let concurrentWorkerCount = decodeOptions?.concurrentWorkerCount ?? 0
@@ -413,7 +446,7 @@ open class WhisperKit {
                 for (index, audioArray) in chunkedAudioArray.enumerated() {
                     taskGroup.addTask {
                         do {
-                            let transcribeResult = try await self.transcribe(
+                            let transcribeResult: [TranscriptionResult] = try await self.transcribe(
                                 audioArray: audioArray,
                                 decodeOptions: decodeOptions,
                                 callback: callback
@@ -437,6 +470,16 @@ open class WhisperKit {
     }
 
     // MARK: - Transcribe audio file
+
+    @available(*, deprecated, message: "Subject to removal in a future version. Use `transcribe(audioPath:decodeOptions:callback:) async throws -> [TranscriptionResult]` instead.")
+    public func transcribe(
+        audioPath: String,
+        decodeOptions: DecodingOptions? = nil,
+        callback: TranscriptionCallback = nil
+    ) async throws -> TranscriptionResult? {
+        let result: [TranscriptionResult] = try await transcribe(audioPath: audioPath, decodeOptions: decodeOptions, callback: callback)
+        return result.first
+    }
 
     public func transcribe(
         audioPath: String,
@@ -465,19 +508,30 @@ open class WhisperKit {
 
     // MARK: - Transcribe audio samples
 
+    @available(*, deprecated, message: "Subject to removal in a future version. Use `transcribe(audioArray:decodeOptions:callback:) async throws -> [TranscriptionResult]` instead.")
+    public func transcribe(
+        audioArray: [Float],
+        decodeOptions: DecodingOptions? = nil,
+        callback: TranscriptionCallback = nil
+    ) async throws -> TranscriptionResult? {
+        let result: [TranscriptionResult] = try await transcribe(audioArray: audioArray, decodeOptions: decodeOptions, callback: callback)
+        return result.first
+    }
+
     public func transcribe(
         audioArray: [Float],
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
     ) async throws -> [TranscriptionResult] {
-        precondition(modelState == .loaded, "Model has to be loaded at this point")
+        guard modelState == .loaded else {
+            throw WhisperError.modelsUnavailable()
+        }
         guard let tokenizer else {
             // Tokenizer required for decoding
             throw WhisperError.tokenizerUnavailable()
         }
         try Task.checkCancellation()
         let transcribeTask = TranscribeTask(
-            maxTokenContext: Self.maxTokenContext,
             currentTimings: currentTimings,
             progress: progress,
             audioEncoder: audioEncoder,

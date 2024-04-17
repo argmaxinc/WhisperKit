@@ -15,6 +15,14 @@ import AppKit
 
 // MARK: - Extensions
 
+extension Array {
+    func chunked(into size: Int) -> [[Element]] {
+        return stride(from: 0, to: count, by: size).map {
+            Array(self[$0 ..< Swift.min($0 + size, count)])
+        }
+    }
+}
+
 extension MLMultiArray {
     /// Calculate the linear offset by summing the products of each dimension’s index with the dimension’s stride.
     /// More info [here](https://developer.apple.com/documentation/coreml/mlmultiarray/2879231-subscript)
@@ -395,7 +403,6 @@ public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirm
 
     let mergedSegments = validResults.flatMap { $0.segments }
     let mergedText = confirmedWords.map { $0.word }.joined()
-    let totalTokens = validResults.map { $0.totalTokens }.reduce(0, +)
 
     var mergedTimings = TranscriptionTimings(
         modelLoading: validResults.map { $0.timings.modelLoading }.max() ?? 0,
@@ -436,7 +443,6 @@ public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirm
 
     return TranscriptionResult(
         text: mergedText,
-        totalTokens: totalTokens,
         segments: mergedSegments,
         language: language,
         timings: mergedTimings
@@ -554,6 +560,36 @@ public class Logging {
         if shared.logLevel.shouldLog(level: .error) {
             shared.log(items, separator: separator, terminator: terminator)
         }
+    }
+}
+
+extension Logging {
+    enum AudioEncoding {
+        static let logger = Logger(
+            subsystem: Constants.Logging.subsystem,
+            category: "AudioEncoding"
+        )
+        static let signposter = OSSignposter(logger: logger)
+    }
+}
+
+extension Logging {
+    enum FeatureExtractor {
+        static let logger = Logger(
+            subsystem: Constants.Logging.subsystem,
+            category: "FeatureExtractor"
+        )
+        static let signposter = OSSignposter(logger: logger)
+    }
+}
+
+extension Logging {
+    enum TranscribeTask {
+        static let logger = Logger(
+            subsystem: Constants.Logging.subsystem,
+            category: "TranscribeTask"
+        )
+        static let signposter = OSSignposter(logger: logger)
     }
 }
 

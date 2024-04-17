@@ -6,13 +6,6 @@ import AVFoundation
 import CoreGraphics
 import CoreML
 import Foundation
-import OSLog
-
-private let logger = Logger(
-    subsystem: Constants.Logging.subsystem,
-    category: "FeatureExtractor"
-)
-private let signposter = OSSignposter(logger: logger)
 
 public protocol FeatureExtracting {
     var melCount: Int? { get }
@@ -39,8 +32,8 @@ open class FeatureExtractor: FeatureExtracting, WhisperMLModel {
         }
         try Task.checkCancellation()
 
-        let interval = Logging.beginSignpost("ExtractAudioFeatures", signposter: signposter)
-        defer { Logging.endSignpost("ExtractAudioFeatures", interval: interval, signposter: signposter) }
+        let interval = Logging.beginSignpost("ExtractAudioFeatures", signposter: Logging.FeatureExtractor.signposter)
+        defer { Logging.endSignpost("ExtractAudioFeatures", interval: interval, signposter: Logging.FeatureExtractor.signposter) }
 
         let modelInputs = MelSpectrogramInput(audio: inputAudio)
         let outputFeatures = try await model.asyncPrediction(from: modelInputs, options: MLPredictionOptions())

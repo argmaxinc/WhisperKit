@@ -282,7 +282,7 @@ public struct DecodingOptions {
                 temperature: Float = 0.0,
                 temperatureIncrementOnFallback: Float = 0.2,
                 temperatureFallbackCount: Int = 5,
-                sampleLength: Int = WhisperKit.maxTokenContext,
+                sampleLength: Int = Constants.maxTokenContext,
                 topK: Int = 5,
                 usePrefillPrompt: Bool = true,
                 usePrefillCache: Bool = true,
@@ -455,7 +455,6 @@ public enum WhisperError: Error, LocalizedError, Equatable {
 
 public struct TranscriptionResult: Codable {
     public var text: String
-    public var totalTokens: Int
     public var segments: [TranscriptionSegment]
     public var language: String
     public var timings: TranscriptionTimings
@@ -476,6 +475,7 @@ public struct TranscriptionResult: Codable {
         let timeToFirstToken = timings.firstTokenTime - timings.pipelineStart
         let tokensPerSecond = timings.tokensPerSecond
         let rtf = timings.realTimeFactor
+        let totalTokens = segments.reduce(0) { $0 + $1.tokens.count }
 
         let fullPipelineDuration = timings.fullPipeline * 1000 // Convert to milliseconds
 
@@ -1238,6 +1238,11 @@ extension WhisperTokenizerWrapper {
 // MARK: Constants
 
 public enum Constants {
+    enum Logging {
+        static let subsystem = "com.argmax.whisperkit"
+    }
+
+    public static let maxTokenContext = Int(448 / 2)
     public static let languages: [String: String] =
         [
             "english": "en",
@@ -1353,22 +1358,4 @@ public enum Constants {
             "castilian": "es",
             "mandarin": "zh",
         ]
-}
-
-// MARK: - Constants
-
-enum Constants {
-    enum Logging {
-        static let subsystem = "com.argmax.whisperkit.Whisper"
-    }
-}
-
-// MARK: - Extensions
-
-extension Array {
-    func chunked(into size: Int) -> [[Element]] {
-        return stride(from: 0, to: count, by: size).map {
-            Array(self[$0 ..< Swift.min($0 + size, count)])
-        }
-    }
 }

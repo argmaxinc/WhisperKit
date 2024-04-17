@@ -2,13 +2,6 @@
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
 import CoreML
-import OSLog
-
-private let logger = Logger(
-    subsystem: Constants.Logging.subsystem,
-    category: "AudioEncoding"
-)
-private let signposter = OSSignposter(logger: logger)
 
 /// AudioEncoding protocol defines the requirements for an audio encoding implementation.
 public protocol AudioEncoding {
@@ -50,8 +43,8 @@ public class AudioEncoder: AudioEncoding, WhisperMLModel {
         }
         try Task.checkCancellation()
 
-        let interval = Logging.beginSignpost("EncodeAudio", signposter: signposter)
-        defer { Logging.endSignpost("EncodeAudio", interval: interval, signposter: signposter) }
+        let interval = Logging.beginSignpost("EncodeAudio", signposter: Logging.AudioEncoding.signposter)
+        defer { Logging.endSignpost("EncodeAudio", interval: interval, signposter: Logging.AudioEncoding.signposter) }
 
         let modelInputs = AudioEncoderInput(melspectrogram_features: features)
         let outputFeatures = try await model.asyncPrediction(from: modelInputs, options: MLPredictionOptions())

@@ -41,7 +41,6 @@ public actor AudioStreamTranscriber {
     private let decodingOptions: DecodingOptions
 
     public init(
-        maxTokenContext: Int,
         audioEncoder: any AudioEncoding,
         featureExtractor: any FeatureExtracting,
         segmentSeeker: any SegmentSeeking,
@@ -56,7 +55,6 @@ public actor AudioStreamTranscriber {
         stateChangeCallback: AudioStreamTranscriberCallback?
     ) {
         self.transcribeTask = TranscribeTask(
-            maxTokenContext: maxTokenContext,
             currentTimings: TranscriptionTimings(),
             progress: Progress(),
             audioEncoder: audioEncoder,

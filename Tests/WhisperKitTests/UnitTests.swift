@@ -368,8 +368,8 @@ final class UnitTests: XCTestCase {
 
         let options = DecodingOptions(usePrefillPrompt: true, withoutTimestamps: false, firstTokenLogProbThreshold: nil)
 
-        let transcribeResult = try await whisperKit.transcribe(audioArray: multiWindowSamples, decodeOptions: options)
-        let result = try XCTUnwrap(transcribeResult)
+        let transcribeResult: [TranscriptionResult] = try await whisperKit.transcribe(audioArray: multiWindowSamples, decodeOptions: options)
+        let result = try XCTUnwrap(transcribeResult.first)
         XCTAssertEqual(result.segments.count, 2, "Expected 3 segments")
 
         // Compare last timestamp to the length of the audio
@@ -494,11 +494,7 @@ final class UnitTests: XCTestCase {
 
         // To detect language only, set `sampleLength` to 1 and no prefill prompt
         let optionsDetectOnly = DecodingOptions(task: .transcribe, temperatureFallbackCount: 0, sampleLength: 1, detectLanguage: true)
-
-        let resultNoPrefill = try await XCTUnwrapAsync(
-            await whisperKit.transcribe(audioPath: audioFilePath, decodeOptions: optionsDetectOnly),
-            "Failed to transcribe"
-        )
+        let resultNoPrefill: [TranscriptionResult] = try await whisperKit.transcribe(audioPath: audioFilePath, decodeOptions: optionsDetectOnly)
 
         XCTAssertEqual(resultNoPrefill.first?.language, targetLanguage)
     }
@@ -576,11 +572,7 @@ final class UnitTests: XCTestCase {
 
         // To detect language only, set `sampleLength` to 1 and no prefill prompt
         let optionsDetectOnly = DecodingOptions(task: .transcribe, temperatureFallbackCount: 0, sampleLength: 1, detectLanguage: true)
-
-        let result = try await XCTUnwrapAsync(
-            await whisperKit.transcribe(audioPath: audioFilePath, decodeOptions: optionsDetectOnly),
-            "Failed to transcribe"
-        )
+        let result: [TranscriptionResult] = try await whisperKit.transcribe(audioPath: audioFilePath, decodeOptions: optionsDetectOnly)
 
         XCTAssertEqual(result.first?.language, targetLanguage)
     }
@@ -665,14 +657,11 @@ final class UnitTests: XCTestCase {
         let audioSamples = [Float](repeating: 0.0, count: 30 * 16000)
         let options = DecodingOptions(usePrefillPrompt: false, skipSpecialTokens: false)
 
-        let result = try await XCTUnwrapAsync(
-            await whisperKit.transcribe(audioArray: audioSamples, decodeOptions: options),
-            "Failed to transcribe"
-        )
+        let result: [TranscriptionResult] = try await whisperKit.transcribe(audioArray: audioSamples, decodeOptions: options)
+        let tokenizer = try XCTUnwrap(whisperKit.tokenizer, "Tokeznier not available")
+        let segment = try XCTUnwrap(result.first?.segments.first, "First segment not available")
 
-        let tokenizer = try XCTUnwrap(whisperKit.tokenizer)
-
-        XCTAssertTrue(result.segments.first!.tokens.contains(tokenizer.specialTokens.noSpeechToken))
+        XCTAssertTrue(segment.tokens.contains(tokenizer.specialTokens.noSpeechToken))
     }
 
     func testTemperatureIncrement() async throws {
@@ -694,13 +683,11 @@ final class UnitTests: XCTestCase {
         )
 
         // Perform transcription
-        let result = try await XCTUnwrapAsync(
-            await whisperKit.transcribe(audioArray: audioSamples, decodeOptions: options),
-            "Failed to transcribe"
-        )
+        let result: [TranscriptionResult] = try await whisperKit.transcribe(audioArray: audioSamples, decodeOptions: options)
+        let segment = try XCTUnwrap(result.first?.segments.first, "First segment not available")
 
         let expectedTemperature = initialTemperature + temperatureIncrement * Float(fallbackCount)
-        XCTAssertEqual(result.segments.first!.temperature, expectedTemperature, "Temperature was not incremented correctly after fallbacks")
+        XCTAssertEqual(segment.temperature, expectedTemperature, "Temperature was not incremented correctly after fallbacks")
     }
 
     func testTopK() async throws {

@@ -30,11 +30,7 @@ final class FunctionalTests: XCTestCase {
                 logLevel: .debug
             )
 
-            let transcriptionResult = try await XCTUnwrapAsync(
-                await whisperKit.transcribe(audioPath: audioFilePath),
-                "Transcription failed"
-            )
-
+            let transcriptionResult: [TranscriptionResult] = try await whisperKit.transcribe(audioPath: audioFilePath)
             let transcriptionResultText = transcriptionResult.text
 
             print("[Integration] \(transcriptionResultText)")
@@ -64,10 +60,7 @@ final class FunctionalTests: XCTestCase {
         measure(metrics: metrics, options: measureOptions) {
             let dispatchSemaphore = DispatchSemaphore(value: 0)
             Task {
-                let transcriptionResult = try await XCTUnwrapAsync(
-                    await whisperKit.transcribe(audioPath: audioFilePath),
-                    "Transcription failed"
-                )
+                let transcriptionResult: [TranscriptionResult] = try await whisperKit.transcribe(audioPath: audioFilePath)
                 let transcriptionResultText = transcriptionResult.map(\.text).joined(separator: " ")
                 XCTAssertGreaterThan(transcriptionResultText.count, 0)
                 dispatchSemaphore.signal()
@@ -94,10 +87,7 @@ final class FunctionalTests: XCTestCase {
         measure(metrics: metrics, options: measureOptions) {
             let dispatchSemaphore = DispatchSemaphore(value: 0)
             Task {
-                let transcriptionResult = try await XCTUnwrapAsync(
-                    await whisperKit.transcribe(audioPath: audioFilePath),
-                    "Transcription failed"
-                )
+                let transcriptionResult: [TranscriptionResult] = try await whisperKit.transcribe(audioPath: audioFilePath)
                 XCTAssertGreaterThan(transcriptionResult.text.count, 0)
                 dispatchSemaphore.signal()
             }
@@ -115,10 +105,7 @@ final class FunctionalTests: XCTestCase {
 
         Task {
             let whisperKit = try await XCTUnwrapAsync(await WhisperKit(model: "large-v3"))
-            let transcriptionResult = try await XCTUnwrapAsync(
-                await whisperKit.transcribe(audioPath: audioFilePath),
-                "Transcription failed"
-            )
+            let transcriptionResult: [TranscriptionResult] = try await whisperKit.transcribe(audioPath: audioFilePath)
             XCTAssertGreaterThan(transcriptionResult.text.count, 0)
             dispatchSemaphore.signal()
         }
@@ -132,10 +119,7 @@ final class FunctionalTests: XCTestCase {
             "Audio file not found"
         )
         let whisperKit = try await WhisperKit(model: "large-v3")
-        let transcriptionResult = try await XCTUnwrapAsync(
-            await whisperKit.transcribe(audioPath: audioFilePath),
-            "Transcription failed"
-        )
+        let transcriptionResult: [TranscriptionResult] = try await whisperKit.transcribe(audioPath: audioFilePath)
 
         XCTAssertGreaterThan(transcriptionResult.text.count, 0)
     }
@@ -156,10 +140,7 @@ final class FunctionalTests: XCTestCase {
             )
         ]
         let whisperKit = try await WhisperKit(modelFolder: try tinyModelPath())
-        let transcriptionResults = try await XCTUnwrapAsync(
-            await whisperKit.transcribe(audioPaths: audioPaths),
-            "Transcription failed"
-        )
+        let transcriptionResults: [Result<[TranscriptionResult], Swift.Error>] = await whisperKit.transcribe(audioPaths: audioPaths)
 
         XCTAssertEqual(transcriptionResults.count, 3)
         XCTAssertTrue(transcriptionResults.allSatisfy { $0.isSuccess })
@@ -187,10 +168,7 @@ final class FunctionalTests: XCTestCase {
             "/path/to/file2.wav"
         ]
         let whisperKit = try await WhisperKit(modelFolder: try tinyModelPath())
-        let transcriptionResults = try await XCTUnwrapAsync(
-            await whisperKit.transcribe(audioPaths: audioPaths),
-            "Transcription failed"
-        )
+        let transcriptionResults: [Result<[TranscriptionResult], Swift.Error>] = await whisperKit.transcribe(audioPaths: audioPaths)
 
         XCTAssertEqual(transcriptionResults.count, 3)
         XCTAssertEqual(
@@ -227,10 +205,7 @@ final class FunctionalTests: XCTestCase {
             .map { AudioProcessor.convertBufferToArray(buffer: $0) }
 
         let whisperKit = try await WhisperKit(modelFolder: try tinyModelPath())
-        let transcriptionResults = try await XCTUnwrapAsync(
-            await whisperKit.transcribe(audioArrays: audioArrays),
-            "Transcription failed"
-        )
+        let transcriptionResults: [Result<[TranscriptionResult], Swift.Error>] = await whisperKit.transcribe(audioArrays: audioArrays)
 
         XCTAssertEqual(transcriptionResults.count, 3)
         XCTAssertTrue(transcriptionResults.allSatisfy { $0.isSuccess })
@@ -249,24 +224,21 @@ final class FunctionalTests: XCTestCase {
     }
 
     func testModelSearchPathLarge() async throws {
-        guard let audioFilePath = Bundle.module.path(forResource: "jfk", ofType: "wav") else {
-            XCTFail("Audio file not found")
-            return
-        }
+        let audioFilePath = try XCTUnwrap(
+            Bundle.module.path(forResource: "jfk", ofType: "wav"),
+            "Audio file not found"
+        )
 
-        var pipe = try await WhisperKit(model: "large-v3", verbose: true, logLevel: .debug)
-
-        let transcriptionResult1 = try await pipe.transcribe(audioPath: audioFilePath)
+        let pipe1 = try await WhisperKit(model: "large-v3", verbose: true, logLevel: .debug)
+        let transcriptionResult1: [TranscriptionResult] = try await pipe1.transcribe(audioPath: audioFilePath)
         XCTAssertFalse(transcriptionResult1.text.isEmpty)
 
-        pipe = try await WhisperKit(model: "distil*large-v3", verbose: true, logLevel: .debug)
-
-        let transcriptionResult2 = try await pipe.transcribe(audioPath: audioFilePath)
+        let pipe2 = try await WhisperKit(model: "distil*large-v3", verbose: true, logLevel: .debug)
+        let transcriptionResult2: [TranscriptionResult] = try await pipe2.transcribe(audioPath: audioFilePath)
         XCTAssertFalse(transcriptionResult2.text.isEmpty)
 
-        pipe = try await WhisperKit(model: "distil-whisper_distil-large-v3", verbose: true, logLevel: .debug)
-
-        let transcriptionResult3 = try await pipe.transcribe(audioPath: audioFilePath)
+        let pipe3 = try await WhisperKit(model: "distil-whisper_distil-large-v3", verbose: true, logLevel: .debug)
+        let transcriptionResult3: [TranscriptionResult] = try await pipe3.transcribe(audioPath: audioFilePath)
         XCTAssertFalse(transcriptionResult3.text.isEmpty)
     }
 }

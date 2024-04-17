@@ -2,19 +2,11 @@
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
 import Foundation
-import OSLog
 import CoreML
-
-private let logger = Logger(
-    subsystem: Constants.Logging.subsystem,
-    category: "TranscribeTask"
-)
-private let signposter = OSSignposter(logger: logger)
 
 /// Responsible for transcribing audio chunk to text using the provided models and configurations.
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 final class TranscribeTask {
-    private let maxTokenContext: Int
     private var timings: TranscriptionTimings
     private let progress: Progress
     private let audioEncoder: any AudioEncoding
@@ -24,7 +16,6 @@ final class TranscribeTask {
     private let tokenizer: any WhisperTokenizer
 
     init(
-        maxTokenContext: Int,
         currentTimings: TranscriptionTimings,
         progress: Progress?,
         audioEncoder: any AudioEncoding,
@@ -33,7 +24,6 @@ final class TranscribeTask {
         textDecoder: any TextDecoding,
         tokenizer: any WhisperTokenizer
     ) {
-        self.maxTokenContext = maxTokenContext
         self.timings = currentTimings
         self.progress = progress ?? Progress()
         self.audioEncoder = audioEncoder
@@ -48,8 +38,8 @@ final class TranscribeTask {
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
     ) async throws -> TranscriptionResult {
-        let interval = Logging.beginSignpost("TranscribeAudio", signposter: signposter)
-        defer { Logging.endSignpost("TranscribeAudio", interval: interval, signposter: signposter) }
+        let interval = Logging.beginSignpost("TranscribeAudio", signposter: Logging.TranscribeTask.signposter)
+        defer { Logging.endSignpost("TranscribeAudio", interval: interval, signposter: Logging.TranscribeTask.signposter) }
 
         timings.pipelineStart = CFAbsoluteTimeGetCurrent()
 
@@ -247,7 +237,10 @@ final class TranscribeTask {
                 timings.totalDecodingWindows += 1
 
                 // Reset cache and move on to the next window
-                decoderInputs.reset(prefilledCacheSize: prefilledCacheSize, maxTokenContext: maxTokenContext)
+                decoderInputs.reset(
+                    prefilledCacheSize: prefilledCacheSize,
+                    maxTokenContext: decodeOptions?.sampleLength ?? Constants.maxTokenContext
+                )
 
                 let clipProgress = min(seek, seekClipEnd) - seekClipStart
                 progress.completedUnitCount = previousSeekProgress + Int64(clipProgress)
@@ -259,8 +252,8 @@ final class TranscribeTask {
             decodingOptions options: DecodingOptions,
             callback: TranscriptionCallback = nil
         ) async throws -> DecodingResult {
-            let interval = Logging.beginSignpost("Decode", signposter: signposter)
-            defer { Logging.endSignpost("Decode", interval: interval, signposter: signposter) }
+            let interval = Logging.beginSignpost("Decode", signposter: Logging.TranscribeTask.signposter)
+            defer { Logging.endSignpost("Decode", interval: interval, signposter: Logging.TranscribeTask.signposter) }
 
             // Fallback `options.temperatureFallbackCount` times with increasing temperatures, starting at `options.temperature`
             let temperatures = (0...options.temperatureFallbackCount).map { FloatType(options.temperature) + FloatType($0) * FloatType(options.temperatureIncrementOnFallback) }
@@ -278,7 +271,7 @@ final class TranscribeTask {
                 var currentDecodingOptions = options
                 // For a multilingual model, if language is not passed and detectLanguage is true, detect language and set in options
                 if textDecoder.isModelMultilingual, options.language == nil, options.detectLanguage {
-                    let languageDecodingResult = try? await textDecoder.detectLanguage(
+                    let languageDecodingResult: DecodingResult? = try? await textDecoder.detectLanguage(
                         from: encoderOutput,
                         using: decoderInputs,
                         sampler: tokenSampler,
@@ -332,7 +325,10 @@ final class TranscribeTask {
                     fallbackCount = Double(i)
                     timings.decodingFallback += Date().timeIntervalSince(decodeWithFallbackStart)
                     timings.totalDecodingFallbacks = fallbackCount
-                    decoderInputs.reset(prefilledCacheSize: prefilledCacheSize, maxTokenContext: maxTokenContext)
+                    decoderInputs.reset(
+                        prefilledCacheSize: prefilledCacheSize,
+                        maxTokenContext: decodeOptions?.sampleLength ?? Constants.maxTokenContext
+                    )
                     Logging.info("Fallback #\(fallbackCount + 1) (\(fallback.fallbackReason))")
                 } else {
                     break
@@ -354,7 +350,6 @@ final class TranscribeTask {
         transcription = tokenizer.decode(tokens: wordTokens).trimmingCharacters(in: .whitespaces)
         return TranscriptionResult(
             text: transcription,
-            totalTokens: allTokens.count,
             segments: allSegments,
             language: detectedLanguage ?? "en",
             timings: timings
