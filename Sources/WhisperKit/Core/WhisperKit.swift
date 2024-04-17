@@ -523,9 +523,10 @@ open class WhisperKit {
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
     ) async throws -> [TranscriptionResult] {
-        guard modelState == .loaded else {
-            throw WhisperError.modelsUnavailable()
+        if self.modelState != .loaded {
+            try await loadModels()
         }
+        
         guard let tokenizer else {
             // Tokenizer required for decoding
             throw WhisperError.tokenizerUnavailable()
