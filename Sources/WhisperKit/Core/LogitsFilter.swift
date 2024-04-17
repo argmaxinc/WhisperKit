@@ -252,8 +252,8 @@ open class LanguageLogitsFilter: LogitsFiltering {
     let sampleBegin: Int
     let nonLanguageTokenIndexes: [[NSNumber]]
 
-    public init(allLanguageTokens: [Int], logitsDim: Int, sampleBegin: Int) {
-        self.allLanguageTokens = Set(allLanguageTokens)
+    public init(allLanguageTokens: Set<Int>, logitsDim: Int, sampleBegin: Int) {
+        self.allLanguageTokens = allLanguageTokens
         self.logitsDim = logitsDim
         self.sampleBegin = sampleBegin
         self.nonLanguageTokenIndexes = LanguageLogitsFilter.getNonLanguageTokenIndexes(logitsDim: self.logitsDim, allLanguageTokens: self.allLanguageTokens)
