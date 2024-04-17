@@ -167,5 +167,4 @@ final class FunctionalTests: XCTestCase {
         }
         XCTAssertGreaterThan(transcriptionResult.text.count, 0)
     }
-    
 }
