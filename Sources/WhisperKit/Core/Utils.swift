@@ -6,6 +6,7 @@ import CoreML
 import Foundation
 import Hub
 import Tokenizers
+import os.signpost
 #if canImport(UIKit)
 import UIKit
 #elseif canImport(AppKit)
@@ -13,6 +14,14 @@ import AppKit
 #endif
 
 // MARK: - Extensions
+
+extension Array {
+    func chunked(into size: Int) -> [[Element]] {
+        return stride(from: 0, to: count, by: size).map {
+            Array(self[$0 ..< Swift.min($0 + size, count)])
+        }
+    }
+}
 
 extension MLMultiArray {
     /// Calculate the linear offset by summing the products of each dimension’s index with the dimension’s stride.
@@ -95,7 +104,6 @@ public extension WhisperKit {
 #endif
     }
 }
-
 
 extension Float {
     func rounded(_ decimalPlaces: Int) -> Float {
@@ -393,46 +401,42 @@ public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirm
     let validResults = results.compactMap { $0 }
     let language = validResults.first?.language ?? "en"
 
-    var mergedSegments: [TranscriptionSegment] = []
+    let mergedSegments = validResults.flatMap { $0.segments }
     let mergedText = confirmedWords.map { $0.word }.joined()
 
-    for result in validResults {
-        mergedSegments.append(contentsOf: result.segments)
-    }
-
     var mergedTimings = TranscriptionTimings(
-        modelLoading: validResults.map { $0.timings?.modelLoading ?? 0 }.max() ?? 0,
-        audioLoading: validResults.map { $0.timings?.audioLoading ?? 0 }.reduce(0, +),
-        audioProcessing: validResults.map { $0.timings?.audioProcessing ?? 0 }.reduce(0, +),
-        logmels: validResults.map { $0.timings?.logmels ?? 0 }.reduce(0, +),
-        encoding: validResults.map { $0.timings?.encoding ?? 0 }.reduce(0, +),
-        prefill: validResults.map { $0.timings?.prefill ?? 0 }.reduce(0, +),
-        decodingInit: validResults.map { $0.timings?.decodingInit ?? 0 }.reduce(0, +),
-        decodingLoop: validResults.map { $0.timings?.decodingLoop ?? 0 }.reduce(0, +),
-        decodingPredictions: validResults.map { $0.timings?.decodingPredictions ?? 0 }.reduce(0, +),
-        decodingFiltering: validResults.map { $0.timings?.decodingFiltering ?? 0 }.reduce(0, +),
-        decodingSampling: validResults.map { $0.timings?.decodingSampling ?? 0 }.reduce(0, +),
-        decodingFallback: validResults.map { $0.timings?.decodingFallback ?? 0 }.reduce(0, +),
-        decodingWindowing: validResults.map { $0.timings?.decodingWindowing ?? 0 }.reduce(0, +),
-        decodingKvCaching: validResults.map { $0.timings?.decodingKvCaching ?? 0 }.reduce(0, +),
-        decodingTimestampAlignment: validResults.map { $0.timings?.decodingWordTimestamps ?? 0 }.reduce(0, +),
-        decodingNonPrediction: validResults.map { $0.timings?.decodingNonPrediction ?? 0 }.reduce(0, +),
-        totalAudioProcessingRuns: validResults.map { $0.timings?.totalAudioProcessingRuns ?? 0 }.reduce(0, +),
-        totalLogmelRuns: validResults.map { $0.timings?.totalLogmelRuns ?? 0 }.reduce(0, +),
-        totalEncodingRuns: validResults.map { $0.timings?.totalEncodingRuns ?? 0 }.reduce(0, +),
-        totalDecodingLoops: validResults.map { $0.timings?.totalDecodingLoops ?? 0 }.reduce(0, +),
-        totalKVUpdateRuns: validResults.map { $0.timings?.totalKVUpdateRuns ?? 0 }.reduce(0, +),
-        totalTimestampAlignmentRuns: validResults.map { $0.timings?.totalTimestampAlignmentRuns ?? 0 }.reduce(0, +),
-        totalDecodingFallbacks: validResults.map { $0.timings?.totalDecodingFallbacks ?? 0 }.reduce(0, +),
-        totalDecodingWindows: validResults.map { $0.timings?.totalDecodingWindows ?? 0 }.reduce(0, +),
-        fullPipeline: validResults.map { $0.timings?.fullPipeline ?? 0 }.reduce(0, +)
+        modelLoading: validResults.map { $0.timings.modelLoading }.max() ?? 0,
+        audioLoading: validResults.map { $0.timings.audioLoading }.reduce(0, +),
+        audioProcessing: validResults.map { $0.timings.audioProcessing }.reduce(0, +),
+        logmels: validResults.map { $0.timings.logmels }.reduce(0, +),
+        encoding: validResults.map { $0.timings.encoding }.reduce(0, +),
+        prefill: validResults.map { $0.timings.prefill }.reduce(0, +),
+        decodingInit: validResults.map { $0.timings.decodingInit }.reduce(0, +),
+        decodingLoop: validResults.map { $0.timings.decodingLoop }.reduce(0, +),
+        decodingPredictions: validResults.map { $0.timings.decodingPredictions }.reduce(0, +),
+        decodingFiltering: validResults.map { $0.timings.decodingFiltering }.reduce(0, +),
+        decodingSampling: validResults.map { $0.timings.decodingSampling }.reduce(0, +),
+        decodingFallback: validResults.map { $0.timings.decodingFallback }.reduce(0, +),
+        decodingWindowing: validResults.map { $0.timings.decodingWindowing }.reduce(0, +),
+        decodingKvCaching: validResults.map { $0.timings.decodingKvCaching }.reduce(0, +),
+        decodingTimestampAlignment: validResults.map { $0.timings.decodingWordTimestamps }.reduce(0, +),
+        decodingNonPrediction: validResults.map { $0.timings.decodingNonPrediction }.reduce(0, +),
+        totalAudioProcessingRuns: validResults.map { $0.timings.totalAudioProcessingRuns }.reduce(0, +),
+        totalLogmelRuns: validResults.map { $0.timings.totalLogmelRuns }.reduce(0, +),
+        totalEncodingRuns: validResults.map { $0.timings.totalEncodingRuns }.reduce(0, +),
+        totalDecodingLoops: validResults.map { $0.timings.totalDecodingLoops }.reduce(0, +),
+        totalKVUpdateRuns: validResults.map { $0.timings.totalKVUpdateRuns }.reduce(0, +),
+        totalTimestampAlignmentRuns: validResults.map { $0.timings.totalTimestampAlignmentRuns }.reduce(0, +),
+        totalDecodingFallbacks: validResults.map { $0.timings.totalDecodingFallbacks }.reduce(0, +),
+        totalDecodingWindows: validResults.map { $0.timings.totalDecodingWindows }.reduce(0, +),
+        fullPipeline: validResults.map { $0.timings.fullPipeline }.reduce(0, +)
     )
 
-    mergedTimings.inputAudioSeconds = validResults.map { $0.timings?.inputAudioSeconds ?? 0 }.reduce(0, +)
+    mergedTimings.inputAudioSeconds = validResults.map { $0.timings.inputAudioSeconds }.reduce(0, +)
 
     // Average first token times
-    if let pipelineStart = validResults.first?.timings?.pipelineStart {
-        let averageFirstTokenTime = validResults.map { (($0.timings?.firstTokenTime ?? 0) - ($0.timings?.pipelineStart ?? 0)) }.reduce(0, +) / Double(validResults.count)
+    if let pipelineStart = validResults.first?.timings.pipelineStart {
+        let averageFirstTokenTime = validResults.map { (($0.timings.firstTokenTime) - ($0.timings.pipelineStart)) }.reduce(0, +) / Double(validResults.count)
         mergedTimings.pipelineStart = pipelineStart
         mergedTimings.firstTokenTime = pipelineStart + averageFirstTokenTime
     }
@@ -556,5 +560,53 @@ public class Logging {
         if shared.logLevel.shouldLog(level: .error) {
             shared.log(items, separator: separator, terminator: terminator)
         }
+    }
+}
+
+extension Logging {
+    enum AudioEncoding {
+        static let logger = Logger(
+            subsystem: Constants.Logging.subsystem,
+            category: "AudioEncoding"
+        )
+        static let signposter = OSSignposter(logger: logger)
+    }
+}
+
+extension Logging {
+    enum FeatureExtractor {
+        static let logger = Logger(
+            subsystem: Constants.Logging.subsystem,
+            category: "FeatureExtractor"
+        )
+        static let signposter = OSSignposter(logger: logger)
+    }
+}
+
+extension Logging {
+    enum TranscribeTask {
+        static let logger = Logger(
+            subsystem: Constants.Logging.subsystem,
+            category: "TranscribeTask"
+        )
+        static let signposter = OSSignposter(logger: logger)
+    }
+}
+
+extension Logging {
+    static func beginSignpost(
+        _ intervalName: StaticString,
+        signposter: OSSignposter
+    ) -> OSSignpostIntervalState {
+        let signpostId = signposter.makeSignpostID()
+        return signposter.beginInterval(intervalName, id: signpostId)
+    }
+
+    static func endSignpost(
+        _ intervalName: StaticString,
+        interval: OSSignpostIntervalState,
+        signposter: OSSignposter
+    ) {
+        signposter.endInterval(intervalName, interval)
     }
 }

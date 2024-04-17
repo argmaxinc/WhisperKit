@@ -4,8 +4,8 @@
 import ArgumentParser
 
 struct CLIArguments: ParsableArguments {
-    @Option(help: "Path to audio file")
-    var audioPath: String = "Tests/WhisperKitTests/Resources/jfk.wav"
+    @Option(help: "Paths to audio files")
+    var audioPath = [String]()
 
     @Option(help: "Path of model files")
     var modelPath: String?
@@ -96,4 +96,7 @@ struct CLIArguments: ParsableArguments {
 
     @Flag(help: "Simulate streaming transcription using the input audio file")
     var streamSimulated: Bool = false
+
+    @Option(help: "Maximum concurrent inference, might be helpful when processing more than 1 audio file at the same time. 0 means unlimited")
+    var concurrentWorkerCount: Int = 0
 }

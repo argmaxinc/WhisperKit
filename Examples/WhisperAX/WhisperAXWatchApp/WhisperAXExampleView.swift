@@ -407,7 +407,7 @@ struct WhisperAXWatchView: View {
                 try await whisperKit.loadModels()
 
                 await MainActor.run {
-                    availableLanguages = whisperKit.tokenizer?.languages.map { $0.key }.sorted() ?? ["english"]
+                    availableLanguages = Constants.languages.map { $0.key }.sorted()
                     loadingProgressValue = 1.0
                     modelState = whisperKit.modelState
                 }
@@ -489,7 +489,7 @@ struct WhisperAXWatchView: View {
     func transcribeAudioSamples(_ samples: [Float]) async throws -> TranscriptionResult? {
         guard let whisperKit = whisperKit else { return nil }
 
-        let languageCode = whisperKit.tokenizer?.languages[selectedLanguage] ?? "en"
+        let languageCode = Constants.languages[selectedLanguage] ?? "en"
         let task: DecodingTask = selectedTask == "transcribe" ? .transcribe : .translate
         let seekClip = [lastConfirmedSegmentEndSeconds]
 
@@ -534,8 +534,12 @@ struct WhisperAXWatchView: View {
             return nil
         }
 
-        let transcription = try await whisperKit.transcribe(audioArray: samples, decodeOptions: options, callback: decodingCallback)
-        return transcription
+        let transcription: [TranscriptionResult] = try await whisperKit.transcribe(
+            audioArray: samples,
+            decodeOptions: options,
+            callback: decodingCallback
+        )
+        return transcription.first
     }
 
     // MARK: Streaming Logic

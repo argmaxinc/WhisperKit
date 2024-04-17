@@ -107,7 +107,7 @@ extension XCTestCase {
         audioFile: String = "jfk.wav",
         file: StaticString = #file,
         line: UInt = #line
-    ) async throws -> TranscriptionResult? {
+    ) async throws -> [TranscriptionResult] {
         let modelPath: String
         switch variant {
             case .largev3:
@@ -232,5 +232,43 @@ extension SpecialTokens {
             translateToken: translateToken,
             whitespaceToken: whitespaceToken
         )
+    }
+}
+
+extension Result {
+    var isSuccess: Bool {
+        switch self {
+        case .success:
+            return true
+        case .failure:
+            return false
+        }
+    }
+
+    func whisperError() -> WhisperError? {
+        switch self {
+        case .success:
+            return nil
+        case .failure(let error):
+            return error as? WhisperError
+        }
+    }
+}
+
+extension Result where Success == [TranscriptionResult] {
+    func normalizedText(prefix: Int) throws -> String {
+        try get().text.normalized.split(separator: " ").prefix(prefix).joined(separator: " ")
+    }
+}
+
+extension Collection where Element == TranscriptionResult {
+    var text: String {
+        map(\.text).joined(separator: " ")
+    }
+}
+
+extension Collection where Element == TranscriptionResult {
+    var segments: [TranscriptionSegment] {
+        flatMap(\.segments)
     }
 }

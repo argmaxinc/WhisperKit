@@ -27,20 +27,17 @@ open class FeatureExtractor: FeatureExtracting, WhisperMLModel {
     }
 
     public func logMelSpectrogram(fromAudio inputAudio: MLMultiArray) async throws -> MLMultiArray? {
-        let modelInputs = MelSpectrogramInput(audio: inputAudio)
-
-        guard let model = model else {
-            return nil
+        guard let model else {
+            throw WhisperError.modelsUnavailable()
         }
-
         try Task.checkCancellation()
 
+        let interval = Logging.beginSignpost("ExtractAudioFeatures", signposter: Logging.FeatureExtractor.signposter)
+        defer { Logging.endSignpost("ExtractAudioFeatures", interval: interval, signposter: Logging.FeatureExtractor.signposter) }
+
+        let modelInputs = MelSpectrogramInput(audio: inputAudio)
         let outputFeatures = try await model.asyncPrediction(from: modelInputs, options: MLPredictionOptions())
-
         let output = MelSpectrogramOutput(features: outputFeatures)
-
-        let encodedFeatures = output.melspectrogramFeatures
-
-        return encodedFeatures
+        return output.melspectrogramFeatures
     }
 }
