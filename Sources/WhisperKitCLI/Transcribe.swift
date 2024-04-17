@@ -68,7 +68,7 @@ struct Transcribe: AsyncParsableCommand {
             options.prefixTokens = tokenizer.encode(text: " " + prefixText.trimmingCharacters(in: .whitespaces)).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
         }
 
-        let transcribeResult = await whisperKit.transcribe(
+        let transcribeResult: [Result<[TranscriptionResult], Swift.Error>] = await whisperKit.transcribe(
             audioPaths: resolvedAudioPaths,
             decodeOptions: options
         )
@@ -101,7 +101,6 @@ struct Transcribe: AsyncParsableCommand {
         let decodingOptions = decodingOptions(task: .transcribe)
 
         let audioStreamTranscriber = AudioStreamTranscriber(
-            maxTokenContext: WhisperKit.maxTokenContext,
             audioEncoder: whisperKit.audioEncoder,
             featureExtractor: whisperKit.featureExtractor,
             segmentSeeker: whisperKit.segmentSeeker,

@@ -731,7 +731,7 @@ struct ContentView: View {
             VStack {
                 Text("Max Tokens Per Loop")
                 HStack {
-                    Slider(value: $sampleLength, in: 0...Double(min(whisperKit?.textDecoder.kvCacheMaxSequenceLength ?? WhisperKit.maxTokenContext, WhisperKit.maxTokenContext)), step: 10)
+                    Slider(value: $sampleLength, in: 0...Double(min(whisperKit?.textDecoder.kvCacheMaxSequenceLength ?? Constants.maxTokenContext, Constants.maxTokenContext)), step: 10)
                     Text(sampleLength.formatted(.number))
                         .frame(width: 30)
                     InfoButton("Maximum number of tokens to generate per loop.\nCan be lowered based on the type of speech in order to further prevent repetition loops from going too long.")
@@ -937,7 +937,7 @@ struct ContentView: View {
                         localModels.append(model)
                     }
                     
-                    availableLanguages = whisperKit.tokenizer?.languages.map { $0.key }.sorted() ?? ["english"]
+                    availableLanguages = Constants.languages.map { $0.key }.sorted()
                     loadingProgressValue = 1.0
                     modelState = whisperKit.modelState
                 }
@@ -1137,7 +1137,7 @@ struct ContentView: View {
     func transcribeAudioSamples(_ samples: [Float]) async throws -> TranscriptionResult? {
         guard let whisperKit = whisperKit else { return nil }
 
-        let languageCode = whisperKit.tokenizer?.languages[selectedLanguage] ?? "en"
+        let languageCode = Constants.languages[selectedLanguage] ?? "en"
         let task: DecodingTask = selectedTask == "transcribe" ? .transcribe : .translate
         let seekClip = [lastConfirmedSegmentEndSeconds]
 
@@ -1353,7 +1353,7 @@ struct ContentView: View {
             return nil
         }
 
-        let languageCode = whisperKit.tokenizer?.languages[selectedLanguage] ?? "en"
+        let languageCode = Constants.languages[selectedLanguage] ?? "en"
         let task: DecodingTask = selectedTask == "transcribe" ? .transcribe : .translate
 
         let options = DecodingOptions(
