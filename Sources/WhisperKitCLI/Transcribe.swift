@@ -21,6 +21,21 @@ struct Transcribe: AsyncParsableCommand {
                 throw ValidationError("Invalid language code \"\(language)\". Supported languages: \(Constants.languages.values)")
             }
         }
+        
+        if cliArguments.audioPath.isEmpty {
+            guard let audioFolder = cliArguments.audioFolder else {
+                throw ValidationError("Either audioPath or audioFolder must be provided.")
+            }
+            let fileManager = FileManager.default
+            let audioExtensions = ["mp3", "wav", "m4a", "flac", "aiff", "aac", "ogg"]
+            let audioFiles = try fileManager.contentsOfDirectory(atPath: audioFolder)
+                .filter { fileName in
+                    let fileExtension = fileName.lowercased().components(separatedBy: ".").last
+                    return audioExtensions.contains(fileExtension ?? "")
+                }
+            
+            cliArguments.audioPath = audioFiles.map { audioFolder + "/" + $0 }
+        }
     }
 
     mutating func run() async throws {
