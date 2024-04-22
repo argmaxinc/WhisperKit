@@ -22,7 +22,7 @@ struct Transcribe: AsyncParsableCommand {
             }
         }
         
-        if cliArguments.audioPath.isEmpty {
+        if cliArguments.audioPath.isEmpty && !cliArguments.stream {
             guard let audioFolder = cliArguments.audioFolder else {
                 throw ValidationError("Either audioPath or audioFolder must be provided.")
             }
