@@ -604,3 +604,35 @@ public extension AudioProcessor {
         audioEngine = nil
     }
 }
+
+
+public class AVAudioPCMBufferedFile{
+    let audioFile: AVAudioFile
+    let chunkSizeInSeconds: UInt32
+    var currentPosition: AVAudioFramePosition = 0
+    let format: AVAudioFormat
+    let frameLength: AVAudioFrameCount
+    let pcmBuffer: AVAudioPCMBuffer
+    
+    
+    init(audioFile: AVAudioFile, chunkSizeInSeconds: UInt32, currentPosition: AVAudioFramePosition = 0){
+        self.audioFile = audioFile
+        self.chunkSizeInSeconds = chunkSizeInSeconds
+        self.currentPosition = currentPosition
+        self.format = audioFile.processingFormat
+        
+        self.audioFile.framePosition = currentPosition
+        self.frameLength = AVAudioFrameCount(Double(self.chunkSizeInSeconds) * self.format.sampleRate)
+        self.pcmBuffer = AVAudioPCMBuffer(pcmFormat: self.format, frameCapacity: frameLength)!
+        
+    }
+    
+    func readNextChunkNoChecks() -> AVAudioPCMBuffer?{
+        if (self.audioFile.length - self.currentPosition) <= 0{
+            return nil
+        }
+        try? self.audioFile.read(into: self.pcmBuffer, frameCount: frameLength)
+        self.currentPosition = self.audioFile.framePosition
+        return self.pcmBuffer
+    }
+}

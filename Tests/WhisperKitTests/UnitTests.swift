@@ -1343,4 +1343,39 @@ final class UnitTests: XCTestCase {
 
         XCTAssertEqual(finalWords.normalized, " And so my fellow Americans. Ask not what your country can do for you ask what you can do for your country.".normalized)
     }
+    
+    
+    func testBufferedAudioFile() async throws{
+        let computeOptions = ModelComputeOptions(
+            melCompute: .cpuOnly
+        )
+        let whisperKit = try await WhisperKit(
+            modelFolder: tinyModelPath(),
+            computeOptions: computeOptions,
+            verbose: true,
+            logLevel: .debug
+        )
+
+        let audioFilePath = try XCTUnwrap(
+            Bundle.module.path(forResource: "4484146", ofType: "wav"),
+            "Audio file not found"
+        )
+        let audioFile = try? AVAudioFile(forReading: URL(fileURLWithPath: audioFilePath))
+        let audioBuffer = try AVAudioPCMBufferedFile(audioFile: audioFile!, chunkSizeInSeconds: 5)
+        var results : [TranscriptionResult] = []
+        var count = 0
+        var text = ""
+        while true{
+            guard let tempBuffer = audioBuffer.readNextChunkNoChecks() else { break }
+            let audioSamples = AudioProcessor.convertBufferToArray(buffer: tempBuffer)
+
+            let options = DecodingOptions(usePrefillPrompt: true, withoutTimestamps: false, firstTokenLogProbThreshold: nil)
+
+            let transcribeResult: [TranscriptionResult] = try await whisperKit.transcribe(audioArray: audioSamples, decodeOptions: options)
+            results.append(transcribeResult[0])
+            count += 1
+            text.append(transcribeResult[0].text)
+        }
+        print(text)
+    }
 }
