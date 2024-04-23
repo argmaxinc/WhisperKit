@@ -30,6 +30,7 @@ open class WhisperKit {
     public static var hopLength: Int = 160
     public static var chunkLength: Int = 30 // seconds
     public static var windowSamples: Int = 480_000 // sampleRate * chunkLength
+    public static var vadWindowSamples: Int = 1600 // sampleRate * 0.1 sec
     public static var secondsPerTimeToken = Float(0.02)
 
     /// Progress
@@ -394,20 +395,24 @@ open class WhisperKit {
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
     ) async -> [Result<[TranscriptionResult], Swift.Error>] {
-        let loadedAudioResult = await AudioProcessor.loadAudio(at: audioPaths)
-        let transcribeResults: [Result<[TranscriptionResult], Swift.Error>] = await transcribe(
-            audioArrays: loadedAudioResult.compactMap { try? $0.get() },
-            decodeOptions: decodeOptions,
-            callback: callback
-        )
         var result = [Result<[TranscriptionResult], Swift.Error>]()
-        var transcribeResultIndex = 0
-        for audioResult in loadedAudioResult {
-            switch audioResult {
-            case .success:
-                result.append(transcribeResults[transcribeResultIndex])
-                transcribeResultIndex += 1
-            case .failure(let error):
+        for audioPath in audioPaths {
+            do {
+                let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioPath)
+                let audioArray = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
+                let chunker = SimpleAudioChunker()
+                let audioChunks = try await chunker.chunkAll(
+                    audioArray: audioArray,
+                    frameLength: WhisperKit.windowSamples,
+                    decodeOptions: decodeOptions
+                )
+                let transcribeResult = await transcribe(
+                    audioChunks: audioChunks,
+                    decodeOptions: decodeOptions,
+                    callback: callback
+                )
+                result.append(contentsOf: transcribeResult)
+            } catch {
                 result.append(.failure(error))
             }
         }
@@ -493,17 +498,28 @@ open class WhisperKit {
 
         let convertAudioStart = Date()
         let audioArray = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
+        let chunker = SimpleAudioChunker()
+        let audioChunks = try await chunker.chunkAll(
+            audioArray: audioArray,
+            frameLength: WhisperKit.windowSamples,
+            decodeOptions: decodeOptions
+        )
         let convertTime = Date().timeIntervalSince(convertAudioStart)
 
         currentTimings.audioLoading = loadTime + convertTime
         Logging.debug("Audio loading time: \(loadTime), Audio convert time: \(convertTime)")
 
         // Send converted samples to transcribe
-        return try await transcribe(
-            audioArray: audioArray,
+        let result = await transcribe(
+            audioChunks: audioChunks,
             decodeOptions: decodeOptions,
             callback: callback
         )
+        let transcriptionResult = result.compactMap { try? $0.get() }.flatMap { $0 }
+        for i in transcriptionResult {
+            i.logSegments()
+        }
+        return transcriptionResult
     }
 
     // MARK: - Transcribe audio samples
@@ -546,6 +562,79 @@ open class WhisperKit {
             decodeOptions: decodeOptions,
             callback: callback
         )
+        if let decodeOptions, decodeOptions.verbose {
+            transcribeTaskResult.logTimings()
+        }
+        transcribeTaskResult.logSegments()
+        return [transcribeTaskResult]
+    }
+
+    private func transcribe(
+        audioChunks: [AudioChunk],
+        decodeOptions: DecodingOptions? = nil,
+        callback: TranscriptionCallback = nil
+    ) async -> [Result<[TranscriptionResult], Swift.Error>] {
+        var result = [Result<[TranscriptionResult], Swift.Error>]()
+        let concurrentWorkerCount = decodeOptions?.concurrentWorkerCount ?? 0
+        let chunkedAudioArrays = concurrentWorkerCount == 0 ? [audioChunks] : audioChunks.chunked(into: concurrentWorkerCount)
+        for chunkedAudioArray in chunkedAudioArrays {
+            let partialResult = await withTaskGroup(of: [(index: Int, result: Result<[TranscriptionResult], Swift.Error>)].self) { taskGroup -> [Result<[TranscriptionResult], Swift.Error>] in
+                for (index, audioChunk) in chunkedAudioArray.enumerated() {
+                    taskGroup.addTask {
+                        do {
+                            let transcribeResult: [TranscriptionResult] = try await self.transcribe(
+                                audioChunk: audioChunk,
+                                decodeOptions: decodeOptions,
+                                callback: callback
+                            )
+                            return [(index: index, result: .success(transcribeResult))]
+                        } catch {
+                            return [(index: index, result: .failure(error))]
+                        }
+                    }
+                }
+                var batchResult = [(index: Int, result: Result<[TranscriptionResult], Swift.Error>)]()
+                for await result in taskGroup {
+                    batchResult.append(contentsOf: result)
+                }
+                batchResult.sort(by: { $0.index < $1.index })
+                return batchResult.map { $0.result }
+            }
+            result.append(contentsOf: partialResult)
+        }
+        return result
+    }
+
+    private func transcribe(
+        audioChunk: AudioChunk,
+        decodeOptions: DecodingOptions? = nil,
+        callback: TranscriptionCallback = nil
+    ) async throws -> [TranscriptionResult] {
+        if self.modelState != .loaded {
+            try await loadModels()
+        }
+
+        guard let tokenizer else {
+            // Tokenizer required for decoding
+            throw WhisperError.tokenizerUnavailable()
+        }
+        try Task.checkCancellation()
+        let transcribeTask = TranscribeTask(
+            currentTimings: currentTimings,
+            progress: progress,
+            audioEncoder: audioEncoder,
+            featureExtractor: featureExtractor,
+            segmentSeeker: segmentSeeker,
+            textDecoder: textDecoder,
+            tokenizer: tokenizer
+        )
+        guard let transcribeTaskResult = try await transcribeTask.run(
+            audioChunk: audioChunk,
+            decodeOptions: decodeOptions,
+            callback: callback
+        ) else {
+            return []
+        }
         if let decodeOptions, decodeOptions.verbose {
             transcribeTaskResult.logTimings()
         }

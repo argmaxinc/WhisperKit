@@ -88,14 +88,24 @@ struct Transcribe: AsyncParsableCommand {
             decodeOptions: options
         )
 
-        for (audioPath, result) in zip(resolvedAudioPaths, transcribeResult) {
+        // FIXME:
+        for result in transcribeResult {
             switch result {
             case .success(let transcribeResult):
-                processTranscriptionResult(audioPath: audioPath, transcribeResult: transcribeResult.first)
+                processTranscriptionResult(audioPath: "audioPath", transcribeResult: mergeTranscriptionResults(transcribeResult))
             case .failure(let error):
-                print("Error when transcribing \(audioPath): \(error)")
+                print("Error when transcribing \("audioPath"): \(error)")
             }
         }
+
+//        for (audioPath, result) in zip(resolvedAudioPaths, transcribeResult) {
+//            switch result {
+//            case .success(let transcribeResult):
+//                processTranscriptionResult(audioPath: audioPath, transcribeResult: mergeTranscriptionResults(transcribeResult))
+//            case .failure(let error):
+//                print("Error when transcribing \(audioPath): \(error)")
+//            }
+//        }
     }
 
     private func transcribeStream() async throws {
