@@ -5,8 +5,8 @@ import AVFoundation
 import CoreML
 import Foundation
 import Hub
-import Tokenizers
 import os.signpost
+import Tokenizers
 #if canImport(UIKit)
 import UIKit
 #elseif canImport(AppKit)
@@ -18,7 +18,7 @@ import AppKit
 extension Array {
     func chunked(into size: Int) -> [[Element]] {
         return stride(from: 0, to: count, by: size).map {
-            Array(self[$0 ..< Swift.min($0 + size, count)])
+            Array(self[$0..<Swift.min($0 + size, count)])
         }
     }
 }
@@ -97,11 +97,11 @@ extension Process {
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public extension WhisperKit {
     static var isRunningOnSimulator: Bool {
-#if targetEnvironment(simulator)
+        #if targetEnvironment(simulator)
         return true
-#else
+        #else
         return false
-#endif
+        #endif
     }
 }
 
@@ -436,7 +436,7 @@ public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirm
 
     // Average first token times
     if let pipelineStart = validResults.first?.timings.pipelineStart {
-        let averageFirstTokenTime = validResults.map { (($0.timings.firstTokenTime) - ($0.timings.pipelineStart)) }.reduce(0, +) / Double(validResults.count)
+        let averageFirstTokenTime = validResults.map { ($0.timings.firstTokenTime) - ($0.timings.pipelineStart) }.reduce(0, +) / Double(validResults.count)
         mergedTimings.pipelineStart = pipelineStart
         mergedTimings.firstTokenTime = pipelineStart + averageFirstTokenTime
     }
