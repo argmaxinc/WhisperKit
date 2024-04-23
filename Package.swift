@@ -7,12 +7,16 @@ let package = Package(
     name: "whisperkit",
     platforms: [
         .iOS(.v16),
-        .macOS(.v13),
+        .macOS("13.3"),
     ],
     products: [
         .library(
             name: "WhisperKit",
             targets: ["WhisperKit"]
+        ),
+        .library(
+            name: "WhisperKitMLX",
+            targets: ["WhisperKitMLX"]
         ),
         .executable(
             name: "whisperkit-cli",
@@ -21,6 +25,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/huggingface/swift-transformers.git", exact: "0.1.7"),
+        .package(url: "https://github.com/ml-explore/mlx-swift", exact: "0.10.0"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", exact: "1.3.0"),
     ],
     targets: [
@@ -28,7 +33,20 @@ let package = Package(
             name: "WhisperKit",
             dependencies: [
                 .product(name: "Transformers", package: "swift-transformers"),
-            ]
+            ],
+            path: "Sources/WhisperKit/Core"
+        ),
+        .target(
+            name: "WhisperKitMLX",
+            dependencies: [
+                "WhisperKit",
+                .product(name: "MLX", package: "mlx-swift"),
+                .product(name: "MLXRandom", package: "mlx-swift"),
+                .product(name: "MLXNN", package: "mlx-swift"),
+                .product(name: "MLXOptimizers", package: "mlx-swift"),
+                .product(name: "MLXFFT", package: "mlx-swift")
+            ],
+            path: "Sources/WhisperKit/MLX"
         ),
         .executableTarget(
             name: "WhisperKitCLI",
@@ -41,6 +59,7 @@ let package = Package(
             name: "WhisperKitTests",
             dependencies: [
                 "WhisperKit",
+                "WhisperKitMLX",
                 .product(name: "Transformers", package: "swift-transformers"),
             ],
             path: ".",
