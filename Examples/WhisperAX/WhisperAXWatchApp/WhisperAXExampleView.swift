@@ -249,7 +249,8 @@ struct WhisperAXWatchView: View {
                 let currentTranscription = (confirmedSegments.map { $0.text } + unconfirmedSegments.map { $0.text }).joined(separator: " ")
                 ShareLink(item: currentTranscription, label: {
                     Image(systemName: "square.and.arrow.up")
-                })            }
+                })
+            }
             ToolbarItem(placement: .bottomBar) {
                 Button {
                     withAnimation {
