@@ -25,7 +25,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/huggingface/swift-transformers.git", exact: "0.1.7"),
-        .package(url: "https://github.com/ml-explore/mlx-swift", exact: "0.10.0"),
+        .package(url: "https://github.com/ml-explore/mlx-swift", branch: "main"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", exact: "1.3.0"),
     ],
     targets: [
@@ -46,12 +46,17 @@ let package = Package(
                 .product(name: "MLXOptimizers", package: "mlx-swift"),
                 .product(name: "MLXFFT", package: "mlx-swift")
             ],
-            path: "Sources/WhisperKit/MLX"
+            path: "Sources/WhisperKit/MLX",
+            resources: [
+                .copy("Resources/mel_filters_80.npy"),
+                .copy("Resources/mel_filters_128.npy")
+            ]
         ),
         .executableTarget(
             name: "WhisperKitCLI",
             dependencies: [
                 "WhisperKit",
+                "WhisperKitMLX",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
         ),
