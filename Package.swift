@@ -64,7 +64,6 @@ let package = Package(
             name: "WhisperKitTests",
             dependencies: [
                 "WhisperKit",
-                "WhisperKitMLX",
                 .product(name: "Transformers", package: "swift-transformers"),
             ],
             path: ".",
@@ -75,10 +74,19 @@ let package = Package(
                 "README.md",
                 "LICENSE",
                 "CONTRIBUTING.md",
+                "Tests/WhisperKitMLXTests"
             ],
             resources: [
                 .process("Tests/WhisperKitTests/Resources"),
                 .copy("Models/whisperkit-coreml"),
+            ]
+        ),
+        .testTarget(
+            name: "WhisperKitMLXTests",
+            dependencies: [
+                "WhisperKit",
+                "WhisperKitMLX",
+                .product(name: "Transformers", package: "swift-transformers"),
             ]
         ),
     ]

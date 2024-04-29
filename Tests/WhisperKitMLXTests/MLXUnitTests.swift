@@ -6,7 +6,7 @@ import MLX
 @testable import WhisperKit
 @testable import WhisperKitMLX
 
-final class MLXTests: XCTestCase {
+final class MLXUnitTests: XCTestCase {
 
     // MARK: - Feature Extractor Tests
 
@@ -17,10 +17,9 @@ final class MLXTests: XCTestCase {
             "Failed to pad audio samples"
         )
         let featureExtractor = MLXFeatureExtractor()
-        let melSpectrogram = try await XCTUnwrapAsync(
-            await featureExtractor.logMelSpectrogram(fromAudio: paddedSamples),
-            "Failed to produce Mel spectrogram from audio samples"
-        )
+        let extractedFeature = try await featureExtractor.logMelSpectrogram(fromAudio: paddedSamples)
+        let melSpectrogram = try XCTUnwrap(extractedFeature, "Failed to produce Mel spectrogram from audio samples")
+
         let expectedShape: [NSNumber] = [3000, 80]
         XCTAssertNotNil(melSpectrogram, "Failed to produce Mel spectrogram from audio samples")
         XCTAssertEqual(melSpectrogram.shape, expectedShape, "Mel spectrogram shape is not as expected")
