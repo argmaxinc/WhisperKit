@@ -62,7 +62,7 @@ jobs:
         run: |
           xcodebuild -downloadAllPlatforms
           echo "Destinations for testing:"
-          xcodebuild test-without-building -only-testing WhisperKitTests/UnitTests -scheme WhisperKit -showdestinations -skipPackagePluginValidation
+          xcodebuild -scheme WhisperKit -showdestinations -skipPackagePluginValidation
       - name: Build and Test - ${{ matrix.run-config['name'] }}
         if: ${{ matrix.run-config['condition'] == true }}
         run: |
