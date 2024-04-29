@@ -36,16 +36,6 @@ open class MLXFeatureExtractor: FeatureExtracting {
             nFFT: nFFT,
             hopLength: hopLength
         )
-        let logMelSpectrogramData = logMelSpectrogram.asArray(Float.self)
-        let result = try MLMultiArray(shape: logMelSpectrogram.shape.map { NSNumber(value: $0) }, dataType: .float32)
-        let maxRow = logMelSpectrogram.shape[0]
-        let maxCol = logMelSpectrogram.shape[1]
-        for row in 0..<maxRow {
-            for col in 0..<maxCol {
-                let key = [row, col] as [NSNumber]
-                result[key] = NSNumber(value: logMelSpectrogramData[row * maxCol + col])
-            }
-        }
-        return result
+        return try logMelSpectrogram.asMLMultiArray()
     }
 }

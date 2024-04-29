@@ -5,6 +5,7 @@ import Foundation
 import WhisperKit
 import MLX
 import MLXFFT
+import CoreML
 
 enum PadMode {
     case constant
@@ -105,4 +106,23 @@ func loadMelFilters(nMels: Int) -> MLXArray {
     precondition(nMels == 80 || nMels == 128, "Unsupported nMels: \(nMels)")
     let fileUrl = Bundle.module.url(forResource: "mel_filters_\(nMels)", withExtension: "npy")!
     return try! MLX.loadArray(url: fileUrl)
+}
+
+// MARK: - Extensions
+
+extension MLXArray {
+    func asMLMultiArray(
+        dataType: MLMultiArrayDataType = .float32,
+        noCopy: Bool = true
+    ) throws -> MLMultiArray {
+        var data = asData(noCopy: noCopy)
+        return try data.withUnsafeMutableBytes { (ptr: UnsafeMutableRawBufferPointer) in
+            try MLMultiArray(
+                dataPointer: ptr.baseAddress!,
+                shape: shape.map { NSNumber(value: $0) },
+                dataType: dataType,
+                strides: strides.map { NSNumber(value: $0) }
+            )
+        }
+    }
 }
