@@ -34,7 +34,7 @@ jobs:
               condition: "${{ inputs.macos-runner == 'macos-14' }}",
               clean-destination: "generic/platform=watchOS",
               test-destination: "platform=watchOS Simulator,OS=10.5,name=Apple Watch Ultra 2 (49mm)",
-              compiler-flags: "MLX_DISABLED=YES",
+              compiler-flags: "OTHER_SWIFT_FLAGS='-D MLX_DISABLED'",
             }
           # - {
           #     name: "visionOS",
@@ -68,5 +68,5 @@ jobs:
         if: ${{ matrix.run-config['condition'] == true }}
         run: |
           set -o pipefail
-          xcodebuild clean build-for-testing -scheme whisperkit-Package -destination '${{ matrix.run-config['clean-destination'] }}' -skipPackagePluginValidation | xcpretty
-          xcodebuild ${{ matrix.run-config['compiler-flags'] }} test -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -destination '${{ matrix.run-config['test-destination'] }}' -skipPackagePluginValidation | xcpretty
+          xcodebuild clean build-for-testing -scheme whisperkit-Package -destination '${{ matrix.run-config['clean-destination'] }}' -skipPackagePluginValidation '${{ matrix.run-config['compiler-flags'] }}' | xcpretty
+          xcodebuild test -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -destination '${{ matrix.run-config['test-destination'] }}' -skipPackagePluginValidation '${{ matrix.run-config['compiler-flags'] }}' | xcpretty
