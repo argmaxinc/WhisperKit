@@ -34,7 +34,7 @@ jobs:
               condition: "${{ inputs.macos-runner == 'macos-14' }}",
               clean-destination: "generic/platform=watchOS",
               test-destination: "platform=watchOS Simulator,OS=10.5,name=Apple Watch Ultra 2 (49mm)",
-              compiler-flags: "OTHER_SWIFT_FLAGS='-D MLX_DISABLED'",
+              compiler-flags: "OTHER_SWIFT_FLAGS='-DMLX_DISABLED'",
             }
           # - {
           #     name: "visionOS",
