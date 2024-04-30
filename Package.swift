@@ -3,7 +3,7 @@
 
 import PackageDescription
 
-#if os(watchOS)
+#if MLX_DISABLED || os(watchOS)
 let products: [PackageDescription.Product] = [
     .library(
         name: "WhisperKit",
@@ -126,7 +126,7 @@ let package = Package(
     name: "whisperkit",
     platforms: [
         .iOS(.v16),
-        .macOS("13.3"),
+        .macOS("13.3")
     ],
     products: products,
     dependencies: [
