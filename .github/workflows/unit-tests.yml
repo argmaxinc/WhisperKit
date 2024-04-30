@@ -17,18 +17,22 @@ jobs:
     strategy:
       matrix:
         run-config:
-          # - {
-          #     name: "macOS",
-          #     condition: true,
-          #     clean-destination: "generic/platform=macOS",
-          #     test-destination: "platform=macOS,arch=arm64",
-          #   }
-          # - {
-          #     name: "iOS",
-          #     condition: true,
-          #     clean-destination: "generic/platform=iOS",
-          #     test-destination: "platform=iOS Simulator,OS=${{ inputs.ios-version }},name=iPhone 15",
-          #   }
+          - {
+              name: "macOS",
+              condition: true,
+              clean-destination: "generic/platform=macOS",
+              test-destination: "platform=macOS,arch=arm64",
+              mlx-disabled: "0",
+              scheme: "whisperkit-Package",
+            }
+          - {
+              name: "iOS",
+              condition: true,
+              clean-destination: "generic/platform=iOS",
+              test-destination: "platform=iOS Simulator,OS=${{ inputs.ios-version }},name=iPhone 15",
+              mlx-disabled: "0",
+              scheme: "whisperkit-Package",
+            }
           - {
               name: "watchOS",
               condition: "${{ inputs.macos-runner == 'macos-14' }}",
@@ -37,12 +41,14 @@ jobs:
               mlx-disabled: "1",
               scheme: "whisperkit",
             }
-          # - {
-          #     name: "visionOS",
-          #     condition: "${{ inputs.macos-runner == 'macos-14' }}",
-          #     clean-destination: "generic/platform=visionOS",
-          #     test-destination: "platform=visionOS Simulator,name=Apple Vision Pro",
-          #   }
+          - {
+              name: "visionOS",
+              condition: "${{ inputs.macos-runner == 'macos-14' }}",
+              clean-destination: "generic/platform=visionOS",
+              test-destination: "platform=visionOS Simulator,name=Apple Vision Pro",
+              mlx-disabled: "0",
+              scheme: "whisperkit-Package",
+            }
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
