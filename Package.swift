@@ -8,11 +8,12 @@ let products: [PackageDescription.Product] = [
     .library(
         name: "WhisperKit",
         targets: ["WhisperKit"]
-    ),
-    .executable(
-        name: "whisperkit-cli",
-        targets: ["WhisperKitCLI"]
-    ),
+    )
+]
+
+let dependencies: [PackageDescription.Package.Dependency] = [
+    .package(url: "https://github.com/huggingface/swift-transformers.git", exact: "0.1.7"),
+    .package(url: "https://github.com/apple/swift-argument-parser.git", exact: "1.3.0"),
 ]
 
 let targets: [PackageDescription.Target] = [
@@ -59,6 +60,12 @@ let products: [PackageDescription.Product] = [
         name: "whisperkit-cli",
         targets: ["WhisperKitCLI"]
     ),
+]
+
+let dependencies: [PackageDescription.Package.Dependency] = [
+    .package(url: "https://github.com/huggingface/swift-transformers.git", exact: "0.1.7"),
+    .package(url: "https://github.com/ml-explore/mlx-swift", branch: "main"),
+    .package(url: "https://github.com/apple/swift-argument-parser.git", exact: "1.3.0"),
 ]
 
 let targets: [PackageDescription.Target] = [
@@ -129,10 +136,6 @@ let package = Package(
         .macOS("13.3")
     ],
     products: products,
-    dependencies: [
-        .package(url: "https://github.com/huggingface/swift-transformers.git", exact: "0.1.7"),
-        .package(url: "https://github.com/ml-explore/mlx-swift", branch: "main"),
-        .package(url: "https://github.com/apple/swift-argument-parser.git", exact: "1.3.0"),
-    ],
+    dependencies: dependencies,
     targets: targets
 )
