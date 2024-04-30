@@ -34,7 +34,8 @@ jobs:
               condition: "${{ inputs.macos-runner == 'macos-14' }}",
               clean-destination: "generic/platform=watchOS",
               test-destination: "platform=watchOS Simulator,OS=10.5,name=Apple Watch Ultra 2 (49mm)",
-              compiler-flags: "OTHER_SWIFT_FLAGS='-DMLX_DISABLED'",
+              mlx-disabled: "1",
+              scheme: "WhisperKit",
             }
           # - {
           #     name: "visionOS",
@@ -60,13 +61,17 @@ jobs:
         if: steps.model-cache.outputs.cache-hit != 'true'
         run: make download-model MODEL=tiny
       - name: Install and discover destinations
+        env:
+          MLX_DISABLED: ${{ matrix.run-config['mlx-disabled'] }}
         run: |
           xcodebuild -downloadAllPlatforms
           echo "Destinations for testing:"
-          xcodebuild test-without-building -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -showdestinations -skipPackagePluginValidation "${{ matrix.run-config['compiler-flags'] }}"
+          export ${{ matrix.run-config['compiler-flags'] }} && xcodebuild test-without-building -only-testing WhisperKitTests/UnitTests -scheme ${{ matrix.run-config['scheme'] }} -showdestinations -skipPackagePluginValidation
       - name: Build and Test - ${{ matrix.run-config['name'] }}
+        env:
+          MLX_DISABLED: ${{ matrix.run-config['mlx-disabled'] }}
         if: ${{ matrix.run-config['condition'] == true }}
         run: |
           set -o pipefail
-          xcodebuild clean build-for-testing -scheme whisperkit-Package -destination "${{ matrix.run-config['clean-destination'] }}" -skipPackagePluginValidation "${{ matrix.run-config['compiler-flags'] }}" | xcpretty
-          xcodebuild test -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -destination "${{ matrix.run-config['test-destination'] }}" -skipPackagePluginValidation "${{ matrix.run-config['compiler-flags'] }}" | xcpretty
+          xcodebuild clean build-for-testing -scheme ${{ matrix.run-config['scheme'] }} -destination "${{ matrix.run-config['clean-destination'] }}" -skipPackagePluginValidation | xcpretty
+          xcodebuild test -only-testing WhisperKitTests/UnitTests -scheme ${{ matrix.run-config['scheme'] }} -destination "${{ matrix.run-config['test-destination'] }}" -skipPackagePluginValidation | xcpretty
