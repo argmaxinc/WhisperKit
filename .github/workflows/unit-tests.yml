@@ -35,7 +35,7 @@ jobs:
               clean-destination: "generic/platform=watchOS",
               test-destination: "platform=watchOS Simulator,OS=10.5,name=Apple Watch Ultra 2 (49mm)",
               mlx-disabled: "1",
-              scheme: "WhisperKit-Package",
+              scheme: "whisperkit",
             }
           # - {
           #     name: "visionOS",
