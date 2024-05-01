@@ -56,6 +56,24 @@ extension MLMultiArray {
             pointer[linearOffset] = value
         }
     }
+
+    class func uninitializedIOSurfaceArray(shape: [NSNumber]) -> MLMultiArray? {
+        guard let width = shape.last?.intValue else { return nil }
+        let height = shape[0..<shape.count-1].reduce(1, { $0 * $1.intValue })
+
+        var pixelBuffer: CVPixelBuffer?
+        let createReturn = CVPixelBufferCreate(
+            kCFAllocatorDefault,
+            width,
+            height,
+            kCVPixelFormatType_OneComponent16Half,
+            [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary,
+            &pixelBuffer)
+        guard createReturn == kCVReturnSuccess else { return nil }
+        guard let pixelBuffer = pixelBuffer else { return nil }
+
+        return MLMultiArray(pixelBuffer: pixelBuffer, shape: shape)
+    }
 }
 
 extension MLModel {
@@ -134,7 +152,16 @@ extension String {
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 func initMLMultiArray(shape: [NSNumber], dataType: MLMultiArrayDataType, initialValue: Any) -> MLMultiArray {
-    let multiArray = try! MLMultiArray(shape: shape, dataType: dataType)
+    var multiArray: MLMultiArray
+    switch dataType {
+    case .float16:
+        // IOSurface-backed arrays are implicitly float16. They can
+        // reduce buffer copies for some OS:compute unit combinations.
+        multiArray = MLMultiArray.uninitializedIOSurfaceArray(shape: shape)!
+    default:
+        multiArray = try! MLMultiArray(shape: shape, dataType: dataType)
+    }
+
 
     let count = multiArray.count
     let pointer = multiArray.dataPointer
