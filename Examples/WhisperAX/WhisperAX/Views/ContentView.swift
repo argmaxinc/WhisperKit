@@ -29,7 +29,7 @@ struct ContentView: View {
     @State private var availableModels: [String] = []
     @State private var availableLanguages: [String] = []
     @State private var disabledModels: [String] = WhisperKit.recommendedModels().disabled
-    
+
     @AppStorage("selectedAudioInput") private var selectedAudioInput: String = "No Audio Input"
     @AppStorage("selectedModel") private var selectedModel: String = WhisperKit.recommendedModels().default
     @AppStorage("selectedTab") private var selectedTab: String = "Transcribe"
@@ -72,7 +72,6 @@ struct ContentView: View {
     @State private var confirmedSegments: [TranscriptionSegment] = []
     @State private var unconfirmedSegments: [TranscriptionSegment] = []
     @State private var unconfirmedText: [String] = []
-
 
     // MARK: Eager mode properties
 
@@ -274,7 +273,8 @@ struct ContentView: View {
                !isRecording,
                !isTranscribing,
                whisperKit.progress.fractionCompleted > 0,
-               whisperKit.progress.fractionCompleted < 1 {
+               whisperKit.progress.fractionCompleted < 1
+            {
                 ProgressView(whisperKit.progress)
                     .progressViewStyle(.linear)
                     .labelsHidden()
@@ -314,7 +314,7 @@ struct ContentView: View {
                             .progressViewStyle(CircularProgressViewStyle())
                             .scaleEffect(0.5)
                     }
-                    
+
                     Button(action: {
                         deleteModel()
                     }, label: {
@@ -405,14 +405,15 @@ struct ContentView: View {
                 if let audioDevices = audioDevices,
                    !audioDevices.isEmpty,
                    selectedAudioInput == "No Audio Input",
-                   let device = audioDevices.first {
+                   let device = audioDevices.first
+                {
                     selectedAudioInput = device.name
                 }
             }
             #endif
         }
     }
-    
+
     var controlsView: some View {
         VStack {
             basicSettingsView
@@ -887,12 +888,11 @@ struct ContentView: View {
                     }
                 })
             }
-            
+
             await MainActor.run {
                 loadingProgressValue = specializationProgressRatio
                 modelState = .downloaded
             }
-
 
             if let modelFolder = folder {
                 whisperKit.modelFolder = modelFolder
@@ -936,7 +936,7 @@ struct ContentView: View {
                     if !localModels.contains(model) {
                         localModels.append(model)
                     }
-                    
+
                     availableLanguages = Constants.languages.map { $0.key }.sorted()
                     loadingProgressValue = 1.0
                     modelState = whisperKit.modelState
@@ -944,18 +944,18 @@ struct ContentView: View {
             }
         }
     }
-    
+
     func deleteModel() {
         if localModels.contains(selectedModel) {
             let modelFolder = URL(fileURLWithPath: localModelPath).appendingPathComponent(selectedModel)
-            
+
             do {
                 try FileManager.default.removeItem(at: modelFolder)
-                
+
                 if let index = localModels.firstIndex(of: selectedModel) {
                     localModels.remove(at: index)
                 }
-                
+
                 modelState = .unloaded
             } catch {
                 print("Error deleting model: \(error)")
@@ -1058,18 +1058,19 @@ struct ContentView: View {
                     print("Microphone access was not granted.")
                     return
                 }
-                
+
                 var deviceId: DeviceID?
                 #if os(macOS)
                 if self.selectedAudioInput != "No Audio Input",
                    let devices = self.audioDevices,
-                   let device = devices.first(where: {$0.name == selectedAudioInput}) {
+                   let device = devices.first(where: { $0.name == selectedAudioInput })
+                {
                     deviceId = device.id
                 }
 
                 // There is no built-in microphone
                 if deviceId == nil {
-                   throw WhisperError.microphoneUnavailable()
+                    throw WhisperError.microphoneUnavailable()
                 }
                 #endif
 
@@ -1403,7 +1404,7 @@ struct ContentView: View {
             return nil
         }
 
-        Logging.info("[EagerMode] \(lastAgreedSeconds)-\(Double(samples.count)/16000.0) seconds")
+        Logging.info("[EagerMode] \(lastAgreedSeconds)-\(Double(samples.count) / 16000.0) seconds")
 
         let streamingAudio = samples
         var streamOptions = options

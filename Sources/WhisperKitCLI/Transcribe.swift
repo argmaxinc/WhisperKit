@@ -21,7 +21,7 @@ struct Transcribe: AsyncParsableCommand {
                 throw ValidationError("Invalid language code \"\(language)\". Supported languages: \(Constants.languages.values)")
             }
         }
-        
+
         if cliArguments.audioPath.isEmpty && !cliArguments.stream {
             guard let audioFolder = cliArguments.audioFolder else {
                 throw ValidationError("Either audioPath or audioFolder must be provided.")
@@ -33,7 +33,7 @@ struct Transcribe: AsyncParsableCommand {
                     let fileExtension = fileName.lowercased().components(separatedBy: ".").last
                     return audioExtensions.contains(fileExtension ?? "")
                 }
-            
+
             cliArguments.audioPath = audioFiles.map { audioFolder + "/" + $0 }
         }
     }
@@ -75,7 +75,7 @@ struct Transcribe: AsyncParsableCommand {
         }
 
         var options = decodingOptions(task: task)
-        if let promptText = cliArguments.prompt, let tokenizer = whisperKit.tokenizer  {
+        if let promptText = cliArguments.prompt, let tokenizer = whisperKit.tokenizer {
             options.promptTokens = tokenizer.encode(text: " " + promptText.trimmingCharacters(in: .whitespaces)).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
         }
 
@@ -90,10 +90,10 @@ struct Transcribe: AsyncParsableCommand {
 
         for (audioPath, result) in zip(resolvedAudioPaths, transcribeResult) {
             switch result {
-            case .success(let transcribeResult):
-                processTranscriptionResult(audioPath: audioPath, transcribeResult: transcribeResult.first)
-            case .failure(let error):
-                print("Error when transcribing \(audioPath): \(error)")
+                case let .success(transcribeResult):
+                    processTranscriptionResult(audioPath: audioPath, transcribeResult: transcribeResult.first)
+                case let .failure(error):
+                    print("Error when transcribing \(audioPath): \(error)")
             }
         }
     }

@@ -6,7 +6,7 @@ import ArgumentParser
 struct CLIArguments: ParsableArguments {
     @Option(help: "Paths to audio files")
     var audioPath = [String]()
-    
+
     @Option(help: "Path to a folder containing audio files")
     var audioFolder: String?
 
