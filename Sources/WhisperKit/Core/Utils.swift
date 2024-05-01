@@ -347,13 +347,39 @@ public func resolveAbsolutePath(_ inputPath: String) -> String {
     return inputPath
 }
 
-func loadTokenizer(
+public func loadTokenizer(
     for pretrained: ModelVariant,
     tokenizerFolder: URL? = nil,
     useBackgroundSession: Bool = false
 ) async throws -> WhisperTokenizer {
     let tokenizerName = tokenizerNameForVariant(pretrained)
     let hubApi = HubApi(downloadBase: tokenizerFolder, useBackgroundSession: useBackgroundSession)
+
+    // Attempt to load tokenizer from local folder if specified
+    let resolvedTokenizerFolder = hubApi.localRepoLocation(HubApi.Repo(id: tokenizerName))
+    let tokenizerConfigPath = resolvedTokenizerFolder.appendingPathComponent("tokenizer.json")
+
+    // Check if 'tokenizer.json' exists in the folder
+    if FileManager.default.fileExists(atPath: tokenizerConfigPath.path) {
+        do {
+            let localConfig = LanguageModelConfigurationFromHub(modelFolder: resolvedTokenizerFolder, hubApi: hubApi)
+            if let tokenizerConfig = try await localConfig.tokenizerConfig {
+                let tokenizerData = try await localConfig.tokenizerData
+                let whisperTokenizer = try PreTrainedTokenizer(tokenizerConfig: tokenizerConfig, tokenizerData: tokenizerData)
+                Logging.debug("Loading tokenizer from local folder")
+                return WhisperTokenizerWrapper(tokenizer: whisperTokenizer)
+            } else {
+                // tokenizerConfig is nil, fall through to load from Hub
+                Logging.debug("Tokenizer configuration not found in local config")
+            }
+        } catch {
+            // Error during the local loading process and fall through to load from Hub
+            Logging.debug("Error loading local tokenizer: \(error)")
+        }
+    }
+
+    // Fallback to loading from the Hub if local loading is not possible or fails
+    Logging.debug("Loading tokenizer from Hub")
     return try await WhisperTokenizerWrapper(
         tokenizer: AutoTokenizer.from(
             pretrained: tokenizerName,
