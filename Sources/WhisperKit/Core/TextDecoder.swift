@@ -607,7 +607,6 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
 
             nextToken = sampleResult.tokens.last!
             let nextTokenLogProb = sampleResult.logProbs.last!
-            logProbs = sampleResult.logProbs
 
             let samplingTime = Date().timeIntervalSince(samplingStartTime)
             timings.decodingSampling += samplingTime
@@ -625,6 +624,9 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
 
             if isSegmentCompleted {
                 // Completed segment, stop the loop
+                timings.decodingNonPrediction += Date().timeIntervalSince(nonInferenceStartTime)
+                timings.decodingLoop += Date().timeIntervalSince(loopStart)
+                timings.totalDecodingLoops += 1
                 break
             } else {
                 // MARK: KV Caching
