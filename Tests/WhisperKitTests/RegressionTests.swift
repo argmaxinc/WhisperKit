@@ -5,13 +5,12 @@ import XCTest
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 final class RegressionTests: XCTestCase {
-    
     var audioFileURL: URL?
-    
+
     override func setUp() {
         super.setUp()
-        
-        if self.audioFileURL == nil{
+
+        if self.audioFileURL == nil {
             let expectation = XCTestExpectation(description: "Download test audio")
             downloadTestAudio { success in
                 if success {
@@ -41,8 +40,8 @@ final class RegressionTests: XCTestCase {
             }
         }
     }
-    
-    func testAndMeasureModelPerformance(model: String, device: String) async throws{
+
+    func testAndMeasureModelPerformance(model: String, device: String) async throws {
         let audioFilePath = try XCTUnwrap(
             self.audioFileURL?.path(),
             "Audio file not found"
@@ -50,10 +49,10 @@ final class RegressionTests: XCTestCase {
 
         let startTime = Date()
         let iso8601DateTimeString = ISO8601DateFormatter().string(from: Date())
-        
+
         var currentMemoryValues = [Float]()
         var currentTPSValues = [Float]()
-        
+
         let memoryStats = MemoryStats(
             measurements: [], units: "MB",
             totalNumberOfMeasurements: 0,
@@ -64,20 +63,20 @@ final class RegressionTests: XCTestCase {
             measurements: [], units: "Tokens/Sec",
             totalNumberOfMeasurements: 0
         )
-        var count: Int = 0
-        
+        var count = 0
+
         let callback = {
-            (result:TranscriptionProgress) -> Bool in
+            (result: TranscriptionProgress) -> Bool in
             count += 1
             let currentMemory = SystemMemoryChecker.getMemoryUsed()
             let currentTPS = result.timings.tokensPerSecond
-            if currentMemory != 0{
+            if currentMemory != 0 {
                 currentMemoryValues.append(Float(currentMemory))
             }
-            if !currentTPS.isNaN{
+            if !currentTPS.isNaN {
                 currentTPSValues.append(Float(currentTPS))
             }
-            if count % 100 == 1{
+            if count % 100 == 1 {
                 let timeElapsed = Date().timeIntervalSince(startTime)
                 memoryStats.measure(from: currentMemoryValues, timeElapsed: timeElapsed)
                 latencyStats.measure(from: currentTPSValues, timeElapsed: timeElapsed)
@@ -86,16 +85,16 @@ final class RegressionTests: XCTestCase {
             }
             return true
         }
-        
+
         let whisperKit = try await WhisperKit(model: model)
         memoryStats.preTranscribeMemory = Float(SystemMemoryChecker.getMemoryUsed())
-        
+
         let transcriptionResult = try await XCTUnwrapAsync(
             await whisperKit.transcribe(audioPath: audioFilePath, callback: callback),
             "Transcription failed"
         )
         XCTAssert(transcriptionResult.text.isEmpty == false, "Transcription failed")
-        
+
         memoryStats.postTranscribeMemory = Float(SystemMemoryChecker.getMemoryUsed())
         let testInfo = TestInfo(
             device: device,
@@ -107,49 +106,46 @@ final class RegressionTests: XCTestCase {
             transcript: transcriptionResult.text
         )
         let json = RegressionStats(testInfo: testInfo, memoryStats: memoryStats, latencyStats: latencyStats)
-        do{
+        do {
             let attachment = try XCTAttachment(data: json.jsonData(), uniformTypeIdentifier: "json")
             attachment.lifetime = .keepAlways
             attachment.name = "\(device)_\(model)_\(iso8601DateTimeString).json"
             add(attachment)
-        }
-        catch{
+        } catch {
             XCTFail("Failed with error: \(error)")
         }
     }
-    
-    func testRegressionAndLatencyForAllModels() async throws{
+
+    func testRegressionAndLatencyForAllModels() async throws {
         var allModels: [String] = []
-        var failureInfo: [String:String] = [:]
+        var failureInfo: [String: String] = [:]
         var currentDevice = WhisperKit.deviceName()
         let iso8601DateTimeString = ISO8601DateFormatter().string(from: Date())
-        
+
         #if os(macOS) && arch(arm64)
         currentDevice = Process.processor
         #endif
-        
-        do{
+
+        do {
             allModels = try await WhisperKit.fetchAvailableModels()
-        }
-        catch{
+        } catch {
             XCTFail("Failed to fetch available models: \(error.localizedDescription)")
         }
-        
-        for model in allModels{
-            do{
+
+        for model in allModels {
+            do {
                 try await testAndMeasureModelPerformance(model: model, device: currentDevice)
-            }
-            catch{
+            } catch {
                 failureInfo[model] = error.localizedDescription
             }
         }
         let testReport = TestReport(device: currentDevice, modelsTested: allModels, failureInfo: failureInfo)
-        do{
+        do {
             let attachment = try XCTAttachment(data: testReport.jsonData(), uniformTypeIdentifier: "json")
             attachment.lifetime = .keepAlways
             attachment.name = "\(currentDevice)_summary_\(iso8601DateTimeString).json"
             add(attachment)
-        }catch{
+        } catch {
             XCTFail("Failed with error: \(error)")
         }
     }

@@ -1,8 +1,8 @@
 //  For licensing see accompanying LICENSE.md file.
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
-import Foundation
 import CoreML
+import Foundation
 
 /// Responsible for transcribing audio chunk to text using the provided models and configurations.
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)

@@ -16,7 +16,7 @@ public protocol TextDecoding {
     var kvCacheMaxSequenceLength: Int? { get }
     var windowSize: Int? { get }
     var embedSize: Int? { get }
-    
+
     func predictLogits(
         inputIds: MLMultiArray,
         cacheLength: MLMultiArray,
@@ -77,7 +77,6 @@ public protocol TextDecoding {
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public extension TextDecoding {
-
     @available(*, deprecated, message: "Subject to removal in a future version. Use `decodeText(from:using:sampler:options:callback:) async throws -> DecodingResult` instead.")
     func decodeText(
         from encoderOutput: MLMultiArray,
@@ -410,7 +409,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         let prefilledIndex = 0
         let currentTokens: [Int] = [tokenizer.specialTokens.startOfTranscriptToken]
         var logProbs: [Float] = Array(repeating: 0, count: prefilledIndex + 1)
-        
+
         guard let logitsSize = logitsSize else {
             throw WhisperError.modelsUnavailable("Failed to read logits size from model")
         }
@@ -423,7 +422,8 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             LanguageLogitsFilter(
                 allLanguageTokens: tokenizer.allLanguageTokens,
                 logitsDim: logitsSize,
-                sampleBegin: prefilledIndex)
+                sampleBegin: prefilledIndex
+            )
         )
 
         let tokenIndex = 0
@@ -433,12 +433,12 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         // Set the current token as model input
         decoderInputs.inputIds[0] = NSNumber(value: nextToken)
         decoderInputs.cacheLength[0] = NSNumber(value: tokenIndex)
-        
+
         // MARK: Decoding Inference
-        
+
         // Predict next token
         let inferenceTime = Date()
-        
+
         Logging.debug("Detecting language...")
         let predictedLogits = try await self.predictLogits(
             inputIds: decoderInputs.inputIds,
@@ -454,30 +454,30 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             Logging.error("Unable to decode logits")
             throw WhisperError.decodingLogitsFailed()
         }
-        
+
         let decodingInferenceTime = Date().timeIntervalSince(inferenceTime)
         timings.decodingPredictions += decodingInferenceTime
-        
+
         // MARK: Non-inference
-        
+
         // Update predicted token as current
         var logits = decoderOutput.logits!
         for filter in logitsFilters {
             logits = filter.filterLogits(logits, withTokens: currentTokens)
         }
-        
+
         // MARK: Sampling
-        
+
         let samplingStartTime = Date()
-        
+
         let sampleResult = tokenSampler.update(tokens: currentTokens, logits: logits, logProbs: logProbs)
-        
+
         nextToken = sampleResult.tokens.last!
         logProbs = sampleResult.logProbs
-        
+
         let samplingTime = Date().timeIntervalSince(samplingStartTime)
         timings.decodingSampling += samplingTime
-        
+
         let detectedLanguage = tokenizer.decode(tokens: [nextToken]).dropFirst(2).dropLast(2)
         var decodingResult = DecodingResult.emptyResults
         decodingResult.timings = timings
@@ -549,7 +549,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
 
             let isPrefill = tokenIndex < intialPromptIndex - 1 // Prefill stops at the last token of the initial prompt
             let isFirstToken = tokenIndex == prefilledIndex
-          
+
             // Check if current index is part of the initial prompt
             if tokenIndex < intialPromptIndex {
                 nextToken = currentTokens[tokenIndex]
@@ -607,7 +607,6 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
 
             nextToken = sampleResult.tokens.last!
             let nextTokenLogProb = sampleResult.logProbs.last!
-            logProbs = sampleResult.logProbs
 
             let samplingTime = Date().timeIntervalSince(samplingStartTime)
             timings.decodingSampling += samplingTime
@@ -618,13 +617,16 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
                 } else {
                     false
                 }
-            let isSegmentCompleted = 
+            let isSegmentCompleted =
                 sampleResult.completed ||
                 currentTokens.count >= Constants.maxTokenContext - 1 ||
                 isFirstTokenLogProbTooLow
 
             if isSegmentCompleted {
                 // Completed segment, stop the loop
+                timings.decodingNonPrediction += Date().timeIntervalSince(nonInferenceStartTime)
+                timings.decodingLoop += Date().timeIntervalSince(loopStart)
+                timings.totalDecodingLoops += 1
                 break
             } else {
                 // MARK: KV Caching
@@ -740,7 +742,8 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         if options.language == nil {
             // Find the first token that is a recognized language token
             if let predictedLanguageIndex = filteredTokens.firstIndex(where: { tokenizer.allLanguageTokens.contains($0) }),
-               predictedLanguageIndex < tokenProbs.count {
+               predictedLanguageIndex < tokenProbs.count
+            {
                 let predictedLanguageToken = filteredTokens[predictedLanguageIndex]
                 // Decode the predicted language token to get the language
                 language = tokenizer.decode(tokens: [predictedLanguageToken]).trimmingCharacters(in: CharacterSet(charactersIn: "<|>"))
@@ -799,7 +802,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             let formattedString = String(format: "%9.6f | %9.6f | %9.6f | %11.0f | %12.0f | %d",
                                          decoderInputs.keyCache[i].floatValue,
                                          decoderInputs.valueCache[i].floatValue,
-                                         decoderInputs.alignmentWeights[i*1500].floatValue,
+                                         decoderInputs.alignmentWeights[i * 1500].floatValue,
                                          decoderInputs.kvCacheUpdateMask[i].floatValue,
                                          decoderInputs.decoderKeyPaddingMask[i].floatValue,
                                          i)

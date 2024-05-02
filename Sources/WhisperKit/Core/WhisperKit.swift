@@ -202,7 +202,7 @@ open class WhisperKit {
                     callback(progress)
                 }
             }
-            
+
             let modelFolderName = modelFolder.appending(path: variantPath)
             return modelFolderName
         } catch {
@@ -404,11 +404,11 @@ open class WhisperKit {
         var transcribeResultIndex = 0
         for audioResult in loadedAudioResult {
             switch audioResult {
-            case .success:
-                result.append(transcribeResults[transcribeResultIndex])
-                transcribeResultIndex += 1
-            case .failure(let error):
-                result.append(.failure(error))
+                case .success:
+                    result.append(transcribeResults[transcribeResultIndex])
+                    transcribeResultIndex += 1
+                case let .failure(error):
+                    result.append(.failure(error))
             }
         }
         return result
@@ -526,7 +526,7 @@ open class WhisperKit {
         if self.modelState != .loaded {
             try await loadModels()
         }
-        
+
         guard let tokenizer else {
             // Tokenizer required for decoding
             throw WhisperError.tokenizerUnavailable()

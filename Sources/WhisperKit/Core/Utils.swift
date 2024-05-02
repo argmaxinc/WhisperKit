@@ -5,8 +5,8 @@ import AVFoundation
 import CoreML
 import Foundation
 import Hub
-import Tokenizers
 import os.signpost
+import Tokenizers
 #if canImport(UIKit)
 import UIKit
 #elseif canImport(AppKit)
@@ -18,7 +18,7 @@ import AppKit
 extension Array {
     func chunked(into size: Int) -> [[Element]] {
         return stride(from: 0, to: count, by: size).map {
-            Array(self[$0 ..< Swift.min($0 + size, count)])
+            Array(self[$0..<Swift.min($0 + size, count)])
         }
     }
 }
@@ -55,6 +55,24 @@ extension MLMultiArray {
             let linearOffset = linearOffset(for: index, strides: strideInts)
             pointer[linearOffset] = value
         }
+    }
+
+    class func uninitializedIOSurfaceArray(shape: [NSNumber]) -> MLMultiArray? {
+        guard let width = shape.last?.intValue else { return nil }
+        let height = shape[0..<shape.count-1].reduce(1, { $0 * $1.intValue })
+
+        var pixelBuffer: CVPixelBuffer?
+        let createReturn = CVPixelBufferCreate(
+            kCFAllocatorDefault,
+            width,
+            height,
+            kCVPixelFormatType_OneComponent16Half,
+            [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary,
+            &pixelBuffer)
+        guard createReturn == kCVReturnSuccess else { return nil }
+        guard let pixelBuffer = pixelBuffer else { return nil }
+
+        return MLMultiArray(pixelBuffer: pixelBuffer, shape: shape)
     }
 }
 
@@ -97,11 +115,11 @@ extension Process {
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public extension WhisperKit {
     static var isRunningOnSimulator: Bool {
-#if targetEnvironment(simulator)
+        #if targetEnvironment(simulator)
         return true
-#else
+        #else
         return false
-#endif
+        #endif
     }
 }
 
@@ -134,7 +152,16 @@ extension String {
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 func initMLMultiArray(shape: [NSNumber], dataType: MLMultiArrayDataType, initialValue: Any) -> MLMultiArray {
-    let multiArray = try! MLMultiArray(shape: shape, dataType: dataType)
+    var multiArray: MLMultiArray
+    switch dataType {
+    case .float16:
+        // IOSurface-backed arrays are implicitly float16. They can
+        // reduce buffer copies for some OS:compute unit combinations.
+        multiArray = MLMultiArray.uninitializedIOSurfaceArray(shape: shape)!
+    default:
+        multiArray = try! MLMultiArray(shape: shape, dataType: dataType)
+    }
+
 
     let count = multiArray.count
     let pointer = multiArray.dataPointer
@@ -347,13 +374,39 @@ public func resolveAbsolutePath(_ inputPath: String) -> String {
     return inputPath
 }
 
-func loadTokenizer(
+public func loadTokenizer(
     for pretrained: ModelVariant,
     tokenizerFolder: URL? = nil,
     useBackgroundSession: Bool = false
 ) async throws -> WhisperTokenizer {
     let tokenizerName = tokenizerNameForVariant(pretrained)
     let hubApi = HubApi(downloadBase: tokenizerFolder, useBackgroundSession: useBackgroundSession)
+
+    // Attempt to load tokenizer from local folder if specified
+    let resolvedTokenizerFolder = hubApi.localRepoLocation(HubApi.Repo(id: tokenizerName))
+    let tokenizerConfigPath = resolvedTokenizerFolder.appendingPathComponent("tokenizer.json")
+
+    // Check if 'tokenizer.json' exists in the folder
+    if FileManager.default.fileExists(atPath: tokenizerConfigPath.path) {
+        do {
+            let localConfig = LanguageModelConfigurationFromHub(modelFolder: resolvedTokenizerFolder, hubApi: hubApi)
+            if let tokenizerConfig = try await localConfig.tokenizerConfig {
+                let tokenizerData = try await localConfig.tokenizerData
+                let whisperTokenizer = try PreTrainedTokenizer(tokenizerConfig: tokenizerConfig, tokenizerData: tokenizerData)
+                Logging.debug("Loading tokenizer from local folder")
+                return WhisperTokenizerWrapper(tokenizer: whisperTokenizer)
+            } else {
+                // tokenizerConfig is nil, fall through to load from Hub
+                Logging.debug("Tokenizer configuration not found in local config")
+            }
+        } catch {
+            // Error during the local loading process and fall through to load from Hub
+            Logging.debug("Error loading local tokenizer: \(error)")
+        }
+    }
+
+    // Fallback to loading from the Hub if local loading is not possible or fails
+    Logging.debug("Loading tokenizer from Hub")
     return try await WhisperTokenizerWrapper(
         tokenizer: AutoTokenizer.from(
             pretrained: tokenizerName,
@@ -436,7 +489,7 @@ public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirm
 
     // Average first token times
     if let pipelineStart = validResults.first?.timings.pipelineStart {
-        let averageFirstTokenTime = validResults.map { (($0.timings.firstTokenTime) - ($0.timings.pipelineStart)) }.reduce(0, +) / Double(validResults.count)
+        let averageFirstTokenTime = validResults.map { ($0.timings.firstTokenTime) - ($0.timings.pipelineStart) }.reduce(0, +) / Double(validResults.count)
         mergedTimings.pipelineStart = pipelineStart
         mergedTimings.firstTokenTime = pipelineStart + averageFirstTokenTime
     }
