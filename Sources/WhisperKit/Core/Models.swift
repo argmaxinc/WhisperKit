@@ -1358,4 +1358,10 @@ public enum Constants {
             "castilian": "es",
             "mandarin": "zh",
         ]
+
+    public static var languageCodes: Set<String> = {
+        Set(languages.values)
+    }()
+
+    public static let defaultLanguageCode: String = "en"
 }

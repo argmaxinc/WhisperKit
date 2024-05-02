@@ -351,7 +351,7 @@ final class TranscribeTask {
         return TranscriptionResult(
             text: transcription,
             segments: allSegments,
-            language: detectedLanguage ?? "en",
+            language: detectedLanguage ?? Constants.defaultLanguageCode,
             timings: timings
         )
     }

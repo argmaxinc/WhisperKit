@@ -490,7 +490,7 @@ struct WhisperAXWatchView: View {
     func transcribeAudioSamples(_ samples: [Float]) async throws -> TranscriptionResult? {
         guard let whisperKit = whisperKit else { return nil }
 
-        let languageCode = Constants.languages[selectedLanguage] ?? "en"
+        let languageCode = Constants.languages[selectedLanguage, default: Constants.defaultLanguageCode]
         let task: DecodingTask = selectedTask == "transcribe" ? .transcribe : .translate
         let seekClip = [lastConfirmedSegmentEndSeconds]
 

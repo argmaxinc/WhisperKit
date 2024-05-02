@@ -185,7 +185,7 @@ public extension TextDecoding {
         if let options = options {
             if isModelMultilingual {
                 // Set languageToken
-                let languageTokenString = "<|\(options.language ?? "en")|>"
+                let languageTokenString = "<|\(options.language ?? Constants.defaultLanguageCode)|>"
                 languageToken = tokenizer.convertTokenToId(languageTokenString) ?? tokenizer.specialTokens.englishToken
                 prefillTokens.append(languageToken)
 
@@ -319,6 +319,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
     public var tokenizer: WhisperTokenizer?
     public var prefillData: WhisperMLModel?
     public var isModelMultilingual: Bool = false
+    private var logitsFilters: LanguageLogitsFilter?
 
     public var supportsWordTimestamps: Bool {
         return getModelOutputDimention(model, named: "alignment_heads_weights", position: 0) != nil
@@ -348,6 +349,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
     public func unloadModel() {
         model = nil
         prefillData = nil
+        logitsFilters = nil
     }
 
     public func predictLogits(
@@ -399,31 +401,24 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         // Predict logits for 1 iteration with sot
         // 1. LanguageLogitsFilter for only language tokens
         // 2. GreedyTokenSampler for most likely language
-        var timings = TranscriptionTimings()
-
         guard let tokenizer = tokenizer else {
             // Tokenizer required for decoding
             throw WhisperError.tokenizerUnavailable()
         }
-
-        let prefilledIndex = 0
-        let currentTokens: [Int] = [tokenizer.specialTokens.startOfTranscriptToken]
-        var logProbs: [Float] = Array(repeating: 0, count: prefilledIndex + 1)
-
         guard let logitsSize = logitsSize else {
             throw WhisperError.modelsUnavailable("Failed to read logits size from model")
         }
 
-        // Logits filters
-        var logitsFilters: [any LogitsFiltering] = []
+        var timings = TranscriptionTimings()
+        let prefilledIndex = 0
+        let currentTokens: [Int] = [tokenizer.specialTokens.startOfTranscriptToken]
+        var logProbs: [Float] = Array(repeating: 0, count: prefilledIndex + 1)
 
-        // language filter
-        logitsFilters.append(
-            LanguageLogitsFilter(
-                allLanguageTokens: tokenizer.allLanguageTokens,
-                logitsDim: logitsSize,
-                sampleBegin: prefilledIndex
-            )
+        // Logits filters
+        let logitsFilters = self.logitsFilters ?? LanguageLogitsFilter(
+            allLanguageTokens: tokenizer.allLanguageTokens,
+            logitsDim: logitsSize,
+            sampleBegin: prefilledIndex
         )
 
         let tokenIndex = 0
@@ -461,10 +456,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         // MARK: Non-inference
 
         // Update predicted token as current
-        var logits = decoderOutput.logits!
-        for filter in logitsFilters {
-            logits = filter.filterLogits(logits, withTokens: currentTokens)
-        }
+        let logits = logitsFilters.filterLogits(decoderOutput.logits!, withTokens: currentTokens)
 
         // MARK: Sampling
 
@@ -478,12 +470,29 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         let samplingTime = Date().timeIntervalSince(samplingStartTime)
         timings.decodingSampling += samplingTime
 
-        let detectedLanguage = tokenizer.decode(tokens: [nextToken]).dropFirst(2).dropLast(2)
-        var decodingResult = DecodingResult.emptyResults
-        decodingResult.timings = timings
-        decodingResult.language = String(detectedLanguage)
-        Logging.debug("Detected language: \(detectedLanguage)")
-        return decodingResult
+        let sampledLanguage = String(tokenizer.decode(tokens: [nextToken]).dropFirst(2).dropLast(2))
+        let detectedLanguage: String
+        if Constants.languageCodes.contains(sampledLanguage) {
+            detectedLanguage = sampledLanguage
+            Logging.debug("Detected language: \(sampledLanguage)")
+        } else {
+            detectedLanguage = Constants.defaultLanguageCode
+            Logging.error("Detected language \(sampledLanguage) is not supported, defaulting to \(Constants.defaultLanguageCode)")
+        }
+        return DecodingResult(
+            language: detectedLanguage,
+            languageProbs: [:],
+            tokens: [],
+            tokenLogProbs: [],
+            text: "",
+            avgLogProb: 0.0,
+            noSpeechProb: 0.0,
+            temperature: 0.0,
+            compressionRatio: 0.0,
+            cache: nil,
+            timings: timings,
+            fallback: nil
+        )
     }
 
     public func decodeText(
@@ -737,7 +746,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         let noSpeechProb: Float = 0 // TODO: implement no speech prob
 
         // If language is still nil here, check language can be inferred from tokens
-        var language = options.language ?? "en"
+        var language = options.language ?? Constants.defaultLanguageCode
         var languageProbs = [String: Float]()
         if options.language == nil {
             // Find the first token that is a recognized language token
