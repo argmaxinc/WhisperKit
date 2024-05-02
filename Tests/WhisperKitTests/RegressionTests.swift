@@ -154,4 +154,30 @@ final class RegressionTests: XCTestCase {
         }
     }
     
+    func testWER(){
+        let enn = EnglishNumberNormalizer()
+
+        var s = "nine and a half thousand dollars"
+        s = enn.preprocess(s)
+
+        var out = enn.processWords(["nine", "thousand", "five", "hundred", "dollars"])
+        enn.processWords(["nine", "point", "five", "thousand", "dollars"])
+        out
+    }
+    
+    func testFractions(){
+        assert(Fraction(numerator: 10, denominator: 0) == nil)
+        assert(Fraction(numerator: 10, denominator: 10) != nil)
+        assert(Fraction("3/7") == Fraction(numerator: 3, denominator: 7))
+        assert(Fraction("1/2") == Fraction(numerator: 2, denominator: 4))
+        assert(Fraction("100") == Fraction(numerator: 100, denominator: 1))
+        assert(Fraction(numerator: 5, denominator: -8) == Fraction(numerator: -5, denominator: 8))
+        assert(Fraction(numerator: -5, denominator: -8) == Fraction(numerator: 5, denominator: 8))
+        assert(Fraction("3.1415") == Fraction(numerator: 6823, denominator: 2000))
+        assert(Fraction("-47e-2") == Fraction(numerator: -47, denominator: 100))
+        assert(Fraction(2.25) == Fraction(numerator: 9, denominator: 4))
+        assert(Fraction(2.25)! * Fraction(numerator: 100, denominator: 5)! == Fraction(numerator: 45, denominator: 1))
+        assert(Fraction(2.25)! * 100 == Fraction(numerator: 225, denominator: 1))
+        assert(Fraction(2.25)! + Fraction(1.25)! == Fraction(numerator: 7, denominator: 2))
+    }
 }
