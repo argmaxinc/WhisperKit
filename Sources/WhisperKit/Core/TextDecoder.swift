@@ -319,7 +319,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
     public var tokenizer: WhisperTokenizer?
     public var prefillData: WhisperMLModel?
     public var isModelMultilingual: Bool = false
-    private var logitsFilters: LanguageLogitsFilter?
+    private var languageLogitsFilter: LanguageLogitsFilter?
 
     public var supportsWordTimestamps: Bool {
         return getModelOutputDimention(model, named: "alignment_heads_weights", position: 0) != nil
@@ -349,7 +349,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
     public func unloadModel() {
         model = nil
         prefillData = nil
-        logitsFilters = nil
+        languageLogitsFilter = nil
     }
 
     public func predictLogits(
@@ -415,11 +415,12 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         var logProbs: [Float] = Array(repeating: 0, count: prefilledIndex + 1)
 
         // Logits filters
-        let logitsFilters = self.logitsFilters ?? LanguageLogitsFilter(
+        let languageLogitsFilter = self.languageLogitsFilter ?? LanguageLogitsFilter(
             allLanguageTokens: tokenizer.allLanguageTokens,
             logitsDim: logitsSize,
             sampleBegin: prefilledIndex
         )
+        self.languageLogitsFilter = languageLogitsFilter
 
         let tokenIndex = 0
         let prefillToken = currentTokens[tokenIndex]
@@ -456,7 +457,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         // MARK: Non-inference
 
         // Update predicted token as current
-        let logits = logitsFilters.filterLogits(decoderOutput.logits!, withTokens: currentTokens)
+        let logits = languageLogitsFilter.filterLogits(decoderOutput.logits!, withTokens: currentTokens)
 
         // MARK: Sampling
 
