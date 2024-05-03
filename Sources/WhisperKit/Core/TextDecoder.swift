@@ -471,7 +471,15 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         let samplingTime = Date().timeIntervalSince(samplingStartTime)
         timings.decodingSampling += samplingTime
 
-        let sampledLanguage = String(tokenizer.decode(tokens: [nextToken]).dropFirst(2).dropLast(2))
+        var languageProbs = [String: Float]()
+        for (tokenIndex, token) in sampleResult.tokens.enumerated() {
+            if tokenizer.allLanguageTokens.contains(token) {
+                let language = tokenizer.decode(tokens: [token]).trimmingSpecialTokenCharacters()
+                languageProbs[language] = sampleResult.logProbs[tokenIndex]
+            }
+        }
+
+        let sampledLanguage = tokenizer.decode(tokens: [nextToken]).trimmingSpecialTokenCharacters()
         let detectedLanguage: String
         if Constants.languageCodes.contains(sampledLanguage) {
             detectedLanguage = sampledLanguage
@@ -482,7 +490,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         }
         return DecodingResult(
             language: detectedLanguage,
-            languageProbs: [:],
+            languageProbs: languageProbs,
             tokens: [],
             tokenLogProbs: [],
             text: "",
@@ -756,7 +764,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             {
                 let predictedLanguageToken = filteredTokens[predictedLanguageIndex]
                 // Decode the predicted language token to get the language
-                language = tokenizer.decode(tokens: [predictedLanguageToken]).trimmingCharacters(in: CharacterSet(charactersIn: "<|>"))
+                language = tokenizer.decode(tokens: [predictedLanguageToken]).trimmingSpecialTokenCharacters()
 
                 // Fetch the corresponding probability for the predicted language
                 let probsDict = tokenProbs[predictedLanguageIndex]

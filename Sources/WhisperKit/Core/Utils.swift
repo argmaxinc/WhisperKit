@@ -146,6 +146,10 @@ extension String {
 
         return singleSpacedString
     }
+
+    func trimmingSpecialTokenCharacters() -> String {
+        trimmingCharacters(in: Constants.specialTokenCharacters)
+    }
 }
 
 // MARK: - Helpers

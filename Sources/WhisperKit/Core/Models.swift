@@ -1242,6 +1242,8 @@ public enum Constants {
         static let subsystem = "com.argmax.whisperkit"
     }
 
+    static let specialTokenCharacters = CharacterSet(charactersIn: "<|>")
+
     public static let maxTokenContext = Int(448 / 2)
     public static let languages: [String: String] =
         [

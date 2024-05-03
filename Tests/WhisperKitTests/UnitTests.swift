@@ -789,6 +789,15 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual([1, 2, 3, 4].chunked(into: 3), [[1, 2, 3], [4]])
     }
 
+    func testTrimmingSpecialTokenCharacters() {
+        XCTAssertEqual("<|en|>".trimmingSpecialTokenCharacters(), "en")
+        XCTAssertEqual("<|endoftext|>".trimmingSpecialTokenCharacters(), "endoftext")
+        XCTAssertEqual("en".trimmingSpecialTokenCharacters(), "en")
+        XCTAssertEqual("<|end<|of|>text|>".trimmingSpecialTokenCharacters(), "end<|of|>text")
+        XCTAssertEqual("<|endoftext".trimmingSpecialTokenCharacters(), "endoftext")
+        XCTAssertEqual("endoftext|>".trimmingSpecialTokenCharacters(), "endoftext")
+    }
+
     // MARK: - LogitsFilter Tests
 
     func testSuppressTokensFilter() throws {
