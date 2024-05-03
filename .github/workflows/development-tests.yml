@@ -2,7 +2,6 @@ name: Development Tests
 
 on:
   pull_request:
-    branches: ["main"]
   pull_request_review:
     types: [submitted]
   workflow_dispatch:
