@@ -1361,9 +1361,7 @@ public enum Constants {
             "mandarin": "zh",
         ]
 
-    public static var languageCodes: Set<String> = {
-        Set(languages.values)
-    }()
+    public static let languageCodes: Set<String> = Set(languages.values)
 
     public static let defaultLanguageCode: String = "en"
 }
