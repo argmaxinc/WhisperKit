@@ -146,6 +146,10 @@ extension String {
 
         return singleSpacedString
     }
+
+    func trimmingSpecialTokenCharacters() -> String {
+        trimmingCharacters(in: Constants.specialTokenCharacters)
+    }
 }
 
 // MARK: - Helpers
@@ -452,7 +456,7 @@ public func findLongestDifferentSuffix(_ words1: [WordTiming], _ words2: [WordTi
 
 public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirmedWords: [WordTiming]) -> TranscriptionResult {
     let validResults = results.compactMap { $0 }
-    let language = validResults.first?.language ?? "en"
+    let language = validResults.first?.language ?? Constants.defaultLanguageCode
 
     let mergedSegments = validResults.flatMap { $0.segments }
     let mergedText = confirmedWords.map { $0.word }.joined()
