@@ -101,15 +101,15 @@ func strip(sentences: [String]) -> [String]{
 func reduceToListOfListOfWords(sentences: [String], word_delimiter: String = " ") -> [[String]]{
     
     let sentence_collection = [[String]]()
-    func process_string(sentence: String) -> [[String]]{
+    func processString(sentence: String) -> [[String]]{
         return [sentence.components(separatedBy: word_delimiter).filter{ !$0.isEmpty }]
     }
     
-    func process_list(sentences: [String]) -> [[String]]{
+    func processList(sentences: [String]) -> [[String]]{
         var sentence_collection = [[String]]()
         
         for sentence in sentences{
-            let list_of_words = process_string(sentence: sentence)[0]
+            let list_of_words = processString(sentence: sentence)[0]
             if !list_of_words.isEmpty {
                 sentence_collection.append(list_of_words)
             }
@@ -118,7 +118,7 @@ func reduceToListOfListOfWords(sentences: [String], word_delimiter: String = " "
         return sentence_collection
     }
     
-    return process_list(sentences: sentences)
+    return processList(sentences: sentences)
 }
 
 func words2char(reference: [[String]], hypothesis: [[String]]) -> ([String],[String]){
@@ -481,10 +481,10 @@ class EnglishNumberNormalizer{
             } else if let tens = self.tens[current] {
                 if value == nil {
                     value = String(tens)
-                } else if var v = value, !v.isEmpty {
+                } else if let v = value, !v.isEmpty {
                     value = v + String(tens)
                 } else {
-                    if var v = value, Int(v)! % 100 == 0 {
+                    if let v = value, Int(v)! % 100 == 0 {
                         value = String(Int(v)! + tens)
                     } else {
                         value = value! + String(tens)
@@ -600,7 +600,7 @@ class EnglishNumberNormalizer{
     func preprocess(_ s: String) -> String {
         var results = [String]()
         
-        var segments = s.split(separator: "and a half", omittingEmptySubsequences: false)
+        let segments = s.split(separator: "and a half", omittingEmptySubsequences: false)
         for (i, segment) in segments.enumerated() {
             let trimmedSegment = segment.trimmingCharacters(in: .whitespaces)
             if trimmedSegment.isEmpty {
@@ -632,15 +632,258 @@ class EnglishNumberNormalizer{
         return processedString
     }
     
-    func postprocess(_ s: String) -> String{
-        return ""
+    func postprocess(_ s: String) -> String {
+        func combineCents(match: NSTextCheckingResult, in string: String) -> String {
+            guard let currencyRange = Range(match.range(at: 1), in: string),
+                  let integerRange = Range(match.range(at: 2), in: string),
+                  let centsRange = Range(match.range(at: 3), in: string) else {
+                return String(string)
+            }
+            let currency = String(string[currencyRange])
+            let integer = String(string[integerRange])
+            let cents = Int(String(string[centsRange])) ?? 0
+            return "\(currency)\(integer).\(String(format: "%02d", cents))"
+        }
+
+        func extractCents(match: NSTextCheckingResult, in string: String) -> String {
+            guard let centsRange = Range(match.range(at: 1), in: string) else {
+                return String(string)
+            }
+            let cents = Int(String(string[centsRange])) ?? 0
+            return "¢\(cents)"
+        }
+
+        var processedString = s
+        
+        
+        // apply currency postprocessing; "$2 and ¢7" -> "$2.07"
+        do {
+            let regex1 = try NSRegularExpression(pattern: "([€£$])([0-9]+) (?:and )?¢([0-9]{1,2})\\b")
+            let matches1 = regex1.matches(in: processedString, range: NSRange(processedString.startIndex..., in: processedString))
+            for match in matches1.reversed() {
+                let range = Range(match.range, in: processedString)!
+                let replacement = combineCents(match: match, in: processedString)
+                processedString.replaceSubrange(range, with: replacement)
+            }
+        } catch {
+            print("Error in regex: \(error)")
+        }
+
+        do {
+            let regex2 = try NSRegularExpression(pattern: "[€£$]0\\.([0-9]{1,2})\\b")
+            let matches2 = regex2.matches(in: processedString, range: NSRange(processedString.startIndex..., in: processedString))
+            for match in matches2.reversed() {
+                let range = Range(match.range, in: processedString)!
+                let replacement = extractCents(match: match, in: processedString)
+                processedString.replaceSubrange(range, with: replacement)
+            }
+        } catch {
+            print("Error in regex: \(error)")
+        }
+
+        // write "one(s)" instead of "1(s)", just for readability
+        processedString = processedString.replacingOccurrences(of: "\\b1(s?)\\b", with: "one$1", options: .regularExpression)
+
+        return processedString
+    }
+    
+    func normalize(_ text: String) -> String{
+        var s = self.preprocess(text)
+        let out = self.processWords(s.components(separatedBy: " ")).compactMap({ $0 })
+        s = out.joined(separator: " ")
+        s = self.postprocess(s)
+        return s
     }
     
 }
 
-//class EnglishSpellingNormalizer{}
-//class EnglishTextNormalizer{
-//}
+class EnglishSpellingNormalizer{
+    //
+    //Applies British-American spelling mappings as listed in [1].
 
+    //[1] https://www.tysto.com/uk-us-spelling-list.html
+    
+    var mapping: [String:String] = [:]
+    
+    init(englishSpellingMapping:[String:String]){
+        self.mapping = englishSpellingMapping
+    }
+    
+    func normalize(_ text: String) -> String{
+        let out = text.components(separatedBy: " ").map( {self.mapping[$0] ?? $0} )
+        return out.joined(separator: " ")
+    }
+}
 
-//let ABBR = ["A"]
+class EnglishTextNormalizer{
+    let numberNormalizer: EnglishNumberNormalizer
+    let spellingNormalizer: EnglishSpellingNormalizer
+    let ignorePatterns = #"\b(hmm|mm|mhm|mmm|uh|um)\b"#
+    let replacers = [
+        // common contractions
+        #"\bwon't\b"#: "will not",
+        #"\bcan't\b"#: "can not",
+        #"\blet's\b"#: "let us",
+        #"\bain't\b"#: "aint",
+        #"\by'all\b"#: "you all",
+        #"\bwanna\b"#: "want to",
+        #"\bgotta\b"#: "got to",
+        #"\bgonna\b"#: "going to",
+        #"\bi'ma\b"#: "i am going to",
+        #"\bimma\b"#: "i am going to",
+        #"\bwoulda\b"#: "would have",
+        #"\bcoulda\b"#: "could have",
+        #"\bshoulda\b"#: "should have",
+        #"\bma'am\b"#: "madam",
+        // contractions in titles/prefixes
+        #"\bmr\b"#: "mister ",
+        #"\bmrs\b"#: "missus ",
+        #"\bst\b"#: "saint ",
+        #"\bdr\b"#: "doctor ",
+        #"\bprof\b"#: "professor ",
+        #"\bcapt\b"#: "captain ",
+        #"\bgov\b"#: "governor ",
+        #"\bald\b"#: "alderman ",
+        #"\bgen\b"#: "general ",
+        #"\bsen\b"#: "senator ",
+        #"\brep\b"#: "representative ",
+        #"\bpres\b"#: "president ",
+        #"\brev\b"#: "reverend ",
+        #"\bhon\b"#: "honorable ",
+        #"\basst\b"#: "assistant ",
+        #"\bassoc\b"#: "associate ",
+        #"\blt\b"#: "lieutenant ",
+        #"\bcol\b"#: "colonel ",
+        #"\bjr\b"#: "junior ",
+        #"\bsr\b"#: "senior ",
+        #"\besq\b"#: "esquire ",
+        // prefect tenses, ideally it should be any past participles, but it's harder..
+        #"'d been\b"#: " had been",
+        #"'s been\b"#: " has been",
+        #"'d gone\b"#: " had gone",
+        #"'s gone\b"#: " has gone",
+        #"'d done\b"#: " had done",  // "'s done" is ambiguous
+        #"'s got\b"#: " has got",
+        // general contractions
+        #"n't\b"#: " not",
+        #"'re\b"#: " are",
+        #"'s\b"#: " is",
+        #"'d\b"#: " would",
+        #"'ll\b"#: " will",
+        #"'t\b"#: " not",
+        #"'ve\b"#: " have",
+        #"'m\b"#: " am",
+    ]
+    // non-ASCII letters that are not separated by "NFKD" normalization
+    let ADDITIONAL_DIACRITICS = [
+        "œ": "oe",
+        "Œ": "OE",
+        "ø": "o",
+        "Ø": "O",
+        "æ": "ae",
+        "Æ": "AE",
+        "ß": "ss",
+        "ẞ": "SS",
+        "đ": "d",
+        "Đ": "D",
+        "ð": "d",
+        "Ð": "D",
+        "þ": "th",
+        "Þ": "th",
+        "ł": "l",
+        "Ł": "L",
+    ]
+    
+    init(){
+        self.numberNormalizer = EnglishNumberNormalizer()
+        self.spellingNormalizer = EnglishSpellingNormalizer(englishSpellingMapping: englishSpellingMappingAbbr)
+    }
+    
+    func normalize(text: String) -> String{
+        var processedText = text
+        processedText = processedText.lowercased()
+        
+        processedText.regReplace(pattern: #"[<\[][^>\]]*[>\]]"#, replaceWith: "") // remove words between brackets
+        processedText.regReplace(pattern: #"\(([^)]+?)\)"#, replaceWith: "") // remove words between parenthesis
+        processedText.regReplace(pattern: self.ignorePatterns, replaceWith: "")
+        processedText.regReplace(pattern: #"\s+'"#, replaceWith: "'") // standardize when there's a space before an apostrophe
+
+        for (pattern, replacement) in self.replacers{
+            processedText.regReplace(pattern: pattern, replaceWith: replacement)
+        }
+        
+        processedText.regReplace(pattern: #"(\d),(\d)"#, replaceWith: #"$1$2"#) // remove commas between digits
+        processedText.regReplace(pattern: #"\.([^0-9]|$)"#, replaceWith: " $1") // remove periods not followed by numbers
+        processedText = self.removeSymbolsAndDiacritics(text: processedText, keep: ".%$¢€£")  // keep some symbols for numerics
+
+        processedText = self.numberNormalizer.normalize(processedText)
+        processedText = self.spellingNormalizer.normalize(processedText)
+
+        // now remove prefix/suffix symbols that are not preceded/followed by numbers
+        processedText.regReplace(pattern: #"[.$¢€£]([^0-9])"#, replaceWith: #" $1"#)
+        processedText.regReplace(pattern: #"([^0-9])%"#, replaceWith: #"$1 "#)
+        processedText.regReplace(pattern: #"\s+"#, replaceWith: " ") // replace any successive whitespace characters with a space
+        return processedText
+    }
+    
+    func removeSymbolsAndDiacritics(text: String, keep:String="") -> String{
+        //
+        //Replace any other markers, symbols, and punctuations with a space, and drop any diacritics
+        //(category 'Mn' and some manual mappings)
+        //"""
+        let keepSet = Set(keep)
+        let categoriesToReplaceWithSpace: [Unicode.GeneralCategory] = [
+            .nonspacingMark,
+            .spacingMark,
+            .enclosingMark,
+            .mathSymbol,
+            .otherSymbol,
+            .currencySymbol,
+            .modifierSymbol,
+            .dashPunctuation,
+            .openPunctuation,
+            .closePunctuation,
+            .finalPunctuation,
+            .otherPunctuation,
+            .initialPunctuation,
+            .connectorPunctuation
+        ]
+        func replaceCharacter(char: Character) -> String{
+            
+            if keepSet.contains(char){
+                return String(char)
+            }
+            else if self.ADDITIONAL_DIACRITICS.keys.contains(String(char)){
+                return self.ADDITIONAL_DIACRITICS[String(char)]!
+            }
+            else if unicodeCategoryFor(char: char) == Unicode.GeneralCategory.nonspacingMark{
+                return ""
+            }
+            else if let category = unicodeCategoryFor(char: char), categoriesToReplaceWithSpace.contains(category){
+                return " "
+            }
+            return String(char)
+        }
+                                                             
+        func unicodeCategoryFor(char: Character) -> Unicode.GeneralCategory?{
+            guard let scalar = char.unicodeScalars.first else {return nil}
+            return scalar.properties.generalCategory
+        }
+        
+        if let normalizedString = text.applyingTransform(StringTransform(rawValue: "NFKD"), reverse: false) {
+            var out = normalizedString.map({ replaceCharacter(char: $0)})
+            return out.joined(separator: "")
+        }
+        return text
+    }
+}
+
+private extension String {
+    mutating func regReplace(pattern: String, replaceWith: String = "") {
+        do {
+            let regex = try NSRegularExpression(pattern: pattern, options: [.caseInsensitive, .anchorsMatchLines])
+            let range = NSRange(self.startIndex..., in: self)
+            self = regex.stringByReplacingMatches(in: self, options: [], range: range, withTemplate: replaceWith)
+        } catch { return }
+    }
+}
