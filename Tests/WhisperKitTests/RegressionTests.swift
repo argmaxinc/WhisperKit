@@ -150,16 +150,7 @@ final class RegressionTests: XCTestCase {
         }
     }
     
-    func testWER(){
-        let enn = EnglishNumberNormalizer()
 
-        var s = "nine and a half thousand dollars"
-        s = enn.preprocess(s)
-
-        var out = enn.processWords(["nine", "thousand", "five", "hundred", "dollars"])
-        enn.processWords(["nine", "point", "five", "thousand", "dollars"])
-        out
-    }
     
     func testFractions(){
         assert(Fraction(numerator: 10, denominator: 0) == nil)
