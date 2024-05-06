@@ -11,6 +11,7 @@ protocol AudioChunking {
 }
 
 /// A audio chunker that splits audio into smaller pieces based on voice activity detection
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 final class VADAudioChunker {
     // prevent hallucinations at the end of the clip by stopping up to 1.0s early
     private let windowPadding: Int
