@@ -36,6 +36,12 @@ struct Transcribe: AsyncParsableCommand {
 
             cliArguments.audioPath = audioFiles.map { audioFolder + "/" + $0 }
         }
+
+        if let chunkingStrategyRaw = cliArguments.chunkingStrategy {
+            if ChunkingStrategy(rawValue: chunkingStrategyRaw) == nil {
+                throw ValidationError("Wrong chunking strategy \"\(chunkingStrategyRaw)\", valid strategies: \(ChunkingStrategy.allCases.map { $0.rawValue })")
+            }
+        }
     }
 
     mutating func run() async throws {
@@ -89,11 +95,13 @@ struct Transcribe: AsyncParsableCommand {
         )
 
         for (audioPath, result) in zip(resolvedAudioPaths, transcribeResult) {
-            switch result {
-                case let .success(transcribeResult):
-                    processTranscriptionResult(audioPath: audioPath, transcribeResult: transcribeResult.first)
-                case let .failure(error):
-                    print("Error when transcribing \(audioPath): \(error)")
+            do {
+                let partialResult = try result.get()
+                for transcribeResult in partialResult {
+                    processTranscriptionResult(audioPath: audioPath, transcribeResult: transcribeResult)
+                }
+            } catch {
+                print("Error when transcribing \(audioPath): \(error)")
             }
         }
     }
@@ -298,6 +306,12 @@ struct Transcribe: AsyncParsableCommand {
     }
 
     private func decodingOptions(task: DecodingTask) -> DecodingOptions {
+        let chunkingStrategy: ChunkingStrategy? =
+            if let chunkingStrategyRaw = cliArguments.chunkingStrategy {
+                ChunkingStrategy(rawValue: chunkingStrategyRaw)
+            } else {
+                nil
+            }
         return DecodingOptions(
             verbose: cliArguments.verbose,
             task: task,
@@ -316,7 +330,8 @@ struct Transcribe: AsyncParsableCommand {
             logProbThreshold: cliArguments.logprobThreshold ?? -1.0,
             firstTokenLogProbThreshold: cliArguments.firstTokenLogProbThreshold,
             noSpeechThreshold: cliArguments.noSpeechThreshold ?? 0.6,
-            concurrentWorkerCount: cliArguments.concurrentWorkerCount
+            concurrentWorkerCount: cliArguments.concurrentWorkerCount,
+            chunkingStrategy: chunkingStrategy
         )
     }
 

@@ -217,6 +217,10 @@ public struct DecodingCache {
     var alignmentWeights: MLMultiArray?
 }
 
+public enum ChunkingStrategy: String, CaseIterable {
+    case vad
+}
+
 /// Options for how to transcribe an audio file using WhisperKit.
 ///
 /// - Parameters:
@@ -275,33 +279,36 @@ public struct DecodingOptions {
     public var firstTokenLogProbThreshold: Float?
     public var noSpeechThreshold: Float?
     public var concurrentWorkerCount: Int
+    public var chunkingStrategy: ChunkingStrategy?
 
-    public init(verbose: Bool = false,
-                task: DecodingTask = .transcribe,
-                language: String? = nil,
-                temperature: Float = 0.0,
-                temperatureIncrementOnFallback: Float = 0.2,
-                temperatureFallbackCount: Int = 5,
-                sampleLength: Int = Constants.maxTokenContext,
-                topK: Int = 5,
-                usePrefillPrompt: Bool = true,
-                usePrefillCache: Bool = true,
-                detectLanguage: Bool? = nil,
-                skipSpecialTokens: Bool = false,
-                withoutTimestamps: Bool = false,
-                wordTimestamps: Bool = false,
-                maxInitialTimestamp: Float? = nil,
-                clipTimestamps: [Float] = [],
-                promptTokens: [Int]? = nil,
-                prefixTokens: [Int]? = nil,
-                suppressBlank: Bool = false,
-                supressTokens: [Int]? = nil,
-                compressionRatioThreshold: Float? = 2.4,
-                logProbThreshold: Float? = -1.0,
-                firstTokenLogProbThreshold: Float? = -1.5,
-                noSpeechThreshold: Float? = 0.6,
-                concurrentWorkerCount: Int = 0)
-    {
+    public init(
+        verbose: Bool = false,
+        task: DecodingTask = .transcribe,
+        language: String? = nil,
+        temperature: Float = 0.0,
+        temperatureIncrementOnFallback: Float = 0.2,
+        temperatureFallbackCount: Int = 5,
+        sampleLength: Int = Constants.maxTokenContext,
+        topK: Int = 5,
+        usePrefillPrompt: Bool = true,
+        usePrefillCache: Bool = true,
+        detectLanguage: Bool? = nil,
+        skipSpecialTokens: Bool = false,
+        withoutTimestamps: Bool = false,
+        wordTimestamps: Bool = false,
+        maxInitialTimestamp: Float? = nil,
+        clipTimestamps: [Float] = [],
+        promptTokens: [Int]? = nil,
+        prefixTokens: [Int]? = nil,
+        suppressBlank: Bool = false,
+        supressTokens: [Int]? = nil,
+        compressionRatioThreshold: Float? = 2.4,
+        logProbThreshold: Float? = -1.0,
+        firstTokenLogProbThreshold: Float? = -1.5,
+        noSpeechThreshold: Float? = 0.6,
+        concurrentWorkerCount: Int = 0,
+        chunkingStrategy: ChunkingStrategy? = nil
+    ) {
         self.verbose = verbose
         self.task = task
         self.language = language
@@ -327,6 +334,7 @@ public struct DecodingOptions {
         self.firstTokenLogProbThreshold = firstTokenLogProbThreshold
         self.noSpeechThreshold = noSpeechThreshold
         self.concurrentWorkerCount = concurrentWorkerCount
+        self.chunkingStrategy = chunkingStrategy
     }
 }
 

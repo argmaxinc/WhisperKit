@@ -394,21 +394,17 @@ open class WhisperKit {
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
     ) async -> [Result<[TranscriptionResult], Swift.Error>] {
-        let loadedAudioResult = await AudioProcessor.loadAudio(at: audioPaths)
-        let transcribeResults: [Result<[TranscriptionResult], Swift.Error>] = await transcribe(
-            audioArrays: loadedAudioResult.compactMap { try? $0.get() },
-            decodeOptions: decodeOptions,
-            callback: callback
-        )
         var result = [Result<[TranscriptionResult], Swift.Error>]()
-        var transcribeResultIndex = 0
-        for audioResult in loadedAudioResult {
-            switch audioResult {
-                case .success:
-                    result.append(transcribeResults[transcribeResultIndex])
-                    transcribeResultIndex += 1
-                case let .failure(error):
-                    result.append(.failure(error))
+        for audioPath in audioPaths {
+            do {
+                let transcribeResult: [TranscriptionResult] = try await transcribe(
+                    audioPath: audioPath,
+                    decodeOptions: decodeOptions,
+                    callback: callback
+                )
+                result.append(.success(transcribeResult))
+            } catch {
+                result.append(.failure(error))
             }
         }
         return result
@@ -494,16 +490,32 @@ open class WhisperKit {
         let convertAudioStart = Date()
         let audioArray = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
         let convertTime = Date().timeIntervalSince(convertAudioStart)
-
         currentTimings.audioLoading = loadTime + convertTime
         Logging.debug("Audio loading time: \(loadTime), Audio convert time: \(convertTime)")
 
-        // Send converted samples to transcribe
-        return try await transcribe(
-            audioArray: audioArray,
-            decodeOptions: decodeOptions,
-            callback: callback
-        )
+        switch decodeOptions?.chunkingStrategy {
+        case .vad:
+            let chunker = VADAudioChunker()
+            let audioChunks = try await chunker.chunkAll(
+                audioArray: audioArray,
+                frameLength: WhisperKit.windowSamples,
+                decodeOptions: decodeOptions
+            )
+
+            // Send chunked samples to transcribe
+            let transcribeResults: [Result<[TranscriptionResult], Swift.Error>] = await transcribe(
+                audioArrays: audioChunks,
+                decodeOptions: decodeOptions,
+                callback: callback
+            )
+            return try transcribeResults.flatMap { try $0.get() }
+        case nil:
+            return try await transcribe(
+                audioArray: audioArray,
+                decodeOptions: decodeOptions,
+                callback: callback
+            )
+        }
     }
 
     // MARK: - Transcribe audio samples

@@ -102,4 +102,7 @@ struct CLIArguments: ParsableArguments {
 
     @Option(help: "Maximum concurrent inference, might be helpful when processing more than 1 audio file at the same time. 0 means unlimited")
     var concurrentWorkerCount: Int = 0
+
+    @Option(help: "Chunking strategy for audio processing, `nil` means no chunking, `vad` means using voice activity detection")
+    var chunkingStrategy: String? = nil
 }

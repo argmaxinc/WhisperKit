@@ -949,6 +949,61 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(result3.data(for: 2), [-.infinity, -.infinity, -.infinity, -.infinity, 0.2, 0.1, 0.2])
     }
 
+    // MARK: - VAD Tests
+
+    func testVoiceActivity() throws {
+        let vad = EnergyVAD()
+
+        XCTAssertTrue(vad.voiceActivity(in: []).isEmpty)
+
+        let audioFilePath = try XCTUnwrap(
+            Bundle.module.path(forResource: "jfk", ofType: "wav"),
+            "Audio file not found"
+        )
+        let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
+        let audioArray = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
+
+        let result1 = try XCTUnwrap(vad.findLongestSilence(in: vad.voiceActivity(in: audioArray)))
+        XCTAssertEqual(result1.startIndex, 115)
+        XCTAssertEqual(result1.endIndex, 164)
+
+        XCTAssertEqual(vad.voiceActivityIndexToAudioIndex(result1.startIndex), 37120)
+        XCTAssertEqual(vad.voiceActivityIndexToAudioIndex(result1.endIndex), 52800)
+    }
+
+    func testFindLongestSilence() throws {
+        let vad = EnergyVAD()
+
+        XCTAssertNil(vad.findLongestSilence(in: []))
+        XCTAssertNil(vad.findLongestSilence(in: [true]))
+        XCTAssertNil(vad.findLongestSilence(in: [true, true]))
+        XCTAssertNil(vad.findLongestSilence(in: [true, true, true, true, true]))
+
+        let (startIndex1, endIndex1) = try XCTUnwrap(vad.findLongestSilence(in: [false]))
+        XCTAssertEqual(startIndex1, 0)
+        XCTAssertEqual(endIndex1, 1)
+
+        let (startIndex2, endIndex2) = try XCTUnwrap(vad.findLongestSilence(in: [false, false]))
+        XCTAssertEqual(startIndex2, 0)
+        XCTAssertEqual(endIndex2, 2)
+
+        let (startIndex3, endIndex3) = try XCTUnwrap(vad.findLongestSilence(in: [true, false, false]))
+        XCTAssertEqual(startIndex3, 1)
+        XCTAssertEqual(endIndex3, 3)
+
+        let (startIndex4, endIndex4) = try XCTUnwrap(vad.findLongestSilence(in: [false, false, true]))
+        XCTAssertEqual(startIndex4, 0)
+        XCTAssertEqual(endIndex4, 2)
+
+        let (startIndex5, endIndex5) = try XCTUnwrap(vad.findLongestSilence(in: [true, false, false, true]))
+        XCTAssertEqual(startIndex5, 1)
+        XCTAssertEqual(endIndex5, 3)
+
+        let (startIndex6, endIndex6) = try XCTUnwrap(vad.findLongestSilence(in: [false, false, true, true, true, false, true, false, false, false, false, true, true]))
+        XCTAssertEqual(startIndex6, 7)
+        XCTAssertEqual(endIndex6, 11)
+    }
+
     // MARK: - Word Timestamp Tests
 
     func testDynamicTimeWarpingSimpleMatrix() {
