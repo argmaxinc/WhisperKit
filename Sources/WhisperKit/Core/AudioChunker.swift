@@ -6,6 +6,7 @@ import Accelerate
 import AVFoundation
 
 /// Responsible for chunking audio into smaller pieces
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 protocol AudioChunking {
     func chunkAll(audioArray: [Float], frameLength: Int, decodeOptions: DecodingOptions?) async throws -> [[Float]]
 }
@@ -53,6 +54,7 @@ final class VADAudioChunker {
     }
 }
 
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 extension VADAudioChunker {
     func chunkAll(audioArray: [Float], frameLength: Int, decodeOptions: DecodingOptions?) async throws -> [[Float]] {
         let seekClips = prepareSeekClips(contentFrames: audioArray.count, decodeOptions: decodeOptions)
