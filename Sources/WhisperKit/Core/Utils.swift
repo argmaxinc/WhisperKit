@@ -155,6 +155,25 @@ extension String {
 // MARK: - Helpers
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
+func prepareSeekClips(contentFrames: Int, decodeOptions: DecodingOptions?) -> [(start: Int, end: Int)] {
+    let options = decodeOptions ?? DecodingOptions()
+    var seekPoints: [Int] = options.clipTimestamps.map { Int(round($0 * Float(WhisperKit.sampleRate))) }
+    if seekPoints.count == 0 {
+        seekPoints.append(0)
+    }
+    if seekPoints.count % 2 == 1 {
+        seekPoints.append(contentFrames)
+    }
+    var seekClips: [(start: Int, end: Int)] = []
+    for i in stride(from: 0, to: seekPoints.count, by: 2) {
+        let start = seekPoints[i]
+        let end = i + 1 < seekPoints.count ? seekPoints[i + 1] : contentFrames
+        seekClips.append((start, end))
+    }
+    return seekClips
+}
+
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 func initMLMultiArray(shape: [NSNumber], dataType: MLMultiArrayDataType, initialValue: Any) -> MLMultiArray {
     var multiArray: MLMultiArray
     switch dataType {
