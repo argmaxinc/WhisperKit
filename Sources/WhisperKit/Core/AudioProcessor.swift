@@ -284,6 +284,61 @@ public class AudioProcessor: NSObject, AudioProcessing {
 
     // MARK: - Utility
 
+    /// Detect voice activity in the given buffer of relative energy values.
+    /// - Parameters:
+    ///   - relativeEnergy: relative energy values
+    ///   - nextBufferInSeconds: duration of the next buffer in seconds
+    ///   - energyValuesToConsider: number of energy values to consider
+    ///   - silenceThreshold: silence threshold
+    /// - Returns: true if voice is detected, false otherwise
+    public static func isVoiceDetected(
+        in relativeEnergy: [Float],
+        nextBufferInSeconds: Float,
+        silenceThreshold: Float
+    ) -> Bool {
+        // Calculate the number of energy values to consider based on the duration of the next buffer
+        // Each energy value corresponds to 1 buffer length (100ms of audio), hence we divide by 0.1
+        let energyValuesToConsider = Int(nextBufferInSeconds / 0.1)
+
+        // Extract the relevant portion of energy values from the currentRelativeEnergy array
+        let nextBufferEnergies = relativeEnergy.suffix(energyValuesToConsider)
+
+        // Determine the number of energy values to check for voice presence
+        // Considering up to the last 1 second of audio, which translates to 10 energy values
+        let numberOfValuesToCheck = max(10, nextBufferEnergies.count - 10)
+
+        // Check if any of the energy values in the considered range exceed the silence threshold
+        // This indicates the presence of voice in the buffer
+        return nextBufferEnergies.prefix(numberOfValuesToCheck).contains { $0 > silenceThreshold }
+    }
+
+    /// Calculate non-silent chunks of an audio.
+    /// - Parameter signal: audio signal
+    /// - Returns: an array of tuples indicating the start and end indices of non-silent chunks
+    public static func calculateNonSilentChunks(
+        in signal: [Float]
+    ) -> [(startIndex: Int, endIndex: Int)] {
+        EnergyVAD().calculateNonSilentChunks(in: signal)
+    }
+
+    /// Calculate voice activity in chunks of an audio based on energy threshold.
+    /// - Parameters:
+    ///   - signal: audio signal
+    ///   - chunkCount: number of chunks
+    ///   - frameLength: frame length in samples
+    ///   - frameShift: frame shift in samples
+    ///   - energyThreshold: energy threshold for silence detection, default is 0.05. Chunks with energy below this threshold are considered silent.
+    /// - Returns: an array of booleans indicating whether each chunk is non-silent
+    public static func calculateVoiceActivityInChunks(
+        of signal: [Float],
+        chunkCount: Int,
+        frameLength: Int,
+        frameShift: Int,
+        energyThreshold: Float = 0.05
+    ) -> [Bool] {
+        return (0..<chunkCount).map { vDSP.sumOfSquares(signal[$0 * frameShift..<($0 * frameShift + frameLength)]) > energyThreshold }
+    }
+
     public static func calculateEnergy(of signal: [Float]) -> (avg: Float, max: Float, min: Float) {
         var rmsEnergy: Float = 0.0
         var minEnergy: Float = 0.0

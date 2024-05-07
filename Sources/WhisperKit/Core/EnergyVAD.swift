@@ -5,6 +5,7 @@ import Foundation
 import Accelerate
 
 /// Voice activity detection based on energy threshold
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 final class EnergyVAD {
     var sampleRate: Int
     var frameLength: Int
@@ -35,27 +36,44 @@ final class EnergyVAD {
         if count < 0 {
             return []
         }
-        return (0..<count).map { vDSP.sumOfSquares(waveform[$0 * frameShift..<($0 * frameShift + frameLength)]) > energyThreshold }
+        return AudioProcessor.calculateVoiceActivityInChunks(
+            of: waveform,
+            chunkCount: count,
+            frameLength: frameLength,
+            frameShift: frameShift,
+            energyThreshold: energyThreshold
+        )
+    }
+
+    func calculateNonSilentChunks(in waveform: [Float]) -> [(startIndex: Int, endIndex: Int)] {
+        let vad = voiceActivity(in: waveform)
+        var result = [(startIndex: Int, endIndex: Int)]()
+        for (index, vadChunk) in vad.enumerated() {
+            if vadChunk {
+                result.append((startIndex: index * frameShift, endIndex: index * frameShift + frameShift))
+            }
+        }
+        return result
     }
 
     func voiceActivityIndexToAudioIndex(_ index: Int) -> Int {
         return index * frameShift + frameShift
     }
 
-    func findLongestSilence(in array: [Bool]) -> (startIndex: Int, endIndex: Int)? {
+    func findLongestSilence(in vadResult: [Bool]) -> (startIndex: Int, endIndex: Int)? {
         var longestStartIndex: Int?
         var longestEndIndex: Int?
         var longestCount = 0
         var index = 0
-        while index < array.count {
-            let value = array[index]
+        while index < vadResult.count {
+            let value = vadResult[index]
             if value {
                 // found non-silence, skip
                 index += 1
             } else {
                 // found beginning of silence, find the end
                 var endIndex = index
-                while endIndex < array.count && !array[endIndex] {
+                while endIndex < vadResult.count && !vadResult[endIndex] {
                     endIndex += 1
                 }
                 let count = endIndex - index

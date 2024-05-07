@@ -969,6 +969,22 @@ final class UnitTests: XCTestCase {
 
         XCTAssertEqual(vad.voiceActivityIndexToAudioIndex(result1.startIndex), 37120)
         XCTAssertEqual(vad.voiceActivityIndexToAudioIndex(result1.endIndex), 52800)
+
+        let nonSilentChunks1 = vad.calculateNonSilentChunks(in: [])
+        XCTAssertEqual(nonSilentChunks1.map(\.startIndex), [])
+        XCTAssertEqual(nonSilentChunks1.map(\.endIndex), [])
+
+        let nonSilentChunks2 = vad.calculateNonSilentChunks(in: Array(repeating: 0, count: 1600))
+        XCTAssertEqual(nonSilentChunks2.map(\.startIndex), [])
+        XCTAssertEqual(nonSilentChunks2.map(\.endIndex), [])
+
+        let nonSilentChunks3 = vad.calculateNonSilentChunks(in: Array(repeating: 1, count: 1600))
+        XCTAssertEqual(nonSilentChunks3.map(\.startIndex), [0, 320, 640, 960])
+        XCTAssertEqual(nonSilentChunks3.map(\.endIndex), [320, 640, 960, 1280])
+
+        let nonSilentChunks4 = vad.calculateNonSilentChunks(in: Array(repeating: 0, count: 1600) + Array(repeating: 1, count: 1600))
+        XCTAssertEqual(nonSilentChunks4.map(\.startIndex), [1280, 1600, 1920, 2240, 2560])
+        XCTAssertEqual(nonSilentChunks4.map(\.endIndex), [1600, 1920, 2240, 2560, 2880])
     }
 
     func testFindLongestSilence() throws {
