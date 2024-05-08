@@ -1,5 +1,5 @@
 # Tested on MacOS with:
-# act -s COMMITTER_TOKEN="$(gh auth token)" release --container-architecture linux/amd64 -P ubuntu-latest=catthehacker/ubuntu:act-latest -e .github/workflows/expo-update-test.json
+# act -s COMMITTER_TOKEN="$(gh auth token)" release --container-architecture linux/amd64 -P ubuntu-latest=catthehacker/ubuntu:act-latest -e <(echo '{ "release": { "tag_name": "v0.0.0" }}')
 name: Update whisper-kit-expo
 
 on:
