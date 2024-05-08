@@ -90,6 +90,8 @@ struct ContentView: View {
     @State private var showAdvancedOptions: Bool = false
     @State private var transcriptionTask: Task<Void, Never>? = nil
     @State private var selectedCategoryId: MenuItem.ID?
+    @State private var transcribeFileTask: Task<Void, Never>? = nil
+
     private var menu = [
         MenuItem(name: "Transcribe", image: "book.pages"),
         MenuItem(name: "Stream", image: "waveform.badge.mic"),
@@ -104,12 +106,12 @@ struct ContentView: View {
     // MARK: Views
 
     func resetState() {
+        transcribeFileTask?.cancel()
         isRecording = false
         isTranscribing = false
         whisperKit?.audioProcessor.stopRecording()
         currentText = ""
         unconfirmedText = []
-
         firstTokenTime = 0
         pipelineStart = 0
         effectiveRealTimeFactor = 0
@@ -1031,7 +1033,7 @@ struct ContentView: View {
     func transcribeFile(path: String) {
         resetState()
         whisperKit?.audioProcessor = AudioProcessor()
-        Task {
+        self.transcribeFileTask = Task {
             do {
                 try await transcribeCurrentFile(path: path)
             } catch {
