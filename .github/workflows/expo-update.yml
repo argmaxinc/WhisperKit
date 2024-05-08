@@ -18,18 +18,13 @@ jobs:
           with:
             repository: seb-sep/whisper-kit-expo
             fetch-depth: 0
-            token: ${{ secrets.GITHUB_TOKEN }}
+            token: ${{ secrets.COMMITTER_TOKEN }}
             ref: main
         
         - name: Setup Node
           uses: actions/setup-node@v4
           with:
             node-version: '20.x'
-
-        - name: Configure Git
-          run: |
-            git config --global user.name 'github-actions'
-            git config --global user.email 'github-actions@github.com'
 
         - name: New branch
           run: |
