@@ -32,8 +32,24 @@ jobs:
             echo ${{ github.event.release }}
             echo "Release tag is $TAG"
         
-        - name: Run update script
-          run: node ./scripts/update-whisperkit.js $TAG
+        - name: Update package.json version
+          run: |
+            PACKAGE_PATH="package.json"
+
+            # Check if the package.json exists at the specified path
+            if [ ! -f "$PACKAGE_PATH" ]; then
+              echo "Could not find package.json at path: $PACKAGE_PATH."
+              exit 1
+            fi
+
+            # Normalize the release tag by removing a leading 'v', if present
+            RELEASE_TAG=${TAG#v}
+
+            # Update package.json with the new version
+            jq --arg newver "$RELEASE_TAG" '.whisperKit.version = $newver' "$PACKAGE_PATH" > tmp.$$.json && mv tmp.$$.json "$PACKAGE_PATH"
+
+            # Verify changes
+            cat "$PACKAGE_PATH"
 
         - name: Commit changes
           run: |
