@@ -1,0 +1,28 @@
+{
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "sourceLanguages": [
+                "swift"
+            ],
+            "args": [],
+            "cwd": "${workspaceFolder:WhisperKit}",
+            "name": "Debug whisperkit-cli",
+            "program": "${workspaceFolder:WhisperKit}/.build/debug/whisperkit-cli",
+            "preLaunchTask": "swift: Build Debug whisperkit-cli"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "sourceLanguages": [
+                "swift"
+            ],
+            "args": [],
+            "cwd": "${workspaceFolder:WhisperKit}",
+            "name": "Release whisperkit-cli",
+            "program": "${workspaceFolder:WhisperKit}/.build/release/whisperkit-cli",
+            "preLaunchTask": "swift: Build Release whisperkit-cli"
+        }
+    ]
+}
