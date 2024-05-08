@@ -38,7 +38,7 @@ jobs:
         - name: Commit changes
           run: |
             git add ./package.json
-            git commit -m "update WhisperKit to $TAG"
+            git commit -m "Update WhisperKit to $TAG"
             git push origin $BRANCH_NAME
         
         - name: Install and setup GitHub CLI if necessary
