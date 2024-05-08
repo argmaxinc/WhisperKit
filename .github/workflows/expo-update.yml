@@ -53,6 +53,8 @@ jobs:
 
         - name: Commit changes
           run: |
+            git config --global user.email "164233781+argmaxincbot@users.noreply.github.com"
+            git config --global user.name "argmaxincbot"
             git add ./package.json
             git commit -m "Update WhisperKit to $TAG"
             git push origin $BRANCH_NAME
