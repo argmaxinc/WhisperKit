@@ -415,9 +415,12 @@ class EnglishNumberNormalizer{
                     if var v = value, v.hasSuffix(".") {
                         v = v + current
                         value = v
+                        continue
+                    } else if var v = value{
                         results.append(output(v))
-                    } else {
-                        let prefix = hasPrefix ? String(current.first!) : nil
+                    }
+                    else {
+                        prefix = hasPrefix ? String(current.first!) : prefix
                         value = f.denominator == 1 ? String(f.numerator) : currentWithoutPrefix
                     }
                 } else {
@@ -548,10 +551,12 @@ class EnglishNumberNormalizer{
             } else if let suffixValue = self.suffixers[current] {
                 if value != nil {
                     if let dictSuffixValue = suffixValue as? [String: String] {
-                        if let nextSuffix = dictSuffixValue[next!] {
+                        if let n = next, let nextSuffix = dictSuffixValue[n] {
                             results.append(output("\(value!)\(nextSuffix)"))
+                            skip = true
                         } else {
                             results.append(output(value!))
+                            results.append(output(current))
                         }
                     } else {
                         results.append(output("\(value!)\(suffixValue)"))
@@ -594,6 +599,9 @@ class EnglishNumberNormalizer{
                 fatalError("Unexpected token: \(current)")
             }
         }
+        if let v = value{
+            results.append(output(v))
+        }
         return results
     }
     
@@ -627,7 +635,7 @@ class EnglishNumberNormalizer{
         processedString = processedString.replacingOccurrences(of: #"([0-9])([a-z])"#, with: "$1 $2", options: .regularExpression)
         
         // Remove spaces which could be a suffix
-        processedString = processedString.replacingOccurrences(of: #"([0-9])\s+(st|nd|rd|th|s)\\b"#, with: "$1$2", options: .regularExpression)
+        processedString = processedString.replacingOccurrences(of: #"([0-9])\s+(st|nd|rd|th|s)\b"#, with: "$1$2", options: .regularExpression)
         
         return processedString
     }
@@ -658,7 +666,7 @@ class EnglishNumberNormalizer{
         
         // apply currency postprocessing; "$2 and ¢7" -> "$2.07"
         do {
-            let regex1 = try NSRegularExpression(pattern: "([€£$])([0-9]+) (?:and )?¢([0-9]{1,2})\\b")
+            let regex1 = try NSRegularExpression(pattern: #"([€£$])([0-9]+) (?:and )?¢([0-9]{1,2})\b"#)
             let matches1 = regex1.matches(in: processedString, range: NSRange(processedString.startIndex..., in: processedString))
             for match in matches1.reversed() {
                 let range = Range(match.range, in: processedString)!
@@ -670,7 +678,7 @@ class EnglishNumberNormalizer{
         }
 
         do {
-            let regex2 = try NSRegularExpression(pattern: "[€£$]0\\.([0-9]{1,2})\\b")
+            let regex2 = try NSRegularExpression(pattern: #"[€£$]0\\.([0-9]{1,2})\b"#)
             let matches2 = regex2.matches(in: processedString, range: NSRange(processedString.startIndex..., in: processedString))
             for match in matches2.reversed() {
                 let range = Range(match.range, in: processedString)!
@@ -682,14 +690,14 @@ class EnglishNumberNormalizer{
         }
 
         // write "one(s)" instead of "1(s)", just for readability
-        processedString = processedString.replacingOccurrences(of: "\\b1(s?)\\b", with: "one$1", options: .regularExpression)
+        processedString = processedString.replacingOccurrences(of: #"\b1(s?)\b"#, with: "one$1", options: .regularExpression)
 
         return processedString
     }
     
     func normalize(_ text: String) -> String{
         var s = self.preprocess(text)
-        let out = self.processWords(s.components(separatedBy: " ")).compactMap({ $0 })
+        let out = self.processWords(s.components(separatedBy: " ")).filter({ $0 != ""})
         s = out.joined(separator: " ")
         s = self.postprocess(s)
         return s
@@ -719,7 +727,7 @@ class EnglishTextNormalizer{
     let numberNormalizer: EnglishNumberNormalizer
     let spellingNormalizer: EnglishSpellingNormalizer
     let ignorePatterns = #"\b(hmm|mm|mhm|mmm|uh|um)\b"#
-    let replacers = [
+    let replacers: KeyValuePairs = [
         // common contractions
         #"\bwon't\b"#: "will not",
         #"\bcan't\b"#: "can not",
