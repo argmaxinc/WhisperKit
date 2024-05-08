@@ -48,7 +48,7 @@ jobs:
               echo "GitHub CLI is not installed, installing..."
               sudo apt update
               sudo apt install -y gh
-              echo ${{ secrets.GITHUB_TOKEN }} | gh auth login --with-token
+              echo ${{ secrets.COMMITTER_TOKEN }} | gh auth login --with-token
             else
               echo "GitHub CLI is already installed"
             fi
