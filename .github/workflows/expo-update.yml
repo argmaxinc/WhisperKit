@@ -1,0 +1,64 @@
+# Tested on MacOS with:
+# act -s GITHUB_TOKEN="$(gh auth token)" release --container-architecture linux/amd64 -P ubuntu-latest=catthehacker/ubuntu:act-latest -e .github/workflows/expo-update-test.json
+name: Update whisper-kit-expo
+
+on:
+  release:
+    types: [released]
+
+jobs:
+  update-whisperkit:
+    runs-on: ubuntu-latest
+    env: 
+      TAG: ${{ github.event.release.tag_name }}
+      BRANCH_NAME: update-whisperkit-${{ github.event.release.tag_name }}
+    steps:
+        - name: Checkout whisper-kit-expo
+          uses: actions/checkout@v4
+          with:
+            repository: seb-sep/whisper-kit-expo
+            fetch-depth: 0
+            token: ${{ secrets.GITHUB_TOKEN }}
+            ref: main
+        
+        - name: Setup Node
+          uses: actions/setup-node@v4
+          with:
+            node-version: '20.x'
+
+        - name: Configure Git
+          run: |
+            git config --global user.name 'github-actions'
+            git config --global user.email 'github-actions@github.com'
+
+        - name: New branch
+          run: |
+            git checkout -b $BRANCH_NAME
+            echo ${{ github.event.release }}
+            echo "Release tag is $TAG"
+        
+        - name: Run update script
+          run: node ./scripts/update-whisperkit.js $TAG
+
+        - name: Commit changes
+          run: |
+            git add ./package.json
+            git commit -m "update WhisperKit to $TAG"
+            git push origin $BRANCH_NAME
+        
+        - name: Install and setup GitHub CLI if necessary
+          run: |
+            if ! command -v gh &> /dev/null
+            then
+              echo "GitHub CLI is not installed, installing..."
+              sudo apt update
+              sudo apt install -y gh
+              echo ${{ secrets.GITHUB_TOKEN }} | gh auth login --with-token
+            else
+              echo "GitHub CLI is already installed"
+            fi
+
+        - name: PR with changes
+          run: |
+            gh pr create --title "Update WhisperKit to $TAG" --body "Update WhisperKit to $TAG" --base main --head $BRANCH_NAME
+          
