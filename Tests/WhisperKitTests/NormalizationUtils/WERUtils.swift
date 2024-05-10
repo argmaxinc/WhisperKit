@@ -6,6 +6,8 @@ func wagnerFischerEditOperations(s1: String, s2: String) -> [Character] {
     let m = s1.count
     let n = s2.count
     var dp = Array(repeating: Array(repeating: (0, Character(" ")), count: n + 1), count: m + 1)
+    let s1Chars = Array(s1)
+    let s2Chars = Array(s2)
     
     // Initialize first row and column
     for i in 0...m {
@@ -17,7 +19,7 @@ func wagnerFischerEditOperations(s1: String, s2: String) -> [Character] {
     // Fill the matrix
     for i in 1...m {
         for j in 1...n {
-            let cost = s1[s1.index(s1.startIndex, offsetBy: i - 1)] == s2[s2.index(s2.startIndex, offsetBy: j - 1)] ? 0 : 1
+            let cost = s1Chars[i - 1] == s2Chars[j - 1] ? 0 : 1
             let insertCost = dp[i][j - 1].0
             let deleteCost = dp[i - 1][j].0
             var replaceCost = dp[i - 1][j - 1].0
@@ -184,6 +186,20 @@ func process_words(reference: [String], hypothesis: [String]) -> Double{
     return wer
 }
 
+func evaluate(originalTranscript: String, generatedTranscript: String, normalizeOriginal: Bool = false) -> Double{
+    var wer: Double = -Double.infinity
+    let normalizer = EnglishTextNormalizer()
+    
+    var reference = normalizeOriginal ? originalTranscript : normalizer.normalize(text: generatedTranscript)
+    var hypothesis = normalizer.normalize(text: generatedTranscript)
+
+    wer = process_words(
+        reference: [reference],
+        hypothesis: [hypothesis]
+    )
+    
+    return wer
+}
 
 // MARK: Normalization
 
