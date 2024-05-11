@@ -61,7 +61,7 @@ open class WhisperKit {
         download: Bool = true,
         useBackgroundDownloadSession: Bool = false
     ) async throws {
-        self.modelCompute = computeOptions ?? ModelComputeOptions()
+        modelCompute = computeOptions ?? ModelComputeOptions()
         self.audioProcessor = audioProcessor ?? AudioProcessor()
         self.featureExtractor = featureExtractor ?? FeatureExtractor()
         self.audioEncoder = audioEncoder ?? AudioEncoder()
@@ -70,7 +70,7 @@ open class WhisperKit {
         self.segmentSeeker = segmentSeeker ?? SegmentSeeker()
         self.tokenizerFolder = tokenizerFolder
         self.useBackgroundDownloadSession = useBackgroundDownloadSession
-        self.currentTimings = TranscriptionTimings()
+        currentTimings = TranscriptionTimings()
         Logging.shared.logLevel = verbose ? logLevel : .none
 
         try await setupModels(
@@ -372,6 +372,63 @@ open class WhisperKit {
 
     // MARK: - Transcribe multiple audio files
 
+    /// Transcribes multiple audio files asynchronously and returns the results as an array of tuples containing the file path and the `Result` object.
+    ///
+    /// This method processes the provided audio file paths by loading the audio data and then transcribing the audio arrays.
+    /// It handles any errors that occur during loading or transcription and ensures that the results are returned in the correct order.
+    ///
+    /// - Parameters:
+    ///   - audioPaths: An array of file paths pointing to the audio files to be transcribed.
+    ///   - decodeOptions: Optional decoding options to customize the transcription process.
+    ///   - callback: Optional callback to receive updates during the transcription process.
+    ///
+    /// - Returns: An array of tuples, each containing the file path and a `Result` object with either a successful transcription result or an error.
+    public func transcribe(
+        audioPaths: [String],
+        decodeOptions: DecodingOptions? = nil,
+        callback: TranscriptionCallback = nil
+    ) async -> [Result<[TranscriptionResult], Swift.Error>] {
+        // Start timing the audio loading and conversion process
+        let loadAudioStart = Date()
+
+        // Load and extract audio data from the provided file paths
+        let loadedAudioResult = await AudioProcessor.loadAudio(at: audioPaths)
+        let audioArrays = loadedAudioResult.compactMap { try? $0.get() }
+
+        // Calculate the time taken to load and convert audio
+        let loadAndConvertTime = Date().timeIntervalSince(loadAudioStart)
+        currentTimings.audioLoading = loadAndConvertTime
+        Logging.debug("Total Audio Loading and Converting Time: \(loadAndConvertTime)")
+
+        // Transcribe the loaded audio arrays
+        let transcribeResults: [Result<[TranscriptionResult], Swift.Error>] = await transcribe(
+            audioArrays: audioArrays,
+            decodeOptions: decodeOptions,
+            callback: callback
+        )
+
+        // Initialize the result array to hold final transcription results
+        var result = [Result<[TranscriptionResult], Swift.Error>]()
+        var transcribeResultIndex = 0
+
+        // Iterate over loadedAudioResult and map each to the corresponding transcription result
+        for (index, audioResult) in loadedAudioResult.enumerated() {
+            switch audioResult {
+                case .success:
+                    // Append the audio path and transcription result if audio loading was successful
+                    result.append(transcribeResults[transcribeResultIndex])
+                    transcribeResultIndex += 1
+                case let .failure(error):
+                    // Append the audio path and failure result if audio loading failed
+                    result.append(.failure(error))
+            }
+        }
+
+        return result
+    }
+
+    /// Convenience method to transcribe multiple audio files asynchronously and return the results as an array of optional arrays of `TranscriptionResult`.
+    /// - Returns: An array of optional arrays containing `TranscriptionResult`.
     public func transcribe(
         audioPaths: [String],
         decodeOptions: DecodingOptions? = nil,
@@ -382,36 +439,80 @@ open class WhisperKit {
             decodeOptions: decodeOptions,
             callback: callback
         )
-        var results = [[TranscriptionResult]?]()
-        for result in transcribeResults {
-            results.append(try? result.get())
-        }
+        let results = transcribeResults.toOptionalArrays()
         return results
     }
 
+    // MARK: - Transcribe multiple audio arrays
+
+    /// Transcribes multiple audio arrays asynchronously and returns the results as an array of `Result` objects.
+    ///
+    /// This method processes the provided audio arrays by dividing them into batches based on the concurrent worker count
+    /// specified in `decodeOptions`, if any. The transcription is performed concurrently on these chunks, and the results
+    /// are aggregated and returned in the original order.
+    ///
+    /// - Parameters:
+    ///   - audioArrays: An array of arrays, each containing audio sample data to be transcribed.
+    ///   - decodeOptions: Optional decoding options to customize the transcription process.
+    ///   - callback: Optional callback to receive updates during the transcription process.
+    ///
+    /// - Returns: An array of `Result` objects, each containing either a successful transcription result or an error.
     public func transcribe(
-        audioPaths: [String],
+        audioArrays: [[Float]],
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
     ) async -> [Result<[TranscriptionResult], Swift.Error>] {
         var result = [Result<[TranscriptionResult], Swift.Error>]()
-        for audioPath in audioPaths {
-            do {
-                let transcribeResult: [TranscriptionResult] = try await transcribe(
-                    audioPath: audioPath,
-                    decodeOptions: decodeOptions,
-                    callback: callback
-                )
-                result.append(.success(transcribeResult))
-            } catch {
-                result.append(.failure(error))
+
+        // Determine the number of concurrent workers from decodeOptions or default to 0
+        let concurrentWorkerCount = decodeOptions?.concurrentWorkerCount ?? 0
+
+        // Chunk the audio arrays based on the number of concurrent workers
+        // If concurrentWorkerCount is 0, all audio arrays are processed in one batch
+        let chunkedAudioArrays = concurrentWorkerCount == 0 ? [audioArrays] : audioArrays.chunked(into: concurrentWorkerCount)
+
+        for audioArrayBatch in chunkedAudioArrays {
+            // Use withTaskGroup to manage concurrent transcription tasks
+            let partialResult = await withTaskGroup(of: [(index: Int, result: Result<[TranscriptionResult], Swift.Error>)].self) { taskGroup -> [Result<[TranscriptionResult], Swift.Error>] in
+                for (index, audioArray) in audioArrayBatch.enumerated() {
+                    // Add a new task to the task group for each audio array
+                    taskGroup.addTask {
+                        do {
+                            let transcribeResult: [TranscriptionResult] = try await self.transcribe(
+                                audioArray: audioArray,
+                                decodeOptions: decodeOptions,
+                                callback: callback
+                            )
+                            // Return the successful transcription result with its index
+                            return [(index: index, result: .success(transcribeResult))]
+                        } catch {
+                            // Return the failure result with its index in case of an error
+                            return [(index: index, result: .failure(error))]
+                        }
+                    }
+                }
+
+                // Collect results from all completed tasks in the task group
+                var batchResult = [(index: Int, result: Result<[TranscriptionResult], Swift.Error>)]()
+                for await result in taskGroup {
+                    batchResult.append(contentsOf: result)
+                }
+
+                // Sort the results by index to maintain the original order (they may not be in order due to concurrency)
+                batchResult.sort(by: { $0.index < $1.index })
+
+                // Map the sorted batch results to a simple array of results
+                return batchResult.map { $0.result }
             }
+
+            // Append the results of each batch to the final result array
+            result.append(contentsOf: partialResult)
         }
         return result
     }
 
-    // MARK: - Transcribe multiple audio samples
-
+    /// Convenience method to transcribe multiple audio arrays asynchronously and return the results as an array of optional arrays of `TranscriptionResult`.
+    /// - Returns: An array of optional arrays containing `TranscriptionResult`.
     public func transcribe(
         audioArrays: [[Float]],
         decodeOptions: DecodingOptions? = nil,
@@ -422,50 +523,11 @@ open class WhisperKit {
             decodeOptions: decodeOptions,
             callback: callback
         )
-        var results = [[TranscriptionResult]?]()
-        for result in transcribeResults {
-            results.append(try? result.get())
-        }
-        return results
+
+        return transcribeResults.toOptionalArrays()
     }
 
-    public func transcribe(
-        audioArrays: [[Float]],
-        decodeOptions: DecodingOptions? = nil,
-        callback: TranscriptionCallback = nil
-    ) async -> [Result<[TranscriptionResult], Swift.Error>] {
-        var result = [Result<[TranscriptionResult], Swift.Error>]()
-        let concurrentWorkerCount = decodeOptions?.concurrentWorkerCount ?? 0
-        let chunkedAudioArrays = concurrentWorkerCount == 0 ? [audioArrays] : audioArrays.chunked(into: concurrentWorkerCount)
-        for chunkedAudioArray in chunkedAudioArrays {
-            let partialResult = await withTaskGroup(of: [(index: Int, result: Result<[TranscriptionResult], Swift.Error>)].self) { taskGroup -> [Result<[TranscriptionResult], Swift.Error>] in
-                for (index, audioArray) in chunkedAudioArray.enumerated() {
-                    taskGroup.addTask {
-                        do {
-                            let transcribeResult: [TranscriptionResult] = try await self.transcribe(
-                                audioArray: audioArray,
-                                decodeOptions: decodeOptions,
-                                callback: callback
-                            )
-                            return [(index: index, result: .success(transcribeResult))]
-                        } catch {
-                            return [(index: index, result: .failure(error))]
-                        }
-                    }
-                }
-                var batchResult = [(index: Int, result: Result<[TranscriptionResult], Swift.Error>)]()
-                for await result in taskGroup {
-                    batchResult.append(contentsOf: result)
-                }
-                batchResult.sort(by: { $0.index < $1.index })
-                return batchResult.map { $0.result }
-            }
-            result.append(contentsOf: partialResult)
-        }
-        return result
-    }
-
-    // MARK: - Transcribe audio file
+    // MARK: - Transcribe single audio file
 
     @available(*, deprecated, message: "Subject to removal in a future version. Use `transcribe(audioPath:decodeOptions:callback:) async throws -> [TranscriptionResult]` instead.")
     public func transcribe(
@@ -477,6 +539,13 @@ open class WhisperKit {
         return result.first
     }
 
+    /// Transcribes an audio file from the given path asynchronously.
+    /// - Parameters:
+    ///   - audioPath: The file path to the audio file to be transcribed.
+    ///   - decodeOptions: Options for how to transcribe audio. Includes a chunking strategy and the number of concurrent workers to parallelize the task.
+    ///   - callback: Optional callback to receive updates during the transcription process.
+    /// - Returns: An array of `TranscriptionResult`.
+    /// - Throws: An error if the transcription fails.
     public func transcribe(
         audioPath: String,
         decodeOptions: DecodingOptions? = nil,
@@ -493,33 +562,18 @@ open class WhisperKit {
         currentTimings.audioLoading = loadTime + convertTime
         Logging.debug("Audio loading time: \(loadTime), Audio convert time: \(convertTime)")
 
-        switch decodeOptions?.chunkingStrategy {
-        case .vad:
-            let chunker = VADAudioChunker()
-            let audioChunks = try await chunker.chunkAll(
-                audioArray: audioArray,
-                frameLength: WhisperKit.windowSamples,
-                decodeOptions: decodeOptions
-            )
+        let transcribeResults: [TranscriptionResult] = try await transcribe(
+            audioArray: audioArray,
+            decodeOptions: decodeOptions,
+            callback: callback
+        )
 
-            // Send chunked samples to transcribe
-            let transcribeResults: [Result<[TranscriptionResult], Swift.Error>] = await transcribe(
-                audioArrays: audioChunks,
-                decodeOptions: decodeOptions,
-                callback: callback
-            )
-            return try transcribeResults.flatMap { try $0.get() }
-        case nil:
-            return try await transcribe(
-                audioArray: audioArray,
-                decodeOptions: decodeOptions,
-                callback: callback
-            )
-        }
+        return transcribeResults
     }
 
-    // MARK: - Transcribe audio samples
+    // MARK: - Transcribe single audio sample array
 
+    /// Deprecated
     @available(*, deprecated, message: "Subject to removal in a future version. Use `transcribe(audioArray:decodeOptions:callback:) async throws -> [TranscriptionResult]` instead.")
     public func transcribe(
         audioArray: [Float],
@@ -530,12 +584,74 @@ open class WhisperKit {
         return result.first
     }
 
+    /// Main entry point for transcribing audio
+    /// - Parameters:
+    ///   - audioArray: Array of 16khz raw float audio samples
+    ///   - decodeOptions: Options for how to transcribe audio. Including a chunking strategy and the number of concurrent workers will paralleize this task.
+    ///   - callback: Optional callback to receive updates during the transcription process.
+    /// - Returns: An array of sorted `TranscriptionResult`.
+    /// - Throws: An error if the transcription fails.
     public func transcribe(
         audioArray: [Float],
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
     ) async throws -> [TranscriptionResult] {
-        if self.modelState != .loaded {
+        var transcribeResults = [TranscriptionResult]()
+
+        // Determine if the audio array requires chunking
+        if audioArray.count > WhisperKit.windowSamples, let chunkingStrategy = decodeOptions?.chunkingStrategy {
+            // We have some audio that will require multiple windows and a strategy to chunk them
+            switch chunkingStrategy {
+                case .vad:
+                    let chunker = VADAudioChunker()
+                    let audioChunks = try await chunker.chunkAll(
+                        audioArray: audioArray,
+                        maxChunkLength: WhisperKit.windowSamples,
+                        decodeOptions: decodeOptions
+                    )
+
+                    // Send chunked samples to transcribe (note: this is recursive)
+                    let chunkedResults: [Result<[TranscriptionResult], Swift.Error>] = await transcribe(
+                        audioArrays: audioChunks,
+                        decodeOptions: decodeOptions,
+                        callback: callback
+                    )
+
+                    transcribeResults = try chunkedResults.flatMap { try $0.get() }
+                @unknown default:
+                    break
+            }
+        }
+
+        // Audio is short enough to transcribe in a single window
+        if transcribeResults.isEmpty {
+            transcribeResults = try await runTranscribeTask(
+                audioArray: audioArray,
+                decodeOptions: decodeOptions,
+                callback: callback
+            )
+        }
+
+        if let decodeOptions, decodeOptions.verbose {
+            Logging.info("Total Transcription Results: \(transcribeResults.count)")
+            for (i, transcribeTaskResult) in transcribeResults.enumerated() {
+                Logging.debug("[Result \(i)]")
+                transcribeTaskResult.logSegments()
+            }
+        }
+
+        return transcribeResults
+    }
+
+    /// Runs the transcription task on a single audio sample array asynchronously.
+    /// - Returns: An array of `TranscriptionResult`.
+    /// - Throws: An error if the transcription fails or if the tokenizer is unavailable.
+    private func runTranscribeTask(
+        audioArray: [Float],
+        decodeOptions: DecodingOptions? = nil,
+        callback: TranscriptionCallback = nil
+    ) async throws -> [TranscriptionResult] {
+        if modelState != .loaded {
             try await loadModels()
         }
 
@@ -544,6 +660,7 @@ open class WhisperKit {
             throw WhisperError.tokenizerUnavailable()
         }
         try Task.checkCancellation()
+
         let transcribeTask = TranscribeTask(
             currentTimings: currentTimings,
             progress: progress,
@@ -561,7 +678,6 @@ open class WhisperKit {
         if let decodeOptions, decodeOptions.verbose {
             transcribeTaskResult.logTimings()
         }
-        transcribeTaskResult.logSegments()
         return [transcribeTaskResult]
     }
 }

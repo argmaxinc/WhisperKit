@@ -49,7 +49,7 @@ final class TranscribeTask {
         var detectedLanguage: String?
 
         let contentFrames = audioArray.count
-        timings.inputAudioSeconds = Double(Int(contentFrames) / WhisperKit.sampleRate) - Double(decodeOptions?.clipTimestamps.first ?? 0)
+        timings.inputAudioSeconds = Double(contentFrames) / Double(WhisperKit.sampleRate) - Double(decodeOptions?.clipTimestamps.first ?? 0)
 
         // MARK: Init decoder inputs
 
@@ -92,7 +92,6 @@ final class TranscribeTask {
 
         // Process seek clips
         let seekClips = prepareSeekClips(contentFrames: contentFrames, decodeOptions: options)
-
         let startDecodeLoopTime = CFAbsoluteTimeGetCurrent()
 
         let totalSeekDuration = seekClips.reduce(0) { $0 + ($1.end - $1.start) }
@@ -298,9 +297,7 @@ final class TranscribeTask {
 
                 // Update timings from the decoder main loop
                 if let decodingTimings = decodingResult?.timings {
-                    if timings.firstTokenTime == 0 {
-                        timings.firstTokenTime = decodingTimings.firstTokenTime
-                    }
+                    timings.firstTokenTime = decodingTimings.firstTokenTime
                     timings.decodingPredictions += decodingTimings.decodingPredictions
                     timings.totalDecodingLoops += decodingTimings.totalDecodingLoops
                     timings.decodingNonPrediction += decodingTimings.decodingNonPrediction

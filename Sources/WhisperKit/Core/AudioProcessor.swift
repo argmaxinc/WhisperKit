@@ -318,27 +318,43 @@ public class AudioProcessor: NSObject, AudioProcessing {
     public static func calculateNonSilentChunks(
         in signal: [Float]
     ) -> [(startIndex: Int, endIndex: Int)] {
-        EnergyVAD().calculateNonSilentChunks(in: signal)
+        EnergyVAD().calculateActiveChunks(in: signal)
     }
 
     /// Calculate voice activity in chunks of an audio based on energy threshold.
     /// - Parameters:
-    ///   - signal: audio signal
-    ///   - chunkCount: number of chunks
-    ///   - frameLength: frame length in samples
-    ///   - frameShift: frame shift in samples
-    ///   - energyThreshold: energy threshold for silence detection, default is 0.05. Chunks with energy below this threshold are considered silent.
-    /// - Returns: an array of booleans indicating whether each chunk is non-silent
+    ///   - signal: Audio signal
+    ///   - chunkCount: Number of chunks
+    ///   - frameLengthSamples: Frame length in samples
+    ///   - frameOverlapSamples: frame overlap in samples, this is helpful to catch large energy values at the very end of a frame
+    ///   - energyThreshold: Energy threshold for silence detection, default is 0.05. Chunks with energy below this threshold are considered silent.
+    /// - Returns: An array of booleans indicating whether each chunk is non-silent
     public static func calculateVoiceActivityInChunks(
         of signal: [Float],
         chunkCount: Int,
-        frameLength: Int,
-        frameShift: Int,
-        energyThreshold: Float = 0.05
+        frameLengthSamples: Int,
+        frameOverlapSamples: Int = 0,
+        energyThreshold: Float = 0.022
     ) -> [Bool] {
-        return (0..<chunkCount).map { vDSP.sumOfSquares(signal[$0 * frameShift..<($0 * frameShift + frameLength)]) > energyThreshold }
+        var chunkEnergies = [Float]()
+        for chunkIndex in 0..<chunkCount {
+            let startIndex = chunkIndex * frameLengthSamples
+            let endIndex = min(startIndex + frameLengthSamples + frameOverlapSamples, signal.count)
+            let chunk = Array(signal[startIndex..<endIndex])
+            let avgEnergy = calculateEnergy(of: chunk).avg
+            chunkEnergies.append(avgEnergy)
+        }
+
+        let vadResult = chunkEnergies.map { $0 > energyThreshold }
+
+        return vadResult
+
+//        return (0..<chunkCount).map { vDSP.sumOfSquares(signal[$0 * frameShift..<($0 * frameShift + frameLength)]) > energyThreshold }
     }
 
+    /// Calculate energy of a signal chunk.
+    /// - Parameter signal: Chunk of audio signal.
+    /// - Returns: Tuple containing average (RMS energy), maximum, and minimum values.
     public static func calculateEnergy(of signal: [Float]) -> (avg: Float, max: Float, min: Float) {
         var rmsEnergy: Float = 0.0
         var minEnergy: Float = 0.0

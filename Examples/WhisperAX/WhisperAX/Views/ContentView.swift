@@ -44,11 +44,12 @@ struct ContentView: View {
     @AppStorage("enableDecoderPreview") private var enableDecoderPreview: Bool = true
     @AppStorage("temperatureStart") private var temperatureStart: Double = 0
     @AppStorage("fallbackCount") private var fallbackCount: Double = 5
-    @AppStorage("compressionCheckWindow") private var compressionCheckWindow: Double = 20
+    @AppStorage("compressionCheckWindow") private var compressionCheckWindow: Double = 60
     @AppStorage("sampleLength") private var sampleLength: Double = 224
     @AppStorage("silenceThreshold") private var silenceThreshold: Double = 0.3
     @AppStorage("useVAD") private var useVAD: Bool = true
     @AppStorage("tokenConfirmationsNeeded") private var tokenConfirmationsNeeded: Double = 2
+    @AppStorage("chunkingStrategy") private var chunkingStrategy: ChunkingStrategy = .none
 
     // MARK: Standard properties
 
@@ -110,8 +111,8 @@ struct ContentView: View {
         currentText = ""
         unconfirmedText = []
 
-        firstTokenTime = 0
-        pipelineStart = 0
+        pipelineStart = CFAbsoluteTimeGetCurrent()
+        firstTokenTime = CFAbsoluteTimeGetCurrent()
         effectiveRealTimeFactor = 0
         totalInferenceTime = 0
         tokensPerSecond = 0
@@ -697,6 +698,19 @@ struct ContentView: View {
             }
             .padding(.horizontal)
 
+            HStack {
+                Text("Chunking Strategy")
+                InfoButton("Select the strategy to use for chunking audio data. If VAD is selected, the audio will be chunked based on voice activity (split on silent portions).")
+                Spacer()
+                Picker("", selection: $chunkingStrategy) {
+                    Text("None").tag(ChunkingStrategy.none)
+                    Text("VAD").tag(ChunkingStrategy.vad)
+                }
+                .pickerStyle(SegmentedPickerStyle())
+            }
+            .padding(.horizontal)
+            .padding(.bottom)
+
             VStack {
                 Text("Starting Temperature:")
                 HStack {
@@ -1153,7 +1167,8 @@ struct ContentView: View {
             usePrefillCache: enableCachePrefill,
             skipSpecialTokens: !enableSpecialCharacters,
             withoutTimestamps: !enableTimestamps,
-            clipTimestamps: seekClip
+            clipTimestamps: seekClip,
+            chunkingStrategy: chunkingStrategy
         )
 
         // Early stopping checks
@@ -1187,11 +1202,15 @@ struct ContentView: View {
             return nil
         }
 
-        return try await whisperKit.transcribe(
+        let transcriptionResults: [TranscriptionResult] = try await whisperKit.transcribe(
             audioArray: samples,
             decodeOptions: options,
             callback: decodingCallback
-        ).first
+        )
+
+        let mergedResults = mergeTranscriptionResults(transcriptionResults)
+
+        return mergedResults
     }
 
     // MARK: Streaming Logic

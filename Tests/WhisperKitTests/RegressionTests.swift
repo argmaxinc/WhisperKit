@@ -90,9 +90,9 @@ final class RegressionTests: XCTestCase {
         memoryStats.preTranscribeMemory = Float(SystemMemoryChecker.getMemoryUsed())
 
         let transcriptionResult = try await XCTUnwrapAsync(
-            await whisperKit.transcribe(audioPath: audioFilePath, callback: callback),
+            try await whisperKit.transcribe(audioPath: audioFilePath, callback: callback),
             "Transcription failed"
-        )
+        ).first!
         XCTAssert(transcriptionResult.text.isEmpty == false, "Transcription failed")
 
         memoryStats.postTranscribeMemory = Float(SystemMemoryChecker.getMemoryUsed())

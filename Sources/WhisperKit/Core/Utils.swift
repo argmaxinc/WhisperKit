@@ -23,6 +23,14 @@ extension Array {
     }
 }
 
+extension Array where Element == Result<[TranscriptionResult], Swift.Error> {
+    /// Convenience method to convert the `Result` object into an array of optional arrays of `TranscriptionResult`.
+    /// - Returns: An array of optional arrays containing `TranscriptionResult`.
+    func toOptionalArrays() -> [[TranscriptionResult]?] {
+        return self.map { try? $0.get() }
+    }
+}
+
 extension MLMultiArray {
     /// Calculate the linear offset by summing the products of each dimension’s index with the dimension’s stride.
     /// More info [here](https://developer.apple.com/documentation/coreml/mlmultiarray/2879231-subscript)
@@ -138,8 +146,11 @@ extension String {
         // Convert to lowercase
         let lowercaseString = trimmedString.lowercased()
 
+        // Replace dashes with spaces
+        let noDashesString = lowercaseString.replacingOccurrences(of: "-", with: " ")
+
         // Remove punctuation
-        let noPunctuationString = lowercaseString.components(separatedBy: .punctuationCharacters).joined()
+        let noPunctuationString = noDashesString.components(separatedBy: .punctuationCharacters).joined()
 
         // Replace multiple spaces with a single space
         let singleSpacedString = noPunctuationString.replacingOccurrences(of: " +", with: " ", options: .regularExpression)
@@ -161,15 +172,18 @@ func prepareSeekClips(contentFrames: Int, decodeOptions: DecodingOptions?) -> [(
     if seekPoints.count == 0 {
         seekPoints.append(0)
     }
+
     if seekPoints.count % 2 == 1 {
         seekPoints.append(contentFrames)
     }
+
     var seekClips: [(start: Int, end: Int)] = []
     for i in stride(from: 0, to: seekPoints.count, by: 2) {
         let start = seekPoints[i]
         let end = i + 1 < seekPoints.count ? seekPoints[i + 1] : contentFrames
         seekClips.append((start, end))
     }
+
     return seekClips
 }
 
@@ -473,13 +487,52 @@ public func findLongestDifferentSuffix(_ words1: [WordTiming], _ words2: [WordTi
     return Array(remainingWords)
 }
 
-public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirmedWords: [WordTiming]) -> TranscriptionResult {
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
+public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirmedWords: [WordTiming]? = nil) -> TranscriptionResult {
+    var mergedText = ""
+    if let words = confirmedWords {
+        mergedText = words.map { $0.word }.joined()
+    } else {
+        mergedText = results.map { $0?.text ?? "" }.joined(separator: " ")
+    }
+
+    // Merge segments
     let validResults = results.compactMap { $0 }
+    var mergedSegments = [TranscriptionSegment]()
+    var previousSeek: Float = 0.0
+    for (resultIndex, result) in validResults.enumerated() {
+        let segmentTiming = result.timings
+        for (segmentIndex, segment) in result.segments.enumerated() {
+            var updatedSegment = segment
+            updatedSegment.id = resultIndex + segmentIndex
+            updatedSegment.seek += Int(previousSeek * Float(WhisperKit.sampleRate))
+            updatedSegment.start += previousSeek
+            updatedSegment.end += previousSeek
+            if var words = updatedSegment.words {
+                for (wordIndex, word) in words.enumerated() {
+                    words[wordIndex].start += previousSeek
+                    words[wordIndex].end += previousSeek
+                }
+                updatedSegment.words = words
+            }
+            mergedSegments.append(updatedSegment)
+        }
+
+        previousSeek += Float(segmentTiming.inputAudioSeconds)
+    }
+
     let language = validResults.first?.language ?? Constants.defaultLanguageCode
 
-    let mergedSegments = validResults.flatMap { $0.segments }
-    let mergedText = confirmedWords.map { $0.word }.joined()
+    // Calculate the earliest start and latest end times
+    let earliestPipelineStart = validResults.map { $0.timings.pipelineStart }.min() ?? 0
+    let latestPipelineEnd = validResults.map { $0.timings.pipelineStart + $0.timings.fullPipeline }.max() ?? 0
 
+    // Calculate the "user" pipeline time, excluding the time spent in concurrent pipelines
+    let userPipelineDuration = latestPipelineEnd - earliestPipelineStart
+    let systemPipelineDuration = validResults.map { $0.timings.fullPipeline }.reduce(0, +)
+    let fullPipelineDuration = min(userPipelineDuration, systemPipelineDuration)
+
+    // Update the merged timings with non-overlapping time values
     var mergedTimings = TranscriptionTimings(
         modelLoading: validResults.map { $0.timings.modelLoading }.max() ?? 0,
         audioLoading: validResults.map { $0.timings.audioLoading }.reduce(0, +),
@@ -505,16 +558,16 @@ public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirm
         totalTimestampAlignmentRuns: validResults.map { $0.timings.totalTimestampAlignmentRuns }.reduce(0, +),
         totalDecodingFallbacks: validResults.map { $0.timings.totalDecodingFallbacks }.reduce(0, +),
         totalDecodingWindows: validResults.map { $0.timings.totalDecodingWindows }.reduce(0, +),
-        fullPipeline: validResults.map { $0.timings.fullPipeline }.reduce(0, +)
+        fullPipeline: fullPipelineDuration
     )
 
     mergedTimings.inputAudioSeconds = validResults.map { $0.timings.inputAudioSeconds }.reduce(0, +)
 
-    // Average first token times
-    if let pipelineStart = validResults.first?.timings.pipelineStart {
-        let averageFirstTokenTime = validResults.map { ($0.timings.firstTokenTime) - ($0.timings.pipelineStart) }.reduce(0, +) / Double(validResults.count)
+    // Use first result for first token times
+    if let pipelineStart = validResults.first?.timings.pipelineStart,
+        let firstTokenTime = validResults.first?.timings.firstTokenTime {
         mergedTimings.pipelineStart = pipelineStart
-        mergedTimings.firstTokenTime = pipelineStart + averageFirstTokenTime
+        mergedTimings.firstTokenTime = firstTokenTime
     }
 
     return TranscriptionResult(

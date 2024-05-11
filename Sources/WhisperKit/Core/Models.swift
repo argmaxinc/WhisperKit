@@ -218,6 +218,7 @@ public struct DecodingCache {
 }
 
 public enum ChunkingStrategy: String, CaseIterable {
+    case none
     case vad
 }
 
@@ -467,17 +468,18 @@ public struct TranscriptionResult: Codable {
     public var language: String
     public var timings: TranscriptionTimings
 
-    func logSegments() {
-        for segment in segments {
+    public func logSegments() {
+        for (i, segment) in segments.enumerated() {
             let start = segment.start
             let end = segment.end
             let text = segment.text
-            let line = "[\(formatTimestamp(start)) --> \(formatTimestamp(end))] \(text)"
+            let line = "[Segment \(i)] [\(formatTimestamp(start)) --> \(formatTimestamp(end))] \(text)"
             Logging.debug(line)
         }
     }
 
-    func logTimings() {
+    public func logTimings() {
+        // Calculate the full pipeline duration in milliseconds
         let decodeLoopTime = timings.decodingLoop
         let totalLoops = timings.totalDecodingLoops
         let timeToFirstToken = timings.firstTokenTime - timings.pipelineStart
@@ -485,23 +487,24 @@ public struct TranscriptionResult: Codable {
         let rtf = timings.realTimeFactor
         let totalTokens = segments.reduce(0) { $0 + $1.tokens.count }
 
-        let fullPipelineDuration = timings.fullPipeline * 1000 // Convert to milliseconds
+        // NOTE: this is a relative value for percentage calculations
+        let fullDecodingDuration = max(timings.decodingLoop, timings.fullPipeline) * 1000 // Convert to milliseconds
 
-        let audioLoadTime = formatTimeWithPercentage(timings.audioLoading, 1, fullPipelineDuration)
-        let audioProcTime = formatTimeWithPercentage(timings.audioProcessing, timings.totalAudioProcessingRuns, fullPipelineDuration)
-        let logmelsTime = formatTimeWithPercentage(timings.logmels, timings.totalLogmelRuns, fullPipelineDuration)
-        let encodingTime = formatTimeWithPercentage(timings.encoding, timings.totalEncodingRuns, fullPipelineDuration)
-        let decodingInitTime = formatTimeWithPercentage(timings.decodingInit, 1, fullPipelineDuration)
-        let prefillInfo = formatTimeWithPercentage(timings.prefill, 1, fullPipelineDuration)
-        let predictionsInfo = formatTimeWithPercentage(timings.decodingPredictions, totalLoops, fullPipelineDuration)
-        let filteringInfo = formatTimeWithPercentage(timings.decodingFiltering, totalLoops, fullPipelineDuration)
-        let samplingInfo = formatTimeWithPercentage(timings.decodingSampling, totalLoops, fullPipelineDuration)
-        let kvCachingInfo = formatTimeWithPercentage(timings.decodingKvCaching, timings.totalKVUpdateRuns, fullPipelineDuration)
-        let wordTimestampInfo = formatTimeWithPercentage(timings.decodingWordTimestamps, timings.totalTimestampAlignmentRuns, fullPipelineDuration)
-        let nonPredTimeInfo = formatTimeWithPercentage(timings.decodingNonPrediction, totalLoops, fullPipelineDuration)
-        let windowingInfo = formatTimeWithPercentage(timings.decodingWindowing - timings.decodingWordTimestamps, timings.totalDecodingWindows, fullPipelineDuration)
-        let fallbackInfo = formatTimeWithPercentage(timings.decodingFallback, timings.totalDecodingFallbacks, fullPipelineDuration)
-        let decodingLoopInfo = formatTimeWithPercentage(timings.decodingLoop, totalLoops, fullPipelineDuration)
+        let audioLoadTime = formatTimeWithPercentage(timings.audioLoading, 1, fullDecodingDuration)
+        let audioProcTime = formatTimeWithPercentage(timings.audioProcessing, timings.totalAudioProcessingRuns, fullDecodingDuration)
+        let logmelsTime = formatTimeWithPercentage(timings.logmels, timings.totalLogmelRuns, fullDecodingDuration)
+        let encodingTime = formatTimeWithPercentage(timings.encoding, timings.totalEncodingRuns, fullDecodingDuration)
+        let decodingInitTime = formatTimeWithPercentage(timings.decodingInit, 1, fullDecodingDuration)
+        let prefillInfo = formatTimeWithPercentage(timings.prefill, 1, fullDecodingDuration)
+        let predictionsInfo = formatTimeWithPercentage(timings.decodingPredictions, totalLoops, fullDecodingDuration)
+        let filteringInfo = formatTimeWithPercentage(timings.decodingFiltering, totalLoops, fullDecodingDuration)
+        let samplingInfo = formatTimeWithPercentage(timings.decodingSampling, totalLoops, fullDecodingDuration)
+        let kvCachingInfo = formatTimeWithPercentage(timings.decodingKvCaching, timings.totalKVUpdateRuns, fullDecodingDuration)
+        let wordTimestampInfo = formatTimeWithPercentage(timings.decodingWordTimestamps, timings.totalTimestampAlignmentRuns, fullDecodingDuration)
+        let nonPredTimeInfo = formatTimeWithPercentage(timings.decodingNonPrediction, totalLoops, fullDecodingDuration)
+        let windowingInfo = formatTimeWithPercentage(timings.decodingWindowing - timings.decodingWordTimestamps, timings.totalDecodingWindows, fullDecodingDuration)
+        let fallbackInfo = formatTimeWithPercentage(timings.decodingFallback, timings.totalDecodingFallbacks, fullDecodingDuration)
+        let decodingLoopInfo = formatTimeWithPercentage(timings.decodingLoop, totalLoops, fullDecodingDuration)
 
         // Logging
         Logging.info("---- Transcription Timings ----")
@@ -524,14 +527,14 @@ public struct TranscriptionResult: Codable {
         Logging.info("-------------------------------")
 
         // Summary statistics
-        Logging.info("Model Load Time:     \(String(format: "%.2f", timings.modelLoading)) seconds")
-        Logging.info("Inference Duration:  \(String(format: "%.2f", timings.fullPipeline)) seconds")
-        Logging.info("- Decoding Loop:     \(String(format: "%.2f", decodeLoopTime)) seconds")
-        Logging.info("Time to first token: \(String(format: "%.2f", timeToFirstToken)) seconds")
-        Logging.info("Total Tokens:        \(totalTokens)")
-        Logging.info("Tokens per Second:   \(String(format: "%.2f", tokensPerSecond)) tok/s")
-        Logging.info("Real Time Factor:    \(String(format: "%.2f", rtf))")
-        Logging.info("Fallbacks:           \(timings.totalDecodingFallbacks)")
+        Logging.info("Model Load Time:           \(String(format: "%.2f", timings.modelLoading)) seconds")
+        Logging.info("Inference Duration:        \(String(format: "%.2f", timings.fullPipeline)) seconds")
+        Logging.info("- Decoding Loop (System):  \(String(format: "%.2f", decodeLoopTime)) seconds")
+        Logging.info("Time to first token:       \(String(format: "%.2f", timeToFirstToken)) seconds")
+        Logging.info("Total Tokens:              \(totalTokens)")
+        Logging.info("Tokens per Second:         \(String(format: "%.2f", tokensPerSecond)) tok/s")
+        Logging.info("Real Time Factor:          \(String(format: "%.2f", rtf))")
+        Logging.info("Fallbacks:                 \(timings.totalDecodingFallbacks)")
     }
 }
 
@@ -609,11 +612,11 @@ public struct TranscriptionTimings: Codable {
 
     /// Computed properties
     public var tokensPerSecond: Double {
-        Double(totalDecodingLoops) / Double(decodingLoop)
+        Double(totalDecodingLoops) / Double(fullPipeline)
     }
 
     public var realTimeFactor: Double {
-        decodingLoop / inputAudioSeconds
+        fullPipeline / inputAudioSeconds
     }
 
     /// Initialize with all time intervals set to zero.
@@ -644,7 +647,7 @@ public struct TranscriptionTimings: Codable {
                 fullPipeline: TimeInterval = 0)
     {
         self.pipelineStart = CFAbsoluteTimeGetCurrent()
-        self.firstTokenTime = 0
+        self.firstTokenTime = CFAbsoluteTimeGetCurrent()
         self.inputAudioSeconds = 0.001
         self.modelLoading = modelLoading
         self.audioLoading = audioLoading

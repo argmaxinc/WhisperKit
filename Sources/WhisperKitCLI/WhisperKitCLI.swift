@@ -11,6 +11,6 @@ struct WhisperKitCLI: AsyncParsableCommand {
         commandName: "whisperkit-cli",
         abstract: "WhisperKit CLI",
         discussion: "Swift native speech recognition with Whisper for Apple Silicon",
-        subcommands: [Transcribe.self]
+        subcommands: [TranscribeCLI.self]
     )
 }
