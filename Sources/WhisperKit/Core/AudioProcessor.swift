@@ -607,6 +607,7 @@ public extension AudioProcessor {
         } else {
             audioEngine = try setupEngine(inputDeviceID: inputDeviceID)
         }
+        
         // Set the callback
         audioBufferCallback = callback
     }
