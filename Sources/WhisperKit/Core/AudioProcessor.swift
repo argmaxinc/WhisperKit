@@ -604,7 +604,7 @@ public extension AudioProcessor {
         
         if inputDeviceID == lastInputDevice{
             try audioEngine?.start()
-        }else{
+        } else {
             audioEngine = try setupEngine(inputDeviceID: inputDeviceID)
         }
         // Set the callback
