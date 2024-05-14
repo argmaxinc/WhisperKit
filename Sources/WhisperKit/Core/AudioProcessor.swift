@@ -64,6 +64,9 @@ public protocol AudioProcessing {
 
     /// Stops recording and cleans up resources
     func stopRecording()
+    
+    /// Starts recording audio from the specified input device, resetting the previous state
+    func reStartRecordingLive(inputDeviceID: DeviceID?, callback: (([Float]) -> Void)?) throws
 }
 
 /// Overrideable default methods for AudioProcessing
@@ -150,6 +153,7 @@ public extension AudioProcessing {
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class AudioProcessor: NSObject, AudioProcessing {
+    private var lastInputDevice:DeviceID?
     public var audioEngine: AVAudioEngine?
     public var audioSamples: ContiguousArray<Float> = []
     public var audioEnergy: [(rel: Float, avg: Float, max: Float, min: Float)] = []
@@ -585,6 +589,20 @@ public extension AudioProcessor {
 
         audioEngine = try setupEngine(inputDeviceID: inputDeviceID)
 
+        // Set the callback
+        audioBufferCallback = callback
+        
+        lastInputDevice = inputDeviceID
+    }
+    
+    func reStartRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)? = nil) throws {
+        try? setupAudioSessionForDevice()
+        
+        if inputDeviceID == lastInputDevice{
+            try audioEngine?.start()
+        }else{
+            audioEngine = try setupEngine(inputDeviceID: inputDeviceID)
+        }
         // Set the callback
         audioBufferCallback = callback
     }
