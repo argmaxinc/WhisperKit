@@ -75,8 +75,8 @@ public extension AudioProcessing {
         try startRecordingLive(inputDeviceID: inputDeviceID, callback: callback)
     }
     
-    func reStartRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)?) throws {
-        try reStartRecordingLive(inputDeviceID: inputDeviceID, callback: callback)
+    func resumeRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)?) throws {
+        try resumeRecordingLive(inputDeviceID: inputDeviceID, callback: callback)
     }
 
     static func padOrTrimAudio(fromArray audioArray: [Float], startAt startIndex: Int = 0, toLength frameLength: Int = 480_000, saveSegment: Bool = false) -> MLMultiArray? {
