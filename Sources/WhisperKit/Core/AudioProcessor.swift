@@ -65,8 +65,8 @@ public protocol AudioProcessing {
     /// Stops recording and cleans up resources
     func stopRecording()
     
-    /// Restart recording audio from the specified input device,you can continius record after puase record
-    func reStartRecordingLive(inputDeviceID: DeviceID?, callback: (([Float]) -> Void)?) throws
+    /// Resume recording audio from the specified input device, appending to continuous `audioArray` after pause
+    func resumeRecordingLive(inputDeviceID: DeviceID?, callback: (([Float]) -> Void)?) throws
 }
 
 /// Overrideable default methods for AudioProcessing
@@ -75,8 +75,8 @@ public extension AudioProcessing {
         try startRecordingLive(inputDeviceID: inputDeviceID, callback: callback)
     }
     
-    func reStartRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)?) throws {
-        try reStartRecordingLive(inputDeviceID: inputDeviceID, callback: callback)
+    func resumeRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)?) throws {
+        try resumeRecordingLive(inputDeviceID: inputDeviceID, callback: callback)
     }
 
     static func padOrTrimAudio(fromArray audioArray: [Float], startAt startIndex: Int = 0, toLength frameLength: Int = 480_000, saveSegment: Bool = false) -> MLMultiArray? {
@@ -599,7 +599,7 @@ public extension AudioProcessor {
         lastInputDevice = inputDeviceID
     }
     
-    func reStartRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)? = nil) throws {
+    func resumeRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)? = nil) throws {
         try? setupAudioSessionForDevice()
         
         if inputDeviceID == lastInputDevice{
