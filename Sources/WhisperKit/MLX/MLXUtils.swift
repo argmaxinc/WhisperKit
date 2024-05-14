@@ -3,6 +3,7 @@
 
 import Foundation
 import MLX
+import MLXNN
 import CoreML
 
 // MARK: - Extensions
@@ -42,4 +43,32 @@ extension MLXArray {
             return .float32
         }
     }
+}
+
+// MARK: - Functions
+
+func sinusoids(length: Int, channels: Int, maxTimescale: Int = 10000) -> MLXArray {
+    assert(channels % 2 == 0)
+    let logTimescaleIncrement = log(Float(maxTimescale)) / Float(channels / 2 - 1)
+    let invTimescales = MLX.exp(-logTimescaleIncrement * MLXArray(Array(0..<(channels / 2))))
+    let scaledTime = MLXArray(Array(0..<length)).reshaped([length, 1]) * invTimescales.reshaped([1, channels / 2])
+    return MLX.concatenated([MLX.sin(scaledTime), MLX.cos(scaledTime)], axis: 1)
+}
+
+func loadParameters(at url: URL, forKey key: String? = nil) throws -> NestedDictionary<String, MLXArray> {
+    let arrays = try MLX.loadArrays(url: url)
+    let params = ModuleParameters.unflattened(arrays)
+    guard let key else {
+        return params
+    }
+    guard let keyParams = params[key] else {
+        throw CocoaError.error(.coderValueNotFound)
+    }
+    return NestedDictionary(item: keyParams)
+}
+
+func loadConfig(at url: URL) throws -> ModelConfig {
+    let configDecoder = JSONDecoder()
+    configDecoder.keyDecodingStrategy = .convertFromSnakeCase
+    return try configDecoder.decode(ModelConfig.self, from: Data(contentsOf: url))
 }
