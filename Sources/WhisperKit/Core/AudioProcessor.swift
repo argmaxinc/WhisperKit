@@ -65,7 +65,7 @@ public protocol AudioProcessing {
     /// Stops recording and cleans up resources
     func stopRecording()
     
-    /// Starts recording audio from the specified input device, resetting the previous state
+    /// Restart recording audio from the specified input device,you can continius record after puase record
     func reStartRecordingLive(inputDeviceID: DeviceID?, callback: (([Float]) -> Void)?) throws
 }
 
