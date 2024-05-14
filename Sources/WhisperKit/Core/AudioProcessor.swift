@@ -599,7 +599,7 @@ public extension AudioProcessor {
         lastInputDevice = inputDeviceID
     }
     
-    func reStartRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)? = nil) throws {
+    func resumeRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)? = nil) throws {
         try? setupAudioSessionForDevice()
         
         if inputDeviceID == lastInputDevice{
