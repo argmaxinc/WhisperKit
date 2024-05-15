@@ -609,8 +609,10 @@ public extension AudioProcessor {
         }
         
 
-        // Set the callback
-        audioBufferCallback = callback
+        // Set the callback only if the provided callback is not nil
+        if let callback = callback {
+            audioBufferCallback = callback
+        }
     }
 
     func pauseRecording() {
