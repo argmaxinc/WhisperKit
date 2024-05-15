@@ -9,28 +9,18 @@ import WhisperKit
 public class MLXAudioEncoder: AudioEncoding {
 
     public var embedSize: Int? {
-        return 1234
+        fatalError("Not implemented")
     }
 
     public var sequenceLength: Int? {
-        return 1234
+        fatalError("Not implemented")
     }
 
     public init() {}
 
     public func encodeFeatures(_ features: MLMultiArray) async throws -> MLMultiArray? {
         // Make sure features is shape MultiArray (Float32 1 × {80,128} × 3000)
-//        guard let model else {
-//            throw WhisperError.modelsUnavailable()
-//        }
         try Task.checkCancellation()
-
-//        let interval = Logging.beginSignpost("EncodeAudio", signposter: Logging.AudioEncoding.signposter)
-//        defer { Logging.endSignpost("EncodeAudio", interval: interval, signposter: Logging.AudioEncoding.signposter) }
-
-        let modelInputs = MLXArray()
-        let outputFeatures =  MLXArray()
-        let output =  MLMultiArray()
-        return output
+        fatalError("Not implemented")
     }
 }
