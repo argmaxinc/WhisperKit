@@ -125,21 +125,21 @@ final class FunctionalTests: XCTestCase {
     }
 
     func testBatchTranscribeAudioPaths() async throws {
-        let audioPaths = [
-            try XCTUnwrap(
+        let audioPaths = try [
+            XCTUnwrap(
                 Bundle.module.path(forResource: "jfk", ofType: "wav"),
                 "Audio file not found"
             ),
-            try XCTUnwrap(
+            XCTUnwrap(
                 Bundle.module.path(forResource: "es_test_clip", ofType: "wav"),
                 "Audio file not found"
             ),
-            try XCTUnwrap(
+            XCTUnwrap(
                 Bundle.module.path(forResource: "ja_test_clip", ofType: "wav"),
                 "Audio file not found"
-            )
+            ),
         ]
-        let whisperKit = try await WhisperKit(modelFolder: try tinyModelPath())
+        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath())
         let transcriptionResults: [Result<[TranscriptionResult], Swift.Error>] = await whisperKit.transcribe(audioPaths: audioPaths)
 
         XCTAssertEqual(transcriptionResults.count, 3)
@@ -159,15 +159,15 @@ final class FunctionalTests: XCTestCase {
     }
 
     func testBatchTranscribeAudioPathsWithErrors() async throws {
-        let audioPaths = [
+        let audioPaths = try [
             "/path/to/file1.wav",
-            try XCTUnwrap(
+            XCTUnwrap(
                 Bundle.module.path(forResource: "jfk", ofType: "wav"),
                 "Audio file not found"
             ),
-            "/path/to/file2.wav"
+            "/path/to/file2.wav",
         ]
-        let whisperKit = try await WhisperKit(modelFolder: try tinyModelPath())
+        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath())
         let transcriptionResults: [Result<[TranscriptionResult], Swift.Error>] = await whisperKit.transcribe(audioPaths: audioPaths)
 
         XCTAssertEqual(transcriptionResults.count, 3)
@@ -186,25 +186,25 @@ final class FunctionalTests: XCTestCase {
     }
 
     func testBatchTranscribeAudioArrays() async throws {
-        let audioPaths = [
-            try XCTUnwrap(
+        let audioPaths = try [
+            XCTUnwrap(
                 Bundle.module.path(forResource: "jfk", ofType: "wav"),
                 "Audio file not found"
             ),
-            try XCTUnwrap(
+            XCTUnwrap(
                 Bundle.module.path(forResource: "es_test_clip", ofType: "wav"),
                 "Audio file not found"
             ),
-            try XCTUnwrap(
+            XCTUnwrap(
                 Bundle.module.path(forResource: "ja_test_clip", ofType: "wav"),
                 "Audio file not found"
-            )
+            ),
         ]
         let audioArrays = try audioPaths
             .map { try AudioProcessor.loadAudio(fromPath: $0) }
             .map { AudioProcessor.convertBufferToArray(buffer: $0) }
 
-        let whisperKit = try await WhisperKit(modelFolder: try tinyModelPath())
+        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath())
         let transcriptionResults: [Result<[TranscriptionResult], Swift.Error>] = await whisperKit.transcribe(audioArrays: audioArrays)
 
         XCTAssertEqual(transcriptionResults.count, 3)

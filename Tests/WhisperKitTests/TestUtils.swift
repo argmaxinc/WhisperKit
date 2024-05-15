@@ -173,7 +173,7 @@ extension XCTestCase {
                 if try isGitLFSPointerFile(url: proxyFileToCheck) {
                     continue
                 }
-                
+
                 // Check if the directory name contains the quantization pattern
                 // Only test large quantized models
                 let dirName = folderURL.lastPathComponent
@@ -184,15 +184,16 @@ extension XCTestCase {
         }
         return modelPaths
     }
-    
-    // Function to check if the beginning of the file matches a Git LFS pointer pattern
+
+    /// Function to check if the beginning of the file matches a Git LFS pointer pattern
     func isGitLFSPointerFile(url: URL) throws -> Bool {
         let fileHandle = try FileHandle(forReadingFrom: url)
         // Read the first few bytes of the file to get enough for the Git LFS pointer signature
         let data = fileHandle.readData(ofLength: 512) // Read first 512 bytes
         fileHandle.closeFile()
         if let string = String(data: data, encoding: .utf8),
-           string.starts(with: "version https://git-lfs.github.com/") {
+           string.starts(with: "version https://git-lfs.github.com/")
+        {
             return true
         }
         return false
@@ -238,19 +239,19 @@ extension SpecialTokens {
 extension Result {
     var isSuccess: Bool {
         switch self {
-        case .success:
-            return true
-        case .failure:
-            return false
+            case .success:
+                return true
+            case .failure:
+                return false
         }
     }
 
     func whisperError() -> WhisperError? {
         switch self {
-        case .success:
-            return nil
-        case .failure(let error):
-            return error as? WhisperError
+            case .success:
+                return nil
+            case let .failure(error):
+                return error as? WhisperError
         }
     }
 }

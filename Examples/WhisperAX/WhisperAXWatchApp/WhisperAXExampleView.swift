@@ -249,7 +249,8 @@ struct WhisperAXWatchView: View {
                 let currentTranscription = (confirmedSegments.map { $0.text } + unconfirmedSegments.map { $0.text }).joined(separator: " ")
                 ShareLink(item: currentTranscription, label: {
                     Image(systemName: "square.and.arrow.up")
-                })            }
+                })
+            }
             ToolbarItem(placement: .bottomBar) {
                 Button {
                     withAnimation {
@@ -489,7 +490,7 @@ struct WhisperAXWatchView: View {
     func transcribeAudioSamples(_ samples: [Float]) async throws -> TranscriptionResult? {
         guard let whisperKit = whisperKit else { return nil }
 
-        let languageCode = Constants.languages[selectedLanguage] ?? "en"
+        let languageCode = Constants.languages[selectedLanguage, default: Constants.defaultLanguageCode]
         let task: DecodingTask = selectedTask == "transcribe" ? .transcribe : .translate
         let seekClip = [lastConfirmedSegmentEndSeconds]
 

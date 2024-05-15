@@ -1,8 +1,8 @@
 //  For licensing see accompanying LICENSE.md file.
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
-import Foundation
 import CoreML
+import Foundation
 
 /// Responsible for transcribing audio chunk to text using the provided models and configurations.
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
@@ -287,8 +287,13 @@ final class TranscribeTask {
                     if options.usePrefillPrompt {
                         decoderInputs = try await textDecoder.prefillDecoderInputs(decoderInputs, withOptions: currentDecodingOptions)
                     }
-
                     Logging.debug("Prefill prompt updated to: \(decoderInputs.initialPrompt.map { tokenizer.convertIdToToken($0) ?? "" })")
+
+                    // Update timings from the language detection
+                    if let languageDecodingTimings = languageDecodingResult?.timings {
+                        timings.decodingPredictions += languageDecodingTimings.decodingPredictions
+                        timings.decodingSampling += languageDecodingTimings.decodingSampling
+                    }
                 }
 
                 decodingResult = try await textDecoder.decodeText(
@@ -351,7 +356,7 @@ final class TranscribeTask {
         return TranscriptionResult(
             text: transcription,
             segments: allSegments,
-            language: detectedLanguage ?? "en",
+            language: detectedLanguage ?? Constants.defaultLanguageCode,
             timings: timings
         )
     }

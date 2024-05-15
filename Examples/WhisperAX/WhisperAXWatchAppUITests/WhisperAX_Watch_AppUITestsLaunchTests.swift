@@ -4,7 +4,6 @@
 import XCTest
 
 final class WhisperAX_Watch_AppUITestsLaunchTests: XCTestCase {
-
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true
     }

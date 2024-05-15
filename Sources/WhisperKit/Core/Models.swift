@@ -334,7 +334,7 @@ public struct DecodingOptions {
 public struct DecodingFallback {
     public var needsFallback: Bool
     public var fallbackReason: String
-    
+
     public init(needsFallback: Bool, fallbackReason: String) {
         self.needsFallback = needsFallback
         self.fallbackReason = fallbackReason
@@ -451,7 +451,7 @@ public enum WhisperError: Error, LocalizedError, Equatable {
     }
 }
 
-/// Structs
+// Structs
 
 public struct TranscriptionResult: Codable {
     public var text: String
@@ -1090,25 +1090,25 @@ struct WhisperTokenizerWrapper: WhisperTokenizer {
                 .filter { $0 > specialTokens.specialTokenBegin }
         )
     }
-    
+
     private func splitTokensOnUnicode(tokens: [Int]) -> (words: [String], wordTokens: [[Int]]) {
         let decodedFull = tokenizer.decode(tokens: tokens)
         let replacementString = "\u{fffd}"
-        
+
         var words: [String] = []
         var wordTokens: [[Int]] = []
         var currentTokens: [Int] = []
         var unicodeOffset = 0
-        
+
         for token in tokens {
             currentTokens.append(token)
             let decoded = tokenizer.decode(tokens: currentTokens)
-            
+
             var hasUnicodeInFullString = false
             if let range = decoded.range(of: replacementString) {
                 hasUnicodeInFullString = decodedFull[range] == replacementString
             }
-            
+
             if !decoded.contains(replacementString) || hasUnicodeInFullString {
                 words.append(decoded)
                 wordTokens.append(currentTokens)
@@ -1116,15 +1116,15 @@ struct WhisperTokenizerWrapper: WhisperTokenizer {
                 unicodeOffset += decoded.count
             }
         }
-        
+
         return (words, wordTokens)
     }
-    
+
     private func splitTokensOnSpaces(tokens: [Int]) -> (words: [String], wordTokens: [[Int]]) {
         let (subwords, subwordTokensList) = splitTokensOnUnicode(tokens: tokens)
         var words: [String] = []
         var wordTokens: [[Int]] = []
-        
+
         for (subword, subwordTokens) in zip(subwords, subwordTokensList) {
             let special = subwordTokens.first! >= specialTokens.specialTokenBegin
             let withSpace = subword.hasPrefix(" ")
@@ -1140,10 +1140,10 @@ struct WhisperTokenizerWrapper: WhisperTokenizer {
                 wordTokens[words.count - 1].append(contentsOf: subwordTokens)
             }
         }
-        
+
         return (words, wordTokens)
     }
-    
+
     private func isPunctuation(_ text: String, tokenRange: Range<String.Index>, tag: NLTag?) -> Bool {
         let punctuationCharacters = CharacterSet.punctuationCharacters
         let token = String(text[tokenRange])
@@ -1154,18 +1154,18 @@ struct WhisperTokenizerWrapper: WhisperTokenizer {
         }
         return false
     }
-    
+
     /// Decodes token ids into individual words and per-word subtokens
     /// - Parameter tokenIds: Array of tokens to decode and then split
     /// - Returns: Tuple containing and array of the split words and all tokens for each word
     func splitToWordTokens(tokenIds: [Int]) -> (words: [String], wordTokens: [[Int]]) {
         let decodedWords = tokenizer.decode(tokens: tokenIds.filter { $0 < specialTokens.specialTokenBegin })
-        
+
         // Detect language of input text
         let recognizer = NLLanguageRecognizer()
         recognizer.processString(decodedWords)
         let languageCode = recognizer.dominantLanguage?.rawValue
-        
+
         if ["zh", "ja", "th", "lo", "my", "yue"].contains(languageCode) {
             return splitTokensOnUnicode(tokens: tokenIds)
         } else {
@@ -1178,43 +1178,43 @@ extension WhisperTokenizerWrapper: Tokenizer {
     func tokenize(text: String) -> [String] {
         tokenizer.tokenize(text: text)
     }
-    
+
     func encode(text: String) -> [Int] {
         tokenizer.encode(text: text)
     }
-    
+
     func decode(tokens: [Int]) -> String {
         tokenizer.decode(tokens: tokens)
     }
-    
+
     func convertTokenToId(_ token: String) -> Int? {
         tokenizer.convertTokenToId(token)
     }
-    
+
     func convertIdToToken(_ id: Int) -> String? {
         tokenizer.convertIdToToken(id)
     }
-    
+
     var bosToken: String? {
         tokenizer.bosToken
     }
-    
+
     var bosTokenId: Int? {
         tokenizer.bosTokenId
     }
-    
+
     var eosToken: String? {
         tokenizer.eosToken
     }
-    
+
     var eosTokenId: Int? {
         tokenizer.eosTokenId
     }
-    
+
     var unknownToken: String? {
         tokenizer.unknownToken
     }
-    
+
     var unknownTokenId: Int? {
         tokenizer.unknownTokenId
     }
@@ -1241,6 +1241,8 @@ public enum Constants {
     enum Logging {
         static let subsystem = "com.argmax.whisperkit"
     }
+
+    static let specialTokenCharacters = CharacterSet(charactersIn: "<|>")
 
     public static let maxTokenContext = Int(448 / 2)
     public static let languages: [String: String] =
@@ -1358,4 +1360,8 @@ public enum Constants {
             "castilian": "es",
             "mandarin": "zh",
         ]
+
+    public static let languageCodes: Set<String> = Set(languages.values)
+
+    public static let defaultLanguageCode: String = "en"
 }

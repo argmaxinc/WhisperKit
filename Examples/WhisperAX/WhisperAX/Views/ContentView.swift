@@ -29,7 +29,7 @@ struct ContentView: View {
     @State private var availableModels: [String] = []
     @State private var availableLanguages: [String] = []
     @State private var disabledModels: [String] = WhisperKit.recommendedModels().disabled
-    
+
     @AppStorage("selectedAudioInput") private var selectedAudioInput: String = "No Audio Input"
     @AppStorage("selectedModel") private var selectedModel: String = WhisperKit.recommendedModels().default
     @AppStorage("selectedTab") private var selectedTab: String = "Transcribe"
@@ -73,7 +73,6 @@ struct ContentView: View {
     @State private var unconfirmedSegments: [TranscriptionSegment] = []
     @State private var unconfirmedText: [String] = []
 
-
     // MARK: Eager mode properties
 
     @State private var eagerResults: [TranscriptionResult?] = []
@@ -91,6 +90,8 @@ struct ContentView: View {
     @State private var showAdvancedOptions: Bool = false
     @State private var transcriptionTask: Task<Void, Never>? = nil
     @State private var selectedCategoryId: MenuItem.ID?
+    @State private var transcribeFileTask: Task<Void, Never>? = nil
+
     private var menu = [
         MenuItem(name: "Transcribe", image: "book.pages"),
         MenuItem(name: "Stream", image: "waveform.badge.mic"),
@@ -105,12 +106,12 @@ struct ContentView: View {
     // MARK: Views
 
     func resetState() {
+        transcribeFileTask?.cancel()
         isRecording = false
         isTranscribing = false
         whisperKit?.audioProcessor.stopRecording()
         currentText = ""
         unconfirmedText = []
-
         firstTokenTime = 0
         pipelineStart = 0
         effectiveRealTimeFactor = 0
@@ -274,7 +275,8 @@ struct ContentView: View {
                !isRecording,
                !isTranscribing,
                whisperKit.progress.fractionCompleted > 0,
-               whisperKit.progress.fractionCompleted < 1 {
+               whisperKit.progress.fractionCompleted < 1
+            {
                 ProgressView(whisperKit.progress)
                     .progressViewStyle(.linear)
                     .labelsHidden()
@@ -314,7 +316,7 @@ struct ContentView: View {
                             .progressViewStyle(CircularProgressViewStyle())
                             .scaleEffect(0.5)
                     }
-                    
+
                     Button(action: {
                         deleteModel()
                     }, label: {
@@ -405,14 +407,15 @@ struct ContentView: View {
                 if let audioDevices = audioDevices,
                    !audioDevices.isEmpty,
                    selectedAudioInput == "No Audio Input",
-                   let device = audioDevices.first {
+                   let device = audioDevices.first
+                {
                     selectedAudioInput = device.name
                 }
             }
             #endif
         }
     }
-    
+
     var controlsView: some View {
         VStack {
             basicSettingsView
@@ -887,12 +890,11 @@ struct ContentView: View {
                     }
                 })
             }
-            
+
             await MainActor.run {
                 loadingProgressValue = specializationProgressRatio
                 modelState = .downloaded
             }
-
 
             if let modelFolder = folder {
                 whisperKit.modelFolder = modelFolder
@@ -936,7 +938,7 @@ struct ContentView: View {
                     if !localModels.contains(model) {
                         localModels.append(model)
                     }
-                    
+
                     availableLanguages = Constants.languages.map { $0.key }.sorted()
                     loadingProgressValue = 1.0
                     modelState = whisperKit.modelState
@@ -944,18 +946,18 @@ struct ContentView: View {
             }
         }
     }
-    
+
     func deleteModel() {
         if localModels.contains(selectedModel) {
             let modelFolder = URL(fileURLWithPath: localModelPath).appendingPathComponent(selectedModel)
-            
+
             do {
                 try FileManager.default.removeItem(at: modelFolder)
-                
+
                 if let index = localModels.firstIndex(of: selectedModel) {
                     localModels.remove(at: index)
                 }
-                
+
                 modelState = .unloaded
             } catch {
                 print("Error deleting model: \(error)")
@@ -1031,7 +1033,7 @@ struct ContentView: View {
     func transcribeFile(path: String) {
         resetState()
         whisperKit?.audioProcessor = AudioProcessor()
-        Task {
+        self.transcribeFileTask = Task {
             do {
                 try await transcribeCurrentFile(path: path)
             } catch {
@@ -1058,18 +1060,19 @@ struct ContentView: View {
                     print("Microphone access was not granted.")
                     return
                 }
-                
+
                 var deviceId: DeviceID?
                 #if os(macOS)
                 if self.selectedAudioInput != "No Audio Input",
                    let devices = self.audioDevices,
-                   let device = devices.first(where: {$0.name == selectedAudioInput}) {
+                   let device = devices.first(where: { $0.name == selectedAudioInput })
+                {
                     deviceId = device.id
                 }
 
                 // There is no built-in microphone
                 if deviceId == nil {
-                   throw WhisperError.microphoneUnavailable()
+                    throw WhisperError.microphoneUnavailable()
                 }
                 #endif
 
@@ -1137,7 +1140,7 @@ struct ContentView: View {
     func transcribeAudioSamples(_ samples: [Float]) async throws -> TranscriptionResult? {
         guard let whisperKit = whisperKit else { return nil }
 
-        let languageCode = Constants.languages[selectedLanguage] ?? "en"
+        let languageCode = Constants.languages[selectedLanguage, default: Constants.defaultLanguageCode]
         let task: DecodingTask = selectedTask == "transcribe" ? .transcribe : .translate
         let seekClip = [lastConfirmedSegmentEndSeconds]
 
@@ -1353,7 +1356,7 @@ struct ContentView: View {
             return nil
         }
 
-        let languageCode = Constants.languages[selectedLanguage] ?? "en"
+        let languageCode = Constants.languages[selectedLanguage, default: Constants.defaultLanguageCode]
         let task: DecodingTask = selectedTask == "transcribe" ? .transcribe : .translate
 
         let options = DecodingOptions(
@@ -1403,7 +1406,7 @@ struct ContentView: View {
             return nil
         }
 
-        Logging.info("[EagerMode] \(lastAgreedSeconds)-\(Double(samples.count)/16000.0) seconds")
+        Logging.info("[EagerMode] \(lastAgreedSeconds)-\(Double(samples.count) / 16000.0) seconds")
 
         let streamingAudio = samples
         var streamOptions = options

@@ -3,17 +3,16 @@
 
 import AVFoundation
 import CoreML
-import Tokenizers
 import Hub
 import NaturalLanguage
+import Tokenizers
 @testable import WhisperKit
 import XCTest
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 final class UnitTests: XCTestCase {
-
     // MARK: - Model Loading Test
-    
+
     func testInit() async throws {
         try await XCTUnwrapAsync(
             await WhisperKit(prewarm: false, load: false, download: false),
@@ -181,7 +180,7 @@ final class UnitTests: XCTestCase {
             )
         )
     }
-    
+
     func testDecoderLogProbThresholdDecodingFallback() async throws {
         let decodingOptions = DecodingOptions(
             withoutTimestamps: true,
@@ -598,7 +597,7 @@ final class UnitTests: XCTestCase {
             let languageCode = recognizer.dominantLanguage!.rawValue
 
             XCTAssertEqual(
-                languageCode, 
+                languageCode,
                 option.language,
                 "Text language \"\(languageCode)\" at index \(i) did not match expected language \"\(option.language)\""
             )
@@ -666,7 +665,7 @@ final class UnitTests: XCTestCase {
 
     func testTemperatureIncrement() async throws {
         let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
-        
+
         // Generate random audio samples
         let audioSamples = (0..<(30 * 16000)).map { _ in Float.random(in: -0.7...0.7) }
 
@@ -790,6 +789,15 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual([1, 2, 3, 4].chunked(into: 3), [[1, 2, 3], [4]])
     }
 
+    func testTrimmingSpecialTokenCharacters() {
+        XCTAssertEqual("<|en|>".trimmingSpecialTokenCharacters(), "en")
+        XCTAssertEqual("<|endoftext|>".trimmingSpecialTokenCharacters(), "endoftext")
+        XCTAssertEqual("en".trimmingSpecialTokenCharacters(), "en")
+        XCTAssertEqual("<|end<|of|>text|>".trimmingSpecialTokenCharacters(), "end<|of|>text")
+        XCTAssertEqual("<|endoftext".trimmingSpecialTokenCharacters(), "endoftext")
+        XCTAssertEqual("endoftext|>".trimmingSpecialTokenCharacters(), "endoftext")
+    }
+
     // MARK: - LogitsFilter Tests
 
     func testSuppressTokensFilter() throws {
@@ -842,13 +850,13 @@ final class UnitTests: XCTestCase {
         let result5 = tokensFilter5.filterLogits(logits5, withTokens: [1, 2, 3])
         XCTAssertEqual(result5.data(for: 2), [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
     }
-    
-    func testLanguageLogitsFilter() throws{
+
+    func testLanguageLogitsFilter() throws {
         let tokensFilter1 = LanguageLogitsFilter(allLanguageTokens: [2, 4, 6], logitsDim: 7, sampleBegin: 0)
         let logits1 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
         let result1 = tokensFilter1.filterLogits(logits1, withTokens: [])
         XCTAssertEqual(result1.data(for: 2), [-.infinity, -.infinity, 0.3, -.infinity, 0.5, -.infinity, 0.7])
-        
+
         let tokensFilter2 = LanguageLogitsFilter(allLanguageTokens: [2, 4, 6], logitsDim: 7, sampleBegin: 0)
         let logits2 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
         let result2 = tokensFilter2.filterLogits(logits2, withTokens: [1])
@@ -907,7 +915,7 @@ final class UnitTests: XCTestCase {
         let logits1 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2])
         let result1 = tokensFilter1.filterLogits(logits1, withTokens: [])
         XCTAssertEqual(result1.data(for: 2), [1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2])
-        
+
         let tokensFilter2 = TimestampRulesFilter(
             specialTokens: .default(
                 endToken: 3,
@@ -1238,7 +1246,7 @@ final class UnitTests: XCTestCase {
             WordTiming(word: " do", tokens: [360], start: 9.44, end: 9.64, probability: 0.87),
             WordTiming(word: " for", tokens: [337], start: 9.64, end: 9.86, probability: 0.95),
             WordTiming(word: " your", tokens: [428], start: 9.86, end: 10.06, probability: 0.96),
-            WordTiming(word: " country.", tokens: [1941, 13], start: 10.06, end: 10.5, probability: 0.91)
+            WordTiming(word: " country.", tokens: [1941, 13], start: 10.06, end: 10.5, probability: 0.91),
         ]
 
         XCTAssertEqual(wordTimings.count, expectedWordTimings.count, "Number of word timings should match")
@@ -1261,7 +1269,7 @@ final class UnitTests: XCTestCase {
         let audioFile = "jfk.wav"
         let modelPath = try tinyModelPath()
 
-        let whisperKit = try await WhisperKit(modelFolder: modelPath,/* computeOptions: computeOptions,*/ verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(modelFolder: modelPath, /* computeOptions: computeOptions,*/ verbose: true, logLevel: .debug)
 
         let startTime = Date()
         let audioComponents = audioFile.components(separatedBy: ".")
@@ -1271,7 +1279,6 @@ final class UnitTests: XCTestCase {
         }
         let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFileURL)
         let audioArray = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
-
 
         var results: [TranscriptionResult?] = []
         var prevResult: TranscriptionResult?
@@ -1284,7 +1291,7 @@ final class UnitTests: XCTestCase {
 
         for seekSample in stride(from: 0, to: audioArray.count, by: 32000) {
             let endSample = min(seekSample + 32000, audioArray.count)
-            Logging.info("[testStreamingTimestamps] \(lastAgreedSeconds)-\(Double(endSample)/16000.0) seconds")
+            Logging.info("[testStreamingTimestamps] \(lastAgreedSeconds)-\(Double(endSample) / 16000.0) seconds")
 
             let simulatedStreamingAudio = Array(audioArray[..<endSample])
             var streamOptions = options
@@ -1311,13 +1318,11 @@ final class UnitTests: XCTestCase {
 
                             confirmedWords.append(contentsOf: commonPrefix.prefix(commonPrefix.count - agreementCountNeeded))
                             let currentWords = confirmedWords.map { $0.word }.joined()
-                            Logging.info("[testStreamingTimestamps] Current:  \(lastAgreedSeconds) -> \(Double(endSample)/16000.0) \(currentWords)")
+                            Logging.info("[testStreamingTimestamps] Current:  \(lastAgreedSeconds) -> \(Double(endSample) / 16000.0) \(currentWords)")
                         } else {
                             Logging.info("[testStreamingTimestamps] Using same last agreed time \(lastAgreedSeconds)")
                             skipAppend = true
                         }
-
-
                     }
                     prevResult = result
                 }

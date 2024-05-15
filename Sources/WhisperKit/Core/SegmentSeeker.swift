@@ -88,7 +88,6 @@ open class SegmentSeeker: SegmentSeeking {
         let singleTimestampEnding = lastThreeTokens == [false, true, false]
         let noTimestampEnding = lastThreeTokens == [false, false, false]
 
-
         // find all end indexes of time token pairs
         var sliceIndexes = [Int]()
 
@@ -297,7 +296,8 @@ open class SegmentSeeker: SegmentSeeking {
             // Check if the previous word starts with a whitespace character and is part of the prepended punctuations
             if let firstChar = previousWord.word.unicodeScalars.first,
                CharacterSet.whitespaces.contains(firstChar),
-                prepended.contains(previousWord.word.trimmingCharacters(in: .whitespaces)) {
+               prepended.contains(previousWord.word.trimmingCharacters(in: .whitespaces))
+            {
                 currentWord.word = previousWord.word + currentWord.word
                 currentWord.tokens = previousWord.tokens + currentWord.tokens
                 prependedAlignment[prependedAlignment.count - 1] = currentWord
@@ -530,7 +530,8 @@ open class SegmentSeeker: SegmentSeeking {
                 // Logic for the first word
                 if firstWord.end - lastSpeechTimestamp > constrainedMedianDuration * 4 &&
                     (firstWord.end - firstWord.start > maxDuration ||
-                     (wordsInSegment.count > 1 && wordsInSegment[1].end - firstWord.start > maxDuration * 2)) {
+                        (wordsInSegment.count > 1 && wordsInSegment[1].end - firstWord.start > maxDuration * 2))
+                {
                     if wordsInSegment.count > 1 && wordsInSegment[1].end - wordsInSegment[1].start > maxDuration {
                         let boundary = max(wordsInSegment[1].end / 2, wordsInSegment[1].end - maxDuration)
                         wordsInSegment[0].end = boundary
@@ -555,7 +556,7 @@ open class SegmentSeeker: SegmentSeeking {
 
                 lastSpeechTimestamp = updatedSegment.end
             }
-            
+
             updatedSegment.words = wordsInSegment
             updatedSegments.append(updatedSegment)
         }
