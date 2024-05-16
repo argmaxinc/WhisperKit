@@ -349,15 +349,22 @@ public class AudioProcessor: NSObject, AudioProcessing {
             let startIndex = chunkIndex * frameLengthSamples
             let endIndex = min(startIndex + frameLengthSamples + frameOverlapSamples, signal.count)
             let chunk = Array(signal[startIndex..<endIndex])
-            let avgEnergy = calculateEnergy(of: chunk).avg
+            let avgEnergy = calculateAverageEnergy(of: chunk)
             chunkEnergies.append(avgEnergy)
         }
 
         let vadResult = chunkEnergies.map { $0 > energyThreshold }
 
         return vadResult
+    }
 
-//        return (0..<chunkCount).map { vDSP.sumOfSquares(signal[$0 * frameShift..<($0 * frameShift + frameLength)]) > energyThreshold }
+    /// Calculate average energy of a signal chunk.
+    /// - Parameter signal: Chunk of audio signal.
+    /// - Returns: Average (RMS) energy of the signal chunk.
+    public static func calculateAverageEnergy(of signal: [Float]) -> Float {
+        var rmsEnergy: Float = 0.0
+        vDSP_rmsqv(signal, 1, &rmsEnergy, vDSP_Length(signal.count))
+        return rmsEnergy
     }
 
     /// Calculate energy of a signal chunk.
@@ -381,7 +388,7 @@ public class AudioProcessor: NSObject, AudioProcessing {
     }
 
     public static func calculateRelativeEnergy(of signal: [Float], relativeTo reference: Float?) -> Float {
-        let signalEnergy = calculateEnergy(of: signal).avg
+        let signalEnergy = calculateAverageEnergy(of: signal)
 
         // Make sure reference is greater than 0
         // Default 1e-3 measured empirically in a silent room

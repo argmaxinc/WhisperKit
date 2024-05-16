@@ -509,7 +509,7 @@ public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirm
             updatedSegment.start += previousSeek
             updatedSegment.end += previousSeek
             if var words = updatedSegment.words {
-                for (wordIndex, word) in words.enumerated() {
+                for wordIndex in 0..<words.count {
                     words[wordIndex].start += previousSeek
                     words[wordIndex].end += previousSeek
                 }
@@ -525,6 +525,7 @@ public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirm
 
     // Calculate the earliest start and latest end times
     let earliestPipelineStart = validResults.map { $0.timings.pipelineStart }.min() ?? 0
+    let earliestTokenTime = validResults.map { $0.timings.firstTokenTime }.min() ?? 0
     let latestPipelineEnd = validResults.map { $0.timings.pipelineStart + $0.timings.fullPipeline }.max() ?? 0
 
     // Calculate the "user" pipeline time, excluding the time spent in concurrent pipelines
@@ -561,14 +562,9 @@ public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirm
         fullPipeline: fullPipelineDuration
     )
 
+    mergedTimings.pipelineStart = earliestPipelineStart
+    mergedTimings.firstTokenTime = earliestTokenTime
     mergedTimings.inputAudioSeconds = validResults.map { $0.timings.inputAudioSeconds }.reduce(0, +)
-
-    // Use first result for first token times
-    if let pipelineStart = validResults.first?.timings.pipelineStart,
-        let firstTokenTime = validResults.first?.timings.firstTokenTime {
-        mergedTimings.pipelineStart = pipelineStart
-        mergedTimings.firstTokenTime = firstTokenTime
-    }
 
     return TranscriptionResult(
         text: mergedText,

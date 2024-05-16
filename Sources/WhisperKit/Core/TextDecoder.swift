@@ -714,6 +714,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             timings.totalDecodingLoops += 1
 
             if tokenIndex == prefilledIndex {
+                Logging.debug("Found first token at: \(Date())")
                 timings.firstTokenTime = CFAbsoluteTimeGetCurrent()
             }
         }

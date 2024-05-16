@@ -482,6 +482,7 @@ public struct TranscriptionResult: Codable {
         // Calculate the full pipeline duration in milliseconds
         let decodeLoopTime = timings.decodingLoop
         let totalLoops = timings.totalDecodingLoops
+        let decodeTimePerWindow = decodeLoopTime / timings.totalAudioProcessingRuns
         let timeToFirstToken = timings.firstTokenTime - timings.pipelineStart
         let tokensPerSecond = timings.tokensPerSecond
         let rtf = timings.realTimeFactor
@@ -527,14 +528,15 @@ public struct TranscriptionResult: Codable {
         Logging.info("-------------------------------")
 
         // Summary statistics
-        Logging.info("Model Load Time:           \(String(format: "%.2f", timings.modelLoading)) seconds")
-        Logging.info("Inference Duration:        \(String(format: "%.2f", timings.fullPipeline)) seconds")
-        Logging.info("- Decoding Loop (System):  \(String(format: "%.2f", decodeLoopTime)) seconds")
-        Logging.info("Time to first token:       \(String(format: "%.2f", timeToFirstToken)) seconds")
-        Logging.info("Total Tokens:              \(totalTokens)")
-        Logging.info("Tokens per Second:         \(String(format: "%.2f", tokensPerSecond)) tok/s")
-        Logging.info("Real Time Factor:          \(String(format: "%.2f", rtf))")
-        Logging.info("Fallbacks:                 \(timings.totalDecodingFallbacks)")
+        Logging.info("Model Load Time:               \(String(format: "%.2f", timings.modelLoading)) seconds")
+        Logging.info("Inference Duration (Global):   \(String(format: "%.2f", timings.fullPipeline)) seconds")
+        Logging.info("- Decoding Loop (Avg/window):  \(String(format: "%.2f", decodeTimePerWindow)) seconds")
+        Logging.info("- Audio Windows:               \(String(format: "%.2f", timings.totalAudioProcessingRuns))")
+        Logging.info("Time to first token:           \(String(format: "%.2f", timeToFirstToken)) seconds")
+        Logging.info("Total Tokens:                  \(totalTokens)")
+        Logging.info("Tokens per Second:             \(String(format: "%.2f", tokensPerSecond)) tok/s")
+        Logging.info("Real Time Factor:              \(String(format: "%.3f", rtf))")
+        Logging.info("Fallbacks:                     \(timings.totalDecodingFallbacks)")
     }
 }
 
@@ -646,8 +648,8 @@ public struct TranscriptionTimings: Codable {
                 totalDecodingWindows: Double = 0,
                 fullPipeline: TimeInterval = 0)
     {
-        self.pipelineStart = CFAbsoluteTimeGetCurrent()
-        self.firstTokenTime = CFAbsoluteTimeGetCurrent()
+        self.pipelineStart = Double.greatestFiniteMagnitude
+        self.firstTokenTime = Double.greatestFiniteMagnitude
         self.inputAudioSeconds = 0.001
         self.modelLoading = modelLoading
         self.audioLoading = audioLoading

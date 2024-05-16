@@ -76,7 +76,7 @@ final class UnitTests: XCTestCase {
     func testAudioEnergy() {
         let samples = [Float](repeating: 0.0, count: 16000)
         let silence = samples.map { _ in Float(0.0) }
-        let energy = AudioProcessor.calculateEnergy(of: silence).avg
+        let energy = AudioProcessor.calculateAverageEnergy(of: silence)
         XCTAssertEqual(energy, 0.0, "Audio energy is not silent")
 
         let loudNoise = samples.map { _ in Float.random(in: -1...1) }
@@ -84,7 +84,7 @@ final class UnitTests: XCTestCase {
         XCTAssertGreaterThan(energyLoud, energy, "Audio energy is not loud")
 
         let veryLoudNoise = samples.map { _ in Float.random(in: -10...10) }
-        let energyVeryLoud = AudioProcessor.calculateEnergy(of: veryLoudNoise).avg
+        let energyVeryLoud = AudioProcessor.calculateAverageEnergy(of: veryLoudNoise)
         XCTAssertGreaterThan(energyVeryLoud, energyLoud, "Audio energy is not very loud")
     }
 

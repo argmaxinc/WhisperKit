@@ -41,7 +41,8 @@ final class TranscribeTask {
         let interval = Logging.beginSignpost("TranscribeAudio", signposter: Logging.TranscribeTask.signposter)
         defer { Logging.endSignpost("TranscribeAudio", interval: interval, signposter: Logging.TranscribeTask.signposter) }
 
-        timings.pipelineStart = CFAbsoluteTimeGetCurrent()
+        timings.pipelineStart = min(CFAbsoluteTimeGetCurrent(), timings.pipelineStart)
+        Logging.debug("Starting pipeline at: \(Date())")
 
         var options = decodeOptions ?? DecodingOptions()
         options.verbose = Logging.shared.logLevel != .none
@@ -297,7 +298,7 @@ final class TranscribeTask {
 
                 // Update timings from the decoder main loop
                 if let decodingTimings = decodingResult?.timings {
-                    timings.firstTokenTime = decodingTimings.firstTokenTime
+                    timings.firstTokenTime = min(decodingTimings.firstTokenTime, timings.firstTokenTime)
                     timings.decodingPredictions += decodingTimings.decodingPredictions
                     timings.totalDecodingLoops += decodingTimings.totalDecodingLoops
                     timings.decodingNonPrediction += decodingTimings.decodingNonPrediction

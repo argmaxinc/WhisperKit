@@ -75,7 +75,7 @@ final class EnergyVAD {
                 let chunkStart = index * frameLengthSamples
                 let chunkEnd = min(chunkStart + frameLengthSamples, waveform.count)
 
-                if let _ = currentStartIndex {
+                if currentStartIndex != nil {
                     // If we already have a starting point, just update the end point in the last added segment
                     result[result.count - 1].endIndex = chunkEnd
                 } else {

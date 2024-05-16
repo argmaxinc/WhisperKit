@@ -114,8 +114,8 @@ struct ContentView: View {
         currentText = ""
         unconfirmedText = []
 
-        pipelineStart = CFAbsoluteTimeGetCurrent()
-        firstTokenTime = CFAbsoluteTimeGetCurrent()
+        pipelineStart = Double.greatestFiniteMagnitude
+        firstTokenTime = Double.greatestFiniteMagnitude
         effectiveRealTimeFactor = 0
         totalInferenceTime = 0
         tokensPerSecond = 0

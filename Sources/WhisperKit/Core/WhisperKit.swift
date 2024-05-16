@@ -412,14 +412,14 @@ open class WhisperKit {
         var transcribeResultIndex = 0
 
         // Iterate over loadedAudioResult and map each to the corresponding transcription result
-        for (index, audioResult) in loadedAudioResult.enumerated() {
+        for audioResult in loadedAudioResult {
             switch audioResult {
                 case .success:
-                    // Append the audio path and transcription result if audio loading was successful
+                    // Append transcription result if audio loading was successful (may still contain failure)
                     result.append(transcribeResults[transcribeResultIndex])
                     transcribeResultIndex += 1
                 case let .failure(error):
-                    // Append the audio path and failure result if audio loading failed
+                    // Append failure result if audio loading failed
                     result.append(.failure(error))
             }
         }
@@ -599,37 +599,32 @@ open class WhisperKit {
         var transcribeResults = [TranscriptionResult]()
 
         // Determine if the audio array requires chunking
-        if audioArray.count > WhisperKit.windowSamples, let chunkingStrategy = decodeOptions?.chunkingStrategy {
-            // We have some audio that will require multiple windows and a strategy to chunk them
-            switch chunkingStrategy {
-                case .vad:
-                    let chunker = VADAudioChunker()
-                    let audioChunks = try await chunker.chunkAll(
-                        audioArray: audioArray,
-                        maxChunkLength: WhisperKit.windowSamples,
-                        decodeOptions: decodeOptions
-                    )
+        let requiresChunking = audioArray.count > WhisperKit.windowSamples
+        switch (requiresChunking, decodeOptions?.chunkingStrategy) {
+            case (true, .vad):
+                // We have some audio that will require multiple windows and a strategy to chunk them
+                let chunker = VADAudioChunker()
+                let audioChunks = try await chunker.chunkAll(
+                    audioArray: audioArray,
+                    maxChunkLength: WhisperKit.windowSamples,
+                    decodeOptions: decodeOptions
+                )
 
-                    // Send chunked samples to transcribe (note: this is recursive)
-                    let chunkedResults: [Result<[TranscriptionResult], Swift.Error>] = await transcribe(
-                        audioArrays: audioChunks,
-                        decodeOptions: decodeOptions,
-                        callback: callback
-                    )
+                // Send chunked samples to transcribe (note: this is recursive)
+                let chunkedResults: [Result<[TranscriptionResult], Swift.Error>] = await transcribe(
+                    audioArrays: audioChunks,
+                    decodeOptions: decodeOptions,
+                    callback: callback
+                )
 
-                    transcribeResults = try chunkedResults.flatMap { try $0.get() }
-                @unknown default:
-                    break
-            }
-        }
-
-        // Audio is short enough to transcribe in a single window
-        if transcribeResults.isEmpty {
-            transcribeResults = try await runTranscribeTask(
-                audioArray: audioArray,
-                decodeOptions: decodeOptions,
-                callback: callback
-            )
+                transcribeResults = try chunkedResults.flatMap { try $0.get() }
+            default:
+                // Audio is short enough to transcribe in a single window and doesn't require chunking
+                transcribeResults = try await runTranscribeTask(
+                    audioArray: audioArray,
+                    decodeOptions: decodeOptions,
+                    callback: callback
+                )
         }
 
         if let decodeOptions, decodeOptions.verbose {
