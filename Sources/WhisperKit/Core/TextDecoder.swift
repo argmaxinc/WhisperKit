@@ -626,6 +626,8 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             nextToken = sampleResult.tokens.last!
             let nextTokenLogProb = sampleResult.logProbs.last!
 
+            Logging.debug("Predicted next tokenIndex: \(tokenIndex + 1), token: \(nextToken), text: \(tokenizer.decode(tokens: [nextToken]))")
+
             let samplingTime = Date().timeIntervalSince(samplingStartTime)
             timings.decodingSampling += samplingTime
 
@@ -697,7 +699,6 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
                 let compressionRatio = compressionRatio(of: currentTokens)
 
                 let result = TranscriptionProgress(timings: timings, text: currentTranscript, tokens: currentTokens, avgLogprob: averageLogProb, compressionRatio: compressionRatio)
-                Logging.debug("Predicted next tokenIndex: \(tokenIndex + 1), token: \(nextToken), text: \(tokenizer.decode(tokens: [nextToken]))")
 
                 // Call the callback if it is provided
                 if let shouldContinue = callback?(result) {
@@ -713,6 +714,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             timings.totalDecodingLoops += 1
 
             if tokenIndex == prefilledIndex {
+                Logging.debug("Found first token at: \(Date())")
                 timings.firstTokenTime = CFAbsoluteTimeGetCurrent()
             }
         }
@@ -779,6 +781,8 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         }
 
         let transcript = tokenizer.decode(tokens: filteredTokens)
+
+        Logging.debug("Completed window: \(transcript)")
 
         let decodingFallback = DecodingFallback(
             options: options,

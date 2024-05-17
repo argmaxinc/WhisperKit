@@ -44,11 +44,12 @@ struct ContentView: View {
     @AppStorage("enableDecoderPreview") private var enableDecoderPreview: Bool = true
     @AppStorage("temperatureStart") private var temperatureStart: Double = 0
     @AppStorage("fallbackCount") private var fallbackCount: Double = 5
-    @AppStorage("compressionCheckWindow") private var compressionCheckWindow: Double = 20
+    @AppStorage("compressionCheckWindow") private var compressionCheckWindow: Double = 60
     @AppStorage("sampleLength") private var sampleLength: Double = 224
     @AppStorage("silenceThreshold") private var silenceThreshold: Double = 0.3
     @AppStorage("useVAD") private var useVAD: Bool = true
     @AppStorage("tokenConfirmationsNeeded") private var tokenConfirmationsNeeded: Double = 2
+    @AppStorage("chunkingStrategy") private var chunkingStrategy: ChunkingStrategy = .none
 
     // MARK: Standard properties
 
@@ -90,6 +91,8 @@ struct ContentView: View {
     @State private var showAdvancedOptions: Bool = false
     @State private var transcriptionTask: Task<Void, Never>? = nil
     @State private var selectedCategoryId: MenuItem.ID?
+    @State private var transcribeFileTask: Task<Void, Never>? = nil
+
     private var menu = [
         MenuItem(name: "Transcribe", image: "book.pages"),
         MenuItem(name: "Stream", image: "waveform.badge.mic"),
@@ -104,14 +107,15 @@ struct ContentView: View {
     // MARK: Views
 
     func resetState() {
+        transcribeFileTask?.cancel()
         isRecording = false
         isTranscribing = false
         whisperKit?.audioProcessor.stopRecording()
         currentText = ""
         unconfirmedText = []
 
-        firstTokenTime = 0
-        pipelineStart = 0
+        pipelineStart = Double.greatestFiniteMagnitude
+        firstTokenTime = Double.greatestFiniteMagnitude
         effectiveRealTimeFactor = 0
         totalInferenceTime = 0
         tokensPerSecond = 0
@@ -697,6 +701,19 @@ struct ContentView: View {
             }
             .padding(.horizontal)
 
+            HStack {
+                Text("Chunking Strategy")
+                InfoButton("Select the strategy to use for chunking audio data. If VAD is selected, the audio will be chunked based on voice activity (split on silent portions).")
+                Spacer()
+                Picker("", selection: $chunkingStrategy) {
+                    Text("None").tag(ChunkingStrategy.none)
+                    Text("VAD").tag(ChunkingStrategy.vad)
+                }
+                .pickerStyle(SegmentedPickerStyle())
+            }
+            .padding(.horizontal)
+            .padding(.bottom)
+
             VStack {
                 Text("Starting Temperature:")
                 HStack {
@@ -1031,7 +1048,7 @@ struct ContentView: View {
     func transcribeFile(path: String) {
         resetState()
         whisperKit?.audioProcessor = AudioProcessor()
-        Task {
+        self.transcribeFileTask = Task {
             do {
                 try await transcribeCurrentFile(path: path)
             } catch {
@@ -1153,7 +1170,8 @@ struct ContentView: View {
             usePrefillCache: enableCachePrefill,
             skipSpecialTokens: !enableSpecialCharacters,
             withoutTimestamps: !enableTimestamps,
-            clipTimestamps: seekClip
+            clipTimestamps: seekClip,
+            chunkingStrategy: chunkingStrategy
         )
 
         // Early stopping checks
@@ -1187,11 +1205,15 @@ struct ContentView: View {
             return nil
         }
 
-        return try await whisperKit.transcribe(
+        let transcriptionResults: [TranscriptionResult] = try await whisperKit.transcribe(
             audioArray: samples,
             decodeOptions: options,
             callback: decodingCallback
-        ).first
+        )
+
+        let mergedResults = mergeTranscriptionResults(transcriptionResults)
+
+        return mergedResults
     }
 
     // MARK: Streaming Logic

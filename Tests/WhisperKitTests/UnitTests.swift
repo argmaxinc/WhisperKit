@@ -76,7 +76,7 @@ final class UnitTests: XCTestCase {
     func testAudioEnergy() {
         let samples = [Float](repeating: 0.0, count: 16000)
         let silence = samples.map { _ in Float(0.0) }
-        let energy = AudioProcessor.calculateEnergy(of: silence).avg
+        let energy = AudioProcessor.calculateAverageEnergy(of: silence)
         XCTAssertEqual(energy, 0.0, "Audio energy is not silent")
 
         let loudNoise = samples.map { _ in Float.random(in: -1...1) }
@@ -84,7 +84,7 @@ final class UnitTests: XCTestCase {
         XCTAssertGreaterThan(energyLoud, energy, "Audio energy is not loud")
 
         let veryLoudNoise = samples.map { _ in Float.random(in: -10...10) }
-        let energyVeryLoud = AudioProcessor.calculateEnergy(of: veryLoudNoise).avg
+        let energyVeryLoud = AudioProcessor.calculateAverageEnergy(of: veryLoudNoise)
         XCTAssertGreaterThan(energyVeryLoud, energyLoud, "Audio energy is not very loud")
     }
 
@@ -963,28 +963,65 @@ final class UnitTests: XCTestCase {
         let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
         let audioArray = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
 
-        let result1 = try XCTUnwrap(vad.findLongestSilence(in: vad.voiceActivity(in: audioArray)))
-        XCTAssertEqual(result1.startIndex, 115)
-        XCTAssertEqual(result1.endIndex, 164)
+        let jfkVad = vad.voiceActivity(in: audioArray)
+        let result1 = try XCTUnwrap(vad.findLongestSilence(in: jfkVad))
+        XCTAssertEqual(result1.startIndex, 43)
+        XCTAssertEqual(result1.endIndex, 54)
 
-        XCTAssertEqual(vad.voiceActivityIndexToAudioIndex(result1.startIndex), 37120)
-        XCTAssertEqual(vad.voiceActivityIndexToAudioIndex(result1.endIndex), 52800)
+        XCTAssertEqual(vad.voiceActivityIndexToAudioSampleIndex(result1.startIndex), 68800)
+        XCTAssertEqual(vad.voiceActivityIndexToAudioSampleIndex(result1.endIndex), 86400)
 
-        let nonSilentChunks1 = vad.calculateNonSilentChunks(in: [])
+        XCTAssertEqual(vad.voiceActivityIndexToSeconds(result1.startIndex), 4.3)
+        XCTAssertEqual(vad.voiceActivityIndexToSeconds(result1.endIndex), 5.4)
+
+        // When looking for silence boundaries, a smaller frame length is preferred
+        let vadForSilence = EnergyVAD(frameLengthSamples: 320)
+        let nonSilentChunks1 = vadForSilence.calculateActiveChunks(in: [])
         XCTAssertEqual(nonSilentChunks1.map(\.startIndex), [])
         XCTAssertEqual(nonSilentChunks1.map(\.endIndex), [])
 
-        let nonSilentChunks2 = vad.calculateNonSilentChunks(in: Array(repeating: 0, count: 1600))
+        let nonSilentChunks2 = vadForSilence.calculateActiveChunks(in: Array(repeating: 0, count: 1600))
         XCTAssertEqual(nonSilentChunks2.map(\.startIndex), [])
         XCTAssertEqual(nonSilentChunks2.map(\.endIndex), [])
 
-        let nonSilentChunks3 = vad.calculateNonSilentChunks(in: Array(repeating: 1, count: 1600))
-        XCTAssertEqual(nonSilentChunks3.map(\.startIndex), [0, 320, 640, 960])
-        XCTAssertEqual(nonSilentChunks3.map(\.endIndex), [320, 640, 960, 1280])
+        let nonSilentChunks3 = vadForSilence.calculateActiveChunks(in: Array(repeating: 1, count: 1600))
+        XCTAssertEqual(nonSilentChunks3.map(\.startIndex), [0])
+        XCTAssertEqual(nonSilentChunks3.map(\.endIndex), [1600])
 
-        let nonSilentChunks4 = vad.calculateNonSilentChunks(in: Array(repeating: 0, count: 1600) + Array(repeating: 1, count: 1600))
-        XCTAssertEqual(nonSilentChunks4.map(\.startIndex), [1280, 1600, 1920, 2240, 2560])
-        XCTAssertEqual(nonSilentChunks4.map(\.endIndex), [1600, 1920, 2240, 2560, 2880])
+        let nonSilentChunks4 = vadForSilence.calculateActiveChunks(in: Array(repeating: 0, count: 1600) + Array(repeating: 1, count: 1600))
+        XCTAssertEqual(nonSilentChunks4.map(\.startIndex), [1600])
+        XCTAssertEqual(nonSilentChunks4.map(\.endIndex), [3200])
+
+        let nonSilentChunksWithUnevenFrameLength1 = vadForSilence.calculateActiveChunks(in: Array(repeating: 1, count: 1601))
+        XCTAssertEqual(nonSilentChunksWithUnevenFrameLength1.map(\.startIndex), [0])
+        XCTAssertEqual(nonSilentChunksWithUnevenFrameLength1.map(\.endIndex), [1601])
+
+        let nonSilentChunksWithUnevenFrameLength2 = vadForSilence.calculateActiveChunks(in: Array(repeating: 1, count: 1599))
+        XCTAssertEqual(nonSilentChunksWithUnevenFrameLength2.map(\.startIndex), [0])
+        XCTAssertEqual(nonSilentChunksWithUnevenFrameLength2.map(\.endIndex), [1599])
+
+        let nonSilentChunksWithUnevenFrameLength3 = vadForSilence.calculateActiveChunks(in: Array(repeating: 1, count: 1599) + Array(repeating: 0, count: 1600))
+        XCTAssertEqual(nonSilentChunksWithUnevenFrameLength3.map(\.startIndex), [0])
+        XCTAssertEqual(nonSilentChunksWithUnevenFrameLength3.map(\.endIndex), [1600]) // frame length
+
+        // Even with a smaller frame lenth, sometimes we need an overlap to detect them when they are very close to the boundary
+        let vadWithOverlap = EnergyVAD(frameLengthSamples: 320, frameOverlapSamples: 80)
+        let nonSilentChunksWithOverlap = vadWithOverlap.calculateActiveChunks(in: Array(repeating: 0, count: 1600) + Array(repeating: 1, count: 1600))
+        XCTAssertEqual(nonSilentChunksWithOverlap.map(\.startIndex), [1280])
+        XCTAssertEqual(nonSilentChunksWithOverlap.map(\.endIndex), [3200])
+
+        // When specifically looking for speech instead of silence, a larger window is preferred
+        let vadWithLargeWindow = EnergyVAD(frameLength: 0.2, frameOverlap: 0.1)
+        let activitySeekClips = vadWithLargeWindow.calculateNonSilentSeekClips(in: audioArray)
+        XCTAssertEqual(activitySeekClips.map(\.start), [3200, 51200, 83200, 128000, 169600])
+        XCTAssertEqual(activitySeekClips.map(\.end), [35200, 70400, 121600, 166400, 176000])
+
+        let activityTimestamps = vadWithLargeWindow.voiceActivityClipTimestamps(in: audioArray)
+        XCTAssertEqual(activityTimestamps, [0.2, 2.2, 3.2, 4.4, 5.2, 7.6, 8.0, 10.4, 10.6, 11.0])
+
+        let activitySeekTimestamps = vadWithLargeWindow.calculateSeekTimestamps(in: audioArray)
+        XCTAssertEqual(activitySeekTimestamps.map(\.startTime), [0.2, 3.2, 5.2, 8.0, 10.6])
+        XCTAssertEqual(activitySeekTimestamps.map(\.endTime), [2.2, 4.4, 7.6, 10.4, 11.0])
     }
 
     func testFindLongestSilence() throws {
@@ -1018,6 +1055,68 @@ final class UnitTests: XCTestCase {
         let (startIndex6, endIndex6) = try XCTUnwrap(vad.findLongestSilence(in: [false, false, true, true, true, false, true, false, false, false, false, true, true]))
         XCTAssertEqual(startIndex6, 7)
         XCTAssertEqual(endIndex6, 11)
+    }
+
+    func testVADAudioChunker() async throws {
+        let chunker = VADAudioChunker()
+        
+        let singleChunkPath = try XCTUnwrap(
+            Bundle.module.path(forResource: "jfk", ofType: "wav"),
+            "Audio file not found"
+        )
+        var audioBuffer = try AudioProcessor.loadAudio(fromPath: singleChunkPath)
+        var audioArray = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
+
+        var audioChunks = try await chunker.chunkAll(
+            audioArray: audioArray,
+            maxChunkLength: WhisperKit.windowSamples,
+            decodeOptions: DecodingOptions()
+        )
+
+        XCTAssertEqual(audioChunks.count, 1)
+
+        let multiChunkPath = try XCTUnwrap(
+            Bundle.module.path(forResource: "ted_60", ofType: "m4a"),
+            "Audio file not found"
+        )
+        audioBuffer = try AudioProcessor.loadAudio(fromPath: multiChunkPath)
+        audioArray = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
+
+        audioChunks = try await chunker.chunkAll(
+            audioArray: audioArray,
+            maxChunkLength: WhisperKit.windowSamples,
+            decodeOptions: DecodingOptions()
+        )
+
+        XCTAssertEqual(audioChunks.count, 4)
+    }
+
+    func testVADAudioChunkerAccuracy() async throws {
+        let testResult = try await XCTUnwrapAsync(
+            await transcribe(with: .tiny, options: DecodingOptions(), audioFile: "ted_60.m4a"),
+            "Failed to transcribe"
+        )
+
+        let options = DecodingOptions(chunkingStrategy: .vad)
+
+        let chunkedResult = try await XCTUnwrapAsync(
+            await transcribe(with: .tiny, options: options, audioFile: "ted_60.m4a"),
+            "Failed to transcribe"
+        )
+
+        XCTAssertFalse(testResult.text.isEmpty, "The test text should not be empty")
+        XCTAssertFalse(chunkedResult.text.isEmpty, "The chunked text should not be empty")
+
+        // Select few sentences to compare at VAD border
+        // TODO: test that WER is in acceptable range
+        XCTAssertTrue(testResult.text.contains("and then I would kind of do this"))
+        XCTAssertTrue(chunkedResult.text.contains("and then I would kind of do this"))
+
+        XCTAssertTrue(testResult.text.contains("And that would happen every single paper"))
+        XCTAssertTrue(chunkedResult.text.contains("And that would happen every single paper"))
+
+        XCTAssertTrue(testResult.text.contains("But then came my 90 page senior thesis"))
+        XCTAssertTrue(chunkedResult.text.contains("But then came my 90 page senior thesis"))
     }
 
     // MARK: - Word Timestamp Tests

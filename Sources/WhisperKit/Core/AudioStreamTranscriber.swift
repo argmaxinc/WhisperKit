@@ -50,7 +50,7 @@ public actor AudioStreamTranscriber {
         decodingOptions: DecodingOptions,
         requiredSegmentsForConfirmation: Int = 2,
         silenceThreshold: Float = 0.3,
-        compressionCheckWindow: Int = 20,
+        compressionCheckWindow: Int = 60,
         useVAD: Bool = true,
         stateChangeCallback: AudioStreamTranscriberCallback?
     ) {
