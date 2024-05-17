@@ -8,7 +8,6 @@ import MLXNN
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class MLXAudioEncoder: AudioEncoding {
-    public var model: MLModel?
     public var embedSize: Int? {
         encoder?.nState
     }
