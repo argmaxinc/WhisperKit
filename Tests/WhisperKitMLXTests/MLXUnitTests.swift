@@ -34,7 +34,7 @@ final class MLXUnitTests: XCTestCase {
     func testEncoderOutput() async throws {
         let audioEncoder = MLXAudioEncoder()
         let modelPath = try URL(filePath: tinyMLXModelPath())
-        try await audioEncoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().audioEncoderCompute)
+        try await audioEncoder.loadModel(at: modelPath)
 
         let encoderInput = try MLMultiArray(shape: [1, 3000, 80], dataType: .float16)
         let expectedShape: [NSNumber] = [1, 1500, 384]

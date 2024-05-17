@@ -29,8 +29,8 @@ public class MLXAudioEncoder: AudioEncoding {
     }
 }
 
-extension MLXAudioEncoder: WhisperMLModel {
-    public func loadModel(at modelPath: URL, computeUnits: MLComputeUnits, prewarmMode: Bool = false) async throws {
+extension MLXAudioEncoder: WhisperMLXModel {
+    public func loadModel(at modelPath: URL) async throws {
         let parameters = try loadParameters(at: modelPath.appending(path: "weights.safetensors"), forKey: "encoder")
         let config = try loadConfig(at: modelPath.appending(path: "config.json"))
         let encoder = AudioEncoder(
@@ -44,6 +44,10 @@ extension MLXAudioEncoder: WhisperMLModel {
         let loadedEncoder = try encoder.update(parameters: parameters, verify: [.noUnusedKeys])
         MLX.eval(loadedEncoder)
         self.encoder = encoder
+    }
+
+    public func unloadModel() {
+        encoder = nil
     }
 }
 
