@@ -108,13 +108,15 @@ final class TranscribeTask {
             let windowPadding = 16000 // prevent hallucinations at the end of the clip by stopping up to 1.0s early
             while seek < seekClipEnd - windowPadding {
                 // calculate new encoder segment features
-                Logging.debug("Decoding Seek: \(seek)")
                 let timeOffset = Float(seek) / Float(WhisperKit.sampleRate)
                 let segmentSize = min(WhisperKit.windowSamples, contentFrames - seek, seekClipEnd - seek)
                 let timeOffsetEnd = Float(seek + segmentSize) / Float(WhisperKit.sampleRate)
+                Logging.debug("Decoding Seek: \(seek) (\(formatTimestamp(timeOffset))s)")
+                Logging.debug("Decoding Window Size: \(segmentSize) (\(formatTimestamp(timeOffsetEnd - timeOffset))s)")
 
                 let audioProcessingStart = Date()
-                guard let audioSamples = AudioProcessor.padOrTrimAudio(fromArray: audioArray, startAt: seek, toLength: WhisperKit.windowSamples) else {
+                let clipAudioSamples = Array(audioArray[seek..<(seek + segmentSize)])
+                guard let audioSamples = AudioProcessor.padOrTrimAudio(fromArray: clipAudioSamples, startAt: 0, toLength: WhisperKit.windowSamples) else {
                     throw WhisperError.transcriptionFailed("Audio samples are nil")
                 }
                 let processTime = Date().timeIntervalSince(audioProcessingStart)
@@ -140,11 +142,19 @@ final class TranscribeTask {
                 timings.totalEncodingRuns += 1
 
                 // All features are computed, now we can decode
-                Logging.info("Decoding \(timeOffset)s - \(timeOffsetEnd)s")
+                Logging.info("Decoding \(formatTimestamp(timeOffset))s - \(formatTimestamp(timeOffsetEnd))s")
+
+                // Overload progress callback to include windowId
+                let decodingCallback: ((TranscriptionProgress) -> Bool?) = { [weak self] progress in
+                    guard let self = self else { return nil }
+                    var windowProgress = progress
+                    windowProgress.windowId = Int(self.timings.totalDecodingWindows - self.timings.totalDecodingFallbacks)
+                    return callback?(windowProgress)
+                }
 
                 try Task.checkCancellation()
                 // Send to decoder to predict text tokens with fallback
-                let decodingResult = try await decodeWithFallback(encoderSegment: encoderOutput, decodingOptions: options, callback: callback)
+                let decodingResult = try await decodeWithFallback(encoderSegment: encoderOutput, decodingOptions: options, callback: decodingCallback)
 
                 // MARK: Windowing
 
@@ -210,6 +220,7 @@ final class TranscribeTask {
 
                 if options.verbose {
                     let lines = formatSegments(currentSegments)
+                    Logging.debug("Segments for window:")
                     for line in lines {
                         Logging.debug(line)
                     }

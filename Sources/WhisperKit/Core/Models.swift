@@ -20,14 +20,14 @@ extension Float16: MLShapedArrayScalar {}
 
 // MARK: - CoreML
 
-public protocol WhisperMLModel {
+public protocol WhisperMLModel: AnyObject {
     var model: MLModel? { get set }
-    mutating func loadModel(at modelPath: URL, computeUnits: MLComputeUnits, prewarmMode: Bool) async throws
-    mutating func unloadModel()
+    func loadModel(at modelPath: URL, computeUnits: MLComputeUnits, prewarmMode: Bool) async throws
+    func unloadModel()
 }
 
 public extension WhisperMLModel {
-    mutating func loadModel(at modelPath: URL, computeUnits: MLComputeUnits, prewarmMode: Bool = false) async throws {
+    func loadModel(at modelPath: URL, computeUnits: MLComputeUnits, prewarmMode: Bool = false) async throws {
         let loadedModel = try await Task {
             let modelConfig = MLModelConfiguration()
             modelConfig.computeUnits = computeUnits
@@ -37,8 +37,12 @@ public extension WhisperMLModel {
         model = prewarmMode ? nil : loadedModel
     }
 
-    mutating func unloadModel() {
+    func unloadModel() {
         model = nil
+    }
+
+    var modelState: ModelState {
+        return model == nil ? .unloaded : .loaded
     }
 }
 
@@ -158,6 +162,13 @@ public struct ModelComputeOptions {
             self.audioEncoderCompute = audioEncoderCompute ?? .cpuAndGPU
         }
     }
+}
+
+// MARK: - Chunking
+
+public struct AudioChunk {
+    var seekOffsetIndex: Int
+    var audioSamples: [Float]
 }
 
 // MARK: - Decoding
@@ -467,6 +478,7 @@ public struct TranscriptionResult: Codable {
     public var segments: [TranscriptionSegment]
     public var language: String
     public var timings: TranscriptionTimings
+    public var seekTime: Float?
 
     public func logSegments() {
         for (i, segment) in segments.enumerated() {
@@ -576,6 +588,7 @@ public struct TranscriptionProgress {
     public var temperature: Float?
     public var avgLogprob: Float?
     public var compressionRatio: Float?
+    public var windowId: Int = 0
 }
 
 /// Callback to receive progress updates during transcription.
