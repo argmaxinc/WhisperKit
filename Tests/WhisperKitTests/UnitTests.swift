@@ -7,6 +7,7 @@ import Hub
 import NaturalLanguage
 import Tokenizers
 @testable import WhisperKit
+import WhisperKitTestsUtils
 import XCTest
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
@@ -31,7 +32,7 @@ final class UnitTests: XCTestCase {
 
     func testAudioFileLoading() throws {
         let audioFilePath = try XCTUnwrap(
-            Bundle.module.path(forResource: "jfk", ofType: "wav"),
+            TestResource.path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
         let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
@@ -56,7 +57,7 @@ final class UnitTests: XCTestCase {
 
     func testAudioResample() throws {
         let audioFileURL = try XCTUnwrap(
-            Bundle.module.url(forResource: "jfk", withExtension: "wav"),
+            TestResource.url(forResource: "jfk", withExtension: "wav"),
             "Audio file not found"
         )
         let audioFile = try AVAudioFile(forReading: audioFileURL)
@@ -357,7 +358,7 @@ final class UnitTests: XCTestCase {
         )
 
         let audioFilePath = try XCTUnwrap(
-            Bundle.module.path(forResource: "jfk", ofType: "wav"),
+            TestResource.path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
         let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
@@ -487,7 +488,7 @@ final class UnitTests: XCTestCase {
         )
 
         let audioFilePath = try XCTUnwrap(
-            Bundle.module.path(forResource: "es_test_clip", ofType: "wav"),
+            TestResource.path(forResource: "es_test_clip", ofType: "wav"),
             "Audio file not found"
         )
 
@@ -565,7 +566,7 @@ final class UnitTests: XCTestCase {
         )
 
         let audioFilePath = try XCTUnwrap(
-            Bundle.module.path(forResource: "ja_test_clip", ofType: "wav"),
+            TestResource.path(forResource: "ja_test_clip", ofType: "wav"),
             "Audio file not found"
         )
 
@@ -1266,18 +1267,16 @@ final class UnitTests: XCTestCase {
 
     func testStreamingTimestamps() async throws {
         let options = DecodingOptions(usePrefillPrompt: true, wordTimestamps: true)
-        let audioFile = "jfk.wav"
         let modelPath = try tinyModelPath()
 
         let whisperKit = try await WhisperKit(modelFolder: modelPath, /* computeOptions: computeOptions,*/ verbose: true, logLevel: .debug)
 
+        let audioFilePath = try XCTUnwrap(
+            TestResource.path(forResource: "jfk", ofType: "wav"),
+            "Audio file not found"
+        )
         let startTime = Date()
-        let audioComponents = audioFile.components(separatedBy: ".")
-        guard let audioFileURL = Bundle.module.path(forResource: audioComponents.first, ofType: audioComponents.last) else {
-            XCTFail("Audio file not found")
-            return
-        }
-        let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFileURL)
+        let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
         let audioArray = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
 
         var results: [TranscriptionResult?] = []

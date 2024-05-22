@@ -5,8 +5,10 @@ PYTHON_COMMAND := python3
 
 # Define model repository and directories
 MODEL_REPO := argmaxinc/whisperkit-coreml
-MODEL_REPO_DIR := ./Models/whisperkit-coreml
-BASE_COMPILED_DIR := ./Models
+MLX_MODEL_REPO := jkrukowski/whisper-tiny-mlx-safetensors
+MLX_MODEL_REPO_DIR := ./Sources/WhisperKitTestsUtils/Models/mlx/whisper-tiny-mlx
+MODEL_REPO_DIR := ./Sources/WhisperKitTestsUtils/Models/whisperkit-coreml
+BASE_COMPILED_DIR := ./Sources/WhisperKitTestsUtils/Models
 
 
 setup:
@@ -56,6 +58,19 @@ setup-model-repo:
 		git clone https://huggingface.co/$(MODEL_REPO) $(MODEL_REPO_DIR); \
 	fi
 
+setup-mlx-model-repo:
+	@echo "Setting up mlx repository..."
+	@mkdir -p $(BASE_COMPILED_DIR)
+	@if [ -d "$(MLX_MODEL_REPO_DIR)/.git" ]; then \
+		echo "Repository exists, resetting..."; \
+		export GIT_LFS_SKIP_SMUDGE=1; \
+		cd $(MLX_MODEL_REPO_DIR) && git fetch --all && git reset --hard origin/main && git clean -fdx; \
+	else \
+		echo "Repository not found, initializing..."; \
+		export GIT_LFS_SKIP_SMUDGE=1; \
+		git clone https://huggingface.co/$(MLX_MODEL_REPO) $(MLX_MODEL_REPO_DIR); \
+	fi
+
 # Download all models
 download-models: setup-model-repo
 	@echo "Downloading all models..."
@@ -73,6 +88,13 @@ download-model:
 	@echo "Fetching model $(MODEL)..."
 	@cd $(MODEL_REPO_DIR) && \
 	git lfs pull --include="openai_whisper-$(MODEL)/*"
+
+download-mlx-model:
+	@echo "Downloading mlx model $(MODEL)..."
+	@$(MAKE) setup-mlx-model-repo
+	@echo "Fetching mlx model $(MODEL)..."
+	@cd $(MLX_MODEL_REPO_DIR) && \
+	git lfs pull
 
 build:
 	@echo "Building WhisperKit..."

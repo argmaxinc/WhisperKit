@@ -23,6 +23,7 @@ Models
 **/*.mp3
 **/*.m4a
 **/*.flac
+!Sources/WhisperKitTestsUtils/Resources/*.*
 
 ## Xcode
 # Build generated
