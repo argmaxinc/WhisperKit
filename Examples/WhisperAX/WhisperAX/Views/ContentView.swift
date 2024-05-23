@@ -92,6 +92,7 @@ struct ContentView: View {
 
     // MARK: UI properties
 
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var showComputeUnits: Bool = true
     @State private var showAdvancedOptions: Bool = false
     @State private var transcriptionTask: Task<Void, Never>? = nil
@@ -158,7 +159,7 @@ struct ContentView: View {
     }
 
     var body: some View {
-        NavigationSplitView(columnVisibility: Binding.constant(.all)) {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             VStack(alignment: .leading) {
                 modelSelectorView
                     .padding(.vertical)
@@ -179,9 +180,9 @@ struct ContentView: View {
                 }
                 .disabled(modelState != .loaded)
                 .foregroundColor(modelState != .loaded ? .secondary : .primary)
-                .navigationTitle("WhisperAX")
-                .navigationSplitViewColumnWidth(min: 300, ideal: 350)
             }
+            .navigationTitle("WhisperAX")
+            .navigationSplitViewColumnWidth(min: 300, ideal: 350)
             .padding(.horizontal)
             Spacer()
         } detail: {
