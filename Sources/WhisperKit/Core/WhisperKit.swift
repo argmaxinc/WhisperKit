@@ -565,6 +565,7 @@ open class WhisperKit {
     // MARK: - Transcribe single audio file
 
     @available(*, deprecated, message: "Subject to removal in a future version. Use `transcribe(audioPath:decodeOptions:callback:) async throws -> [TranscriptionResult]` instead.")
+    @_disfavoredOverload
     public func transcribe(
         audioPath: String,
         decodeOptions: DecodingOptions? = nil,
@@ -610,6 +611,7 @@ open class WhisperKit {
 
     /// Deprecated
     @available(*, deprecated, message: "Subject to removal in a future version. Use `transcribe(audioArray:decodeOptions:callback:) async throws -> [TranscriptionResult]` instead.")
+    @_disfavoredOverload
     public func transcribe(
         audioArray: [Float],
         decodeOptions: DecodingOptions? = nil,
