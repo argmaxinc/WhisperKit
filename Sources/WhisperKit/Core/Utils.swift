@@ -585,6 +585,7 @@ public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirm
     )
 }
 
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public func updateSegmentTimings(segment: TranscriptionSegment, seekTime: Float) -> TranscriptionSegment {
     var updatedSegment = segment
     let seekOffsetIndex = Int(seekTime * Float(WhisperKit.sampleRate))
