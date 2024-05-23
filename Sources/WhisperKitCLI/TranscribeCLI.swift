@@ -92,7 +92,7 @@ struct TranscribeCLI: AsyncParsableCommand {
             options.usePrefillPrompt = true
         }
 
-        let transcribeResult: [Result<[TranscriptionResult], Swift.Error>] = await whisperKit.transcribe(
+        let transcribeResult: [Result<[TranscriptionResult], Swift.Error>] = await whisperKit.transcribeWithResults(
             audioPaths: resolvedAudioPaths,
             decodeOptions: options
         )
@@ -337,6 +337,7 @@ struct TranscribeCLI: AsyncParsableCommand {
             skipSpecialTokens: cliArguments.skipSpecialTokens,
             withoutTimestamps: cliArguments.withoutTimestamps,
             wordTimestamps: cliArguments.wordTimestamps || cliArguments.streamSimulated,
+            clipTimestamps: cliArguments.clipTimestamps,
             supressTokens: cliArguments.supressTokens,
             compressionRatioThreshold: cliArguments.compressionRatioThreshold ?? 2.4,
             logProbThreshold: cliArguments.logprobThreshold ?? -1.0,

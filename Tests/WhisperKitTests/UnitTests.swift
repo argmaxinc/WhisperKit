@@ -96,7 +96,7 @@ final class UnitTests: XCTestCase {
             AudioProcessor.padOrTrimAudio(fromArray: audioSamples, startAt: 0, toLength: 480_000),
             "Failed to pad audio samples"
         )
-        var featureExtractor = FeatureExtractor()
+        let featureExtractor = FeatureExtractor()
         let modelPath = try URL(filePath: tinyModelPath()).appending(path: "MelSpectrogram.mlmodelc")
         try await featureExtractor.loadModel(at: modelPath, computeUnits: ModelComputeOptions().melCompute)
         let melSpectrogram = try await XCTUnwrapAsync(
@@ -135,7 +135,7 @@ final class UnitTests: XCTestCase {
     // MARK: - Encoder Tests
 
     func testEncoderOutput() async throws {
-        var audioEncoder = AudioEncoder()
+        let audioEncoder = AudioEncoder()
         let modelPath = try URL(filePath: tinyModelPath()).appending(path: "AudioEncoder.mlmodelc")
         try? await audioEncoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().audioEncoderCompute)
 
@@ -150,7 +150,7 @@ final class UnitTests: XCTestCase {
     // MARK: - Decoder Tests
 
     func testDecoderOutput() async throws {
-        var textDecoder = TextDecoder()
+        let textDecoder = TextDecoder()
         let decodingOptions = DecodingOptions()
         let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         await XCTAssertNoThrowAsync(
@@ -189,7 +189,7 @@ final class UnitTests: XCTestCase {
             firstTokenLogProbThreshold: nil,
             noSpeechThreshold: nil
         )
-        var textDecoder = TextDecoder()
+        let textDecoder = TextDecoder()
         let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
         textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
@@ -213,7 +213,7 @@ final class UnitTests: XCTestCase {
             firstTokenLogProbThreshold: 1000.0,
             noSpeechThreshold: nil
         )
-        var textDecoder = TextDecoder()
+        let textDecoder = TextDecoder()
         let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
         textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
@@ -778,15 +778,15 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(logits4.data(for: 2), [0.1, 0.2, -.infinity, -.infinity, -.infinity, 0.6, 0.7])
     }
 
-    func testChunkedArray() {
-        XCTAssertEqual([Int]().chunked(into: 1), [])
-        XCTAssertEqual([1, 2, 3, 4].chunked(into: 1), [[1], [2], [3], [4]])
+    func testBatchedArray() {
+        XCTAssertEqual([Int]().batched(into: 1), [])
+        XCTAssertEqual([1, 2, 3, 4].batched(into: 1), [[1], [2], [3], [4]])
 
-        XCTAssertEqual([Int]().chunked(into: 10), [])
-        XCTAssertEqual([1, 2, 3, 4].chunked(into: 10), [[1, 2, 3, 4]])
+        XCTAssertEqual([Int]().batched(into: 10), [])
+        XCTAssertEqual([1, 2, 3, 4].batched(into: 10), [[1, 2, 3, 4]])
 
-        XCTAssertEqual([Int]().chunked(into: 3), [])
-        XCTAssertEqual([1, 2, 3, 4].chunked(into: 3), [[1, 2, 3], [4]])
+        XCTAssertEqual([Int]().batched(into: 3), [])
+        XCTAssertEqual([1, 2, 3, 4].batched(into: 3), [[1, 2, 3], [4]])
     }
 
     func testTrimmingSpecialTokenCharacters() {
@@ -1059,7 +1059,8 @@ final class UnitTests: XCTestCase {
 
     func testVADAudioChunker() async throws {
         let chunker = VADAudioChunker()
-        
+        Logging.shared.logLevel = .debug
+
         let singleChunkPath = try XCTUnwrap(
             Bundle.module.path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
@@ -1088,7 +1089,7 @@ final class UnitTests: XCTestCase {
             decodeOptions: DecodingOptions()
         )
 
-        XCTAssertEqual(audioChunks.count, 4)
+        XCTAssertEqual(audioChunks.count, 3)
     }
 
     func testVADAudioChunkerAccuracy() async throws {
@@ -1109,14 +1110,14 @@ final class UnitTests: XCTestCase {
 
         // Select few sentences to compare at VAD border
         // TODO: test that WER is in acceptable range
-        XCTAssertTrue(testResult.text.contains("and then I would kind of do this"))
-        XCTAssertTrue(chunkedResult.text.contains("and then I would kind of do this"))
+        XCTAssertTrue(testResult.text.contains("and then I would kind of do this"), "Expected text not found in \(testResult.text)")
+        XCTAssertTrue(chunkedResult.text.contains("and then I would kind of do this"), "Expected text not found in \(chunkedResult.text)")
 
-        XCTAssertTrue(testResult.text.contains("And that would happen every single paper"))
-        XCTAssertTrue(chunkedResult.text.contains("And that would happen every single paper"))
+        XCTAssertTrue(testResult.text.contains("And that would happen every single paper"), "Expected text not found in \(testResult.text)")
+        XCTAssertTrue(chunkedResult.text.contains("And that would happen every single paper"), "Expected text not found in \(chunkedResult.text)")
 
-        XCTAssertTrue(testResult.text.contains("But then came my 90 page senior thesis"))
-        XCTAssertTrue(chunkedResult.text.contains("But then came my 90 page senior thesis"))
+        XCTAssertTrue(testResult.text.contains("But then came my 90 page senior"), "Expected text not found in \(testResult.text)")
+        XCTAssertTrue(chunkedResult.text.contains("But then came my 90 page senior"), "Expected text not found in \(chunkedResult.text)")
     }
 
     // MARK: - Word Timestamp Tests

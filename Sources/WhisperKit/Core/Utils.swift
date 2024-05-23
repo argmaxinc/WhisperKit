@@ -16,7 +16,7 @@ import AppKit
 // MARK: - Extensions
 
 extension Array {
-    func chunked(into size: Int) -> [[Element]] {
+    func batched(into size: Int) -> [[Element]] {
         return stride(from: 0, to: count, by: size).map {
             Array(self[$0..<Swift.min($0 + size, count)])
         }
@@ -95,6 +95,23 @@ extension MLModel {
             return try await Task {
                 try prediction(from: input, options: options)
             }.value
+        }
+    }
+}
+
+public extension MLComputeUnits {
+    var description: String {
+        switch self {
+            case .cpuOnly:
+                return "cpuOnly"
+            case .cpuAndGPU:
+                return "cpuAndGPU"
+            case .all:
+                return "all"
+            case .cpuAndNeuralEngine:
+                return "cpuAndNeuralEngine"
+            @unknown default:
+                return "unknown"
         }
     }
 }
@@ -501,24 +518,18 @@ public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirm
     var mergedSegments = [TranscriptionSegment]()
     var previousSeek: Float = 0.0
     for (resultIndex, result) in validResults.enumerated() {
-        let segmentTiming = result.timings
+        let seekTime = result.seekTime ?? previousSeek
         for (segmentIndex, segment) in result.segments.enumerated() {
             var updatedSegment = segment
             updatedSegment.id = resultIndex + segmentIndex
-            updatedSegment.seek += Int(previousSeek * Float(WhisperKit.sampleRate))
-            updatedSegment.start += previousSeek
-            updatedSegment.end += previousSeek
-            if var words = updatedSegment.words {
-                for wordIndex in 0..<words.count {
-                    words[wordIndex].start += previousSeek
-                    words[wordIndex].end += previousSeek
-                }
-                updatedSegment.words = words
-            }
             mergedSegments.append(updatedSegment)
         }
-
-        previousSeek += Float(segmentTiming.inputAudioSeconds)
+        // Update previousSeek only if seekTime is nil
+        if result.seekTime == nil {
+            previousSeek += Float(result.timings.inputAudioSeconds)
+        } else {
+            previousSeek = seekTime + Float(result.timings.inputAudioSeconds)
+        }
     }
 
     let language = validResults.first?.language ?? Constants.defaultLanguageCode
@@ -572,6 +583,22 @@ public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirm
         language: language,
         timings: mergedTimings
     )
+}
+
+public func updateSegmentTimings(segment: TranscriptionSegment, seekTime: Float) -> TranscriptionSegment {
+    var updatedSegment = segment
+    let seekOffsetIndex = Int(seekTime * Float(WhisperKit.sampleRate))
+    updatedSegment.seek += seekOffsetIndex
+    updatedSegment.start += seekTime
+    updatedSegment.end += seekTime
+    if var words = updatedSegment.words {
+        for wordIndex in 0..<words.count {
+            words[wordIndex].start += seekTime
+            words[wordIndex].end += seekTime
+        }
+        updatedSegment.words = words
+    }
+    return updatedSegment
 }
 
 func timeit(operation: () -> Void) -> TimeInterval {

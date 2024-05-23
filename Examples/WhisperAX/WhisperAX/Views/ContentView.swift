@@ -9,6 +9,7 @@ import UIKit
 import AppKit
 #endif
 import AVFoundation
+import CoreML
 
 struct ContentView: View {
     @State var whisperKit: WhisperKit? = nil
@@ -18,6 +19,7 @@ struct ContentView: View {
     @State var isRecording: Bool = false
     @State var isTranscribing: Bool = false
     @State var currentText: String = ""
+    @State var currentChunks: [Int: (chunkText: [String], fallbacks: Int)] = [:]
     // TODO: Make this configurable in the UI
     @State var modelStorage: String = "huggingface/models/argmaxinc/whisperkit-coreml"
 
@@ -50,6 +52,8 @@ struct ContentView: View {
     @AppStorage("useVAD") private var useVAD: Bool = true
     @AppStorage("tokenConfirmationsNeeded") private var tokenConfirmationsNeeded: Double = 2
     @AppStorage("chunkingStrategy") private var chunkingStrategy: ChunkingStrategy = .none
+    @AppStorage("encoderComputeUnits") private var encoderComputeUnits: MLComputeUnits = .cpuAndNeuralEngine
+    @AppStorage("decoderComputeUnits") private var decoderComputeUnits: MLComputeUnits = .cpuAndNeuralEngine
 
     // MARK: Standard properties
 
@@ -72,7 +76,6 @@ struct ContentView: View {
     @State private var bufferSeconds: Double = 0
     @State private var confirmedSegments: [TranscriptionSegment] = []
     @State private var unconfirmedSegments: [TranscriptionSegment] = []
-    @State private var unconfirmedText: [String] = []
 
     // MARK: Eager mode properties
 
@@ -88,6 +91,7 @@ struct ContentView: View {
 
     // MARK: UI properties
 
+    @State private var showComputeUnits: Bool = true
     @State private var showAdvancedOptions: Bool = false
     @State private var transcriptionTask: Task<Void, Never>? = nil
     @State private var selectedCategoryId: MenuItem.ID?
@@ -104,6 +108,11 @@ struct ContentView: View {
         var image: String
     }
 
+
+    func getComputeOptions() -> ModelComputeOptions {
+        return ModelComputeOptions(audioEncoderCompute: encoderComputeUnits, textDecoderCompute: decoderComputeUnits)
+    }
+
     // MARK: Views
 
     func resetState() {
@@ -112,7 +121,7 @@ struct ContentView: View {
         isTranscribing = false
         whisperKit?.audioProcessor.stopRecording()
         currentText = ""
-        unconfirmedText = []
+        currentChunks = [:]
 
         pipelineStart = Double.greatestFiniteMagnitude
         firstTokenTime = Double.greatestFiniteMagnitude
@@ -144,21 +153,28 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView(columnVisibility: Binding.constant(.all)) {
-            modelSelectorView
-                .padding()
-            Spacer()
-            List(menu, selection: $selectedCategoryId) { item in
-                HStack {
-                    Image(systemName: item.image)
-                    Text(item.name)
-                        .font(.system(.title3))
-                        .bold()
+            VStack(alignment: .leading) {
+                modelSelectorView
+                    .padding(.vertical)
+                computeUnitsView
+                    .disabled(modelState != .loaded && modelState != .unloaded)
+                    .padding(.bottom)
+
+                List(menu, selection: $selectedCategoryId) { item in
+                    HStack {
+                        Image(systemName: item.image)
+                        Text(item.name)
+                            .font(.system(.title3))
+                            .bold()
+                    }
                 }
+                .disabled(modelState != .loaded)
+                .foregroundColor(modelState != .loaded ? .secondary : .primary)
+                .navigationTitle("WhisperAX")
+                .navigationSplitViewColumnWidth(min: 300, ideal: 350)
             }
-            .disabled(modelState != .loaded)
-            .foregroundColor(modelState != .loaded ? .secondary : .primary)
-            .navigationTitle("WhisperAX")
-            .navigationSplitViewColumnWidth(min: 300, ideal: 350)
+            .padding(.horizontal)
+            Spacer()
         } detail: {
             VStack {
                 #if os(iOS)
@@ -256,11 +272,6 @@ struct ContentView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         if enableDecoderPreview {
-                            Text("\(unconfirmedText.joined(separator: "\n"))")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.leading)
-                                .frame(maxWidth: .infinity, alignment: .leading)
                             Text("\(currentText)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -385,6 +396,56 @@ struct ContentView: View {
                     }
                 }
             }
+        }
+    }
+
+    var computeUnitsView: some View {
+        DisclosureGroup(isExpanded: $showComputeUnits) {
+            VStack(alignment: .leading) {
+                HStack {
+                    Image(systemName: "circle.fill")
+                        .foregroundStyle((whisperKit?.audioEncoder as? WhisperMLModel)?.modelState == .loaded ? .green : (modelState == .unloaded ? .red : .yellow))
+                        .symbolEffect(.variableColor, isActive: modelState != .loaded && modelState != .unloaded)
+                    Text("Audio Encoder")
+                    Spacer()
+                    Picker("", selection: $encoderComputeUnits) {
+                        Text("CPU").tag(MLComputeUnits.cpuOnly)
+                        Text("GPU").tag(MLComputeUnits.cpuAndGPU)
+                        Text("Neural Engine").tag(MLComputeUnits.cpuAndNeuralEngine)
+                    }
+                    .onChange(of: encoderComputeUnits, initial: false) { _, _ in
+                        loadModel(selectedModel)
+                    }
+                    .pickerStyle(MenuPickerStyle())
+                    .frame(width: 150)
+                }
+                HStack {
+                    Image(systemName: "circle.fill")
+                        .foregroundStyle((whisperKit?.textDecoder as? WhisperMLModel)?.modelState == .loaded ? .green : (modelState == .unloaded ? .red : .yellow))
+                        .symbolEffect(.variableColor, isActive: modelState != .loaded && modelState != .unloaded)
+                    Text("Text Decoder")
+                    Spacer()
+                    Picker("", selection: $decoderComputeUnits) {
+                        Text("CPU").tag(MLComputeUnits.cpuOnly)
+                        Text("GPU").tag(MLComputeUnits.cpuAndGPU)
+                        Text("Neural Engine").tag(MLComputeUnits.cpuAndNeuralEngine)
+                    }
+                    .onChange(of: decoderComputeUnits, initial: false) { _, _ in
+                        loadModel(selectedModel)
+                    }
+                    .pickerStyle(MenuPickerStyle())
+                    .frame(width: 150)
+                }
+            }
+            .padding(.top)
+        } label: {
+            Button {
+                showComputeUnits.toggle()
+            } label: {
+                Text("Compute Units")
+                    .font(.headline)
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -875,10 +936,18 @@ struct ContentView: View {
 
     func loadModel(_ model: String, redownload: Bool = false) {
         print("Selected Model: \(UserDefaults.standard.string(forKey: "selectedModel") ?? "nil")")
+        print("""
+            Computing Options:
+            - Mel Spectrogram:  \(getComputeOptions().melCompute.description)
+            - Audio Encoder:    \(getComputeOptions().audioEncoderCompute.description)
+            - Text Decoder:     \(getComputeOptions().textDecoderCompute.description)
+            - Prefill Data:     \(getComputeOptions().prefillCompute.description)
+        """)
 
         whisperKit = nil
         Task {
             whisperKit = try await WhisperKit(
+                computeOptions: getComputeOptions(),
                 verbose: true,
                 logLevel: .debug,
                 prewarm: false,
@@ -1136,7 +1205,6 @@ struct ContentView: View {
 
         await MainActor.run {
             currentText = ""
-            unconfirmedText = []
             guard let segments = transcription?.segments else {
                 return
             }
@@ -1157,7 +1225,7 @@ struct ContentView: View {
 
         let languageCode = Constants.languages[selectedLanguage, default: Constants.defaultLanguageCode]
         let task: DecodingTask = selectedTask == "transcribe" ? .transcribe : .translate
-        let seekClip = [lastConfirmedSegmentEndSeconds]
+        let seekClip: [Float] = []
 
         let options = DecodingOptions(
             verbose: false,
@@ -1175,20 +1243,42 @@ struct ContentView: View {
         )
 
         // Early stopping checks
-        let decodingCallback: ((TranscriptionProgress) -> Bool?) = { progress in
+        let decodingCallback: ((TranscriptionProgress) -> Bool?) = { (progress: TranscriptionProgress) in
             DispatchQueue.main.async {
+
                 let fallbacks = Int(progress.timings.totalDecodingFallbacks)
-                if progress.text.count < currentText.count {
-                    if fallbacks == self.currentFallbacks {
-                        self.unconfirmedText.append(currentText)
+                let chunkId = progress.windowId
+
+                // First check if this is a new window for the same chunk, append if so
+                var updatedChunk = (chunkText: [progress.text], fallbacks: fallbacks)
+                if var currentChunk = self.currentChunks[chunkId], let previousChunkText = currentChunk.chunkText.last {
+                    if progress.text.count >= previousChunkText.count {
+                        // This is the same window of an existing chunk, so we just update the last value
+                        currentChunk.chunkText[currentChunk.chunkText.endIndex - 1] = progress.text
+                        updatedChunk = currentChunk
                     } else {
-                        print("Fallback occured: \(fallbacks)")
+                        // This is either a new window or a fallback (only in streaming mode)
+                        if fallbacks == currentChunk.fallbacks && selectedTab != "Transcribe"  {
+                            // New window (since fallbacks havent changed)
+                            updatedChunk.chunkText = currentChunk.chunkText + [progress.text]
+                        } else {
+                            // Fallback, overwrite the previous bad text
+                            updatedChunk.chunkText[currentChunk.chunkText.endIndex - 1] = progress.text
+                            updatedChunk.fallbacks = fallbacks
+                            print("Fallback occured: \(fallbacks)")
+                        }
                     }
                 }
-                self.currentText = progress.text
+
+                // Set the new text for the chunk
+                self.currentChunks[chunkId] = updatedChunk
+                let joinedChunks = self.currentChunks.sorted { $0.key < $1.key }.flatMap { $0.value.chunkText }.joined(separator: "\n")
+
+                self.currentText = joinedChunks
                 self.currentFallbacks = fallbacks
                 self.currentDecodingLoops += 1
             }
+
             // Check early stopping
             let currentTokens = progress.tokens
             let checkWindow = Int(compressionCheckWindow)
@@ -1271,8 +1361,9 @@ struct ContentView: View {
                     }
                 }
 
+                // TODO: Implement silence buffer purging
 //                if nextBufferSeconds > 30 {
-//                    // This is a completely silent segment of 30s, so we can purge the audio and confirm anything pending
+//                    This is a completely silent segment of 30s, so we can purge the audio and confirm anything pending
 //                    lastConfirmedSegmentEndSeconds = 0
 //                    whisperKit.audioProcessor.purgeAudioSamples(keepingLast: 2 * WhisperKit.sampleRate) // keep last 2s to include VAD overlap
 //                    currentBuffer = whisperKit.audioProcessor.audioSamples
@@ -1311,7 +1402,6 @@ struct ContentView: View {
             // We need to run this next part on the main thread
             await MainActor.run {
                 currentText = ""
-                unconfirmedText = []
                 guard let segments = transcription?.segments else {
                     return
                 }
