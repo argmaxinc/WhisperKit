@@ -1110,11 +1110,11 @@ final class UnitTests: XCTestCase {
 
         // Select few sentences to compare at VAD border
         // TODO: test that WER is in acceptable range
-        XCTAssertTrue(testResult.text.contains("and then I would kind of do this"), "Expected text not found in \(testResult.text)")
-        XCTAssertTrue(chunkedResult.text.contains("and then I would kind of do this"), "Expected text not found in \(chunkedResult.text)")
+        XCTAssertTrue(testResult.text.normalized.contains("and then I would kind of do this"), "Expected text not found in \(testResult.text.normalized)")
+        XCTAssertTrue(chunkedResult.text.normalized.contains("and then I would kind of do this"), "Expected text not found in \(chunkedResult.text.normalized)")
 
-        XCTAssertTrue(testResult.text.contains("And that would happen every single paper"), "Expected text not found in \(testResult.text)")
-        XCTAssertTrue(chunkedResult.text.contains("And that would happen every single paper"), "Expected text not found in \(chunkedResult.text)")
+        XCTAssertTrue(testResult.text.normalized.contains("And that would happen every single paper"), "Expected text not found in \(testResult.text.normalized)")
+        XCTAssertTrue(chunkedResult.text.normalized.contains("And that would happen every single paper"), "Expected text not found in \(chunkedResult.text.normalized)")
 
         XCTAssertTrue(testResult.text.normalized.contains("But then came my 90 page senior".normalized), "Expected text not found in \(testResult.text.normalized)")
         XCTAssertTrue(chunkedResult.text.normalized.contains("But then came my 90 page senior".normalized), "Expected text not found in \(chunkedResult.text.normalized)")
