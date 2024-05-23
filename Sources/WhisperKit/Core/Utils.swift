@@ -16,10 +16,18 @@ import AppKit
 // MARK: - Extensions
 
 extension Array {
-    func chunked(into size: Int) -> [[Element]] {
+    func batched(into size: Int) -> [[Element]] {
         return stride(from: 0, to: count, by: size).map {
             Array(self[$0..<Swift.min($0 + size, count)])
         }
+    }
+}
+
+extension Array where Element == Result<[TranscriptionResult], Swift.Error> {
+    /// Convenience method to convert the `Result` object into an array of optional arrays of `TranscriptionResult`.
+    /// - Returns: An array of optional arrays containing `TranscriptionResult`.
+    func toOptionalArrays() -> [[TranscriptionResult]?] {
+        return self.map { try? $0.get() }
     }
 }
 
@@ -59,7 +67,7 @@ extension MLMultiArray {
 
     class func uninitializedIOSurfaceArray(shape: [NSNumber]) -> MLMultiArray? {
         guard let width = shape.last?.intValue else { return nil }
-        let height = shape[0..<shape.count-1].reduce(1, { $0 * $1.intValue })
+        let height = shape[0..<shape.count - 1].reduce(1) { $0 * $1.intValue }
 
         var pixelBuffer: CVPixelBuffer?
         let createReturn = CVPixelBufferCreate(
@@ -68,7 +76,8 @@ extension MLMultiArray {
             height,
             kCVPixelFormatType_OneComponent16Half,
             [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary,
-            &pixelBuffer)
+            &pixelBuffer
+        )
         guard createReturn == kCVReturnSuccess else { return nil }
         guard let pixelBuffer = pixelBuffer else { return nil }
 
@@ -87,6 +96,23 @@ extension MLModel {
             return try await Task {
                 try prediction(from: input, options: options)
             }.value
+        }
+    }
+}
+
+public extension MLComputeUnits {
+    var description: String {
+        switch self {
+            case .cpuOnly:
+                return "cpuOnly"
+            case .cpuAndGPU:
+                return "cpuAndGPU"
+            case .all:
+                return "all"
+            case .cpuAndNeuralEngine:
+                return "cpuAndNeuralEngine"
+            @unknown default:
+                return "unknown"
         }
     }
 }
@@ -138,8 +164,11 @@ extension String {
         // Convert to lowercase
         let lowercaseString = trimmedString.lowercased()
 
+        // Replace dashes with spaces
+        let noDashesString = lowercaseString.replacingOccurrences(of: "-", with: " ")
+
         // Remove punctuation
-        let noPunctuationString = lowercaseString.components(separatedBy: .punctuationCharacters).joined()
+        let noPunctuationString = noDashesString.components(separatedBy: .punctuationCharacters).joined()
 
         // Replace multiple spaces with a single space
         let singleSpacedString = noPunctuationString.replacingOccurrences(of: " +", with: " ", options: .regularExpression)
@@ -155,17 +184,38 @@ extension String {
 // MARK: - Helpers
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
+func prepareSeekClips(contentFrames: Int, decodeOptions: DecodingOptions?) -> [(start: Int, end: Int)] {
+    let options = decodeOptions ?? DecodingOptions()
+    var seekPoints: [Int] = options.clipTimestamps.map { Int(round($0 * Float(WhisperKit.sampleRate))) }
+    if seekPoints.count == 0 {
+        seekPoints.append(0)
+    }
+
+    if seekPoints.count % 2 == 1 {
+        seekPoints.append(contentFrames)
+    }
+
+    var seekClips: [(start: Int, end: Int)] = []
+    for i in stride(from: 0, to: seekPoints.count, by: 2) {
+        let start = seekPoints[i]
+        let end = i + 1 < seekPoints.count ? seekPoints[i + 1] : contentFrames
+        seekClips.append((start, end))
+    }
+
+    return seekClips
+}
+
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 func initMLMultiArray(shape: [NSNumber], dataType: MLMultiArrayDataType, initialValue: Any) -> MLMultiArray {
     var multiArray: MLMultiArray
     switch dataType {
-    case .float16:
-        // IOSurface-backed arrays are implicitly float16. They can
-        // reduce buffer copies for some OS:compute unit combinations.
-        multiArray = MLMultiArray.uninitializedIOSurfaceArray(shape: shape)!
-    default:
-        multiArray = try! MLMultiArray(shape: shape, dataType: dataType)
+        case .float16:
+            // IOSurface-backed arrays are implicitly float16. They can
+            // reduce buffer copies for some OS:compute unit combinations.
+            multiArray = MLMultiArray.uninitializedIOSurfaceArray(shape: shape)!
+        default:
+            multiArray = try! MLMultiArray(shape: shape, dataType: dataType)
     }
-
 
     let count = multiArray.count
     let pointer = multiArray.dataPointer
@@ -454,13 +504,47 @@ public func findLongestDifferentSuffix(_ words1: [WordTiming], _ words2: [WordTi
     return Array(remainingWords)
 }
 
-public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirmedWords: [WordTiming]) -> TranscriptionResult {
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
+public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirmedWords: [WordTiming]? = nil) -> TranscriptionResult {
+    var mergedText = ""
+    if let words = confirmedWords {
+        mergedText = words.map { $0.word }.joined()
+    } else {
+        mergedText = results.map { $0?.text ?? "" }.joined(separator: " ")
+    }
+
+    // Merge segments
     let validResults = results.compactMap { $0 }
+    var mergedSegments = [TranscriptionSegment]()
+    var previousSeek: Float = 0.0
+    for (resultIndex, result) in validResults.enumerated() {
+        let seekTime = result.seekTime ?? previousSeek
+        for (segmentIndex, segment) in result.segments.enumerated() {
+            var updatedSegment = segment
+            updatedSegment.id = resultIndex + segmentIndex
+            mergedSegments.append(updatedSegment)
+        }
+        // Update previousSeek only if seekTime is nil
+        if result.seekTime == nil {
+            previousSeek += Float(result.timings.inputAudioSeconds)
+        } else {
+            previousSeek = seekTime + Float(result.timings.inputAudioSeconds)
+        }
+    }
+
     let language = validResults.first?.language ?? Constants.defaultLanguageCode
 
-    let mergedSegments = validResults.flatMap { $0.segments }
-    let mergedText = confirmedWords.map { $0.word }.joined()
+    // Calculate the earliest start and latest end times
+    let earliestPipelineStart = validResults.map { $0.timings.pipelineStart }.min() ?? 0
+    let earliestTokenTime = validResults.map { $0.timings.firstTokenTime }.min() ?? 0
+    let latestPipelineEnd = validResults.map { $0.timings.pipelineStart + $0.timings.fullPipeline }.max() ?? 0
 
+    // Calculate the "user" pipeline time, excluding the time spent in concurrent pipelines
+    let userPipelineDuration = latestPipelineEnd - earliestPipelineStart
+    let systemPipelineDuration = validResults.map { $0.timings.fullPipeline }.reduce(0, +)
+    let fullPipelineDuration = min(userPipelineDuration, systemPipelineDuration)
+
+    // Update the merged timings with non-overlapping time values
     var mergedTimings = TranscriptionTimings(
         modelLoading: validResults.map { $0.timings.modelLoading }.max() ?? 0,
         audioLoading: validResults.map { $0.timings.audioLoading }.reduce(0, +),
@@ -486,17 +570,12 @@ public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirm
         totalTimestampAlignmentRuns: validResults.map { $0.timings.totalTimestampAlignmentRuns }.reduce(0, +),
         totalDecodingFallbacks: validResults.map { $0.timings.totalDecodingFallbacks }.reduce(0, +),
         totalDecodingWindows: validResults.map { $0.timings.totalDecodingWindows }.reduce(0, +),
-        fullPipeline: validResults.map { $0.timings.fullPipeline }.reduce(0, +)
+        fullPipeline: fullPipelineDuration
     )
 
+    mergedTimings.pipelineStart = earliestPipelineStart
+    mergedTimings.firstTokenTime = earliestTokenTime
     mergedTimings.inputAudioSeconds = validResults.map { $0.timings.inputAudioSeconds }.reduce(0, +)
-
-    // Average first token times
-    if let pipelineStart = validResults.first?.timings.pipelineStart {
-        let averageFirstTokenTime = validResults.map { ($0.timings.firstTokenTime) - ($0.timings.pipelineStart) }.reduce(0, +) / Double(validResults.count)
-        mergedTimings.pipelineStart = pipelineStart
-        mergedTimings.firstTokenTime = pipelineStart + averageFirstTokenTime
-    }
 
     return TranscriptionResult(
         text: mergedText,
@@ -504,6 +583,23 @@ public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirm
         language: language,
         timings: mergedTimings
     )
+}
+
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
+public func updateSegmentTimings(segment: TranscriptionSegment, seekTime: Float) -> TranscriptionSegment {
+    var updatedSegment = segment
+    let seekOffsetIndex = Int(seekTime * Float(WhisperKit.sampleRate))
+    updatedSegment.seek += seekOffsetIndex
+    updatedSegment.start += seekTime
+    updatedSegment.end += seekTime
+    if var words = updatedSegment.words {
+        for wordIndex in 0..<words.count {
+            words[wordIndex].start += seekTime
+            words[wordIndex].end += seekTime
+        }
+        updatedSegment.words = words
+    }
+    return updatedSegment
 }
 
 func timeit(operation: () -> Void) -> TimeInterval {
