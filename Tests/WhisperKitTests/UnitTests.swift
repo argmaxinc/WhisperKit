@@ -1116,8 +1116,8 @@ final class UnitTests: XCTestCase {
         XCTAssertTrue(testResult.text.contains("And that would happen every single paper"), "Expected text not found in \(testResult.text)")
         XCTAssertTrue(chunkedResult.text.contains("And that would happen every single paper"), "Expected text not found in \(chunkedResult.text)")
 
-        XCTAssertTrue(testResult.normalized.text.contains("But then came my 90 page senior".normalized), "Expected text not found in \(testResult.normalized.text)")
-        XCTAssertTrue(chunkedResult.normalized.text.contains("But then came my 90 page senior".normalized), "Expected text not found in \(chunkedResult.normalized.text)")
+        XCTAssertTrue(testResult.text.normalized.contains("But then came my 90 page senior".normalized), "Expected text not found in \(testResult.text.normalized)")
+        XCTAssertTrue(chunkedResult.text.normalized.contains("But then came my 90 page senior".normalized), "Expected text not found in \(chunkedResult.text.normalized)")
     }
 
     // MARK: - Word Timestamp Tests
