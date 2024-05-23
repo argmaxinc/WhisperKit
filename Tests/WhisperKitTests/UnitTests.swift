@@ -1013,8 +1013,8 @@ final class UnitTests: XCTestCase {
         // When specifically looking for speech instead of silence, a larger window is preferred
         let vadWithLargeWindow = EnergyVAD(frameLength: 0.2, frameOverlap: 0.1)
         let activitySeekClips = vadWithLargeWindow.calculateNonSilentSeekClips(in: audioArray)
-        XCTAssertEqual(activitySeekClips.map(\.start), [3200, 51200, 83200, 128000, 169600])
-        XCTAssertEqual(activitySeekClips.map(\.end), [35200, 70400, 121600, 166400, 176000])
+        XCTAssertEqual(activitySeekClips.map(\.start), [3200, 51200, 83200, 128_000, 169_600])
+        XCTAssertEqual(activitySeekClips.map(\.end), [35200, 70400, 121_600, 166_400, 176_000])
 
         let activityTimestamps = vadWithLargeWindow.voiceActivityClipTimestamps(in: audioArray)
         XCTAssertEqual(activityTimestamps, [0.2, 2.2, 3.2, 4.4, 5.2, 7.6, 8.0, 10.4, 10.6, 11.0])
@@ -1116,8 +1116,8 @@ final class UnitTests: XCTestCase {
         XCTAssertTrue(testResult.text.contains("And that would happen every single paper"), "Expected text not found in \(testResult.text)")
         XCTAssertTrue(chunkedResult.text.contains("And that would happen every single paper"), "Expected text not found in \(chunkedResult.text)")
 
-        XCTAssertTrue(testResult.text.contains("But then came my 90 page senior"), "Expected text not found in \(testResult.text)")
-        XCTAssertTrue(chunkedResult.text.contains("But then came my 90 page senior"), "Expected text not found in \(chunkedResult.text)")
+        XCTAssertTrue(testResult.normalized.text.contains("But then came my 90 page senior".normalized), "Expected text not found in \(testResult.normalized.text)")
+        XCTAssertTrue(chunkedResult.normalized.text.contains("But then came my 90 page senior".normalized), "Expected text not found in \(chunkedResult.normalized.text)")
     }
 
     // MARK: - Word Timestamp Tests

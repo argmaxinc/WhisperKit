@@ -167,8 +167,8 @@ public struct ModelComputeOptions {
 // MARK: - Chunking
 
 public struct AudioChunk {
-    var seekOffsetIndex: Int
-    var audioSamples: [Float]
+    public var seekOffsetIndex: Int
+    public var audioSamples: [Float]
 }
 
 // MARK: - Decoding
@@ -632,6 +632,10 @@ public struct TranscriptionTimings: Codable {
 
     public var realTimeFactor: Double {
         fullPipeline / inputAudioSeconds
+    }
+
+    public var speedFactor: Double {
+        inputAudioSeconds / fullPipeline
     }
 
     /// Initialize with all time intervals set to zero.

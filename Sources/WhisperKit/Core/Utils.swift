@@ -67,7 +67,7 @@ extension MLMultiArray {
 
     class func uninitializedIOSurfaceArray(shape: [NSNumber]) -> MLMultiArray? {
         guard let width = shape.last?.intValue else { return nil }
-        let height = shape[0..<shape.count-1].reduce(1, { $0 * $1.intValue })
+        let height = shape[0..<shape.count - 1].reduce(1) { $0 * $1.intValue }
 
         var pixelBuffer: CVPixelBuffer?
         let createReturn = CVPixelBufferCreate(
@@ -76,7 +76,8 @@ extension MLMultiArray {
             height,
             kCVPixelFormatType_OneComponent16Half,
             [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary,
-            &pixelBuffer)
+            &pixelBuffer
+        )
         guard createReturn == kCVReturnSuccess else { return nil }
         guard let pixelBuffer = pixelBuffer else { return nil }
 
@@ -208,14 +209,13 @@ func prepareSeekClips(contentFrames: Int, decodeOptions: DecodingOptions?) -> [(
 func initMLMultiArray(shape: [NSNumber], dataType: MLMultiArrayDataType, initialValue: Any) -> MLMultiArray {
     var multiArray: MLMultiArray
     switch dataType {
-    case .float16:
-        // IOSurface-backed arrays are implicitly float16. They can
-        // reduce buffer copies for some OS:compute unit combinations.
-        multiArray = MLMultiArray.uninitializedIOSurfaceArray(shape: shape)!
-    default:
-        multiArray = try! MLMultiArray(shape: shape, dataType: dataType)
+        case .float16:
+            // IOSurface-backed arrays are implicitly float16. They can
+            // reduce buffer copies for some OS:compute unit combinations.
+            multiArray = MLMultiArray.uninitializedIOSurfaceArray(shape: shape)!
+        default:
+            multiArray = try! MLMultiArray(shape: shape, dataType: dataType)
     }
-
 
     let count = multiArray.count
     let pointer = multiArray.dataPointer

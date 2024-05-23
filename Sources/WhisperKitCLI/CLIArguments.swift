@@ -75,7 +75,7 @@ struct CLIArguments: ParsableArguments {
 
     @Option(parsing: .upToNextOption, help: "List of timestamps (in seconds) of start and end values to transcribe as seperate clips in single audio file (example: --clip-timestamps 0 10.2 34.5 60.0)")
     var clipTimestamps: [Float] = []
-    
+
     @Option(parsing: .upToNextOption, help: "List of tokens to supress in the output (example: --supress-tokens 1 2 3)")
     var supressTokens: [Int] = []
 

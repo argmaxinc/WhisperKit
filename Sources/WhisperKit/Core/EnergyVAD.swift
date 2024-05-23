@@ -1,8 +1,8 @@
 //  For licensing see accompanying LICENSE.md file.
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
-import Foundation
 import Accelerate
+import Foundation
 
 /// Voice activity detection based on energy threshold
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
@@ -45,7 +45,6 @@ final class EnergyVAD {
         self.energyThreshold = energyThreshold
     }
 
-
     func voiceActivity(in waveform: [Float]) -> [Bool] {
         let chunkRatio = Double(waveform.count) / Double(frameLengthSamples)
 
@@ -60,7 +59,7 @@ final class EnergyVAD {
             energyThreshold: energyThreshold
         )
 
-       return chunkedVoiceActivity
+        return chunkedVoiceActivity
     }
 
     func calculateActiveChunks(in waveform: [Float]) -> [(startIndex: Int, endIndex: Int)] {
@@ -68,7 +67,7 @@ final class EnergyVAD {
         var result = [(startIndex: Int, endIndex: Int)]()
 
         // Temporary variables to hold the start of the current non-silent segment
-        var currentStartIndex: Int? = nil
+        var currentStartIndex: Int?
 
         for (index, vadChunk) in vad.enumerated() {
             if vadChunk {
@@ -148,7 +147,7 @@ final class EnergyVAD {
             } else {
                 // found beginning of silence, find the end
                 var endIndex = index
-                while endIndex < vadResult.count && !vadResult[endIndex] {
+                while endIndex < vadResult.count, !vadResult[endIndex] {
                     endIndex += 1
                 }
                 let count = endIndex - index

@@ -64,7 +64,7 @@ public protocol AudioProcessing {
 
     /// Stops recording and cleans up resources
     func stopRecording()
-    
+
     /// Resume recording audio from the specified input device, appending to continuous `audioArray` after pause
     func resumeRecordingLive(inputDeviceID: DeviceID?, callback: (([Float]) -> Void)?) throws
 }
@@ -74,7 +74,7 @@ public extension AudioProcessing {
     func startRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)?) throws {
         try startRecordingLive(inputDeviceID: inputDeviceID, callback: callback)
     }
-    
+
     func resumeRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)?) throws {
         try resumeRecordingLive(inputDeviceID: inputDeviceID, callback: callback)
     }
@@ -157,7 +157,7 @@ public extension AudioProcessing {
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class AudioProcessor: NSObject, AudioProcessing {
-    private var lastInputDevice:DeviceID?
+    private var lastInputDevice: DeviceID?
     public var audioEngine: AVAudioEngine?
     public var audioSamples: ContiguousArray<Float> = []
     public var audioEnergy: [(rel: Float, avg: Float, max: Float, min: Float)] = []
@@ -673,19 +673,18 @@ public extension AudioProcessor {
 
         // Set the callback
         audioBufferCallback = callback
-        
+
         lastInputDevice = inputDeviceID
     }
-    
+
     func resumeRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)? = nil) throws {
         try? setupAudioSessionForDevice()
-        
-        if inputDeviceID == lastInputDevice{
+
+        if inputDeviceID == lastInputDevice {
             try audioEngine?.start()
         } else {
             audioEngine = try setupEngine(inputDeviceID: inputDeviceID)
         }
-        
 
         // Set the callback only if the provided callback is not nil
         if let callback = callback {
