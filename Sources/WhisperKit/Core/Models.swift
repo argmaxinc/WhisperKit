@@ -592,7 +592,15 @@ public struct TranscriptionProgress {
 }
 
 /// Callback to receive progress updates during transcription.
-/// Return `false` to force the transcription to stop early.
+///
+/// - Parameters:
+///   - progress: The current transcription progress, including the transcribed text, tokens, and other relevant information.
+///
+/// - Returns: A Boolean value indicating whether to continue the transcription process or stop early.
+///   - `true`: Continue the transcription process.
+///   - `false`: Stop the transcription process early.
+///   - `nil`: Continue the transcription process (equivalent to returning `true`).
+/// - Note: This callback should be lightweight and return as quickly as possible to avoid extra decoding loops
 public typealias TranscriptionCallback = ((TranscriptionProgress) -> Bool?)?
 
 public struct TranscriptionTimings: Codable {

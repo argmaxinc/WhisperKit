@@ -146,10 +146,10 @@ final class TranscribeTask {
 
                 // Overload progress callback to include windowId
                 let decodingCallback: ((TranscriptionProgress) -> Bool?) = { [weak self] progress in
-                    guard let self = self else { return nil }
+                    guard let self = self, let callback = callback else { return nil }
                     var windowProgress = progress
                     windowProgress.windowId = Int(self.timings.totalDecodingWindows - self.timings.totalDecodingFallbacks)
-                    return callback?(windowProgress)
+                    return callback(windowProgress)
                 }
 
                 try Task.checkCancellation()

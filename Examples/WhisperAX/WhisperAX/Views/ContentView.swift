@@ -706,7 +706,7 @@ struct ContentView: View {
                     .lineLimit(1)
                 Spacer()
                 #if os(macOS)
-                Text(effectiveSpeedFactor.formatted(.number.precision(.fractionLength(0))) + " Speed Factor")
+                Text(effectiveSpeedFactor.formatted(.number.precision(.fractionLength(1))) + " Speed Factor")
                     .font(.system(.body))
                     .lineLimit(1)
                 Spacer()
