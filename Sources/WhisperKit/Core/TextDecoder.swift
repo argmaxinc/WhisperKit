@@ -307,6 +307,29 @@ public extension TextDecoding {
             }
         }
     }
+
+    func debugCaches(decoderInputs: DecodingInputs, tokenIndex: Int, prefillSize: Int) {
+        Logging.debug("--------------- DECODER INPUTS DEBUG ---------------")
+        Logging.debug(
+            String(
+                format: "Cache Length: %2.0f Input Token: %4.0f",
+                decoderInputs.cacheLength[0].floatValue,
+                decoderInputs.inputIds[0].floatValue
+            )
+        )
+        Logging.debug("Key Cache | Val Cache | Align Cache | Update Mask | Decoder Mask | Position")
+
+        for i in 0..<min(prefillSize + 4, Constants.maxTokenContext) {
+            let formattedString = String(format: "%9.6f | %9.6f | %9.6f | %11.0f | %12.0f | %d",
+                                         decoderInputs.keyCache[i].floatValue,
+                                         decoderInputs.valueCache[i].floatValue,
+                                         decoderInputs.alignmentWeights[i * 1500].floatValue,
+                                         decoderInputs.kvCacheUpdateMask[i].floatValue,
+                                         decoderInputs.decoderKeyPaddingMask[i].floatValue,
+                                         i)
+            Logging.debug(formattedString)
+        }
+    }
 }
 
 public class TextDecoderContextPrefill: WhisperMLModel {
@@ -319,6 +342,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
     public var tokenizer: WhisperTokenizer?
     public var prefillData: WhisperMLModel?
     public var isModelMultilingual: Bool = false
+    public var shouldEarlyStop: Bool = false
     private var languageLogitsFilter: LanguageLogitsFilter?
 
     public var supportsWordTimestamps: Bool {
@@ -700,11 +724,14 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
 
                 let result = TranscriptionProgress(timings: timings, text: currentTranscript, tokens: currentTokens, avgLogprob: averageLogProb, compressionRatio: compressionRatio)
 
-                // Call the callback if it is provided
-                if let shouldContinue = callback?(result) {
-                    if !shouldContinue && !isPrefill {
-                        Logging.debug("Early stopping")
-                        break
+                // Call the callback if it is provided on a background thread to avoid blocking the decoding loop
+                if let callback = callback {
+                    DispatchQueue.global().async { [weak self] in
+                        let shouldContinue = callback(result)
+                        if let shouldContinue = shouldContinue, !shouldContinue, !isPrefill {
+                            Logging.debug("Early stopping")
+                            self?.shouldEarlyStop = true
+                        }
                     }
                 }
             }
@@ -716,6 +743,11 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             if tokenIndex == prefilledIndex {
                 Logging.debug("Found first token at: \(Date())")
                 timings.firstTokenTime = CFAbsoluteTimeGetCurrent()
+            }
+
+            // Check if early stopping is triggered
+            if shouldEarlyStop {
+                break
             }
         }
 
@@ -807,28 +839,5 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             fallback: decodingFallback
         )
         return decodingResult
-    }
-
-    func debugCaches(decoderInputs: DecodingInputs, tokenIndex: Int, prefillSize: Int) {
-        Logging.debug("--------------- DECODER INPUTS DEBUG ---------------")
-        Logging.debug(
-            String(
-                format: "Cache Length: %2.0f Input Token: %4.0f",
-                decoderInputs.cacheLength[0].floatValue,
-                decoderInputs.inputIds[0].floatValue
-            )
-        )
-        Logging.debug("Key Cache | Val Cache | Align Cache | Update Mask | Decoder Mask | Position")
-
-        for i in 0..<min(prefillSize + 4, Constants.maxTokenContext) {
-            let formattedString = String(format: "%9.6f | %9.6f | %9.6f | %11.0f | %12.0f | %d",
-                                         decoderInputs.keyCache[i].floatValue,
-                                         decoderInputs.valueCache[i].floatValue,
-                                         decoderInputs.alignmentWeights[i * 1500].floatValue,
-                                         decoderInputs.kvCacheUpdateMask[i].floatValue,
-                                         decoderInputs.decoderKeyPaddingMask[i].floatValue,
-                                         i)
-            Logging.debug(formattedString)
-        }
     }
 }

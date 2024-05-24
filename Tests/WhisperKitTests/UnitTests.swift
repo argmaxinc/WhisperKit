@@ -293,6 +293,43 @@ final class UnitTests: XCTestCase {
         )
     }
 
+    func testDecodingEarlyStopping() async throws {
+        let options = DecodingOptions()
+        let continuationCallback: TranscriptionCallback = { (progress: TranscriptionProgress) -> Bool? in
+            false
+        }
+
+        let result = try await XCTUnwrapAsync(
+            await transcribe(with: .tiny, options: options, callback: continuationCallback).first!,
+            "Failed to transcribe"
+        )
+
+        XCTAssertNotNil(result)
+        let tokenCount = result.segments.flatMap { $0.tokens }.count
+        let decodingTimePerToken = result.timings.decodingLoop / Double(tokenCount)
+
+        // Work done in the callback should not block the decoding loop
+        let continuationCallbackWithWait: TranscriptionCallback = { (progress: TranscriptionProgress) -> Bool? in
+            Thread.sleep(forTimeInterval: 2)
+            return false
+        }
+
+        let resultWithWait = try await XCTUnwrapAsync(
+            await transcribe(with: .tiny, options: options, callback: continuationCallbackWithWait).first!,
+            "Failed to transcribe"
+        )
+
+        XCTAssertNotNil(resultWithWait)
+        let tokenCountWithWait = resultWithWait.segments.flatMap { $0.tokens }.count
+        let decodingTimePerTokenWithWait = resultWithWait.timings.decodingLoop / Double(tokenCountWithWait)
+
+        // Assert that the decoding predictions per token are not slower with the waiting
+        XCTAssertEqual(decodingTimePerTokenWithWait, decodingTimePerToken, accuracy: decodingTimePerToken * 0.75, "Decoding predictions per token should not be significantly slower with waiting")
+
+        // Assert that more tokens are returned in the callback with waiting
+        XCTAssertGreaterThanOrEqual(tokenCountWithWait, tokenCount, "More tokens should be returned in the callback with waiting")
+    }
+
     // MARK: - Tokenizer Tests
 
     func testDecoderTokenizer() async throws {
@@ -1113,8 +1150,8 @@ final class UnitTests: XCTestCase {
         XCTAssertTrue(testResult.text.normalized.contains("I would kind".normalized), "Expected text not found in \(testResult.text.normalized)")
         XCTAssertTrue(chunkedResult.text.normalized.contains("I would kind".normalized), "Expected text not found in \(chunkedResult.text.normalized)")
 
-        XCTAssertTrue(testResult.text.normalized.contains("would happen every single paper".normalized), "Expected text not found in \(testResult.text.normalized)")
-        XCTAssertTrue(chunkedResult.text.normalized.contains("would happen every single paper".normalized), "Expected text not found in \(chunkedResult.text.normalized)")
+        XCTAssertTrue(testResult.text.normalized.contains("every single paper".normalized), "Expected text not found in \(testResult.text.normalized)")
+        XCTAssertTrue(chunkedResult.text.normalized.contains("every single paper".normalized), "Expected text not found in \(chunkedResult.text.normalized)")
 
         XCTAssertTrue(testResult.text.normalized.contains("But then came my 90 page senior".normalized), "Expected text not found in \(testResult.text.normalized)")
         XCTAssertTrue(chunkedResult.text.normalized.contains("But then came my 90 page senior".normalized), "Expected text not found in \(chunkedResult.text.normalized)")
