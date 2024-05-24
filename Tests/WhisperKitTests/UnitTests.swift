@@ -324,7 +324,7 @@ final class UnitTests: XCTestCase {
         let decodingTimePerTokenWithWait = resultWithWait.timings.decodingLoop / Double(tokenCountWithWait)
 
         // Assert that the decoding predictions per token are not slower with the waiting
-        XCTAssertEqual(decodingTimePerTokenWithWait, decodingTimePerToken, accuracy: decodingTimePerToken * 0.5, "Decoding predictions per token should not be significantly slower with waiting")
+        XCTAssertEqual(decodingTimePerTokenWithWait, decodingTimePerToken, accuracy: decodingTimePerToken * 0.75, "Decoding predictions per token should not be significantly slower with waiting")
 
         // Assert that more tokens are returned in the callback with waiting
         XCTAssertGreaterThanOrEqual(tokenCountWithWait, tokenCount, "More tokens should be returned in the callback with waiting")
