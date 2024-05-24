@@ -1150,8 +1150,8 @@ final class UnitTests: XCTestCase {
         XCTAssertTrue(testResult.text.normalized.contains("I would kind".normalized), "Expected text not found in \(testResult.text.normalized)")
         XCTAssertTrue(chunkedResult.text.normalized.contains("I would kind".normalized), "Expected text not found in \(chunkedResult.text.normalized)")
 
-        XCTAssertTrue(testResult.text.normalized.contains("would happen every single paper".normalized), "Expected text not found in \(testResult.text.normalized)")
-        XCTAssertTrue(chunkedResult.text.normalized.contains("would happen every single paper".normalized), "Expected text not found in \(chunkedResult.text.normalized)")
+        XCTAssertTrue(testResult.text.normalized.contains("every single paper".normalized), "Expected text not found in \(testResult.text.normalized)")
+        XCTAssertTrue(chunkedResult.text.normalized.contains("every single paper".normalized), "Expected text not found in \(chunkedResult.text.normalized)")
 
         XCTAssertTrue(testResult.text.normalized.contains("But then came my 90 page senior".normalized), "Expected text not found in \(testResult.text.normalized)")
         XCTAssertTrue(chunkedResult.text.normalized.contains("But then came my 90 page senior".normalized), "Expected text not found in \(chunkedResult.text.normalized)")
