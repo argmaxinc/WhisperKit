@@ -41,6 +41,7 @@ public protocol TextDecoding {
     ) async throws -> DecodingResult
 
     @available(*, deprecated, message: "Subject to removal in a future version. Use `decodeText(from:using:sampler:options:callback:) async throws -> DecodingResult` instead.")
+    @_disfavoredOverload
     func decodeText(
         from encoderOutput: MLMultiArray,
         using decoderInputs: DecodingInputs,
@@ -58,6 +59,7 @@ public protocol TextDecoding {
     ) async throws -> DecodingResult
 
     @available(*, deprecated, message: "Subject to removal in a future version. Use `detectLanguage(from:using:sampler:options:temperature:) async throws -> DecodingResult` instead.")
+    @_disfavoredOverload
     func detectLanguage(
         from encoderOutput: MLMultiArray,
         using decoderInputs: DecodingInputs,

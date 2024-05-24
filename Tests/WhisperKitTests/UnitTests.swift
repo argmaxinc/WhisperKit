@@ -646,6 +646,27 @@ final class UnitTests: XCTestCase {
         }
     }
 
+    func testDetectLanguageHelperMethod() async throws {
+        let targetLanguages = ["es", "ja"]
+        let whisperKit = try await WhisperKit(
+            modelFolder: tinyModelPath(),
+            verbose: true,
+            logLevel: .debug
+        )
+
+        for language in targetLanguages {
+            let audioFilePath = try XCTUnwrap(
+                Bundle.module.path(forResource: "\(language)_test_clip", ofType: "wav"),
+                "Audio file not found"
+            )
+
+            // To detect language with the helper, just call the detect method with an audio file path
+            let result = try await whisperKit.detectLanguage(audioPath: audioFilePath)
+
+            XCTAssertEqual(result.language, language)
+        }
+    }
+
     func testNoTimestamps() async throws {
         let options = DecodingOptions(withoutTimestamps: true)
 
