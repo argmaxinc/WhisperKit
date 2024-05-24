@@ -370,6 +370,71 @@ open class WhisperKit {
         Logging.shared.loggingCallback = callback
     }
 
+    // MARK: - Detect language
+
+    /// Detects the language of the audio file at the specified path.
+    ///
+    /// - Parameter audioPath: The file path of the audio file.
+    /// - Returns: A tuple containing the detected language and the language log probabilities.
+    public func detectLanguage(
+        audioPath: String
+    ) async throws -> (language: String, langProbs: [String: Float]) {
+        let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioPath)
+        let audioArray = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
+        return try await detectLangauge(audioArray: audioArray)
+    }
+
+    /// Detects the language of the audio samples in the provided array.
+    ///
+    /// - Parameter audioArray: An array of audio samples.
+    /// - Returns: A tuple containing the detected language and the language log probabilities.
+    public func detectLangauge(
+        audioArray: [Float]
+    ) async throws -> (language: String, langProbs: [String: Float]) {
+        if modelState != .loaded {
+            try await loadModels()
+        }
+
+        // Ensure the model is multilingual, as language detection is only supported for these models
+        guard textDecoder.isModelMultilingual else {
+            throw WhisperError.decodingFailed("Language detection not supported for this model")
+        }
+        
+        // Tokenizer required for decoding
+        guard let tokenizer else {
+            throw WhisperError.tokenizerUnavailable()
+        }
+
+        let options = DecodingOptions()
+        let decoderInputs = try textDecoder.prepareDecoderInputs(withPrompt: [tokenizer.specialTokens.startOfTranscriptToken])
+        decoderInputs.kvCacheUpdateMask[0] = 1.0
+        decoderInputs.decoderKeyPaddingMask[0] = 0.0
+
+        // Detect language using up to the first 30 seconds
+        guard let audioSamples = AudioProcessor.padOrTrimAudio(fromArray: audioArray, startAt: 0, toLength: WhisperKit.windowSamples) else {
+            throw WhisperError.transcriptionFailed("Audio samples are nil")
+        }
+        guard let melOutput = try await featureExtractor.logMelSpectrogram(fromAudio: audioSamples) else {
+            throw WhisperError.transcriptionFailed("Mel output is nil")
+        }
+        guard let encoderOutput = try await audioEncoder.encodeFeatures(melOutput) else {
+            throw WhisperError.transcriptionFailed("Encoder output is nil")
+        }
+
+        let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: tokenizer.specialTokens.endToken, decodingOptions: options)
+        guard let languageDecodingResult: DecodingResult = try? await textDecoder.detectLanguage(
+            from: encoderOutput,
+            using: decoderInputs,
+            sampler: tokenSampler,
+            options: options,
+            temperature: 0
+        ) else {
+            throw WhisperError.decodingFailed("Language detection failed")
+        }
+
+        return (language: languageDecodingResult.language, langProbs: languageDecodingResult.languageProbs)
+    }
+
     // MARK: - Transcribe multiple audio files
 
     /// Convenience method to transcribe multiple audio files asynchronously and return the results as an array of optional arrays of `TranscriptionResult`.
@@ -398,7 +463,7 @@ open class WhisperKit {
     ///   - decodeOptions: Optional decoding options to customize the transcription process.
     ///   - callback: Optional callback to receive updates during the transcription process.
     ///
-    /// - Returns: An array of tuples, each containing the file path and a `Result` object with either a successful transcription result or an error.
+    /// - Returns: An array of `Result` objects with either a successful transcription result or an error.
     public func transcribeWithResults(
         audioPaths: [String],
         decodeOptions: DecodingOptions? = nil,
