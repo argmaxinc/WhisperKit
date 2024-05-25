@@ -588,6 +588,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         Logging.debug("Running main loop for a maximum of \(loopCount) iterations, starting at index \(prefilledIndex)")
         var hasAlignment = false
         var isFirstTokenLogProbTooLow = false
+        var shouldEarlyStop = false
         for tokenIndex in prefilledIndex..<loopCount {
             let loopStart = Date()
 
