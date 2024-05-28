@@ -41,6 +41,7 @@ public protocol TextDecoding {
     ) async throws -> DecodingResult
 
     @available(*, deprecated, message: "Subject to removal in a future version. Use `decodeText(from:using:sampler:options:callback:) async throws -> DecodingResult` instead.")
+    @_disfavoredOverload
     func decodeText(
         from encoderOutput: MLMultiArray,
         using decoderInputs: DecodingInputs,
@@ -58,6 +59,7 @@ public protocol TextDecoding {
     ) async throws -> DecodingResult
 
     @available(*, deprecated, message: "Subject to removal in a future version. Use `detectLanguage(from:using:sampler:options:temperature:) async throws -> DecodingResult` instead.")
+    @_disfavoredOverload
     func detectLanguage(
         from encoderOutput: MLMultiArray,
         using decoderInputs: DecodingInputs,
@@ -185,7 +187,7 @@ public extension TextDecoding {
         if let options = options {
             if isModelMultilingual {
                 // Set languageToken
-                let languageTokenString = "<|\(options.language ?? "en")|>"
+                let languageTokenString = "<|\(options.language ?? Constants.defaultLanguageCode)|>"
                 languageToken = tokenizer.convertTokenToId(languageTokenString) ?? tokenizer.specialTokens.englishToken
                 prefillTokens.append(languageToken)
 
@@ -307,6 +309,29 @@ public extension TextDecoding {
             }
         }
     }
+
+    func debugCaches(decoderInputs: DecodingInputs, tokenIndex: Int, prefillSize: Int) {
+        Logging.debug("--------------- DECODER INPUTS DEBUG ---------------")
+        Logging.debug(
+            String(
+                format: "Cache Length: %2.0f Input Token: %4.0f",
+                decoderInputs.cacheLength[0].floatValue,
+                decoderInputs.inputIds[0].floatValue
+            )
+        )
+        Logging.debug("Key Cache | Val Cache | Align Cache | Update Mask | Decoder Mask | Position")
+
+        for i in 0..<min(prefillSize + 4, Constants.maxTokenContext) {
+            let formattedString = String(format: "%9.6f | %9.6f | %9.6f | %11.0f | %12.0f | %d",
+                                         decoderInputs.keyCache[i].floatValue,
+                                         decoderInputs.valueCache[i].floatValue,
+                                         decoderInputs.alignmentWeights[i * 1500].floatValue,
+                                         decoderInputs.kvCacheUpdateMask[i].floatValue,
+                                         decoderInputs.decoderKeyPaddingMask[i].floatValue,
+                                         i)
+            Logging.debug(formattedString)
+        }
+    }
 }
 
 public class TextDecoderContextPrefill: WhisperMLModel {
@@ -319,6 +344,8 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
     public var tokenizer: WhisperTokenizer?
     public var prefillData: WhisperMLModel?
     public var isModelMultilingual: Bool = false
+    public var shouldEarlyStop: Bool = false
+    private var languageLogitsFilter: LanguageLogitsFilter?
 
     public var supportsWordTimestamps: Bool {
         return getModelOutputDimention(model, named: "alignment_heads_weights", position: 0) != nil
@@ -348,6 +375,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
     public func unloadModel() {
         model = nil
         prefillData = nil
+        languageLogitsFilter = nil
     }
 
     public func predictLogits(
@@ -399,32 +427,26 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         // Predict logits for 1 iteration with sot
         // 1. LanguageLogitsFilter for only language tokens
         // 2. GreedyTokenSampler for most likely language
-        var timings = TranscriptionTimings()
-
         guard let tokenizer = tokenizer else {
             // Tokenizer required for decoding
             throw WhisperError.tokenizerUnavailable()
         }
-
-        let prefilledIndex = 0
-        let currentTokens: [Int] = [tokenizer.specialTokens.startOfTranscriptToken]
-        var logProbs: [Float] = Array(repeating: 0, count: prefilledIndex + 1)
-
         guard let logitsSize = logitsSize else {
             throw WhisperError.modelsUnavailable("Failed to read logits size from model")
         }
 
-        // Logits filters
-        var logitsFilters: [any LogitsFiltering] = []
+        var timings = TranscriptionTimings()
+        let prefilledIndex = 0
+        let currentTokens: [Int] = [tokenizer.specialTokens.startOfTranscriptToken]
+        var logProbs: [Float] = Array(repeating: 0, count: prefilledIndex + 1)
 
-        // language filter
-        logitsFilters.append(
-            LanguageLogitsFilter(
-                allLanguageTokens: tokenizer.allLanguageTokens,
-                logitsDim: logitsSize,
-                sampleBegin: prefilledIndex
-            )
+        // Logits filters
+        let languageLogitsFilter = self.languageLogitsFilter ?? LanguageLogitsFilter(
+            allLanguageTokens: tokenizer.allLanguageTokens,
+            logitsDim: logitsSize,
+            sampleBegin: prefilledIndex
         )
+        self.languageLogitsFilter = languageLogitsFilter
 
         let tokenIndex = 0
         let prefillToken = currentTokens[tokenIndex]
@@ -461,10 +483,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         // MARK: Non-inference
 
         // Update predicted token as current
-        var logits = decoderOutput.logits!
-        for filter in logitsFilters {
-            logits = filter.filterLogits(logits, withTokens: currentTokens)
-        }
+        let logits = languageLogitsFilter.filterLogits(decoderOutput.logits!, withTokens: currentTokens)
 
         // MARK: Sampling
 
@@ -478,12 +497,37 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         let samplingTime = Date().timeIntervalSince(samplingStartTime)
         timings.decodingSampling += samplingTime
 
-        let detectedLanguage = tokenizer.decode(tokens: [nextToken]).dropFirst(2).dropLast(2)
-        var decodingResult = DecodingResult.emptyResults
-        decodingResult.timings = timings
-        decodingResult.language = String(detectedLanguage)
-        Logging.debug("Detected language: \(detectedLanguage)")
-        return decodingResult
+        var languageProbs = [String: Float]()
+        for (tokenIndex, token) in sampleResult.tokens.enumerated() {
+            if tokenizer.allLanguageTokens.contains(token) {
+                let language = tokenizer.decode(tokens: [token]).trimmingSpecialTokenCharacters()
+                languageProbs[language] = sampleResult.logProbs[tokenIndex]
+            }
+        }
+
+        let sampledLanguage = tokenizer.decode(tokens: [nextToken]).trimmingSpecialTokenCharacters()
+        let detectedLanguage: String
+        if Constants.languageCodes.contains(sampledLanguage) {
+            detectedLanguage = sampledLanguage
+            Logging.debug("Detected language: \(sampledLanguage)")
+        } else {
+            detectedLanguage = Constants.defaultLanguageCode
+            Logging.error("Detected language \(sampledLanguage) is not supported, defaulting to \(Constants.defaultLanguageCode)")
+        }
+        return DecodingResult(
+            language: detectedLanguage,
+            languageProbs: languageProbs,
+            tokens: [],
+            tokenLogProbs: [],
+            text: "",
+            avgLogProb: 0.0,
+            noSpeechProb: 0.0,
+            temperature: 0.0,
+            compressionRatio: 0.0,
+            cache: nil,
+            timings: timings,
+            fallback: nil
+        )
     }
 
     public func decodeText(
@@ -544,6 +588,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         Logging.debug("Running main loop for a maximum of \(loopCount) iterations, starting at index \(prefilledIndex)")
         var hasAlignment = false
         var isFirstTokenLogProbTooLow = false
+        shouldEarlyStop = false
         for tokenIndex in prefilledIndex..<loopCount {
             let loopStart = Date()
 
@@ -607,6 +652,8 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
 
             nextToken = sampleResult.tokens.last!
             let nextTokenLogProb = sampleResult.logProbs.last!
+
+            Logging.debug("Predicted next tokenIndex: \(tokenIndex + 1), token: \(nextToken), text: \(tokenizer.decode(tokens: [nextToken]))")
 
             let samplingTime = Date().timeIntervalSince(samplingStartTime)
             timings.decodingSampling += samplingTime
@@ -679,13 +726,15 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
                 let compressionRatio = compressionRatio(of: currentTokens)
 
                 let result = TranscriptionProgress(timings: timings, text: currentTranscript, tokens: currentTokens, avgLogprob: averageLogProb, compressionRatio: compressionRatio)
-                Logging.debug("Predicted next tokenIndex: \(tokenIndex + 1), token: \(nextToken), text: \(tokenizer.decode(tokens: [nextToken]))")
 
-                // Call the callback if it is provided
-                if let shouldContinue = callback?(result) {
-                    if !shouldContinue && !isPrefill {
-                        Logging.debug("Early stopping")
-                        break
+                // Call the callback if it is provided on a background thread to avoid blocking the decoding loop
+                if let callback = callback {
+                    DispatchQueue.global().async { [weak self] in
+                        let shouldContinue = callback(result)
+                        if let shouldContinue = shouldContinue, !shouldContinue, !isPrefill {
+                            Logging.debug("Early stopping")
+                            self?.shouldEarlyStop = true
+                        }
                     }
                 }
             }
@@ -695,7 +744,13 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             timings.totalDecodingLoops += 1
 
             if tokenIndex == prefilledIndex {
+                Logging.debug("Found first token at: \(Date())")
                 timings.firstTokenTime = CFAbsoluteTimeGetCurrent()
+            }
+
+            // Check if early stopping is triggered
+            if shouldEarlyStop {
+                break
             }
         }
 
@@ -737,7 +792,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         let noSpeechProb: Float = 0 // TODO: implement no speech prob
 
         // If language is still nil here, check language can be inferred from tokens
-        var language = options.language ?? "en"
+        var language = options.language ?? Constants.defaultLanguageCode
         var languageProbs = [String: Float]()
         if options.language == nil {
             // Find the first token that is a recognized language token
@@ -746,7 +801,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             {
                 let predictedLanguageToken = filteredTokens[predictedLanguageIndex]
                 // Decode the predicted language token to get the language
-                language = tokenizer.decode(tokens: [predictedLanguageToken]).trimmingCharacters(in: CharacterSet(charactersIn: "<|>"))
+                language = tokenizer.decode(tokens: [predictedLanguageToken]).trimmingSpecialTokenCharacters()
 
                 // Fetch the corresponding probability for the predicted language
                 let probsDict = tokenProbs[predictedLanguageIndex]
@@ -761,6 +816,8 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         }
 
         let transcript = tokenizer.decode(tokens: filteredTokens)
+
+        Logging.debug("Completed window: \(transcript)")
 
         let decodingFallback = DecodingFallback(
             options: options,
@@ -785,28 +842,5 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             fallback: decodingFallback
         )
         return decodingResult
-    }
-
-    func debugCaches(decoderInputs: DecodingInputs, tokenIndex: Int, prefillSize: Int) {
-        Logging.debug("--------------- DECODER INPUTS DEBUG ---------------")
-        Logging.debug(
-            String(
-                format: "Cache Length: %2.0f Input Token: %4.0f",
-                decoderInputs.cacheLength[0].floatValue,
-                decoderInputs.inputIds[0].floatValue
-            )
-        )
-        Logging.debug("Key Cache | Val Cache | Align Cache | Update Mask | Decoder Mask | Position")
-
-        for i in 0..<min(prefillSize + 4, Constants.maxTokenContext) {
-            let formattedString = String(format: "%9.6f | %9.6f | %9.6f | %11.0f | %12.0f | %d",
-                                         decoderInputs.keyCache[i].floatValue,
-                                         decoderInputs.valueCache[i].floatValue,
-                                         decoderInputs.alignmentWeights[i * 1500].floatValue,
-                                         decoderInputs.kvCacheUpdateMask[i].floatValue,
-                                         decoderInputs.decoderKeyPaddingMask[i].floatValue,
-                                         i)
-            Logging.debug(formattedString)
-        }
     }
 }

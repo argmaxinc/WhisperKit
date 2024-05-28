@@ -140,7 +140,7 @@ final class FunctionalTests: XCTestCase {
             ),
         ]
         let whisperKit = try await WhisperKit(modelFolder: tinyModelPath())
-        let transcriptionResults: [Result<[TranscriptionResult], Swift.Error>] = await whisperKit.transcribe(audioPaths: audioPaths)
+        let transcriptionResults: [Result<[TranscriptionResult], Swift.Error>] = await whisperKit.transcribeWithResults(audioPaths: audioPaths)
 
         XCTAssertEqual(transcriptionResults.count, 3)
         XCTAssertTrue(transcriptionResults.allSatisfy { $0.isSuccess })
@@ -168,7 +168,7 @@ final class FunctionalTests: XCTestCase {
             "/path/to/file2.wav",
         ]
         let whisperKit = try await WhisperKit(modelFolder: tinyModelPath())
-        let transcriptionResults: [Result<[TranscriptionResult], Swift.Error>] = await whisperKit.transcribe(audioPaths: audioPaths)
+        let transcriptionResults: [Result<[TranscriptionResult], Swift.Error>] = await whisperKit.transcribeWithResults(audioPaths: audioPaths)
 
         XCTAssertEqual(transcriptionResults.count, 3)
         XCTAssertEqual(
@@ -205,7 +205,7 @@ final class FunctionalTests: XCTestCase {
             .map { AudioProcessor.convertBufferToArray(buffer: $0) }
 
         let whisperKit = try await WhisperKit(modelFolder: tinyModelPath())
-        let transcriptionResults: [Result<[TranscriptionResult], Swift.Error>] = await whisperKit.transcribe(audioArrays: audioArrays)
+        let transcriptionResults: [Result<[TranscriptionResult], Swift.Error>] = await whisperKit.transcribeWithResults(audioArrays: audioArrays)
 
         XCTAssertEqual(transcriptionResults.count, 3)
         XCTAssertTrue(transcriptionResults.allSatisfy { $0.isSuccess })
