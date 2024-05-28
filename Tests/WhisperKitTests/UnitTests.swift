@@ -657,7 +657,7 @@ final class UnitTests: XCTestCase {
 
         for language in targetLanguages {
             let audioFilePath = try XCTUnwrap(
-                Bundle.module.path(forResource: "\(language)_test_clip", ofType: "wav"),
+                TestResource.path(forResource: "\(language)_test_clip", ofType: "wav"),
                 "Audio file not found"
             )
 
@@ -1016,7 +1016,7 @@ final class UnitTests: XCTestCase {
         XCTAssertTrue(vad.voiceActivity(in: []).isEmpty)
 
         let audioFilePath = try XCTUnwrap(
-            Bundle.module.path(forResource: "jfk", ofType: "wav"),
+            TestResource.path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
         let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
@@ -1121,7 +1121,7 @@ final class UnitTests: XCTestCase {
         Logging.shared.logLevel = .debug
 
         let singleChunkPath = try XCTUnwrap(
-            Bundle.module.path(forResource: "jfk", ofType: "wav"),
+            TestResource.path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
         var audioBuffer = try AudioProcessor.loadAudio(fromPath: singleChunkPath)
@@ -1136,7 +1136,7 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(audioChunks.count, 1)
 
         let multiChunkPath = try XCTUnwrap(
-            Bundle.module.path(forResource: "ted_60", ofType: "m4a"),
+            TestResource.path(forResource: "ted_60", ofType: "m4a"),
             "Audio file not found"
         )
         audioBuffer = try AudioProcessor.loadAudio(fromPath: multiChunkPath)
