@@ -41,7 +41,8 @@ final class TranscribeTask {
         let interval = Logging.beginSignpost("TranscribeAudio", signposter: Logging.TranscribeTask.signposter)
         defer { Logging.endSignpost("TranscribeAudio", interval: interval, signposter: Logging.TranscribeTask.signposter) }
 
-        timings.pipelineStart = CFAbsoluteTimeGetCurrent()
+        timings.pipelineStart = min(CFAbsoluteTimeGetCurrent(), timings.pipelineStart)
+        Logging.debug("Starting pipeline at: \(Date())")
 
         var options = decodeOptions ?? DecodingOptions()
         options.verbose = Logging.shared.logLevel != .none
@@ -49,7 +50,7 @@ final class TranscribeTask {
         var detectedLanguage: String?
 
         let contentFrames = audioArray.count
-        timings.inputAudioSeconds = Double(Int(contentFrames) / WhisperKit.sampleRate) - Double(decodeOptions?.clipTimestamps.first ?? 0)
+        timings.inputAudioSeconds = Double(contentFrames) / Double(WhisperKit.sampleRate) - Double(decodeOptions?.clipTimestamps.first ?? 0)
 
         // MARK: Init decoder inputs
 
@@ -91,26 +92,14 @@ final class TranscribeTask {
         var fallbackCount: Double = 0
 
         // Process seek clips
-        var seekPoints: [Int] = options.clipTimestamps.map { Int(round($0 * Float(WhisperKit.sampleRate))) }
-        if seekPoints.count == 0 {
-            seekPoints.append(0)
-        }
-        if seekPoints.count % 2 == 1 {
-            seekPoints.append(contentFrames)
-        }
-
-        var seekClips: [(start: Int, end: Int)] = []
-        for i in stride(from: 0, to: seekPoints.count, by: 2) {
-            let start = seekPoints[i]
-            let end = i + 1 < seekPoints.count ? seekPoints[i + 1] : contentFrames
-            seekClips.append((start, end))
-        }
-
-        let startDecodeLoopTime = CFAbsoluteTimeGetCurrent()
+        let seekClips = prepareSeekClips(contentFrames: contentFrames, decodeOptions: options)
+        Logging.debug("Decoding seek clips: \(seekClips)")
 
         let totalSeekDuration = seekClips.reduce(0) { $0 + ($1.end - $1.start) }
         progress.totalUnitCount = Int64(totalSeekDuration)
         defer { progress.completedUnitCount = progress.totalUnitCount }
+
+        let startDecodeLoopTime = CFAbsoluteTimeGetCurrent()
         for (seekClipStart, seekClipEnd) in seekClips {
             // Loop through the current clip until we reach the end
             // Typically this will be the full audio file, unless seek points are explicitly provided
@@ -121,13 +110,15 @@ final class TranscribeTask {
             let windowPadding = 16000 // prevent hallucinations at the end of the clip by stopping up to 1.0s early
             while seek < seekClipEnd - windowPadding {
                 // calculate new encoder segment features
-                Logging.debug("Decoding Seek: \(seek)")
                 let timeOffset = Float(seek) / Float(WhisperKit.sampleRate)
                 let segmentSize = min(WhisperKit.windowSamples, contentFrames - seek, seekClipEnd - seek)
                 let timeOffsetEnd = Float(seek + segmentSize) / Float(WhisperKit.sampleRate)
+                Logging.debug("Decoding Seek: \(seek) (\(formatTimestamp(timeOffset))s)")
+                Logging.debug("Decoding Window Size: \(segmentSize) (\(formatTimestamp(timeOffsetEnd - timeOffset))s)")
 
                 let audioProcessingStart = Date()
-                guard let audioSamples = AudioProcessor.padOrTrimAudio(fromArray: audioArray, startAt: seek, toLength: WhisperKit.windowSamples) else {
+                let clipAudioSamples = Array(audioArray[seek..<(seek + segmentSize)])
+                guard let audioSamples = AudioProcessor.padOrTrimAudio(fromArray: clipAudioSamples, startAt: 0, toLength: WhisperKit.windowSamples) else {
                     throw WhisperError.transcriptionFailed("Audio samples are nil")
                 }
                 let processTime = Date().timeIntervalSince(audioProcessingStart)
@@ -153,11 +144,19 @@ final class TranscribeTask {
                 timings.totalEncodingRuns += 1
 
                 // All features are computed, now we can decode
-                Logging.info("Decoding \(timeOffset)s - \(timeOffsetEnd)s")
+                Logging.info("Decoding \(formatTimestamp(timeOffset))s - \(formatTimestamp(timeOffsetEnd))s")
+
+                // Overload progress callback to include windowId
+                let decodingCallback: ((TranscriptionProgress) -> Bool?) = { [weak self] progress in
+                    guard let self = self, let callback = callback else { return nil }
+                    var windowProgress = progress
+                    windowProgress.windowId = Int(self.timings.totalDecodingWindows - self.timings.totalDecodingFallbacks)
+                    return callback(windowProgress)
+                }
 
                 try Task.checkCancellation()
                 // Send to decoder to predict text tokens with fallback
-                let decodingResult = try await decodeWithFallback(encoderSegment: encoderOutput, decodingOptions: options, callback: callback)
+                let decodingResult = try await decodeWithFallback(encoderSegment: encoderOutput, decodingOptions: options, callback: decodingCallback)
 
                 // MARK: Windowing
 
@@ -223,6 +222,7 @@ final class TranscribeTask {
 
                 if options.verbose {
                     let lines = formatSegments(currentSegments)
+                    Logging.debug("Segments for window:")
                     for line in lines {
                         Logging.debug(line)
                     }
@@ -311,9 +311,7 @@ final class TranscribeTask {
 
                 // Update timings from the decoder main loop
                 if let decodingTimings = decodingResult?.timings {
-                    if timings.firstTokenTime == 0 {
-                        timings.firstTokenTime = decodingTimings.firstTokenTime
-                    }
+                    timings.firstTokenTime = min(decodingTimings.firstTokenTime, timings.firstTokenTime)
                     timings.decodingPredictions += decodingTimings.decodingPredictions
                     timings.totalDecodingLoops += decodingTimings.totalDecodingLoops
                     timings.decodingNonPrediction += decodingTimings.decodingNonPrediction

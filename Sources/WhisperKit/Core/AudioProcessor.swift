@@ -64,12 +64,19 @@ public protocol AudioProcessing {
 
     /// Stops recording and cleans up resources
     func stopRecording()
+
+    /// Resume recording audio from the specified input device, appending to continuous `audioArray` after pause
+    func resumeRecordingLive(inputDeviceID: DeviceID?, callback: (([Float]) -> Void)?) throws
 }
 
 /// Overrideable default methods for AudioProcessing
 public extension AudioProcessing {
     func startRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)?) throws {
         try startRecordingLive(inputDeviceID: inputDeviceID, callback: callback)
+    }
+
+    func resumeRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)?) throws {
+        try resumeRecordingLive(inputDeviceID: inputDeviceID, callback: callback)
     }
 
     static func padOrTrimAudio(fromArray audioArray: [Float], startAt startIndex: Int = 0, toLength frameLength: Int = 480_000, saveSegment: Bool = false) -> MLMultiArray? {
@@ -150,6 +157,7 @@ public extension AudioProcessing {
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class AudioProcessor: NSObject, AudioProcessing {
+    private var lastInputDevice: DeviceID?
     public var audioEngine: AVAudioEngine?
     public var audioSamples: ContiguousArray<Float> = []
     public var audioEnergy: [(rel: Float, avg: Float, max: Float, min: Float)] = []
@@ -284,6 +292,84 @@ public class AudioProcessor: NSObject, AudioProcessing {
 
     // MARK: - Utility
 
+    /// Detect voice activity in the given buffer of relative energy values.
+    /// - Parameters:
+    ///   - relativeEnergy: relative energy values
+    ///   - nextBufferInSeconds: duration of the next buffer in seconds
+    ///   - energyValuesToConsider: number of energy values to consider
+    ///   - silenceThreshold: silence threshold
+    /// - Returns: true if voice is detected, false otherwise
+    public static func isVoiceDetected(
+        in relativeEnergy: [Float],
+        nextBufferInSeconds: Float,
+        silenceThreshold: Float
+    ) -> Bool {
+        // Calculate the number of energy values to consider based on the duration of the next buffer
+        // Each energy value corresponds to 1 buffer length (100ms of audio), hence we divide by 0.1
+        let energyValuesToConsider = Int(nextBufferInSeconds / 0.1)
+
+        // Extract the relevant portion of energy values from the currentRelativeEnergy array
+        let nextBufferEnergies = relativeEnergy.suffix(energyValuesToConsider)
+
+        // Determine the number of energy values to check for voice presence
+        // Considering up to the last 1 second of audio, which translates to 10 energy values
+        let numberOfValuesToCheck = max(10, nextBufferEnergies.count - 10)
+
+        // Check if any of the energy values in the considered range exceed the silence threshold
+        // This indicates the presence of voice in the buffer
+        return nextBufferEnergies.prefix(numberOfValuesToCheck).contains { $0 > silenceThreshold }
+    }
+
+    /// Calculate non-silent chunks of an audio.
+    /// - Parameter signal: audio signal
+    /// - Returns: an array of tuples indicating the start and end indices of non-silent chunks
+    public static func calculateNonSilentChunks(
+        in signal: [Float]
+    ) -> [(startIndex: Int, endIndex: Int)] {
+        EnergyVAD().calculateActiveChunks(in: signal)
+    }
+
+    /// Calculate voice activity in chunks of an audio based on energy threshold.
+    /// - Parameters:
+    ///   - signal: Audio signal
+    ///   - chunkCount: Number of chunks
+    ///   - frameLengthSamples: Frame length in samples
+    ///   - frameOverlapSamples: frame overlap in samples, this is helpful to catch large energy values at the very end of a frame
+    ///   - energyThreshold: Energy threshold for silence detection, default is 0.05. Chunks with energy below this threshold are considered silent.
+    /// - Returns: An array of booleans indicating whether each chunk is non-silent
+    public static func calculateVoiceActivityInChunks(
+        of signal: [Float],
+        chunkCount: Int,
+        frameLengthSamples: Int,
+        frameOverlapSamples: Int = 0,
+        energyThreshold: Float = 0.022
+    ) -> [Bool] {
+        var chunkEnergies = [Float]()
+        for chunkIndex in 0..<chunkCount {
+            let startIndex = chunkIndex * frameLengthSamples
+            let endIndex = min(startIndex + frameLengthSamples + frameOverlapSamples, signal.count)
+            let chunk = Array(signal[startIndex..<endIndex])
+            let avgEnergy = calculateAverageEnergy(of: chunk)
+            chunkEnergies.append(avgEnergy)
+        }
+
+        let vadResult = chunkEnergies.map { $0 > energyThreshold }
+
+        return vadResult
+    }
+
+    /// Calculate average energy of a signal chunk.
+    /// - Parameter signal: Chunk of audio signal.
+    /// - Returns: Average (RMS) energy of the signal chunk.
+    public static func calculateAverageEnergy(of signal: [Float]) -> Float {
+        var rmsEnergy: Float = 0.0
+        vDSP_rmsqv(signal, 1, &rmsEnergy, vDSP_Length(signal.count))
+        return rmsEnergy
+    }
+
+    /// Calculate energy of a signal chunk.
+    /// - Parameter signal: Chunk of audio signal.
+    /// - Returns: Tuple containing average (RMS energy), maximum, and minimum values.
     public static func calculateEnergy(of signal: [Float]) -> (avg: Float, max: Float, min: Float) {
         var rmsEnergy: Float = 0.0
         var minEnergy: Float = 0.0
@@ -302,7 +388,7 @@ public class AudioProcessor: NSObject, AudioProcessing {
     }
 
     public static func calculateRelativeEnergy(of signal: [Float], relativeTo reference: Float?) -> Float {
-        let signalEnergy = calculateEnergy(of: signal).avg
+        let signalEnergy = calculateAverageEnergy(of: signal)
 
         // Make sure reference is greater than 0
         // Default 1e-3 measured empirically in a silent room
@@ -587,6 +673,23 @@ public extension AudioProcessor {
 
         // Set the callback
         audioBufferCallback = callback
+
+        lastInputDevice = inputDeviceID
+    }
+
+    func resumeRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)? = nil) throws {
+        try? setupAudioSessionForDevice()
+
+        if inputDeviceID == lastInputDevice {
+            try audioEngine?.start()
+        } else {
+            audioEngine = try setupEngine(inputDeviceID: inputDeviceID)
+        }
+
+        // Set the callback only if the provided callback is not nil
+        if let callback = callback {
+            audioBufferCallback = callback
+        }
     }
 
     func pauseRecording() {

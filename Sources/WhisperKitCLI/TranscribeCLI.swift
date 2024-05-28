@@ -7,8 +7,9 @@ import Foundation
 import WhisperKit
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-struct Transcribe: AsyncParsableCommand {
+struct TranscribeCLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
+        commandName: "transcribe",
         abstract: "Transcribe audio to text using WhisperKit"
     )
 
@@ -35,6 +36,12 @@ struct Transcribe: AsyncParsableCommand {
                 }
 
             cliArguments.audioPath = audioFiles.map { audioFolder + "/" + $0 }
+        }
+
+        if let chunkingStrategyRaw = cliArguments.chunkingStrategy {
+            if ChunkingStrategy(rawValue: chunkingStrategyRaw) == nil {
+                throw ValidationError("Wrong chunking strategy \"\(chunkingStrategyRaw)\", valid strategies: \(ChunkingStrategy.allCases.map { $0.rawValue })")
+            }
         }
     }
 
@@ -77,23 +84,36 @@ struct Transcribe: AsyncParsableCommand {
         var options = decodingOptions(task: task)
         if let promptText = cliArguments.prompt, let tokenizer = whisperKit.tokenizer {
             options.promptTokens = tokenizer.encode(text: " " + promptText.trimmingCharacters(in: .whitespaces)).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
+            options.usePrefillPrompt = true
         }
 
         if let prefixText = cliArguments.prefix, let tokenizer = whisperKit.tokenizer {
             options.prefixTokens = tokenizer.encode(text: " " + prefixText.trimmingCharacters(in: .whitespaces)).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
+            options.usePrefillPrompt = true
         }
 
-        let transcribeResult: [Result<[TranscriptionResult], Swift.Error>] = await whisperKit.transcribe(
+        let transcribeResult: [Result<[TranscriptionResult], Swift.Error>] = await whisperKit.transcribeWithResults(
             audioPaths: resolvedAudioPaths,
             decodeOptions: options
         )
 
+        // TODO: we need to track the results between audio files, and shouldnt merge them
+        // ONLY merge results for different chunks of the same audio file or array
+        let allSuccessfulResults = transcribeResult.compactMap { try? $0.get() }.flatMap { $0 }
+
+        // Log timings for full transcription run
+        if cliArguments.verbose {
+            let mergedResult = mergeTranscriptionResults(allSuccessfulResults)
+            mergedResult.logTimings()
+        }
+
         for (audioPath, result) in zip(resolvedAudioPaths, transcribeResult) {
-            switch result {
-                case let .success(transcribeResult):
-                    processTranscriptionResult(audioPath: audioPath, transcribeResult: transcribeResult.first)
-                case let .failure(error):
-                    print("Error when transcribing \(audioPath): \(error)")
+            do {
+                let partialResult = try result.get()
+                let mergedPartialResult = mergeTranscriptionResults(partialResult)
+                processTranscriptionResult(audioPath: audioPath, transcribeResult: mergedPartialResult)
+            } catch {
+                print("Error when transcribing \(audioPath): \(error)")
             }
         }
     }
@@ -298,6 +318,12 @@ struct Transcribe: AsyncParsableCommand {
     }
 
     private func decodingOptions(task: DecodingTask) -> DecodingOptions {
+        let chunkingStrategy: ChunkingStrategy? =
+            if let chunkingStrategyRaw = cliArguments.chunkingStrategy {
+                ChunkingStrategy(rawValue: chunkingStrategyRaw)
+            } else {
+                nil
+            }
         return DecodingOptions(
             verbose: cliArguments.verbose,
             task: task,
@@ -311,12 +337,14 @@ struct Transcribe: AsyncParsableCommand {
             skipSpecialTokens: cliArguments.skipSpecialTokens,
             withoutTimestamps: cliArguments.withoutTimestamps,
             wordTimestamps: cliArguments.wordTimestamps || cliArguments.streamSimulated,
+            clipTimestamps: cliArguments.clipTimestamps,
             supressTokens: cliArguments.supressTokens,
             compressionRatioThreshold: cliArguments.compressionRatioThreshold ?? 2.4,
             logProbThreshold: cliArguments.logprobThreshold ?? -1.0,
             firstTokenLogProbThreshold: cliArguments.firstTokenLogProbThreshold,
             noSpeechThreshold: cliArguments.noSpeechThreshold ?? 0.6,
-            concurrentWorkerCount: cliArguments.concurrentWorkerCount
+            concurrentWorkerCount: cliArguments.concurrentWorkerCount,
+            chunkingStrategy: chunkingStrategy
         )
     }
 
@@ -324,11 +352,11 @@ struct Transcribe: AsyncParsableCommand {
         audioPath: String,
         transcribeResult: TranscriptionResult?
     ) {
+        let audioFile = URL(fileURLWithPath: audioPath).lastPathComponent
+        let audioFileName = audioFile.components(separatedBy: ".").first!
         let transcription = transcribeResult?.text ?? "Transcription failed"
 
         if cliArguments.report, let result = transcribeResult {
-            let audioFileName = URL(fileURLWithPath: audioPath).lastPathComponent.components(separatedBy: ".").first!
-
             // Write SRT (SubRip Subtitle Format) for the transcription
             let srtReportWriter = WriteSRT(outputDir: cliArguments.reportPath)
             let savedSrtReport = srtReportWriter.write(result: result, to: audioFileName)
@@ -355,7 +383,7 @@ struct Transcribe: AsyncParsableCommand {
         }
 
         if cliArguments.verbose {
-            print("\n\nTranscription: \n\n\(transcription)\n")
+            print("\n\nTranscription of \(audioFile): \n\n\(transcription)\n")
         } else {
             print(transcription)
         }

@@ -76,7 +76,7 @@ final class UnitTests: XCTestCase {
     func testAudioEnergy() {
         let samples = [Float](repeating: 0.0, count: 16000)
         let silence = samples.map { _ in Float(0.0) }
-        let energy = AudioProcessor.calculateEnergy(of: silence).avg
+        let energy = AudioProcessor.calculateAverageEnergy(of: silence)
         XCTAssertEqual(energy, 0.0, "Audio energy is not silent")
 
         let loudNoise = samples.map { _ in Float.random(in: -1...1) }
@@ -84,7 +84,7 @@ final class UnitTests: XCTestCase {
         XCTAssertGreaterThan(energyLoud, energy, "Audio energy is not loud")
 
         let veryLoudNoise = samples.map { _ in Float.random(in: -10...10) }
-        let energyVeryLoud = AudioProcessor.calculateEnergy(of: veryLoudNoise).avg
+        let energyVeryLoud = AudioProcessor.calculateAverageEnergy(of: veryLoudNoise)
         XCTAssertGreaterThan(energyVeryLoud, energyLoud, "Audio energy is not very loud")
     }
 
@@ -96,7 +96,7 @@ final class UnitTests: XCTestCase {
             AudioProcessor.padOrTrimAudio(fromArray: audioSamples, startAt: 0, toLength: 480_000),
             "Failed to pad audio samples"
         )
-        var featureExtractor = FeatureExtractor()
+        let featureExtractor = FeatureExtractor()
         let modelPath = try URL(filePath: tinyModelPath()).appending(path: "MelSpectrogram.mlmodelc")
         try await featureExtractor.loadModel(at: modelPath, computeUnits: ModelComputeOptions().melCompute)
         let melSpectrogram = try await XCTUnwrapAsync(
@@ -135,7 +135,7 @@ final class UnitTests: XCTestCase {
     // MARK: - Encoder Tests
 
     func testEncoderOutput() async throws {
-        var audioEncoder = AudioEncoder()
+        let audioEncoder = AudioEncoder()
         let modelPath = try URL(filePath: tinyModelPath()).appending(path: "AudioEncoder.mlmodelc")
         try? await audioEncoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().audioEncoderCompute)
 
@@ -150,7 +150,7 @@ final class UnitTests: XCTestCase {
     // MARK: - Decoder Tests
 
     func testDecoderOutput() async throws {
-        var textDecoder = TextDecoder()
+        let textDecoder = TextDecoder()
         let decodingOptions = DecodingOptions()
         let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         await XCTAssertNoThrowAsync(
@@ -189,7 +189,7 @@ final class UnitTests: XCTestCase {
             firstTokenLogProbThreshold: nil,
             noSpeechThreshold: nil
         )
-        var textDecoder = TextDecoder()
+        let textDecoder = TextDecoder()
         let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
         textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
@@ -213,7 +213,7 @@ final class UnitTests: XCTestCase {
             firstTokenLogProbThreshold: 1000.0,
             noSpeechThreshold: nil
         )
-        var textDecoder = TextDecoder()
+        let textDecoder = TextDecoder()
         let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
         textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
@@ -291,6 +291,43 @@ final class UnitTests: XCTestCase {
                 avgLogProb: 0
             )
         )
+    }
+
+    func testDecodingEarlyStopping() async throws {
+        let options = DecodingOptions()
+        let continuationCallback: TranscriptionCallback = { (progress: TranscriptionProgress) -> Bool? in
+            false
+        }
+
+        let result = try await XCTUnwrapAsync(
+            await transcribe(with: .tiny, options: options, callback: continuationCallback).first!,
+            "Failed to transcribe"
+        )
+
+        XCTAssertNotNil(result)
+        let tokenCount = result.segments.flatMap { $0.tokens }.count
+        let decodingTimePerToken = result.timings.decodingLoop / Double(tokenCount)
+
+        // Work done in the callback should not block the decoding loop
+        let continuationCallbackWithWait: TranscriptionCallback = { (progress: TranscriptionProgress) -> Bool? in
+            Thread.sleep(forTimeInterval: 2)
+            return false
+        }
+
+        let resultWithWait = try await XCTUnwrapAsync(
+            await transcribe(with: .tiny, options: options, callback: continuationCallbackWithWait).first!,
+            "Failed to transcribe"
+        )
+
+        XCTAssertNotNil(resultWithWait)
+        let tokenCountWithWait = resultWithWait.segments.flatMap { $0.tokens }.count
+        let decodingTimePerTokenWithWait = resultWithWait.timings.decodingLoop / Double(tokenCountWithWait)
+
+        // Assert that the decoding predictions per token are not slower with the waiting
+        XCTAssertEqual(decodingTimePerTokenWithWait, decodingTimePerToken, accuracy: decodingTimePerToken * 0.75, "Decoding predictions per token should not be significantly slower with waiting")
+
+        // Assert that more tokens are returned in the callback with waiting
+        XCTAssertGreaterThan(tokenCountWithWait, tokenCount, "More tokens should be returned in the callback with waiting")
     }
 
     // MARK: - Tokenizer Tests
@@ -609,6 +646,27 @@ final class UnitTests: XCTestCase {
         }
     }
 
+    func testDetectLanguageHelperMethod() async throws {
+        let targetLanguages = ["es", "ja"]
+        let whisperKit = try await WhisperKit(
+            modelFolder: tinyModelPath(),
+            verbose: true,
+            logLevel: .debug
+        )
+
+        for language in targetLanguages {
+            let audioFilePath = try XCTUnwrap(
+                Bundle.module.path(forResource: "\(language)_test_clip", ofType: "wav"),
+                "Audio file not found"
+            )
+
+            // To detect language with the helper, just call the detect method with an audio file path
+            let result = try await whisperKit.detectLanguage(audioPath: audioFilePath)
+
+            XCTAssertEqual(result.language, language)
+        }
+    }
+
     func testNoTimestamps() async throws {
         let options = DecodingOptions(withoutTimestamps: true)
 
@@ -778,15 +836,15 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(logits4.data(for: 2), [0.1, 0.2, -.infinity, -.infinity, -.infinity, 0.6, 0.7])
     }
 
-    func testChunkedArray() {
-        XCTAssertEqual([Int]().chunked(into: 1), [])
-        XCTAssertEqual([1, 2, 3, 4].chunked(into: 1), [[1], [2], [3], [4]])
+    func testBatchedArray() {
+        XCTAssertEqual([Int]().batched(into: 1), [])
+        XCTAssertEqual([1, 2, 3, 4].batched(into: 1), [[1], [2], [3], [4]])
 
-        XCTAssertEqual([Int]().chunked(into: 10), [])
-        XCTAssertEqual([1, 2, 3, 4].chunked(into: 10), [[1, 2, 3, 4]])
+        XCTAssertEqual([Int]().batched(into: 10), [])
+        XCTAssertEqual([1, 2, 3, 4].batched(into: 10), [[1, 2, 3, 4]])
 
-        XCTAssertEqual([Int]().chunked(into: 3), [])
-        XCTAssertEqual([1, 2, 3, 4].chunked(into: 3), [[1, 2, 3], [4]])
+        XCTAssertEqual([Int]().batched(into: 3), [])
+        XCTAssertEqual([1, 2, 3, 4].batched(into: 3), [[1, 2, 3], [4]])
     }
 
     func testTrimmingSpecialTokenCharacters() {
@@ -947,6 +1005,177 @@ final class UnitTests: XCTestCase {
         let logits3 = try MLMultiArray.logits([1.1, 0.2, 0.3, 0.4, 0.2, 0.1, 0.2])
         let result3 = tokensFilter3.filterLogits(logits3, withTokens: [101])
         XCTAssertEqual(result3.data(for: 2), [-.infinity, -.infinity, -.infinity, -.infinity, 0.2, 0.1, 0.2])
+    }
+
+    // MARK: - VAD Tests
+
+    func testVoiceActivity() throws {
+        let vad = EnergyVAD()
+
+        XCTAssertTrue(vad.voiceActivity(in: []).isEmpty)
+
+        let audioFilePath = try XCTUnwrap(
+            Bundle.module.path(forResource: "jfk", ofType: "wav"),
+            "Audio file not found"
+        )
+        let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
+        let audioArray = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
+
+        let jfkVad = vad.voiceActivity(in: audioArray)
+        let result1 = try XCTUnwrap(vad.findLongestSilence(in: jfkVad))
+        XCTAssertEqual(result1.startIndex, 43)
+        XCTAssertEqual(result1.endIndex, 54)
+
+        XCTAssertEqual(vad.voiceActivityIndexToAudioSampleIndex(result1.startIndex), 68800)
+        XCTAssertEqual(vad.voiceActivityIndexToAudioSampleIndex(result1.endIndex), 86400)
+
+        XCTAssertEqual(vad.voiceActivityIndexToSeconds(result1.startIndex), 4.3)
+        XCTAssertEqual(vad.voiceActivityIndexToSeconds(result1.endIndex), 5.4)
+
+        // When looking for silence boundaries, a smaller frame length is preferred
+        let vadForSilence = EnergyVAD(frameLengthSamples: 320)
+        let nonSilentChunks1 = vadForSilence.calculateActiveChunks(in: [])
+        XCTAssertEqual(nonSilentChunks1.map(\.startIndex), [])
+        XCTAssertEqual(nonSilentChunks1.map(\.endIndex), [])
+
+        let nonSilentChunks2 = vadForSilence.calculateActiveChunks(in: Array(repeating: 0, count: 1600))
+        XCTAssertEqual(nonSilentChunks2.map(\.startIndex), [])
+        XCTAssertEqual(nonSilentChunks2.map(\.endIndex), [])
+
+        let nonSilentChunks3 = vadForSilence.calculateActiveChunks(in: Array(repeating: 1, count: 1600))
+        XCTAssertEqual(nonSilentChunks3.map(\.startIndex), [0])
+        XCTAssertEqual(nonSilentChunks3.map(\.endIndex), [1600])
+
+        let nonSilentChunks4 = vadForSilence.calculateActiveChunks(in: Array(repeating: 0, count: 1600) + Array(repeating: 1, count: 1600))
+        XCTAssertEqual(nonSilentChunks4.map(\.startIndex), [1600])
+        XCTAssertEqual(nonSilentChunks4.map(\.endIndex), [3200])
+
+        let nonSilentChunksWithUnevenFrameLength1 = vadForSilence.calculateActiveChunks(in: Array(repeating: 1, count: 1601))
+        XCTAssertEqual(nonSilentChunksWithUnevenFrameLength1.map(\.startIndex), [0])
+        XCTAssertEqual(nonSilentChunksWithUnevenFrameLength1.map(\.endIndex), [1601])
+
+        let nonSilentChunksWithUnevenFrameLength2 = vadForSilence.calculateActiveChunks(in: Array(repeating: 1, count: 1599))
+        XCTAssertEqual(nonSilentChunksWithUnevenFrameLength2.map(\.startIndex), [0])
+        XCTAssertEqual(nonSilentChunksWithUnevenFrameLength2.map(\.endIndex), [1599])
+
+        let nonSilentChunksWithUnevenFrameLength3 = vadForSilence.calculateActiveChunks(in: Array(repeating: 1, count: 1599) + Array(repeating: 0, count: 1600))
+        XCTAssertEqual(nonSilentChunksWithUnevenFrameLength3.map(\.startIndex), [0])
+        XCTAssertEqual(nonSilentChunksWithUnevenFrameLength3.map(\.endIndex), [1600]) // frame length
+
+        // Even with a smaller frame lenth, sometimes we need an overlap to detect them when they are very close to the boundary
+        let vadWithOverlap = EnergyVAD(frameLengthSamples: 320, frameOverlapSamples: 80)
+        let nonSilentChunksWithOverlap = vadWithOverlap.calculateActiveChunks(in: Array(repeating: 0, count: 1600) + Array(repeating: 1, count: 1600))
+        XCTAssertEqual(nonSilentChunksWithOverlap.map(\.startIndex), [1280])
+        XCTAssertEqual(nonSilentChunksWithOverlap.map(\.endIndex), [3200])
+
+        // When specifically looking for speech instead of silence, a larger window is preferred
+        let vadWithLargeWindow = EnergyVAD(frameLength: 0.2, frameOverlap: 0.1)
+        let activitySeekClips = vadWithLargeWindow.calculateNonSilentSeekClips(in: audioArray)
+        XCTAssertEqual(activitySeekClips.map(\.start), [3200, 51200, 83200, 128_000, 169_600])
+        XCTAssertEqual(activitySeekClips.map(\.end), [35200, 70400, 121_600, 166_400, 176_000])
+
+        let activityTimestamps = vadWithLargeWindow.voiceActivityClipTimestamps(in: audioArray)
+        XCTAssertEqual(activityTimestamps, [0.2, 2.2, 3.2, 4.4, 5.2, 7.6, 8.0, 10.4, 10.6, 11.0])
+
+        let activitySeekTimestamps = vadWithLargeWindow.calculateSeekTimestamps(in: audioArray)
+        XCTAssertEqual(activitySeekTimestamps.map(\.startTime), [0.2, 3.2, 5.2, 8.0, 10.6])
+        XCTAssertEqual(activitySeekTimestamps.map(\.endTime), [2.2, 4.4, 7.6, 10.4, 11.0])
+    }
+
+    func testFindLongestSilence() throws {
+        let vad = EnergyVAD()
+
+        XCTAssertNil(vad.findLongestSilence(in: []))
+        XCTAssertNil(vad.findLongestSilence(in: [true]))
+        XCTAssertNil(vad.findLongestSilence(in: [true, true]))
+        XCTAssertNil(vad.findLongestSilence(in: [true, true, true, true, true]))
+
+        let (startIndex1, endIndex1) = try XCTUnwrap(vad.findLongestSilence(in: [false]))
+        XCTAssertEqual(startIndex1, 0)
+        XCTAssertEqual(endIndex1, 1)
+
+        let (startIndex2, endIndex2) = try XCTUnwrap(vad.findLongestSilence(in: [false, false]))
+        XCTAssertEqual(startIndex2, 0)
+        XCTAssertEqual(endIndex2, 2)
+
+        let (startIndex3, endIndex3) = try XCTUnwrap(vad.findLongestSilence(in: [true, false, false]))
+        XCTAssertEqual(startIndex3, 1)
+        XCTAssertEqual(endIndex3, 3)
+
+        let (startIndex4, endIndex4) = try XCTUnwrap(vad.findLongestSilence(in: [false, false, true]))
+        XCTAssertEqual(startIndex4, 0)
+        XCTAssertEqual(endIndex4, 2)
+
+        let (startIndex5, endIndex5) = try XCTUnwrap(vad.findLongestSilence(in: [true, false, false, true]))
+        XCTAssertEqual(startIndex5, 1)
+        XCTAssertEqual(endIndex5, 3)
+
+        let (startIndex6, endIndex6) = try XCTUnwrap(vad.findLongestSilence(in: [false, false, true, true, true, false, true, false, false, false, false, true, true]))
+        XCTAssertEqual(startIndex6, 7)
+        XCTAssertEqual(endIndex6, 11)
+    }
+
+    func testVADAudioChunker() async throws {
+        let chunker = VADAudioChunker()
+        Logging.shared.logLevel = .debug
+
+        let singleChunkPath = try XCTUnwrap(
+            Bundle.module.path(forResource: "jfk", ofType: "wav"),
+            "Audio file not found"
+        )
+        var audioBuffer = try AudioProcessor.loadAudio(fromPath: singleChunkPath)
+        var audioArray = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
+
+        var audioChunks = try await chunker.chunkAll(
+            audioArray: audioArray,
+            maxChunkLength: WhisperKit.windowSamples,
+            decodeOptions: DecodingOptions()
+        )
+
+        XCTAssertEqual(audioChunks.count, 1)
+
+        let multiChunkPath = try XCTUnwrap(
+            Bundle.module.path(forResource: "ted_60", ofType: "m4a"),
+            "Audio file not found"
+        )
+        audioBuffer = try AudioProcessor.loadAudio(fromPath: multiChunkPath)
+        audioArray = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
+
+        audioChunks = try await chunker.chunkAll(
+            audioArray: audioArray,
+            maxChunkLength: WhisperKit.windowSamples,
+            decodeOptions: DecodingOptions()
+        )
+
+        XCTAssertEqual(audioChunks.count, 3)
+    }
+
+    func testVADAudioChunkerAccuracy() async throws {
+        let testResult = try await XCTUnwrapAsync(
+            await transcribe(with: .tiny, options: DecodingOptions(), audioFile: "ted_60.m4a"),
+            "Failed to transcribe"
+        )
+
+        let options = DecodingOptions(chunkingStrategy: .vad)
+
+        let chunkedResult = try await XCTUnwrapAsync(
+            await transcribe(with: .tiny, options: options, audioFile: "ted_60.m4a"),
+            "Failed to transcribe"
+        )
+
+        XCTAssertFalse(testResult.text.isEmpty, "The test text should not be empty")
+        XCTAssertFalse(chunkedResult.text.isEmpty, "The chunked text should not be empty")
+
+        // Select few sentences to compare at VAD border
+        // TODO: test that WER is in acceptable range
+//        XCTAssertTrue(testResult.text.normalized.contains("I would kind".normalized), "Expected text not found in \(testResult.text.normalized)")
+//        XCTAssertTrue(chunkedResult.text.normalized.contains("I would kind".normalized), "Expected text not found in \(chunkedResult.text.normalized)")
+//
+//        XCTAssertTrue(testResult.text.normalized.contains("every single paper".normalized), "Expected text not found in \(testResult.text.normalized)")
+//        XCTAssertTrue(chunkedResult.text.normalized.contains("every single paper".normalized), "Expected text not found in \(chunkedResult.text.normalized)")
+
+        XCTAssertTrue(testResult.text.normalized.contains("But then came my 90 page senior".normalized), "Expected text not found in \(testResult.text.normalized)")
+        XCTAssertTrue(chunkedResult.text.normalized.contains("But then came my 90 page senior".normalized), "Expected text not found in \(chunkedResult.text.normalized)")
     }
 
     // MARK: - Word Timestamp Tests

@@ -104,6 +104,7 @@ extension XCTestCase {
     func transcribe(
         with variant: ModelVariant,
         options: DecodingOptions,
+        callback: TranscriptionCallback = nil,
         audioFile: String = "jfk.wav",
         file: StaticString = #file,
         line: UInt = #line
@@ -128,7 +129,7 @@ extension XCTestCase {
         guard let audioFileURL = Bundle.module.path(forResource: audioComponents.first, ofType: audioComponents.last) else {
             throw TestError.missingFile("Missing audio file")
         }
-        return try await whisperKit.transcribe(audioPath: audioFileURL, decodeOptions: options)
+        return try await whisperKit.transcribe(audioPath: audioFileURL, decodeOptions: options, callback: callback)
     }
 
     func tinyModelPath() throws -> String {

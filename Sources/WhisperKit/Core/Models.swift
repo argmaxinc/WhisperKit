@@ -20,14 +20,14 @@ extension Float16: MLShapedArrayScalar {}
 
 // MARK: - CoreML
 
-public protocol WhisperMLModel {
+public protocol WhisperMLModel: AnyObject {
     var model: MLModel? { get set }
-    mutating func loadModel(at modelPath: URL, computeUnits: MLComputeUnits, prewarmMode: Bool) async throws
-    mutating func unloadModel()
+    func loadModel(at modelPath: URL, computeUnits: MLComputeUnits, prewarmMode: Bool) async throws
+    func unloadModel()
 }
 
 public extension WhisperMLModel {
-    mutating func loadModel(at modelPath: URL, computeUnits: MLComputeUnits, prewarmMode: Bool = false) async throws {
+    func loadModel(at modelPath: URL, computeUnits: MLComputeUnits, prewarmMode: Bool = false) async throws {
         let loadedModel = try await Task {
             let modelConfig = MLModelConfiguration()
             modelConfig.computeUnits = computeUnits
@@ -37,8 +37,12 @@ public extension WhisperMLModel {
         model = prewarmMode ? nil : loadedModel
     }
 
-    mutating func unloadModel() {
+    func unloadModel() {
         model = nil
+    }
+
+    var modelState: ModelState {
+        return model == nil ? .unloaded : .loaded
     }
 }
 
@@ -160,6 +164,13 @@ public struct ModelComputeOptions {
     }
 }
 
+// MARK: - Chunking
+
+public struct AudioChunk {
+    public var seekOffsetIndex: Int
+    public var audioSamples: [Float]
+}
+
 // MARK: - Decoding
 
 public enum DecodingTask: CustomStringConvertible, CaseIterable {
@@ -215,6 +226,11 @@ public struct DecodingCache {
     var keyCache: MLMultiArray?
     var valueCache: MLMultiArray?
     var alignmentWeights: MLMultiArray?
+}
+
+public enum ChunkingStrategy: String, CaseIterable {
+    case none
+    case vad
 }
 
 /// Options for how to transcribe an audio file using WhisperKit.
@@ -275,33 +291,36 @@ public struct DecodingOptions {
     public var firstTokenLogProbThreshold: Float?
     public var noSpeechThreshold: Float?
     public var concurrentWorkerCount: Int
+    public var chunkingStrategy: ChunkingStrategy?
 
-    public init(verbose: Bool = false,
-                task: DecodingTask = .transcribe,
-                language: String? = nil,
-                temperature: Float = 0.0,
-                temperatureIncrementOnFallback: Float = 0.2,
-                temperatureFallbackCount: Int = 5,
-                sampleLength: Int = Constants.maxTokenContext,
-                topK: Int = 5,
-                usePrefillPrompt: Bool = true,
-                usePrefillCache: Bool = true,
-                detectLanguage: Bool? = nil,
-                skipSpecialTokens: Bool = false,
-                withoutTimestamps: Bool = false,
-                wordTimestamps: Bool = false,
-                maxInitialTimestamp: Float? = nil,
-                clipTimestamps: [Float] = [],
-                promptTokens: [Int]? = nil,
-                prefixTokens: [Int]? = nil,
-                suppressBlank: Bool = false,
-                supressTokens: [Int]? = nil,
-                compressionRatioThreshold: Float? = 2.4,
-                logProbThreshold: Float? = -1.0,
-                firstTokenLogProbThreshold: Float? = -1.5,
-                noSpeechThreshold: Float? = 0.6,
-                concurrentWorkerCount: Int = 0)
-    {
+    public init(
+        verbose: Bool = false,
+        task: DecodingTask = .transcribe,
+        language: String? = nil,
+        temperature: Float = 0.0,
+        temperatureIncrementOnFallback: Float = 0.2,
+        temperatureFallbackCount: Int = 5,
+        sampleLength: Int = Constants.maxTokenContext,
+        topK: Int = 5,
+        usePrefillPrompt: Bool = true,
+        usePrefillCache: Bool = true,
+        detectLanguage: Bool? = nil,
+        skipSpecialTokens: Bool = false,
+        withoutTimestamps: Bool = false,
+        wordTimestamps: Bool = false,
+        maxInitialTimestamp: Float? = nil,
+        clipTimestamps: [Float] = [],
+        promptTokens: [Int]? = nil,
+        prefixTokens: [Int]? = nil,
+        suppressBlank: Bool = false,
+        supressTokens: [Int]? = nil,
+        compressionRatioThreshold: Float? = 2.4,
+        logProbThreshold: Float? = -1.0,
+        firstTokenLogProbThreshold: Float? = -1.5,
+        noSpeechThreshold: Float? = 0.6,
+        concurrentWorkerCount: Int = 0,
+        chunkingStrategy: ChunkingStrategy? = nil
+    ) {
         self.verbose = verbose
         self.task = task
         self.language = language
@@ -327,6 +346,7 @@ public struct DecodingOptions {
         self.firstTokenLogProbThreshold = firstTokenLogProbThreshold
         self.noSpeechThreshold = noSpeechThreshold
         self.concurrentWorkerCount = concurrentWorkerCount
+        self.chunkingStrategy = chunkingStrategy
     }
 }
 
@@ -458,42 +478,46 @@ public struct TranscriptionResult: Codable {
     public var segments: [TranscriptionSegment]
     public var language: String
     public var timings: TranscriptionTimings
+    public var seekTime: Float?
 
-    func logSegments() {
-        for segment in segments {
+    public func logSegments() {
+        for (i, segment) in segments.enumerated() {
             let start = segment.start
             let end = segment.end
             let text = segment.text
-            let line = "[\(formatTimestamp(start)) --> \(formatTimestamp(end))] \(text)"
+            let line = "[Segment \(i)] [\(formatTimestamp(start)) --> \(formatTimestamp(end))] \(text)"
             Logging.debug(line)
         }
     }
 
-    func logTimings() {
+    public func logTimings() {
+        // Calculate the full pipeline duration in milliseconds
         let decodeLoopTime = timings.decodingLoop
         let totalLoops = timings.totalDecodingLoops
+        let decodeTimePerWindow = decodeLoopTime / timings.totalAudioProcessingRuns
         let timeToFirstToken = timings.firstTokenTime - timings.pipelineStart
         let tokensPerSecond = timings.tokensPerSecond
         let rtf = timings.realTimeFactor
         let totalTokens = segments.reduce(0) { $0 + $1.tokens.count }
 
-        let fullPipelineDuration = timings.fullPipeline * 1000 // Convert to milliseconds
+        // NOTE: this is a relative value for percentage calculations
+        let fullDecodingDuration = max(timings.decodingLoop, timings.fullPipeline) * 1000 // Convert to milliseconds
 
-        let audioLoadTime = formatTimeWithPercentage(timings.audioLoading, 1, fullPipelineDuration)
-        let audioProcTime = formatTimeWithPercentage(timings.audioProcessing, timings.totalAudioProcessingRuns, fullPipelineDuration)
-        let logmelsTime = formatTimeWithPercentage(timings.logmels, timings.totalLogmelRuns, fullPipelineDuration)
-        let encodingTime = formatTimeWithPercentage(timings.encoding, timings.totalEncodingRuns, fullPipelineDuration)
-        let decodingInitTime = formatTimeWithPercentage(timings.decodingInit, 1, fullPipelineDuration)
-        let prefillInfo = formatTimeWithPercentage(timings.prefill, 1, fullPipelineDuration)
-        let predictionsInfo = formatTimeWithPercentage(timings.decodingPredictions, totalLoops, fullPipelineDuration)
-        let filteringInfo = formatTimeWithPercentage(timings.decodingFiltering, totalLoops, fullPipelineDuration)
-        let samplingInfo = formatTimeWithPercentage(timings.decodingSampling, totalLoops, fullPipelineDuration)
-        let kvCachingInfo = formatTimeWithPercentage(timings.decodingKvCaching, timings.totalKVUpdateRuns, fullPipelineDuration)
-        let wordTimestampInfo = formatTimeWithPercentage(timings.decodingWordTimestamps, timings.totalTimestampAlignmentRuns, fullPipelineDuration)
-        let nonPredTimeInfo = formatTimeWithPercentage(timings.decodingNonPrediction, totalLoops, fullPipelineDuration)
-        let windowingInfo = formatTimeWithPercentage(timings.decodingWindowing - timings.decodingWordTimestamps, timings.totalDecodingWindows, fullPipelineDuration)
-        let fallbackInfo = formatTimeWithPercentage(timings.decodingFallback, timings.totalDecodingFallbacks, fullPipelineDuration)
-        let decodingLoopInfo = formatTimeWithPercentage(timings.decodingLoop, totalLoops, fullPipelineDuration)
+        let audioLoadTime = formatTimeWithPercentage(timings.audioLoading, 1, fullDecodingDuration)
+        let audioProcTime = formatTimeWithPercentage(timings.audioProcessing, timings.totalAudioProcessingRuns, fullDecodingDuration)
+        let logmelsTime = formatTimeWithPercentage(timings.logmels, timings.totalLogmelRuns, fullDecodingDuration)
+        let encodingTime = formatTimeWithPercentage(timings.encoding, timings.totalEncodingRuns, fullDecodingDuration)
+        let decodingInitTime = formatTimeWithPercentage(timings.decodingInit, 1, fullDecodingDuration)
+        let prefillInfo = formatTimeWithPercentage(timings.prefill, 1, fullDecodingDuration)
+        let predictionsInfo = formatTimeWithPercentage(timings.decodingPredictions, totalLoops, fullDecodingDuration)
+        let filteringInfo = formatTimeWithPercentage(timings.decodingFiltering, totalLoops, fullDecodingDuration)
+        let samplingInfo = formatTimeWithPercentage(timings.decodingSampling, totalLoops, fullDecodingDuration)
+        let kvCachingInfo = formatTimeWithPercentage(timings.decodingKvCaching, timings.totalKVUpdateRuns, fullDecodingDuration)
+        let wordTimestampInfo = formatTimeWithPercentage(timings.decodingWordTimestamps, timings.totalTimestampAlignmentRuns, fullDecodingDuration)
+        let nonPredTimeInfo = formatTimeWithPercentage(timings.decodingNonPrediction, totalLoops, fullDecodingDuration)
+        let windowingInfo = formatTimeWithPercentage(timings.decodingWindowing - timings.decodingWordTimestamps, timings.totalDecodingWindows, fullDecodingDuration)
+        let fallbackInfo = formatTimeWithPercentage(timings.decodingFallback, timings.totalDecodingFallbacks, fullDecodingDuration)
+        let decodingLoopInfo = formatTimeWithPercentage(timings.decodingLoop, totalLoops, fullDecodingDuration)
 
         // Logging
         Logging.info("---- Transcription Timings ----")
@@ -516,14 +540,15 @@ public struct TranscriptionResult: Codable {
         Logging.info("-------------------------------")
 
         // Summary statistics
-        Logging.info("Model Load Time:     \(String(format: "%.2f", timings.modelLoading)) seconds")
-        Logging.info("Inference Duration:  \(String(format: "%.2f", timings.fullPipeline)) seconds")
-        Logging.info("- Decoding Loop:     \(String(format: "%.2f", decodeLoopTime)) seconds")
-        Logging.info("Time to first token: \(String(format: "%.2f", timeToFirstToken)) seconds")
-        Logging.info("Total Tokens:        \(totalTokens)")
-        Logging.info("Tokens per Second:   \(String(format: "%.2f", tokensPerSecond)) tok/s")
-        Logging.info("Real Time Factor:    \(String(format: "%.2f", rtf))")
-        Logging.info("Fallbacks:           \(timings.totalDecodingFallbacks)")
+        Logging.info("Model Load Time:               \(String(format: "%.2f", timings.modelLoading)) seconds")
+        Logging.info("Inference Duration (Global):   \(String(format: "%.2f", timings.fullPipeline)) seconds")
+        Logging.info("- Decoding Loop (Avg/window):  \(String(format: "%.2f", decodeTimePerWindow)) seconds")
+        Logging.info("- Audio Windows:               \(String(format: "%.2f", timings.totalAudioProcessingRuns))")
+        Logging.info("Time to first token:           \(String(format: "%.2f", timeToFirstToken)) seconds")
+        Logging.info("Total Tokens:                  \(totalTokens)")
+        Logging.info("Tokens per Second:             \(String(format: "%.2f", tokensPerSecond)) tok/s")
+        Logging.info("Real Time Factor:              \(String(format: "%.3f", rtf))")
+        Logging.info("Fallbacks:                     \(timings.totalDecodingFallbacks)")
     }
 }
 
@@ -563,10 +588,19 @@ public struct TranscriptionProgress {
     public var temperature: Float?
     public var avgLogprob: Float?
     public var compressionRatio: Float?
+    public var windowId: Int = 0
 }
 
 /// Callback to receive progress updates during transcription.
-/// Return `false` to force the transcription to stop early.
+///
+/// - Parameters:
+///   - progress: The current transcription progress, including the transcribed text, tokens, and other relevant information.
+///
+/// - Returns: A Boolean value indicating whether to continue the transcription process or stop early.
+///   - `true`: Continue the transcription process.
+///   - `false`: Stop the transcription process early.
+///   - `nil`: Continue the transcription process (equivalent to returning `true`).
+/// - Note: This callback should be lightweight and return as quickly as possible to avoid extra decoding loops
 public typealias TranscriptionCallback = ((TranscriptionProgress) -> Bool?)?
 
 public struct TranscriptionTimings: Codable {
@@ -601,11 +635,15 @@ public struct TranscriptionTimings: Codable {
 
     /// Computed properties
     public var tokensPerSecond: Double {
-        Double(totalDecodingLoops) / Double(decodingLoop)
+        Double(totalDecodingLoops) / Double(fullPipeline)
     }
 
     public var realTimeFactor: Double {
-        decodingLoop / inputAudioSeconds
+        fullPipeline / inputAudioSeconds
+    }
+
+    public var speedFactor: Double {
+        inputAudioSeconds / fullPipeline
     }
 
     /// Initialize with all time intervals set to zero.
@@ -635,8 +673,8 @@ public struct TranscriptionTimings: Codable {
                 totalDecodingWindows: Double = 0,
                 fullPipeline: TimeInterval = 0)
     {
-        self.pipelineStart = CFAbsoluteTimeGetCurrent()
-        self.firstTokenTime = 0
+        self.pipelineStart = Double.greatestFiniteMagnitude
+        self.firstTokenTime = Double.greatestFiniteMagnitude
         self.inputAudioSeconds = 0.001
         self.modelLoading = modelLoading
         self.audioLoading = audioLoading
