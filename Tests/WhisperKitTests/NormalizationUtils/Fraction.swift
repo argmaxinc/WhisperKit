@@ -69,20 +69,20 @@ struct Fraction{
         var numerator = Int(matches["num"] ?? "0")!
         var denominator: Int
         
-        if var denom = matches["denom"]{
+        if let denom = matches["denom"]{
             denominator = Int(denom)!
         }
         else{
             denominator = 1
             if var decimal = matches["decimal"]{
                 decimal = decimal.replacingOccurrences(of: "_", with: "")
-                var scale = Int(pow(Double(10), Double(decimal.count))) //10**len(decimal)
+                let scale = Int(pow(Double(10), Double(decimal.count))) //10**len(decimal)
                 guard let d = Int(decimal) else {return nil}
                 numerator = numerator * scale + d
                 denominator *= scale
             }
             
-            if matches["exp"] != nil, var exponent = Int(matches["exp"]!){
+            if matches["exp"] != nil, let exponent = Int(matches["exp"]!){
                 if exponent >= 0{
                     numerator *= Int(pow(Double(10), Double(exponent)))
                 }else{
@@ -116,17 +116,17 @@ struct Fraction{
     }
     
     static func +(lhs: Fraction, rhs: Fraction) -> Fraction?{
-        var na = lhs.numerator
-        var nb = rhs.numerator
-        var da = lhs.denominator
-        var db = rhs.denominator
-        var g = Fraction.gcd(lhs: da, rhs: db)
+        let na = lhs.numerator
+        let nb = rhs.numerator
+        let da = lhs.denominator
+        let db = rhs.denominator
+        let g = Fraction.gcd(lhs: da, rhs: db)
         if g == 1{
             return Fraction(numerator: na * db + da * nb, denominator: da * db)
         }
-        var s = da / g
-        var t = na * (db / g) + nb * s
-        var g2 = Fraction.gcd(lhs: t, rhs: g)
+        let s = da / g
+        let t = na * (db / g) + nb * s
+        let g2 = Fraction.gcd(lhs: t, rhs: g)
         if g2 == 1{
             return Fraction(numerator: t, denominator: s * db)
         }
@@ -134,17 +134,17 @@ struct Fraction{
     }
     
     static func -(lhs: Fraction, rhs: Fraction) -> Fraction?{
-        var na = lhs.numerator
-        var nb = rhs.numerator
-        var da = lhs.denominator
-        var db = rhs.denominator
-        var g = Fraction.gcd(lhs: da, rhs: db)
+        let na = lhs.numerator
+        let nb = rhs.numerator
+        let da = lhs.denominator
+        let db = rhs.denominator
+        let g = Fraction.gcd(lhs: da, rhs: db)
         if g == 1{
             return Fraction(numerator: na * db - da * nb, denominator: da * db)
         }
-        var s = da / g
-        var t = na * (db / g) - nb * s
-        var g2 = Fraction.gcd(lhs: t, rhs: g)
+        let s = da / g
+        let t = na * (db / g) - nb * s
+        let g2 = Fraction.gcd(lhs: t, rhs: g)
         if g2 == 1{
             return Fraction(numerator: t, denominator: s * db)
         }
