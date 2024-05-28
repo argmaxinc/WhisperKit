@@ -61,11 +61,11 @@ jobs:
         id: model-cache
         uses: actions/cache@v4
         with:
-          path: Models
+          path: Sources/WhisperKitTestsUtils/Models
           key: ${{ runner.os }}-models
       - name: Download Models
         if: steps.model-cache.outputs.cache-hit != 'true'
-        run: make download-model MODEL=tiny
+        run: make download-model MODEL=tiny && make download-mlx-model
       - name: Install and discover destinations
         env:
           MLX_DISABLED: ${{ matrix.run-config['mlx-disabled'] }}

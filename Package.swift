@@ -72,25 +72,24 @@ func targets() -> [PackageDescription.Target] {
             ],
             path: "Sources/WhisperKit/Core"
         ),
-        .testTarget(
-            name: "WhisperKitTests",
+        .target(
+            name: "WhisperKitTestsUtils",
             dependencies: [
                 "WhisperKit",
                 .product(name: "Transformers", package: "swift-transformers"),
             ],
-            path: ".",
-            exclude: [
-                "Examples",
-                "Sources",
-                "Makefile",
-                "README.md",
-                "LICENSE",
-                "CONTRIBUTING.md",
-                "Tests/WhisperKitMLXTests"
-            ],
             resources: [
-                .process("Tests/WhisperKitTests/Resources"),
                 .copy("Models/whisperkit-coreml"),
+                .copy("Models/mlx"),
+                .process("Resources"),
+            ]
+        ),
+        .testTarget(
+            name: "WhisperKitTests",
+            dependencies: [
+                "WhisperKit",
+                "WhisperKitTestsUtils",
+                .product(name: "Transformers", package: "swift-transformers"),
             ]
         )
     ]
@@ -115,7 +114,8 @@ func mlxTargets() -> [PackageDescription.Target] {
                 dependencies: [
                     "WhisperKit",
                     .product(name: "MLX", package: "mlx-swift"),
-                    .product(name: "MLXFFT", package: "mlx-swift")
+                    .product(name: "MLXFFT", package: "mlx-swift"),
+                    .product(name: "MLXNN", package: "mlx-swift")
                 ],
                 path: "Sources/WhisperKit/MLX",
                 resources: [
@@ -128,6 +128,7 @@ func mlxTargets() -> [PackageDescription.Target] {
                 dependencies: [
                     "WhisperKit",
                     "WhisperKitMLX",
+                    "WhisperKitTestsUtils",
                     .product(name: "Transformers", package: "swift-transformers"),
                 ]
             )

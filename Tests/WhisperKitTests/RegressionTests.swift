@@ -1,6 +1,7 @@
 import CoreML
 import Hub
 @testable import WhisperKit
+import WhisperKitTestsUtils
 import XCTest
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)

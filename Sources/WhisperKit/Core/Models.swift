@@ -20,10 +20,17 @@ extension Float16: MLShapedArrayScalar {}
 
 // MARK: - CoreML
 
-public protocol WhisperMLModel: AnyObject {
+public protocol WhisperModel: AnyObject {
+    func unloadModel()
+}
+
+public protocol WhisperMLModel: WhisperModel {
     var model: MLModel? { get set }
     func loadModel(at modelPath: URL, computeUnits: MLComputeUnits, prewarmMode: Bool) async throws
-    func unloadModel()
+}
+
+public protocol WhisperMLXModel: WhisperModel {
+    func loadModel(at modelPath: URL) async throws
 }
 
 public extension WhisperMLModel {
