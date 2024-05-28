@@ -2,66 +2,13 @@ import Foundation
 
 // Return the operations needed to transform s1 into s2 using Wagner-Fischer algo.
 // "i" = insertion, "d" = deletion, "r" = replacement
-func wagnerFischerEditOperations(s1: String, s2: String) -> [Character] {
-    let m = s1.count
-    let n = s2.count
-    var dp = Array(repeating: Array(repeating: (0, Character(" ")), count: n + 1), count: m + 1)
-    let s1Chars = Array(s1)
-    let s2Chars = Array(s2)
-    
-    // Initialize first row and column
-    for i in 0...m {
-        dp[i][0] = (i, i > 0 ? "d" : Character(" "))
-    }
-    for j in 0...n {
-        dp[0][j] = (j, j > 0 ? "i" : Character(" "))
-    }
-    // Fill the matrix
-    for i in 1...m {
-        for j in 1...n {
-            let cost = s1Chars[i - 1] == s2Chars[j - 1] ? 0 : 1
-            let insertCost = dp[i][j - 1].0
-            let deleteCost = dp[i - 1][j].0
-            var replaceCost = dp[i - 1][j - 1].0
-            var replaceOp = dp[i - 1][j - 1].1
-            if cost == 1 {
-                replaceOp = "r"
-            }
-            replaceCost += cost
-            let minCost = min(insertCost + 1, deleteCost + 1, replaceCost)
-            var operation: Character = Character(" ")
-            if minCost == insertCost + 1 {
-                operation = "i"
-            } else if minCost == deleteCost + 1 {
-                operation = "d"
-            } else if cost == 1{
-                operation = replaceOp
-            }
-            dp[i][j] = (minCost, operation)
-        }
-    }
-    
-    // Traceback to get the operations
-    var i = m
-    var j = n
-    var operations = [Character]()
-    while i > 0 || j > 0 {
-        let (_, op) = dp[i][j]
-        if op != Character(" ") {
-            operations.append(op)
-        }
-        if op == "i" {
-            j -= 1
-        } else if op == "d" {
-            i -= 1
-        } else {
-            i -= 1
-            j -= 1
-        }
-    }
-    operations.reverse()
-    return operations
+enum EditOp:UInt8{
+    case blank
+    case replace
+    case delete
+    case insert
 }
+
 
 // MARK:- TRANSFORMS
 // sentences = ["this is   an   example ", "  hello goodbye  ", "  "]
@@ -130,16 +77,56 @@ func words2char(reference: [[String]], hypothesis: [[String]]) -> ([String],[Str
         return (value, index)
     })
     
-    let referenceChars = reference.map { sentence in
-        String(sentence.map { word in
-            Character(UnicodeScalar(word2char[word]!)!)
+    let referenceCharsEfficient = reference.map { sentence in
+        String(sentence.lazy.compactMap { word in
+            if let charCode = word2char[word], let unicodeScalar = UnicodeScalar(charCode) {
+                return Character(unicodeScalar)
+            }
+            return nil
         })
     }
 
-    let hypothesisChars = hypothesis.map { sentence in
-        String(sentence.map { word in
-            Character(UnicodeScalar(word2char[word]!)!)
+    let hypothesisCharsEfficient = hypothesis.map { sentence in
+        String(sentence.lazy.compactMap { word in
+            if let charCode = word2char[word], let unicodeScalar = UnicodeScalar(charCode) {
+                return Character(unicodeScalar)
+            }
+            return nil
         })
+    }
+    
+    return (referenceCharsEfficient, hypothesisCharsEfficient)
+}
+
+func _word2charCustom(reference: [[String]], hypothesis: [[String]]) throws -> (referenceChars: [String], hypothesisChars: [String]) {
+    // Flatten the reference and hypothesis arrays and create a set of unique words
+    var vocabulary = Set(reference.flatMap { $0 } + hypothesis.flatMap { $0 })
+    
+    // Ensure no empty strings are present in the vocabulary
+    if vocabulary.contains("") {
+        throw NSError(domain: "EmptyStringError", code: 1, userInfo: [
+            NSLocalizedDescriptionKey: "Empty strings cannot be a word. Please ensure that the given transform removes empty strings."
+        ])
+    }
+    
+    // Create a dictionary mapping each word to a unique integer
+    var word2char = [String: Int]()
+    for (index, word) in vocabulary.enumerated() {
+        word2char[word] = index
+    }
+    print(word2char)
+    
+    // Convert each word in the reference and hypothesis to its corresponding character
+    let referenceChars = reference.map { sentence in
+        sentence.map { word in
+            String(Character(UnicodeScalar(word2char[word]!)!))
+        }.joined()
+    }
+    
+    let hypothesisChars = hypothesis.map { sentence in
+        sentence.map { word in
+            String(Character(UnicodeScalar(word2char[word]!)!))
+        }.joined()
     }
     
     return (referenceChars, hypothesisChars)
@@ -156,19 +143,37 @@ func process_words(reference: [String], hypothesis: [String]) -> Double{
     
     let (refAsChars, hypAsChars) = words2char(reference: refTransformedReduced, hypothesis: hypTransformedReduced)
     
+    let refArrays = refAsChars.map({Array($0.unicodeScalars)})
+    let hypArrays = hypAsChars.map({Array($0.unicodeScalars)})
+    
     var (numHits, numSubstitutions, numDeletions, numInsertions) = (0, 0, 0, 0)
     var (numRfWords, numHypWords) = (0, 0)
     
-    for (reference_sentence, hypothesis_sentence) in zip(refAsChars, hypAsChars){
+    for (reference_sentence, hypothesis_sentence) in zip(refArrays, hypArrays){
         // Get the required edit operations to transform reference into hypothesis
-        let editOps: [Character] = wagnerFischerEditOperations(
-            s1: reference_sentence, s2: hypothesis_sentence
-        )
+        let editOps = hirschberg(reference_sentence, hypothesis_sentence)
         
-        // count the number of edits of each type
-        let substitutions: Int = editOps.map { $0 == "r" ? 1 : 0 }.reduce(0, +)
-        let deletions:Int = editOps.map { $0 == "d" ? 1 : 0 }.reduce(0, +)
-        let insertions:Int = editOps.map { $0 == "i" ? 1 : 0 }.reduce(0, +)
+        // count the number of edits of each type    
+        var substitutions: Int = 0
+        var deletions: Int = 0
+        var insertions: Int = 0
+        
+        for op in editOps{
+            switch op{
+            case .replace:
+                substitutions += 1
+                continue
+            case .delete:
+                deletions += 1
+                continue
+            case .insert:
+                insertions += 1
+                continue
+            case .blank:
+                continue
+            }
+        }
+        
         let hits:Int = reference_sentence.count - (substitutions + deletions)
         
         // update state
@@ -189,8 +194,7 @@ func process_words(reference: [String], hypothesis: [String]) -> Double{
 func evaluate(originalTranscript: String, generatedTranscript: String, normalizeOriginal: Bool = false) -> Double{
     var wer: Double = -Double.infinity
     let normalizer = EnglishTextNormalizer()
-    
-    var reference = normalizeOriginal ? originalTranscript : normalizer.normalize(text: generatedTranscript)
+    var reference = normalizeOriginal ? normalizer.normalize(text: originalTranscript) : originalTranscript
     var hypothesis = normalizer.normalize(text: generatedTranscript)
 
     wer = process_words(
@@ -435,10 +439,8 @@ class EnglishNumberNormalizer{
                     } else if var v = value{
                         results.append(output(v))
                     }
-                    else {
-                        prefix = hasPrefix ? String(current.first!) : prefix
-                        value = f.denominator == 1 ? String(f.numerator) : currentWithoutPrefix
-                    }
+                prefix = hasPrefix ? String(current.first!) : prefix
+                value = f.denominator == 1 ? String(f.numerator) : currentWithoutPrefix
                 } else {
                     fatalError("Converting the fraction failed")
                 }
@@ -713,7 +715,7 @@ class EnglishNumberNormalizer{
     
     func normalize(_ text: String) -> String{
         var s = self.preprocess(text)
-        let out = self.processWords(s.components(separatedBy: " ")).filter({ $0 != ""})
+        let out = self.processWords(s.components(separatedBy: " ").filter({ $0 != ""}))
         s = out.joined(separator: " ")
         s = self.postprocess(s)
         return s
