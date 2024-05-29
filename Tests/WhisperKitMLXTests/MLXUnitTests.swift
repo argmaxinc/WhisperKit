@@ -24,7 +24,7 @@ final class MLXUnitTests: XCTestCase {
         let extractedFeature = try await featureExtractor.logMelSpectrogram(fromAudio: paddedSamples)
         let melSpectrogram = try XCTUnwrap(extractedFeature, "Failed to produce Mel spectrogram from audio samples")
 
-        let expectedShape: [NSNumber] = [3000, 80]
+        let expectedShape: [NSNumber] = [1, 80, 1, 3000]
         XCTAssertNotNil(melSpectrogram, "Failed to produce Mel spectrogram from audio samples")
         XCTAssertEqual(melSpectrogram.shape, expectedShape, "Mel spectrogram shape is not as expected")
     }
@@ -36,8 +36,8 @@ final class MLXUnitTests: XCTestCase {
         let modelPath = try URL(filePath: tinyMLXModelPath())
         try await audioEncoder.loadModel(at: modelPath)
 
-        let encoderInput = try MLMultiArray(shape: [1, 3000, 80], dataType: .float16)
-        let expectedShape: [NSNumber] = [1, 1500, 384]
+        let encoderInput = try MLMultiArray(shape: [1, 80, 1, 3000], dataType: .float16)
+        let expectedShape: [NSNumber] = [1, 384, 1, 1500]
 
         let encoderOutput = try await audioEncoder.encodeFeatures(encoderInput)
         XCTAssertNotNil(encoderOutput, "Failed to encode features")
@@ -45,6 +45,19 @@ final class MLXUnitTests: XCTestCase {
     }
 
     // MARK: - Utils Tests
+
+    func testArrayConversion() throws {
+        let count = 16
+        let arr1 = MLXArray(0..<count, [2, count / 2]).asType(Int32.self)
+        let arr2 = try arr1.asMLMultiArray().asMLXArray(Int32.self)
+        XCTAssertTrue(MLX.allClose(arr1, arr2).item(), "Array conversion failed")
+
+        let arr3 = arr1.asMLXOutput().asMLXInput()
+        XCTAssertTrue(MLX.allClose(arr1, arr3).item(), "Input output conversion failed")
+
+        let arr4 = try arr1.asMLXOutput().asMLMultiArray().asMLXArray(Int32.self).asMLXInput()
+        XCTAssertTrue(MLX.allClose(arr1, arr4).item(), "Complex conversion failed")
+    }
 
     func testAsMLMultiArray() throws {
         let count = 24

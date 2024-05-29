@@ -5,6 +5,7 @@ import ArgumentParser
 import CoreML
 import Foundation
 import WhisperKit
+import WhisperKitMLX
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 struct TranscribeCLI: AsyncParsableCommand {
@@ -310,6 +311,8 @@ struct TranscribeCLI: AsyncParsableCommand {
             modelFolder: cliArguments.modelPath,
             tokenizerFolder: downloadTokenizerFolder,
             computeOptions: computeOptions,
+            featureExtractor: MLXFeatureExtractor(),
+            audioEncoder: MLXAudioEncoder(),
             verbose: cliArguments.verbose,
             logLevel: .debug,
             load: true,

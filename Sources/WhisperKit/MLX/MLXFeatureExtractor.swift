@@ -27,17 +27,15 @@ open class MLXFeatureExtractor: FeatureExtracting {
 
     public func logMelSpectrogram(fromAudio inputAudio: MLMultiArray) async throws -> MLMultiArray? {
         try Task.checkCancellation()
-        let input = inputAudio.withUnsafeBytes { ptr in
-            MLXArray(ptr, inputAudio.shape.map { $0.intValue }, type: Float.self)
-        }
-        let logMelSpectrogram = MLXFeatureExtractor.logMelSpectrogram(
+        let input = inputAudio.asMLXArray(Float.self)
+        let output = MLXFeatureExtractor.logMelSpectrogram(
             audio: input,
             filters: filters,
             nMels: melCount ?? 80,
             nFFT: nFFT,
             hopLength: hopLength
         )
-        return try logMelSpectrogram.asMLMultiArray()
+        return try output.asType(FloatType.self).asMLXOutput().asMLMultiArray()
     }
 }
 

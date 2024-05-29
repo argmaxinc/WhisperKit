@@ -20,11 +20,10 @@ public class MLXAudioEncoder: AudioEncoding {
             throw WhisperError.modelsUnavailable()
         }
         try Task.checkCancellation()
-        let input = features.withUnsafeBytes { ptr in
-            MLXArray(ptr, features.shape.map { $0.intValue }, type: FloatType.self)
-        }
-        let ouput = encoder(input)
-        return try ouput.asMLMultiArray()
+        let inputArray = features.asMLXArray(FloatType.self)
+        let input = inputArray.asMLXInput()
+        let output = encoder(input[.newAxis])
+        return try output.asMLXOutput().asMLMultiArray()
     }
 }
 
