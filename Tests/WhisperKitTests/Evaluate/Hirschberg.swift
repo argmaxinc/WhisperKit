@@ -82,7 +82,7 @@ func needlemanWunsch(_ xArray: Array<Unicode.Scalar>, _ yArray: Array<Unicode.Sc
 }
 
 
-func hirschberg(_ s1: Array<Unicode.Scalar>, _ s2: Array<Unicode.Scalar>) -> [EditOp] {
+func hirschberg(_ reference: Array<Unicode.Scalar>, _ s2: Array<Unicode.Scalar>) -> [EditOp] {
 
     func hirschbergRec(_ x: Array<Unicode.Scalar>, _ y: Array<Unicode.Scalar>) -> [EditOp] {
 
@@ -124,5 +124,5 @@ func hirschberg(_ s1: Array<Unicode.Scalar>, _ s2: Array<Unicode.Scalar>) -> [Ed
         return result
     }
 
-    return hirschbergRec(s1, s2)
+    return hirschbergRec(reference, s2)
 }

@@ -1,212 +1,63 @@
 import Foundation
 
-// Return the operations needed to transform s1 into s2 using Wagner-Fischer algo.
-// "i" = insertion, "d" = deletion, "r" = replacement
-enum EditOp:UInt8{
-    case blank
-    case replace
-    case delete
-    case insert
-}
-
-
-// MARK:- TRANSFORMS
-// sentences = ["this is   an   example ", "  hello goodbye  ", "  "]
-// ['this is an example ', " hello goodbye ", " "]
-func removeMultipleSpaces(sentences: [String]) -> [String]{
+class NormalizationUtils{
+    // sentences = ["this is   an   example ", "  hello goodbye  ", "  "]
+    // ['this is an example ', " hello goodbye ", " "]
+    static func removeMultipleSpaces(sentences: [String]) -> [String]{
+        
+        var replacedSentences = [String]()
+        for sentence in sentences {
+            // Define the pattern you want to replace
+            let pattern = "\\s\\s+"
+            
+            do {
+                let regex = try NSRegularExpression(pattern: pattern, options: [])
+                let replacedString = regex.stringByReplacingMatches(
+                    in: sentence,
+                    options: [],
+                    range: NSRange(location: 0, length: sentence.utf16.count),
+                    withTemplate: " "
+                )
+                replacedSentences.append(replacedString)
+            } catch {
+                print("Error while creating regex: \(error)")
+            }
+        }
+        return replacedSentences
+    }
     
-    var replacedSentences = [String]()
-    for sentence in sentences {
-        // Define the pattern you want to replace
-        let pattern = "\\s\\s+"
-
-        do {
-            let regex = try NSRegularExpression(pattern: pattern, options: [])
-            let replacedString = regex.stringByReplacingMatches(in: sentence, options: [],
-                                                                 range: NSRange(location: 0, length: sentence.utf16.count),
-                                                                 withTemplate: " ")
+    //[" this is an example ", "  hello goodbye  ", "  "]
+    //['this is an example', "hello goodbye", ""]
+    static func strip(sentences: [String]) -> [String]{
+        var replacedSentences = [String]()
+        for sentence in sentences {
+            let replacedString = sentence.trimmingCharacters(in: .whitespaces)
             replacedSentences.append(replacedString)
-        } catch {
-            print("Error while creating regex: \(error)")
         }
-    }
-    return replacedSentences
-}
-
-//[" this is an example ", "  hello goodbye  ", "  "]
-//['this is an example', "hello goodbye", ""]
-func strip(sentences: [String]) -> [String]{
-    var replacedSentences = [String]()
-    
-    for sentence in sentences {
-        let replacedString = sentence.trimmingCharacters(in: .whitespaces)
-        replacedSentences.append(replacedString)
-    }
-    return replacedSentences
-}
-
-//["hi", "this is an example"]
-//[['hi'], ['this', 'is', 'an, 'example']]
-func reduceToListOfListOfWords(sentences: [String], word_delimiter: String = " ") -> [[String]]{
-    
-    let sentence_collection = [[String]]()
-    func processString(sentence: String) -> [[String]]{
-        return [sentence.components(separatedBy: word_delimiter).filter{ !$0.isEmpty }]
+        return replacedSentences
     }
     
-    func processList(sentences: [String]) -> [[String]]{
-        var sentence_collection = [[String]]()
+    //["hi", "this is an example"]
+    //[['hi'], ['this', 'is', 'an, 'example']]
+    static func reduceToListOfListOfWords(sentences: [String], word_delimiter: String = " ") -> [[String]]{
         
-        for sentence in sentences{
-            let list_of_words = processString(sentence: sentence)[0]
-            if !list_of_words.isEmpty {
-                sentence_collection.append(list_of_words)
-            }
+        func processString(sentence: String) -> [[String]]{
+            return [sentence.components(separatedBy: word_delimiter).filter{ !$0.isEmpty }]
         }
         
-        return sentence_collection
-    }
-    
-    return processList(sentences: sentences)
-}
-
-func words2char(reference: [[String]], hypothesis: [[String]]) -> ([String],[String]){
-    //tokenize each word into an integer
-    let vocabulary = Set((reference + hypothesis).flatMap{$0})
-    let word2char = Dictionary(uniqueKeysWithValues: vocabulary.enumerated().map { index, value in
-        return (value, index)
-    })
-    
-    let referenceCharsEfficient = reference.map { sentence in
-        String(sentence.lazy.compactMap { word in
-            if let charCode = word2char[word], let unicodeScalar = UnicodeScalar(charCode) {
-                return Character(unicodeScalar)
+        func processList(sentences: [String]) -> [[String]]{
+            var sentenceCollection = [[String]]()
+            for sentence in sentences{
+                let list_of_words = processString(sentence: sentence)[0]
+                if !list_of_words.isEmpty {
+                    sentenceCollection.append(list_of_words)
+                }
             }
-            return nil
-        })
-    }
-
-    let hypothesisCharsEfficient = hypothesis.map { sentence in
-        String(sentence.lazy.compactMap { word in
-            if let charCode = word2char[word], let unicodeScalar = UnicodeScalar(charCode) {
-                return Character(unicodeScalar)
-            }
-            return nil
-        })
-    }
-    
-    return (referenceCharsEfficient, hypothesisCharsEfficient)
-}
-
-func _word2charCustom(reference: [[String]], hypothesis: [[String]]) throws -> (referenceChars: [String], hypothesisChars: [String]) {
-    // Flatten the reference and hypothesis arrays and create a set of unique words
-    var vocabulary = Set(reference.flatMap { $0 } + hypothesis.flatMap { $0 })
-    
-    // Ensure no empty strings are present in the vocabulary
-    if vocabulary.contains("") {
-        throw NSError(domain: "EmptyStringError", code: 1, userInfo: [
-            NSLocalizedDescriptionKey: "Empty strings cannot be a word. Please ensure that the given transform removes empty strings."
-        ])
-    }
-    
-    // Create a dictionary mapping each word to a unique integer
-    var word2char = [String: Int]()
-    for (index, word) in vocabulary.enumerated() {
-        word2char[word] = index
-    }
-    print(word2char)
-    
-    // Convert each word in the reference and hypothesis to its corresponding character
-    let referenceChars = reference.map { sentence in
-        sentence.map { word in
-            String(Character(UnicodeScalar(word2char[word]!)!))
-        }.joined()
-    }
-    
-    let hypothesisChars = hypothesis.map { sentence in
-        sentence.map { word in
-            String(Character(UnicodeScalar(word2char[word]!)!))
-        }.joined()
-    }
-    
-    return (referenceChars, hypothesisChars)
-}
-
-func process_words(reference: [String], hypothesis: [String]) -> Double{
-    var refTransformed = removeMultipleSpaces(sentences: reference)
-    refTransformed = strip(sentences: refTransformed)
-    let refTransformedReduced = reduceToListOfListOfWords(sentences: refTransformed)
-    
-    var hypTransformed = removeMultipleSpaces(sentences: hypothesis)
-    hypTransformed = strip(sentences: hypTransformed)
-    let hypTransformedReduced = reduceToListOfListOfWords(sentences: hypTransformed)
-    
-    let (refAsChars, hypAsChars) = words2char(reference: refTransformedReduced, hypothesis: hypTransformedReduced)
-    
-    let refArrays = refAsChars.map({Array($0.unicodeScalars)})
-    let hypArrays = hypAsChars.map({Array($0.unicodeScalars)})
-    
-    var (numHits, numSubstitutions, numDeletions, numInsertions) = (0, 0, 0, 0)
-    var (numRfWords, numHypWords) = (0, 0)
-    
-    for (reference_sentence, hypothesis_sentence) in zip(refArrays, hypArrays){
-        // Get the required edit operations to transform reference into hypothesis
-        let editOps = hirschberg(reference_sentence, hypothesis_sentence)
-        
-        // count the number of edits of each type    
-        var substitutions: Int = 0
-        var deletions: Int = 0
-        var insertions: Int = 0
-        
-        for op in editOps{
-            switch op{
-            case .replace:
-                substitutions += 1
-                continue
-            case .delete:
-                deletions += 1
-                continue
-            case .insert:
-                insertions += 1
-                continue
-            case .blank:
-                continue
-            }
+            return sentenceCollection
         }
-        
-        let hits:Int = reference_sentence.count - (substitutions + deletions)
-        
-        // update state
-        numHits += hits
-        numSubstitutions += substitutions
-        numDeletions += deletions
-        numInsertions += insertions
-        numRfWords += reference_sentence.count
-        numHypWords += hypothesis_sentence.count
+        return processList(sentences: sentences)
     }
-    let (S, D, I, H) = (numSubstitutions, numDeletions, numInsertions, numHits)
-
-    let wer = Double(S + D + I) / Double(H + S + D)
-    
-    return wer
 }
-
-func evaluate(originalTranscript: String, generatedTranscript: String, normalizeOriginal: Bool = false) -> Double{
-    var wer: Double = -Double.infinity
-    let normalizer = EnglishTextNormalizer()
-    var reference = normalizeOriginal ? normalizer.normalize(text: originalTranscript) : originalTranscript
-    var hypothesis = normalizer.normalize(text: generatedTranscript)
-
-    wer = process_words(
-        reference: [reference],
-        hypothesis: [hypothesis]
-    )
-    
-    return wer
-}
-
-// MARK: Normalization
-
 class EnglishNumberNormalizer{
     //    Convert any spelled-out numbers into arabic numbers, while handling:
     //
@@ -216,6 +67,7 @@ class EnglishNumberNormalizer{
     //    - spell out `one` and `ones`
     //    - interpret successive single-digit numbers as nominal: `one oh one` -> `101`
     let zeros: Set<String>
+    
     let ones: [String:Int]
     let onesPlural: [String:(Int, String)]
     let onesOrdinal: [String:(Int, String)]
@@ -241,21 +93,19 @@ class EnglishNumberNormalizer{
     let words: Set<String>
     let literalWords: Set<String>
     
-    
     init(){
         let zeros: Set = ["o", "oh", "zero"]
+        
         let ones = Dictionary(uniqueKeysWithValues:[
             "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
             "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen",
             "eighteen", "nineteen"].enumerated().map { ($0.element, $0.offset + 1)})
-
         let onesPlural = Dictionary(uniqueKeysWithValues:
             ones.map { name, value in
                 return (name == "six" ? "sixes" : name + "s", (value, "s"))
             }
         )
-
-        var onesOrdinal = {
+        let onesOrdinal = {
             var onesDictionary: [String: (Int, String)] = [
                 "zeroth": (0, "th"),
                 "first": (1, "st"),
@@ -277,7 +127,6 @@ class EnglishNumberNormalizer{
 
             return (onesDictionary)
         }()
-
         let onesSuffixed = onesPlural.merging(onesOrdinal) { $1 }
 
         let tens = [
@@ -290,14 +139,12 @@ class EnglishNumberNormalizer{
             "eighty": 80,
             "ninety": 90,
         ]
-
         let tensPlural = Dictionary(uniqueKeysWithValues: tens.map { name, value in
             return (name.replacingOccurrences(of: "y", with: "ies"), (value, "s"))
         })
         let tensOrdinal = Dictionary(uniqueKeysWithValues: tens.map { name, value in
             return (name.replacingOccurrences(of: "y", with: "ieth"), (value, "th"))
         })
-
         let tensSuffixed = tensPlural.merging(tensOrdinal) { $1 }
 
         let multipliers: [String: Int] = [
@@ -314,26 +161,21 @@ class EnglishNumberNormalizer{
         //    "nonillion": 1_000_000_000_000_000_000_000_000_000_000,
         //    "decillion": 1_000_000_000_000_000_000_000_000_000_000_000
         ]
-
         let multipliersPlural = Dictionary(uniqueKeysWithValues: multipliers.map { name, value in
             return (name + "s", (value, "s"))
         })
-
         let multipliersOrdinal = Dictionary(uniqueKeysWithValues: multipliers.map { name, value in
             return (name + "th", (value, "th"))
         })
-
         let multipliersSuffixed = multipliersPlural.merging(multipliersOrdinal) { $1 }
 
         let decimals: Set = Set(ones.keys).union(tens.keys).union(zeros)
-
         let precedingPrefixers: [String: String] = [
             "minus": "-",
             "negative": "-",
             "plus": "+",
             "positive": "+"
         ]
-
         let followingPrefixers: [String: String] = [
             "pound": "£",
             "pounds": "£",
@@ -347,14 +189,11 @@ class EnglishNumberNormalizer{
 
         let prefixes = Set(precedingPrefixers.values)
                         .union(followingPrefixers.values)
-
         let suffixers: [String: Any] = [
             "per": ["cent": "%"],
             "percent": "%"
         ]
-
         let specials: Set = ["and", "double", "triple", "point"]
-
         let words = zeros.union(ones.keys)
                          .union(onesSuffixed.keys)
                          .union(tens.keys)
@@ -365,10 +204,10 @@ class EnglishNumberNormalizer{
                          .union(followingPrefixers.keys)
                          .union(suffixers.keys)
                          .union(specials)
-
         let literalWords: Set = ["one", "ones"]
         
         self.zeros = zeros
+        
         self.ones = ones
         self.onesPlural = onesPlural
         self.onesOrdinal = onesOrdinal
@@ -413,11 +252,9 @@ class EnglishNumberNormalizer{
 
         
         for idx in 0..<words.count{
-//            guard let current = wordsIterator.next() else { return "" }
             let current = words[idx]
             let prev = idx != 0 ? words[idx - 1] : nil
             let next = words.indices.contains(idx + 1) ? words[idx + 1] : nil
-//            iteratorIndex += 1
             
             if skip {
                 skip = false
@@ -651,7 +488,6 @@ class EnglishNumberNormalizer{
         // Put a space at number/letter boundary
         processedString = processedString.replacingOccurrences(of: #"([a-z])([0-9])"#, with: "$1 $2", options: .regularExpression)
         processedString = processedString.replacingOccurrences(of: #"([0-9])([a-z])"#, with: "$1 $2", options: .regularExpression)
-        
         // Remove spaces which could be a suffix
         processedString = processedString.replacingOccurrences(of: #"([0-9])\s+(st|nd|rd|th|s)\b"#, with: "$1$2", options: .regularExpression)
         
@@ -680,7 +516,6 @@ class EnglishNumberNormalizer{
         }
 
         var processedString = s
-        
         
         // apply currency postprocessing; "$2 and ¢7" -> "$2.07"
         do {
@@ -726,7 +561,6 @@ class EnglishNumberNormalizer{
 class EnglishSpellingNormalizer{
     //
     //Applies British-American spelling mappings as listed in [1].
-
     //[1] https://www.tysto.com/uk-us-spelling-list.html
     
     var mapping: [String:String] = [:]
@@ -829,34 +663,39 @@ class EnglishTextNormalizer{
         var processedText = text
         processedText = processedText.lowercased()
         
-        processedText.regReplace(pattern: #"[<\[][^>\]]*[>\]]"#, replaceWith: "") // remove words between brackets
-        processedText.regReplace(pattern: #"\(([^)]+?)\)"#, replaceWith: "") // remove words between parenthesis
+        // remove words between brackets
+        processedText.regReplace(pattern: #"[<\[][^>\]]*[>\]]"#, replaceWith: "")
+        // remove words between parenthesis
+        processedText.regReplace(pattern: #"\(([^)]+?)\)"#, replaceWith: "")
         processedText.regReplace(pattern: self.ignorePatterns, replaceWith: "")
-        processedText.regReplace(pattern: #"\s+'"#, replaceWith: "'") // standardize when there's a space before an apostrophe
+        // standardize when there's a space before an apostrophe
+        processedText.regReplace(pattern: #"\s+'"#, replaceWith: "'")
 
         for (pattern, replacement) in self.replacers{
             processedText.regReplace(pattern: pattern, replaceWith: replacement)
         }
         
-        processedText.regReplace(pattern: #"(\d),(\d)"#, replaceWith: #"$1$2"#) // remove commas between digits
-        processedText.regReplace(pattern: #"\.([^0-9]|$)"#, replaceWith: " $1") // remove periods not followed by numbers
-        processedText = self.removeSymbolsAndDiacritics(text: processedText, keep: ".%$¢€£")  // keep some symbols for numerics
-
+        // remove commas between digits
+        processedText.regReplace(pattern: #"(\d),(\d)"#, replaceWith: #"$1$2"#)
+        // remove periods not followed by numbers
+        processedText.regReplace(pattern: #"\.([^0-9]|$)"#, replaceWith: " $1")
+        // keep some symbols for numerics
+        processedText = self.removeSymbolsAndDiacritics(text: processedText, keep: ".%$¢€£")
         processedText = self.numberNormalizer.normalize(processedText)
         processedText = self.spellingNormalizer.normalize(processedText)
 
         // now remove prefix/suffix symbols that are not preceded/followed by numbers
         processedText.regReplace(pattern: #"[.$¢€£]([^0-9])"#, replaceWith: #" $1"#)
         processedText.regReplace(pattern: #"([^0-9])%"#, replaceWith: #"$1 "#)
-        processedText.regReplace(pattern: #"\s+"#, replaceWith: " ") // replace any successive whitespace characters with a space
+        // replace any successive whitespace characters with a space
+        processedText.regReplace(pattern: #"\s+"#, replaceWith: " ")
+        
         return processedText
     }
     
     func removeSymbolsAndDiacritics(text: String, keep:String="") -> String{
-        //
         //Replace any other markers, symbols, and punctuations with a space, and drop any diacritics
         //(category 'Mn' and some manual mappings)
-        //"""
         let keepSet = Set(keep)
         let categoriesToReplaceWithSpace: [Unicode.GeneralCategory] = [
             .nonspacingMark,
@@ -897,7 +736,7 @@ class EnglishTextNormalizer{
         }
         
         if let normalizedString = text.applyingTransform(StringTransform(rawValue: "NFKD"), reverse: false) {
-            var out = normalizedString.map({ replaceCharacter(char: $0)})
+            let out = normalizedString.map({ replaceCharacter(char: $0)})
             return out.joined(separator: "")
         }
         return text

@@ -136,7 +136,7 @@ final class RegressionTests: XCTestCase {
         }
         
         if let originalTranscript = getTranscript(){
-            let wer = evaluate(
+            let wer = WERUtils.evaluate(
                 originalTranscript: originalTranscript,
                 generatedTranscript: transcriptionResult.text,
                 normalizeOriginal: true
@@ -209,7 +209,7 @@ final class RegressionTests: XCTestCase {
             origText = try? String(contentsOfFile: origPath, encoding: .utf8)
         }
         
-        let wer = evaluate(originalTranscript: origText!, generatedTranscript: genText!, normalizeOriginal: false)
+        let wer = WERUtils.evaluate(originalTranscript: origText!, generatedTranscript: genText!, normalizeOriginal: false)
         
         assert(wer == 0.42448103078024335)
     }
@@ -217,7 +217,7 @@ final class RegressionTests: XCTestCase {
     func testHirschberg(){
         let s1 = "With a rumble that echoed through the night, thunder crashed overhead, its raw power shaking the earth beneath it, leaving in its wake an exhilarating sense of awe. As rain poured down in torrents, the thunder boomed with a rhythm that seemed to speak a secret language, intertwining nature's symphony with an innovative melody that captivated all who listened."
         let s2 = "In the midst of a summer storm, thunder erupted with a booming chorus, shaking the earth beneath our feet and electrifying the air with its powerful presence. The crackling symphony of thunderbolts danced across the darkened sky, illuminating the clouds with an innovative display of nature's raw energy."
-        var ops = hirschberg(Array(s1.unicodeScalars), Array(s2.unicodeScalars))
+        let ops = hirschberg(Array(s1.unicodeScalars), Array(s2.unicodeScalars))
         assert(ops.count == 228)
     }
 }
