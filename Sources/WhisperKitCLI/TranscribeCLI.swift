@@ -28,7 +28,7 @@ struct TranscribeCLI: AsyncParsableCommand {
                 throw ValidationError("Either audioPath or audioFolder must be provided.")
             }
             let fileManager = FileManager.default
-            let audioExtensions = ["mp3", "wav", "m4a", "flac", "aiff", "aac", "ogg"]
+            let audioExtensions = ["mp3", "wav", "m4a", "flac", "aiff", "aac"]
             let audioFiles = try fileManager.contentsOfDirectory(atPath: audioFolder)
                 .filter { fileName in
                     let fileExtension = fileName.lowercased().components(separatedBy: ".").last
