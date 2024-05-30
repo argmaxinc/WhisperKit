@@ -119,7 +119,7 @@ public extension MLComputeUnits {
 
 #if os(macOS)
 // From: https://stackoverflow.com/a/71726663
-extension Process {
+public extension Process {
     static func stringFromTerminal(command: String) -> String {
         let task = Process()
         let pipe = Pipe()
