@@ -55,8 +55,11 @@ final class MLXUnitTests: XCTestCase {
         let arr3 = arr1.asMLXOutput().asMLXInput()
         XCTAssertTrue(MLX.allClose(arr1, arr3).item(), "Input output conversion failed")
 
-        let arr4 = try arr1.asMLXOutput().asMLMultiArray().asMLXArray(Int32.self).asMLXInput()
+        let arr4 = try arr1.asMLXOutput().asMLXInput().asMLMultiArray().asMLXArray(Int32.self)
         XCTAssertTrue(MLX.allClose(arr1, arr4).item(), "Complex conversion failed")
+
+        let arr5 = try arr1.asMLXOutput().asMLMultiArray().asMLXArray(Int32.self).asMLXInput()
+        XCTAssertTrue(MLX.allClose(arr1, arr5).item(), "Complex conversion failed")
     }
 
     func testAsMLMultiArray() throws {

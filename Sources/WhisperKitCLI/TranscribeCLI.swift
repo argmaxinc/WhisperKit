@@ -311,8 +311,6 @@ struct TranscribeCLI: AsyncParsableCommand {
             modelFolder: cliArguments.modelPath,
             tokenizerFolder: downloadTokenizerFolder,
             computeOptions: computeOptions,
-            featureExtractor: MLXFeatureExtractor(),
-            audioEncoder: MLXAudioEncoder(),
             verbose: cliArguments.verbose,
             logLevel: .debug,
             load: true,
