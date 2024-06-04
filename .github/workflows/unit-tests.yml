@@ -33,7 +33,7 @@ jobs:
               test-destination: "platform=iOS Simulator,OS=${{ inputs.ios-version }},name=iPhone 15",
               test-cases: "-only-testing WhisperKitTests/UnitTests",
               mlx-disabled: "1",
-              scheme: "whisperkit-Package",
+              scheme: "whisperkit",
             }
           - {
               name: "watchOS",
@@ -51,7 +51,7 @@ jobs:
               test-destination: "platform=visionOS Simulator,name=Apple Vision Pro",
               test-cases: "-only-testing WhisperKitTests/UnitTests",
               mlx-disabled: "1",
-              scheme: "whisperkit-Package",
+              scheme: "whisperkit",
             }
     timeout-minutes: 20
     steps:
