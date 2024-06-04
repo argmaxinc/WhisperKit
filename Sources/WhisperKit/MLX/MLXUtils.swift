@@ -29,9 +29,9 @@ extension MLXArray {
 
     /// Adapts the shape of the input array so MLX is compatible with CoreML
     ///
-    /// Remove empty dimensions, swap axes, result: [n, m]
+    /// Remove empty dimensions, swap axes, result: [1, n, m]
     func asMLXInput() -> MLXArray {
-        squeezed().swappedAxes(0, 1)
+        squeezed().swappedAxes(0, 1).expandedDimensions(axes: [0])
     }
 }
 
@@ -72,7 +72,19 @@ extension MLXArray {
     }
 }
 
+extension Embedding {
+    func asLinear(_ x: MLXArray) -> MLXArray {
+        x.matmul(weight.T)
+    }
+}
+
 // MARK: - Functions
+
+func additiveCausalMask(_ n: Int, dType: MLX.DType = .float32) -> MLXArray {
+    let indices = MLXArray(Array(0..<n))
+    let mask = indices[0..., .newAxis] .< indices[.newAxis]
+    return mask.asType(dType) * -1e9
+}
 
 func sinusoids(length: Int, channels: Int, maxTimescale: Int = 10000) -> MLXArray {
     assert(channels % 2 == 0)
