@@ -8,6 +8,33 @@ import CoreML
 
 // MARK: - Extensions
 
+extension MLMultiArray {
+    func asMLXArray<T: MLShapedArrayScalar & HasDType>(_ type: T.Type) -> MLXArray {
+        let shape = shape.map(\.intValue)
+        let strides = strides.map(\.intValue)
+        return withUnsafeBufferPointer(ofType: T.self) { ptr in
+            let buffer = UnsafeBufferPointer(start: ptr.baseAddress, count: shape.reduce(1, *))
+            return asStrided(MLXArray(buffer, shape), shape, strides: strides)
+        }
+    }
+}
+
+extension MLXArray {
+    /// Adapts the shape of the output array so MLX is compatible with CoreML
+    ///
+    /// Remove empty dimensions, swap axes and add empty dimensions, result: [1, n, 1, m]
+    func asMLXOutput() -> MLXArray {
+        squeezed().swappedAxes(0, 1).expandedDimensions(axes: [0, 2])
+    }
+
+    /// Adapts the shape of the input array so MLX is compatible with CoreML
+    ///
+    /// Remove empty dimensions, swap axes, result: [n, m]
+    func asMLXInput() -> MLXArray {
+        squeezed().swappedAxes(0, 1)
+    }
+}
+
 extension MLXArray {
     func asMLMultiArray() throws -> MLMultiArray {
         let dataType = multiArrayDataType()
@@ -67,8 +94,8 @@ func loadParameters(at url: URL, forKey key: String? = nil) throws -> NestedDict
     return NestedDictionary(item: keyParams)
 }
 
-func loadConfig(at url: URL) throws -> ModelConfig {
+func loadConfig(at url: URL) throws -> MLXModelConfig {
     let configDecoder = JSONDecoder()
     configDecoder.keyDecodingStrategy = .convertFromSnakeCase
-    return try configDecoder.decode(ModelConfig.self, from: Data(contentsOf: url))
+    return try configDecoder.decode(MLXModelConfig.self, from: Data(contentsOf: url))
 }

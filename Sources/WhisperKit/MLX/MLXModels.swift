@@ -9,7 +9,7 @@ public enum PadMode {
     case reflect
 }
 
-struct ModelConfig: Codable {
+struct MLXModelConfig: Codable {
     let nMels: Int
     let nAudioCtx: Int
     let nAudioState: Int

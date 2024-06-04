@@ -280,6 +280,12 @@ open class WhisperKit {
                 prewarmMode: prewarmMode
             )
             Logging.debug("Loaded feature extractor")
+        } else if let featureExtractor = featureExtractor as? WhisperMLXModel {
+            Logging.debug("Loading MLX feature extractor")
+            try await featureExtractor.loadModel(
+                at: path
+            )
+            Logging.debug("Loaded MLX feature extractor")
         }
 
         if let audioEncoder = audioEncoder as? WhisperMLModel {
@@ -290,6 +296,12 @@ open class WhisperKit {
                 prewarmMode: prewarmMode
             )
             Logging.debug("Loaded audio encoder")
+        } else if let audioEncoder = audioEncoder as? WhisperMLXModel {
+            Logging.debug("Loading MLX audio encoder")
+            try await audioEncoder.loadModel(
+                at: path
+            )
+            Logging.debug("Loaded MLX audio encoder")
         }
 
         if let textDecoder = textDecoder as? WhisperMLModel {

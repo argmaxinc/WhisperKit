@@ -37,7 +37,7 @@ public class AudioEncoder: AudioEncoding, WhisperMLModel {
     public init() {}
 
     public func encodeFeatures(_ features: MLMultiArray) async throws -> MLMultiArray? {
-        // Make sure features is shape MultiArray (Float32 1 × {80,128} × 3000)
+        // Make sure features is shape MultiArray (Float16 1 × {80,128} x 1 × 3000)
         guard let model else {
             throw WhisperError.modelsUnavailable()
         }
