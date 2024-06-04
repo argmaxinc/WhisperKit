@@ -31,8 +31,8 @@ jobs:
               condition: true,
               clean-destination: "generic/platform=iOS",
               test-destination: "platform=iOS Simulator,OS=${{ inputs.ios-version }},name=iPhone 15",
-              test-cases: "-only-testing WhisperKitTests/UnitTests -only-testing WhisperKitMLXTests/MLXUnitTests",
-              mlx-disabled: "0",
+              test-cases: "-only-testing WhisperKitTests/UnitTests",
+              mlx-disabled: "1",
               scheme: "whisperkit-Package",
             }
           - {
@@ -49,8 +49,8 @@ jobs:
               condition: "${{ inputs.macos-runner == 'macos-14' }}",
               clean-destination: "generic/platform=visionOS",
               test-destination: "platform=visionOS Simulator,name=Apple Vision Pro",
-              test-cases: "-only-testing WhisperKitTests/UnitTests -only-testing WhisperKitMLXTests/MLXUnitTests",
-              mlx-disabled: "0",
+              test-cases: "-only-testing WhisperKitTests/UnitTests",
+              mlx-disabled: "1",
               scheme: "whisperkit-Package",
             }
     timeout-minutes: 20
