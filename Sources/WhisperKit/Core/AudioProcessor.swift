@@ -235,39 +235,45 @@ public class AudioProcessor: NSObject, AudioProcessing {
         }
 
         let frameCount = AVAudioFrameCount(audioFile.length)
-        guard let inputBuffer = AVAudioPCMBuffer(pcmFormat: audioFile.processingFormat, frameCapacity: frameCount),
+
+        // Read audio in 10mb increments to reduce the memory spike for large audio files
+        let maxReadFrameSize: AVAudioFrameCount = 10_000_000
+        guard let inputBuffer = AVAudioPCMBuffer(pcmFormat: audioFile.processingFormat, frameCapacity: min(frameCount, maxReadFrameSize)),
               let outputBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: AVAudioFrameCount(newFrameLength))
         else {
             Logging.error("Unable to create buffers, likely due to unsupported file format")
             return nil
         }
 
-        do {
-            try audioFile.read(into: inputBuffer, frameCount: frameCount)
-        } catch {
-            Logging.error("Error reading audio file: \(error)")
-            return nil
-        }
-
-        let inputBlock: AVAudioConverterInputBlock = { _, outStatus in
-            if inputBuffer.frameLength == 0 {
-                outStatus.pointee = .endOfStream
+        while audioFile.framePosition < frameCount {
+            do {
+                let maxReadFrameCount = min(frameCount - UInt32(audioFile.framePosition), maxReadFrameSize)
+                try audioFile.read(into: inputBuffer, frameCount: maxReadFrameCount)
+            } catch {
+                Logging.error("Error reading audio file: \(error)")
                 return nil
-            } else {
-                outStatus.pointee = .haveData
-                return inputBuffer
             }
-        }
 
-        var error: NSError?
-        let status = converter.convert(to: outputBuffer, error: &error, withInputFrom: inputBlock)
-        switch status {
+            let inputBlock: AVAudioConverterInputBlock = { _, outStatus in
+                if inputBuffer.frameLength == 0 {
+                    outStatus.pointee = .endOfStream
+                    return nil
+                } else {
+                    outStatus.pointee = .haveData
+                    return inputBuffer
+                }
+            }
+
+            var error: NSError?
+            let status = converter.convert(to: outputBuffer, error: &error, withInputFrom: inputBlock)
+            switch status {
             case .error:
                 if let conversionError = error {
                     Logging.error("Error converting audio file: \(conversionError)")
                 }
                 return nil
             default: break
+            }
         }
 
         return outputBuffer
