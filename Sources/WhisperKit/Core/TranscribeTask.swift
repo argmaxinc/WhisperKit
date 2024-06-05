@@ -93,11 +93,13 @@ final class TranscribeTask {
 
         // Process seek clips
         let seekClips = prepareSeekClips(contentFrames: contentFrames, decodeOptions: options)
-        let startDecodeLoopTime = CFAbsoluteTimeGetCurrent()
+        Logging.debug("Decoding seek clips: \(seekClips)")
 
         let totalSeekDuration = seekClips.reduce(0) { $0 + ($1.end - $1.start) }
         progress.totalUnitCount = Int64(totalSeekDuration)
         defer { progress.completedUnitCount = progress.totalUnitCount }
+
+        let startDecodeLoopTime = CFAbsoluteTimeGetCurrent()
         for (seekClipStart, seekClipEnd) in seekClips {
             // Loop through the current clip until we reach the end
             // Typically this will be the full audio file, unless seek points are explicitly provided
