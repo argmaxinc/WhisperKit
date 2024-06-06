@@ -731,10 +731,11 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
                 // Call the callback if it is provided on a background thread to avoid blocking the decoding loop
                 if let callback = callback {
                     DispatchQueue.global().async { [weak self] in
+                        guard let self = self else { return }
                         let shouldContinue = callback(result)
                         if let shouldContinue = shouldContinue, !shouldContinue, !isPrefill {
                             Logging.debug("Early stopping")
-                            self?.shouldEarlyStop[windowUUID] = true
+                            self.shouldEarlyStop[windowUUID] = true
                         }
                     }
                 }
