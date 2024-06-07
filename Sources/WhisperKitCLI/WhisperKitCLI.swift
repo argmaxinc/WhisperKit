@@ -4,6 +4,8 @@
 import ArgumentParser
 import Foundation
 
+let VERSION: String = "development"
+
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 @main
 struct WhisperKitCLI: AsyncParsableCommand {
@@ -11,6 +13,7 @@ struct WhisperKitCLI: AsyncParsableCommand {
         commandName: "whisperkit-cli",
         abstract: "WhisperKit CLI",
         discussion: "Swift native speech recognition with Whisper for Apple Silicon",
+        version: VERSION,
         subcommands: [TranscribeCLI.self]
     )
 }
