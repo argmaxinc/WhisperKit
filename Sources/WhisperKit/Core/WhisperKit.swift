@@ -45,8 +45,8 @@ open class WhisperKit {
         model: String? = nil,
         downloadBase: URL? = nil,
         modelRepo: String? = nil,
-        modelFolder: String? = nil,
-        tokenizerFolder: URL? = nil,
+        modelFolder: String? = nil, // A folder with model files from https://huggingface.co/argmaxinc/whisperkit-coreml
+        tokenizerFolder: URL? = nil, // A folder with the following structure: ./models/openai/whisper-{size}/... from https://huggingface.co/openai/whisper-{size}
         computeOptions: ModelComputeOptions? = nil,
         audioProcessor: (any AudioProcessing)? = nil,
         featureExtractor: (any FeatureExtracting)? = nil,
