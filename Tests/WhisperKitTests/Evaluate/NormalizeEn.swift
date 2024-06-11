@@ -146,15 +146,16 @@ class EnglishNumberNormalizer{
             return (name.replacingOccurrences(of: "y", with: "ieth"), (value, "th"))
         })
         let tensSuffixed = tensPlural.merging(tensOrdinal) { $1 }
-
+        
+        //TODO: Figure out a solution for the overflow.
         let multipliers: [String: Int] = [
             "hundred": 100,
             "thousand": 1_000,
             "million": 1_000_000,
             "billion": 1_000_000_000,
-            "trillion": 1_000_000_000_000,
-            "quadrillion": 1_000_000_000_000_000,
-            "quintillion": 1_000_000_000_000_000_000
+        //    "trillion": 1_000_000_000_000,
+        //    "quadrillion": 1_000_000_000_000_000,
+        //    "quintillion": 1_000_000_000_000_000_000
         //    "sextillion": 1_000_000_000_000_000_000_000,
         //    "septillion": 1_000_000_000_000_000_000_000_000,
         //    "octillion": 1_000_000_000_000_000_000_000_000_000,
