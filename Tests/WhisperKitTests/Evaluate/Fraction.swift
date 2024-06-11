@@ -66,6 +66,8 @@ struct Fraction{
             }
         }
         if matches.count == 0{ return nil}
+        // catch overflow if matches[num] will exceed size of Int64
+        if matches["num"]?.count ?? 0 > 19{ return nil}
         var numerator = Int(matches["num"] ?? "0")!
         var denominator: Int
         
