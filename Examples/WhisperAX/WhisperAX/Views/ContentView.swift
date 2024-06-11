@@ -1308,10 +1308,12 @@ struct ContentView: View {
                 let checkTokens: [Int] = currentTokens.suffix(checkWindow)
                 let compressionRatio = compressionRatio(of: checkTokens)
                 if compressionRatio > options.compressionRatioThreshold! {
+                    Logging.debug("Early stopping due to compression threshold")
                     return false
                 }
             }
             if progress.avgLogprob! < options.logProbThreshold! {
+                Logging.debug("Early stopping due to logprob threshold")
                 return false
             }
             return nil
@@ -1519,10 +1521,12 @@ struct ContentView: View {
                 let checkTokens: [Int] = currentTokens.suffix(checkWindow)
                 let compressionRatio = compressionRatio(of: checkTokens)
                 if compressionRatio > options.compressionRatioThreshold! {
+                    Logging.debug("Early stopping due to compression threshold")
                     return false
                 }
             }
             if progress.avgLogprob! < options.logProbThreshold! {
+                Logging.debug("Early stopping due to logprob threshold")
                 return false
             }
 

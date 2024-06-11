@@ -344,7 +344,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
     public var tokenizer: WhisperTokenizer?
     public var prefillData: WhisperMLModel?
     public var isModelMultilingual: Bool = false
-    public var shouldEarlyStop: Bool = false
+    public var shouldEarlyStop = [UUID: Bool]()
     private var languageLogitsFilter: LanguageLogitsFilter?
 
     public var supportsWordTimestamps: Bool {
@@ -588,7 +588,8 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         Logging.debug("Running main loop for a maximum of \(loopCount) iterations, starting at index \(prefilledIndex)")
         var hasAlignment = false
         var isFirstTokenLogProbTooLow = false
-        shouldEarlyStop = false
+        let windowUUID = UUID()
+        shouldEarlyStop[windowUUID] = false
         for tokenIndex in prefilledIndex..<loopCount {
             let loopStart = Date()
 
@@ -730,10 +731,11 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
                 // Call the callback if it is provided on a background thread to avoid blocking the decoding loop
                 if let callback = callback {
                     DispatchQueue.global().async { [weak self] in
+                        guard let self = self else { return }
                         let shouldContinue = callback(result)
                         if let shouldContinue = shouldContinue, !shouldContinue, !isPrefill {
                             Logging.debug("Early stopping")
-                            self?.shouldEarlyStop = true
+                            self.shouldEarlyStop[windowUUID] = true
                         }
                     }
                 }
@@ -749,10 +751,13 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             }
 
             // Check if early stopping is triggered
-            if shouldEarlyStop {
+            if let shouldStop = shouldEarlyStop[windowUUID], shouldStop {
                 break
             }
         }
+        
+        // Cleanup the early stop flag after loop completion
+        shouldEarlyStop.removeValue(forKey: windowUUID)
 
         let cache = DecodingCache(
             keyCache: decoderInputs.keyCache,
