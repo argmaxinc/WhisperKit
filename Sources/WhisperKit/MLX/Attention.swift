@@ -24,8 +24,8 @@ final class MultiHeadAttention: Module {
         _ x: MLXArray,
         xa: MLXArray? = nil,
         mask: MLXArray? = nil,
-        kvCache: MLXArray? = nil
-    ) -> (MLXArray, (MLXArray, MLXArray), MLXArray) {
+        kvCache: KV? = nil
+    ) -> MultiHeadAttentionResult {
         let q = query(x)
 
         var k: MLXArray
@@ -37,13 +37,17 @@ final class MultiHeadAttention: Module {
             k = key(x)
             v = value(x)
             if let kvCache {
-                k = MLX.concatenated([kvCache[0], k], axis: 1)
-                v = MLX.concatenated([kvCache[1], v], axis: 1)
+                k = MLX.concatenated([kvCache.k, k], axis: 1)
+                v = MLX.concatenated([kvCache.v, v], axis: 1)
             }
         }
 
         let (wv, qk) = qkvAttention(q, k, v, mask)
-        return (out(wv), (k, v), qk)
+        return MultiHeadAttentionResult(
+            x: out(wv),
+            kv: KV(k: k, v: v),
+            qk: qk
+        )
     }
 
     private func qkvAttention(_ q: MLXArray, _ k: MLXArray, _ v: MLXArray, _ mask: MLXArray?) -> (MLXArray, MLXArray) {
@@ -70,10 +74,14 @@ final class ResidualAttentionBlock: Module {
     let mlp1: Linear
     let mlp2: Linear
     let mlp_ln: LayerNorm
+    let cross_attn: MultiHeadAttention?
+    let cross_attn_ln: LayerNorm?
 
-    init(nState: Int, nHead: Int) {
+    init(nState: Int, nHead: Int, crossAttention: Bool = false) {
         self.attn = MultiHeadAttention(nState: nState, nHead: nHead)
         self.attn_ln = LayerNorm(dimensions: nState)
+        self.cross_attn = crossAttention ? MultiHeadAttention(nState: nState, nHead: nHead) : nil
+        self.cross_attn_ln = crossAttention ? LayerNorm(dimensions: nState) : nil
         let nMlp = nState * 4
         self.mlp1 = Linear(nState, nMlp)
         self.mlp2 = Linear(nMlp, nState)
@@ -84,12 +92,29 @@ final class ResidualAttentionBlock: Module {
         _ x: MLXArray,
         xa: MLXArray? = nil,
         mask: MLXArray? = nil,
-        kvCache: (MLXArray, MLXArray)? = nil
+        kvCache: KV? = nil,
+        crossKvCache: KV? = nil
     ) -> ResidualAttentionBlockResult {
-        let (kvCache, crossKv) = kvCache ?? (nil, nil)
-        let (y, kv, _) = attn(attn_ln(x), mask: mask, kvCache: kvCache)
-        var x = x + y
-        x = x + mlp2(gelu(mlp1(mlp_ln(x))))
-        return ResidualAttentionBlockResult(x: x, kv: kv, crossKv: crossKv, crossQk: nil)
+        let attnResult = attn(attn_ln(x), mask: mask, kvCache: kvCache)
+        var x = x + attnResult.x
+        if let cross_attn, let cross_attn_ln {
+            let crossAttnResult = cross_attn(cross_attn_ln(x), xa: xa, kvCache: crossKvCache)
+            x = x + crossAttnResult.x
+            x = x + mlp2(gelu(mlp1(mlp_ln(x))))
+            return ResidualAttentionBlockResult(
+                x: x,
+                kv: attnResult.kv,
+                crossKv: crossAttnResult.kv,
+                crossQk: crossAttnResult.qk
+            )
+        } else {
+            x = x + mlp2(gelu(mlp1(mlp_ln(x))))
+            return ResidualAttentionBlockResult(
+                x: x,
+                kv: attnResult.kv,
+                crossKv: crossKvCache,
+                crossQk: nil
+            )
+        }
     }
 }

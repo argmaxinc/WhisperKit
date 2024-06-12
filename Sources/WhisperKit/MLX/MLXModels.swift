@@ -22,9 +22,25 @@ struct MLXModelConfig: Codable {
     let nTextLayer: Int
 }
 
+struct KV {
+    var k: MLXArray
+    var v: MLXArray
+}
+
+struct TextDecoderResult {
+    var logits: MLXArray
+    var kvCache: [KV]
+}
+
 struct ResidualAttentionBlockResult {
     var x: MLXArray
-    var kv: (MLXArray, MLXArray)
-    var crossKv: MLXArray?
+    var kv: KV
+    var crossKv: KV?
     var crossQk: MLXArray?
+}
+
+struct MultiHeadAttentionResult {
+    var x: MLXArray
+    var kv: KV
+    var qk: MLXArray
 }

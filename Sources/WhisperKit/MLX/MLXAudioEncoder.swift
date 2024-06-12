@@ -22,7 +22,7 @@ public class MLXAudioEncoder: AudioEncoding {
         try Task.checkCancellation()
         let inputArray = features.asMLXArray(FloatType.self)
         let input = inputArray.asMLXInput()
-        let output = encoder(input[.newAxis])
+        let output = encoder(input)
         return try output.asMLXOutput().asMLMultiArray()
     }
 }
