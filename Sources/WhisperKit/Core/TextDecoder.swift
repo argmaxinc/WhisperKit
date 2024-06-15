@@ -451,11 +451,11 @@ public class TextDecoderContextPrefill: WhisperMLModel {
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 open class TextDecoder: TextDecoding, WhisperMLModel {
-    public var model: MLModel?
+     public var model: MLModel?
     public var tokenizer: WhisperTokenizer?
     public var prefillData: WhisperMLModel?
     public var isModelMultilingual: Bool = false
-    public var shouldEarlyStop: Bool = false
+    public var shouldEarlyStop = [UUID: Bool]()
     private var languageLogitsFilter: LanguageLogitsFilter?
 
     public var supportsWordTimestamps: Bool {
@@ -492,15 +492,12 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
     public func predictLogits(
         inputIds: MLMultiArray,
         cacheLength: MLMultiArray,
-        keyCache: MLMultiArray?,
-        valueCache: MLMultiArray?,
+        keyCache: MLMultiArray,
+        valueCache: MLMultiArray,
         kvCacheUpdateMask: MLMultiArray,
         encoderOutputEmbeds: MLMultiArray,
         decoderKeyPaddingMask: MLMultiArray
     ) async throws -> (logits: MLMultiArray?, cache: DecodingCache?)? {
-        guard let model, let keyCache, let valueCache else {
-            return nil
-        }
         let modelInputs = TextDecoderInput(
             input_ids: inputIds,
             cache_length: cacheLength,
@@ -510,6 +507,10 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             encoder_output_embeds: encoderOutputEmbeds,
             decoder_key_padding_mask: decoderKeyPaddingMask
         )
+
+        guard let model = model else {
+            return nil
+        }
 
         try Task.checkCancellation()
 
@@ -615,7 +616,8 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         Logging.debug("Running main loop for a maximum of \(loopCount) iterations, starting at index \(prefilledIndex)")
         var hasAlignment = false
         var isFirstTokenLogProbTooLow = false
-        shouldEarlyStop = false
+        let windowUUID = UUID()
+        shouldEarlyStop[windowUUID] = false
         for tokenIndex in prefilledIndex..<loopCount {
             let loopStart = Date()
 
@@ -767,10 +769,11 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
                 // Call the callback if it is provided on a background thread to avoid blocking the decoding loop
                 if let callback = callback {
                     DispatchQueue.global().async { [weak self] in
+                        guard let self = self else { return }
                         let shouldContinue = callback(result)
                         if let shouldContinue = shouldContinue, !shouldContinue, !isPrefill {
                             Logging.debug("Early stopping")
-                            self?.shouldEarlyStop = true
+                            self.shouldEarlyStop[windowUUID] = true
                         }
                     }
                 }
@@ -786,10 +789,13 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             }
 
             // Check if early stopping is triggered
-            if shouldEarlyStop {
+            if let shouldStop = shouldEarlyStop[windowUUID], shouldStop {
                 break
             }
         }
+        
+        // Cleanup the early stop flag after loop completion
+        shouldEarlyStop.removeValue(forKey: windowUUID)
 
         let cache = DecodingCache(
             keyCache: decoderInputs.keyCache,

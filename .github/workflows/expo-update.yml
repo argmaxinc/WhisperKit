@@ -12,6 +12,7 @@ jobs:
     env: 
       TAG: ${{ github.event.release.tag_name }}
       BRANCH_NAME: update-whisperkit-${{ github.event.release.tag_name }}
+      GH_TOKEN: ${{ secrets.COMMITTER_TOKEN }}
     steps:
         - name: Checkout whisper-kit-expo
           uses: actions/checkout@v4
@@ -66,12 +67,12 @@ jobs:
               echo "GitHub CLI is not installed, installing..."
               sudo apt update
               sudo apt install -y gh
-              echo ${{ secrets.COMMITTER_TOKEN }} | gh auth login --with-token
             else
               echo "GitHub CLI is already installed"
             fi
 
         - name: PR with changes
           run: |
+            echo ${{ secrets.COMMITTER_TOKEN }} | gh auth login --with-token
             gh pr create --title "Update WhisperKit to $TAG" --body "Update WhisperKit to $TAG" --base main --head $BRANCH_NAME
           
