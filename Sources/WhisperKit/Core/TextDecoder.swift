@@ -451,7 +451,7 @@ public class TextDecoderContextPrefill: WhisperMLModel {
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 open class TextDecoder: TextDecoding, WhisperMLModel {
-     public var model: MLModel?
+    public var model: MLModel?
     public var tokenizer: WhisperTokenizer?
     public var prefillData: WhisperMLModel?
     public var isModelMultilingual: Bool = false
@@ -492,12 +492,16 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
     public func predictLogits(
         inputIds: MLMultiArray,
         cacheLength: MLMultiArray,
-        keyCache: MLMultiArray,
-        valueCache: MLMultiArray,
+        keyCache: MLMultiArray?,
+        valueCache: MLMultiArray?,
         kvCacheUpdateMask: MLMultiArray,
         encoderOutputEmbeds: MLMultiArray,
         decoderKeyPaddingMask: MLMultiArray
     ) async throws -> (logits: MLMultiArray?, cache: DecodingCache?)? {
+        guard let model, let keyCache, let valueCache else {
+            return nil
+        }
+        
         let modelInputs = TextDecoderInput(
             input_ids: inputIds,
             cache_length: cacheLength,
@@ -507,10 +511,6 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             encoder_output_embeds: encoderOutputEmbeds,
             decoder_key_padding_mask: decoderKeyPaddingMask
         )
-
-        guard let model = model else {
-            return nil
-        }
 
         try Task.checkCancellation()
 
