@@ -12,6 +12,13 @@ import XCTest
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 final class UnitTests: XCTestCase {
+    private var tinyModelPath: String!
+
+    override func setUp() async throws {
+        try await super.setUp()
+        self.tinyModelPath = try tinyModelPath()
+    }
+
     // MARK: - Model Loading Test
 
     func testInit() async throws {
@@ -23,7 +30,7 @@ final class UnitTests: XCTestCase {
 
     func testInitTiny() async throws {
         try await XCTUnwrapAsync(
-            await WhisperKit(modelFolder: tinyModelPath(), logLevel: .error),
+            await WhisperKit(modelFolder: tinyModelPath, logLevel: .error),
             "Failed to init WhisperKit"
         )
     }
@@ -98,7 +105,7 @@ final class UnitTests: XCTestCase {
             "Failed to pad audio samples"
         )
         let featureExtractor = FeatureExtractor()
-        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "MelSpectrogram.mlmodelc")
+        let modelPath = URL(filePath: tinyModelPath).appending(path: "MelSpectrogram.mlmodelc")
         try await featureExtractor.loadModel(at: modelPath, computeUnits: ModelComputeOptions().melCompute)
         let melSpectrogram = try await XCTUnwrapAsync(
             await featureExtractor.logMelSpectrogram(fromAudio: paddedSamples),
@@ -137,7 +144,7 @@ final class UnitTests: XCTestCase {
 
     func testEncoderOutput() async throws {
         let audioEncoder = AudioEncoder()
-        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "AudioEncoder.mlmodelc")
+        let modelPath = URL(filePath: tinyModelPath).appending(path: "AudioEncoder.mlmodelc")
         try? await audioEncoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().audioEncoderCompute)
 
         let encoderInput = try MLMultiArray(shape: [1, 80, 1, 3000], dataType: .float16)
@@ -153,7 +160,7 @@ final class UnitTests: XCTestCase {
     func testDecoderOutput() async throws {
         let textDecoder = TextDecoder()
         let decodingOptions = DecodingOptions()
-        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        let modelPath = URL(filePath: tinyModelPath).appending(path: "TextDecoder.mlmodelc")
         await XCTAssertNoThrowAsync(
             try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute),
             "Failed to load the model"
@@ -191,7 +198,7 @@ final class UnitTests: XCTestCase {
             noSpeechThreshold: nil
         )
         let textDecoder = TextDecoder()
-        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        let modelPath = URL(filePath: tinyModelPath).appending(path: "TextDecoder.mlmodelc")
         try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
         textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
 
@@ -215,7 +222,7 @@ final class UnitTests: XCTestCase {
             noSpeechThreshold: nil
         )
         let textDecoder = TextDecoder()
-        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        let modelPath = URL(filePath: tinyModelPath).appending(path: "TextDecoder.mlmodelc")
         try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
         textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
 
@@ -301,7 +308,7 @@ final class UnitTests: XCTestCase {
         }
 
         let result = try await XCTUnwrapAsync(
-            await transcribe(with: .tiny, options: options, callback: continuationCallback).first!,
+            try await transcribe(modelPath: tinyModelPath, options: options, callback: continuationCallback).first!,
             "Failed to transcribe"
         )
 
@@ -316,7 +323,7 @@ final class UnitTests: XCTestCase {
         }
 
         let resultWithWait = try await XCTUnwrapAsync(
-            await transcribe(with: .tiny, options: options, callback: continuationCallbackWithWait).first!,
+            try await transcribe(modelPath: tinyModelPath, options: options, callback: continuationCallbackWithWait).first!,
             "Failed to transcribe"
         )
 
@@ -388,7 +395,7 @@ final class UnitTests: XCTestCase {
             melCompute: .cpuOnly
         )
         let whisperKit = try await WhisperKit(
-            modelFolder: tinyModelPath(),
+            modelFolder: tinyModelPath,
             computeOptions: computeOptions,
             verbose: true,
             logLevel: .debug
@@ -483,7 +490,7 @@ final class UnitTests: XCTestCase {
 
         for option in options {
             let result = try await XCTUnwrapAsync(
-                await transcribe(with: .tiny, options: option),
+                try await transcribe(modelPath: tinyModelPath, options: option),
                 "Failed to transcribe"
             )
             XCTAssertEqual(result.segments.first?.tokens.count, targetTokenCount)
@@ -497,7 +504,7 @@ final class UnitTests: XCTestCase {
         let options = DecodingOptions(task: .translate, language: targetLanguage, temperatureFallbackCount: 0)
 
         let result = try await XCTUnwrapAsync(
-            await transcribe(with: .tiny, options: options, audioFile: "es_test_clip.wav"),
+            try await transcribe(modelPath: tinyModelPath, options: options, audioFile: "es_test_clip.wav"),
             "Failed to transcribe"
         )
 
@@ -509,7 +516,7 @@ final class UnitTests: XCTestCase {
         let options = DecodingOptions(task: .transcribe, language: sourceLanguage, temperatureFallbackCount: 0)
 
         let result = try await XCTUnwrapAsync(
-            await transcribe(with: .tiny, options: options, audioFile: "es_test_clip.wav"),
+            try await transcribe(modelPath: tinyModelPath, options: options, audioFile: "es_test_clip.wav"),
             "Failed to transcribe"
         )
 
@@ -519,7 +526,7 @@ final class UnitTests: XCTestCase {
     func testDetectSpanish() async throws {
         let targetLanguage = "es"
         let whisperKit = try await WhisperKit(
-            modelFolder: tinyModelPath(),
+            modelFolder: tinyModelPath,
             verbose: true,
             logLevel: .debug
         )
@@ -549,7 +556,7 @@ final class UnitTests: XCTestCase {
 
         for (i, option) in optionsPairs.enumerated() {
             let result = try await XCTUnwrapAsync(
-                await transcribe(with: .tiny, options: option.options, audioFile: "es_test_clip.wav"),
+                try await transcribe(modelPath: tinyModelPath, options: option.options, audioFile: "es_test_clip.wav"),
                 "Failed to transcribe"
             )
 
@@ -575,7 +582,7 @@ final class UnitTests: XCTestCase {
         let options = DecodingOptions(task: .translate, language: targetLanguage, temperatureFallbackCount: 0)
 
         let result = try await XCTUnwrapAsync(
-            await transcribe(with: .tiny, options: options, audioFile: "ja_test_clip.wav"),
+            try await transcribe(modelPath: tinyModelPath, options: options, audioFile: "ja_test_clip.wav"),
             "Failed to transcribe"
         )
 
@@ -587,7 +594,7 @@ final class UnitTests: XCTestCase {
         let options = DecodingOptions(task: .transcribe, language: sourceLanguage, temperatureFallbackCount: 0)
 
         let result = try await XCTUnwrapAsync(
-            await transcribe(with: .tiny, options: options, audioFile: "ja_test_clip.wav"),
+            try await transcribe(modelPath: tinyModelPath, options: options, audioFile: "ja_test_clip.wav"),
             "Failed to transcribe"
         )
 
@@ -597,7 +604,7 @@ final class UnitTests: XCTestCase {
     func testDetectJapanese() async throws {
         let targetLanguage = "ja"
         let whisperKit = try await WhisperKit(
-            modelFolder: tinyModelPath(),
+            modelFolder: tinyModelPath,
             verbose: true,
             logLevel: .debug
         )
@@ -626,7 +633,7 @@ final class UnitTests: XCTestCase {
 
         for (i, option) in optionsPairs.enumerated() {
             let result = try await XCTUnwrapAsync(
-                await transcribe(with: .tiny, options: option.options, audioFile: "ja_test_clip.wav"),
+                try await transcribe(modelPath: tinyModelPath, options: option.options, audioFile: "ja_test_clip.wav"),
                 "Failed to transcribe"
             )
 
@@ -650,7 +657,7 @@ final class UnitTests: XCTestCase {
     func testDetectLanguageHelperMethod() async throws {
         let targetLanguages = ["es", "ja"]
         let whisperKit = try await WhisperKit(
-            modelFolder: tinyModelPath(),
+            modelFolder: tinyModelPath,
             verbose: true,
             logLevel: .debug
         )
@@ -672,7 +679,7 @@ final class UnitTests: XCTestCase {
         let options = DecodingOptions(withoutTimestamps: true)
 
         let result = try await XCTUnwrapAsync(
-            await transcribe(with: .tiny, options: options),
+            try await transcribe(modelPath: tinyModelPath, options: options),
             "Failed to transcribe"
         )
 
@@ -683,7 +690,7 @@ final class UnitTests: XCTestCase {
         let options = DecodingOptions(skipSpecialTokens: true, withoutTimestamps: true)
 
         let result = try await XCTUnwrapAsync(
-            await transcribe(with: .tiny, options: options),
+            try await transcribe(modelPath: tinyModelPath, options: options),
             "Failed to transcribe"
         )
 
@@ -694,7 +701,7 @@ final class UnitTests: XCTestCase {
         let options = DecodingOptions(usePrefillPrompt: true)
 
         try await XCTUnwrapAsync(
-            await transcribe(with: .tiny, options: options),
+            try await transcribe(modelPath: tinyModelPath, options: options),
             "Failed to transcribe"
         )
     }
@@ -703,7 +710,7 @@ final class UnitTests: XCTestCase {
         let options = DecodingOptions(usePrefillPrompt: false)
 
         let result = try await XCTUnwrapAsync(
-            await transcribe(with: .tiny, options: options),
+            try await transcribe(modelPath: tinyModelPath, options: options),
             "Failed to transcribe"
         )
 
@@ -711,7 +718,7 @@ final class UnitTests: XCTestCase {
     }
 
     func testSilence() async throws {
-        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath, verbose: true, logLevel: .debug)
         let audioSamples = [Float](repeating: 0.0, count: 30 * 16000)
         let options = DecodingOptions(usePrefillPrompt: false, skipSpecialTokens: false)
 
@@ -723,7 +730,7 @@ final class UnitTests: XCTestCase {
     }
 
     func testTemperatureIncrement() async throws {
-        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath, verbose: true, logLevel: .debug)
 
         // Generate random audio samples
         let audioSamples = (0..<(30 * 16000)).map { _ in Float.random(in: -0.7...0.7) }
@@ -750,11 +757,11 @@ final class UnitTests: XCTestCase {
 
     func testTopK() async throws {
         let result10000 = try await XCTUnwrapAsync(
-            await transcribe(with: .tiny, options: DecodingOptions(temperature: 0.5, topK: 10000)).first,
+            try await transcribe(modelPath: tinyModelPath, options: DecodingOptions(temperature: 0.5, topK: 10000)).first,
             "Failed to transcribe"
         )
         let result5 = try await XCTUnwrapAsync(
-            await transcribe(with: .tiny, options: DecodingOptions(temperature: 0.5)).first,
+            try await transcribe(modelPath: tinyModelPath, options: DecodingOptions(temperature: 0.5)).first,
             "Failed to transcribe"
         )
 
@@ -765,7 +772,7 @@ final class UnitTests: XCTestCase {
         var options = DecodingOptions(withoutTimestamps: true, clipTimestamps: [0])
 
         let resultFull = try await XCTUnwrapAsync(
-            await transcribe(with: .tiny, options: options),
+            try await transcribe(modelPath: tinyModelPath, options: options),
             "Failed to transcribe"
         )
 
@@ -773,7 +780,7 @@ final class UnitTests: XCTestCase {
         options = DecodingOptions(withoutTimestamps: true, clipTimestamps: [seekTime])
 
         let resultSeek = try await XCTUnwrapAsync(
-            await transcribe(with: .tiny, options: options),
+            try await transcribe(modelPath: tinyModelPath, options: options),
             "Failed to transcribe"
         )
 
@@ -786,14 +793,14 @@ final class UnitTests: XCTestCase {
     }
 
     func testPromptTokens() async throws {
-        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath, verbose: true, logLevel: .debug)
         let promptText = " prompt to encourage output without any punctuation and without capitalizing americans as if it was already normalized"
         let tokenizer = try XCTUnwrap(whisperKit.tokenizer)
         let promptTokens = tokenizer.encode(text: promptText).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
         let options = DecodingOptions(skipSpecialTokens: true, promptTokens: promptTokens)
 
         let result = try await XCTUnwrapAsync(
-            await transcribe(with: .tiny, options: options),
+            try await transcribe(modelPath: tinyModelPath, options: options),
             "Failed to transcribe"
         )
 
@@ -801,7 +808,7 @@ final class UnitTests: XCTestCase {
     }
 
     func testPrefixTokens() async throws {
-        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath, verbose: true, logLevel: .debug)
         // Prefix to encourage output without any punctuation and without capitalizing americans as if it was already normalized
         let prefixText = " and so my fellow americans"
         let tokenizer = try XCTUnwrap(whisperKit.tokenizer)
@@ -809,7 +816,7 @@ final class UnitTests: XCTestCase {
         let options = DecodingOptions(skipSpecialTokens: true, prefixTokens: prefixTokens)
 
         let result = try await XCTUnwrapAsync(
-            await transcribe(with: .tiny, options: options),
+            try await transcribe(modelPath: tinyModelPath, options: options),
             "Failed to transcribe"
         )
 
@@ -1153,14 +1160,14 @@ final class UnitTests: XCTestCase {
 
     func testVADAudioChunkerAccuracy() async throws {
         let testResult = try await XCTUnwrapAsync(
-            await transcribe(with: .tiny, options: DecodingOptions(), audioFile: "ted_60.m4a"),
+            try await transcribe(modelPath: tinyModelPath, options: DecodingOptions(), audioFile: "ted_60.m4a"),
             "Failed to transcribe"
         )
 
         let options = DecodingOptions(chunkingStrategy: .vad)
 
         let chunkedResult = try await XCTUnwrapAsync(
-            await transcribe(with: .tiny, options: options, audioFile: "ted_60.m4a"),
+            try await transcribe(modelPath: tinyModelPath, options: options, audioFile: "ted_60.m4a"),
             "Failed to transcribe"
         )
 
@@ -1444,14 +1451,10 @@ final class UnitTests: XCTestCase {
         }
     }
 
-    func testWordTimestampCorrectness() async {
+    func testWordTimestampCorrectness() async throws {
         let options = DecodingOptions(wordTimestamps: true)
 
-        guard let result = try? await transcribe(with: .tiny, options: options) else {
-            XCTFail("Failed to transcribe")
-            return
-        }
-
+        let result = try await transcribe(modelPath: tinyModelPath, options: options)
         let wordTimings = result.segments.compactMap { $0.words }.flatMap { $0 }
 
         let expectedWordTimings = [
@@ -1496,9 +1499,11 @@ final class UnitTests: XCTestCase {
 
     func testStreamingTimestamps() async throws {
         let options = DecodingOptions(usePrefillPrompt: true, wordTimestamps: true)
-        let modelPath = try tinyModelPath()
-
-        let whisperKit = try await WhisperKit(modelFolder: modelPath, /* computeOptions: computeOptions,*/ verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(
+            modelFolder: tinyModelPath,
+            verbose: true,
+            logLevel: .debug
+        )
 
         let audioFilePath = try XCTUnwrap(
             TestResource.path(forResource: "jfk", ofType: "wav"),

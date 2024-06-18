@@ -457,9 +457,9 @@ public final class MLXTextDecoder: TextDecoding {
 }
 
 extension MLXTextDecoder: WhisperMLXModel {
-    public func loadModel(at modelPath: URL) async throws {
-        let parameters = try loadParameters(at: modelPath.appending(path: "weights.safetensors"), forKey: "decoder")
-        let config = try loadConfig(at: modelPath.appending(path: "config.json"))
+    public func loadModel(at modelPath: URL, configPath: URL) async throws {
+        let parameters = try loadParameters(at: modelPath)
+        let config = try loadConfig(at: configPath)
         let decoder = TextDecoder(
             nVocab: config.nVocab,
             nCtx: config.nTextCtx,
@@ -490,10 +490,10 @@ final class TextDecoder: Module {
     let nLayer: Int
     let dtype: MLX.DType
 
-    private let token_embedding: Embedding
-    private let positional_embedding: MLXArray
-    private let blocks: [ResidualAttentionBlock]
-    private let ln: LayerNorm
+    @ModuleInfo(key: "token_embedding") private var tokenEmbedding: Embedding
+    @ModuleInfo(key: "positional_embedding") private var positionalEmbedding: MLXArray
+    @ModuleInfo(key: "blocks") private var blocks: [ResidualAttentionBlock]
+    @ModuleInfo(key: "ln") private var ln: LayerNorm
     private let _mask: MLXArray
 
     init(
@@ -511,12 +511,12 @@ final class TextDecoder: Module {
         self.nLayer = nLayer
         self.dtype = dtype
 
-        self.token_embedding = Embedding(embeddingCount: nVocab, dimensions: nState)
-        self.positional_embedding = MLX.zeros([nCtx, nState])
-        self.blocks = (0..<nLayer).map { _ in
+        self._tokenEmbedding.wrappedValue = Embedding(embeddingCount: nVocab, dimensions: nState)
+        self._positionalEmbedding.wrappedValue = MLX.zeros([nCtx, nState])
+        self._blocks.wrappedValue = (0..<nLayer).map { _ in
             ResidualAttentionBlock(nState: nState, nHead: nHead, crossAttention: true)
         }
-        self.ln = LayerNorm(dimensions: nState)
+        self._ln.wrappedValue = LayerNorm(dimensions: nState)
         self._mask = additiveCausalMask(nCtx).asType(dtype)
     }
 
@@ -527,7 +527,7 @@ final class TextDecoder: Module {
     ) -> TextDecoderResult {
         let offset = kvCache?.first??.k.shape[1] ?? 0
         var x = x[.newAxis, .ellipsis]
-        x = token_embedding(x) + positional_embedding[offset..<offset + x.shape[x.shape.count - 1]]
+        x = tokenEmbedding(x) + positionalEmbedding[offset..<offset + x.shape[x.shape.count - 1]]
         var kvCache: [KV?] = kvCache ?? Array(repeating: nil, count: blocks.count)
         for (index, block) in blocks.enumerated() {
             let result = block(x, xa: xa, mask: _mask, kvCache: kvCache[index])
@@ -536,7 +536,7 @@ final class TextDecoder: Module {
         }
         x = ln(x)
         return TextDecoderResult(
-            logits: token_embedding.asLinear(x),
+            logits: tokenEmbedding.asLinear(x),
             kvCache: kvCache.compactMap { $0 }
         )
     }

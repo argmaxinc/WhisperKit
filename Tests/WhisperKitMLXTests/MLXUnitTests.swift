@@ -5,12 +5,18 @@ import XCTest
 import MLX
 import WhisperKitTestsUtils
 import CoreML
+import NaturalLanguage
 @testable import WhisperKit
 @testable import WhisperKitMLX
 
 final class MLXUnitTests: XCTestCase {
-
+    private var tinyModelPath: String!
     private let accuracy: Float = 0.00001
+
+    override func setUp() async throws {
+        try await super.setUp()
+        self.tinyModelPath = try tinyMLXModelPath()
+    }
 
     // MARK: - Feature Extractor Tests
 
@@ -33,8 +39,11 @@ final class MLXUnitTests: XCTestCase {
 
     func testEncoderOutput() async throws {
         let audioEncoder = MLXAudioEncoder()
-        let modelPath = try URL(filePath: tinyMLXModelPath())
-        try await audioEncoder.loadModel(at: modelPath)
+        let modelPath = URL(filePath: tinyModelPath)
+        try await audioEncoder.loadModel(
+            at: modelPath.appending(path: "encoder.safetensors"),
+            configPath: modelPath.appending(path: "config.json")
+        )
 
         let encoderInput = try MLMultiArray(shape: [1, 80, 1, 3000], dataType: .float16)
         let expectedShape: [NSNumber] = [1, 384, 1, 1500]
@@ -49,9 +58,12 @@ final class MLXUnitTests: XCTestCase {
     func testDecoderOutput() async throws {
         let textDecoder = MLXTextDecoder()
         let decodingOptions = DecodingOptions()
-        let modelPath = try URL(filePath: tinyMLXModelPath())
+        let modelPath = URL(filePath: tinyModelPath)
         await XCTAssertNoThrowAsync(
-            try await textDecoder.loadModel(at: modelPath),
+            try await textDecoder.loadModel(
+                at: modelPath.appending(path: "decoder.safetensors"),
+                configPath: modelPath.appending(path: "config.json")
+            ),
             "Failed to load the model"
         )
         textDecoder.tokenizer = try await XCTUnwrapAsync(
@@ -76,6 +88,185 @@ final class MLXUnitTests: XCTestCase {
                 options: decodingOptions
             )
         )
+    }
+
+    func testDecoderLogProbThresholdDecodingFallback() async throws {
+        let decodingOptions = DecodingOptions(
+            withoutTimestamps: true,
+            compressionRatioThreshold: nil,
+            logProbThreshold: 1000.0,
+            firstTokenLogProbThreshold: nil,
+            noSpeechThreshold: nil
+        )
+        let textDecoder = MLXTextDecoder()
+        let modelPath = URL(filePath: tinyModelPath)
+        try await textDecoder.loadModel(
+            at: modelPath.appending(path: "decoder.safetensors"),
+            configPath: modelPath.appending(path: "config.json")
+        )
+        textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
+
+        let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.specialTokens.endToken, decodingOptions: decodingOptions)
+
+        let encoderInput = initMLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16, initialValue: FloatType(0))
+        let inputs = try textDecoder.prepareDecoderInputs(withPrompt: [textDecoder.tokenizer!.specialTokens.startOfTranscriptToken])
+        let decoderOutput = try await textDecoder.decodeText(from: encoderInput, using: inputs, sampler: tokenSampler, options: decodingOptions)
+
+        let fallback = try XCTUnwrap(decoderOutput.fallback, "Fallback should not be `nil`")
+        XCTAssertEqual(fallback.fallbackReason, "logProbThreshold")
+        XCTAssertTrue(fallback.needsFallback)
+    }
+
+    func testDecoderFirstTokenLogProbThresholdDecodingFallback() async throws {
+        let decodingOptions = DecodingOptions(
+            withoutTimestamps: true,
+            compressionRatioThreshold: nil,
+            logProbThreshold: nil,
+            firstTokenLogProbThreshold: 1000.0,
+            noSpeechThreshold: nil
+        )
+        let textDecoder = MLXTextDecoder()
+        let modelPath = URL(filePath: tinyModelPath)
+        try await textDecoder.loadModel(
+            at: modelPath.appending(path: "decoder.safetensors"),
+            configPath: modelPath.appending(path: "config.json")
+        )
+        textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
+
+        let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.specialTokens.endToken, decodingOptions: decodingOptions)
+
+        let encoderInput = initMLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16, initialValue: FloatType(0))
+        let inputs = try textDecoder.prepareDecoderInputs(withPrompt: [textDecoder.tokenizer!.specialTokens.startOfTranscriptToken])
+        let decoderOutput = try await textDecoder.decodeText(from: encoderInput, using: inputs, sampler: tokenSampler, options: decodingOptions)
+
+        let fallback = try XCTUnwrap(decoderOutput.fallback, "Fallback should not be `nil`")
+        XCTAssertEqual(fallback.fallbackReason, "firstTokenLogProbThreshold")
+        XCTAssertTrue(fallback.needsFallback)
+    }
+
+    // MARK: - Options Tests
+
+    /// Multilingual Tests
+    /// NOTE: These are purely for consistency checks and do not reflect the ground truth translations
+    func testTranslateSpanish() async throws {
+        let targetLanguage = "es"
+        let options = DecodingOptions(task: .translate, language: targetLanguage, temperatureFallbackCount: 0)
+
+        let result = try await XCTUnwrapAsync(
+            try await transcribe(modelPath: tinyModelPath, options: options, audioFile: "es_test_clip.wav"),
+            "Failed to transcribe"
+        )
+
+        XCTAssertEqual(result.text.split(separator: " ").prefix(2).joined(separator: " "), "This is")
+    }
+
+    func testTranscribeSpanish() async throws {
+        let sourceLanguage = "es"
+        let options = DecodingOptions(task: .transcribe, language: sourceLanguage, temperatureFallbackCount: 0)
+
+        let result = try await XCTUnwrapAsync(
+            try await transcribe(modelPath: tinyModelPath, options: options, audioFile: "es_test_clip.wav"),
+            "Failed to transcribe"
+        )
+
+        XCTAssertEqual(result.text.split(separator: " ").prefix(4).joined(separator: " "), "Esta es una grabación")
+    }
+
+    func testDetectSpanish() async throws {
+        let targetLanguage = "es"
+        let whisperKit = try await WhisperKit(
+            modelFolder: tinyModelPath,
+            verbose: true,
+            logLevel: .debug
+        )
+
+        let audioFilePath = try XCTUnwrap(
+            TestResource.path(forResource: "es_test_clip", ofType: "wav"),
+            "Audio file not found"
+        )
+
+        // To detect language only, set `sampleLength` to 1 and no prefill prompt
+        let optionsDetectOnly = DecodingOptions(task: .transcribe, temperatureFallbackCount: 0, sampleLength: 1, detectLanguage: true)
+        let resultNoPrefill: [TranscriptionResult] = try await whisperKit.transcribe(audioPath: audioFilePath, decodeOptions: optionsDetectOnly)
+
+        XCTAssertEqual(resultNoPrefill.first?.language, targetLanguage)
+    }
+
+    func testTranslateJapaneseOptions() async throws {
+        let targetLanguage = "ja"
+        let options = DecodingOptions(task: .translate, language: targetLanguage, temperatureFallbackCount: 0)
+
+        let result = try await XCTUnwrapAsync(
+            try await transcribe(modelPath: tinyModelPath, options: options, audioFile: "ja_test_clip.wav"),
+            "Failed to transcribe"
+        )
+
+        XCTAssertEqual(result.text.split(separator: " ").first, "Tokyo")
+    }
+
+    func testTranscribeJapanese() async throws {
+        let sourceLanguage = "ja"
+        let options = DecodingOptions(task: .transcribe, language: sourceLanguage, temperatureFallbackCount: 0)
+
+        let result = try await XCTUnwrapAsync(
+            try await transcribe(modelPath: tinyModelPath, options: options, audioFile: "ja_test_clip.wav"),
+            "Failed to transcribe"
+        )
+
+        XCTAssertEqual(result.text.prefix(3), "東京は")
+    }
+
+    func testDetectJapanese() async throws {
+        let targetLanguage = "ja"
+        let whisperKit = try await WhisperKit(
+            modelFolder: tinyModelPath,
+            verbose: true,
+            logLevel: .debug
+        )
+
+        let audioFilePath = try XCTUnwrap(
+            TestResource.path(forResource: "ja_test_clip", ofType: "wav"),
+            "Audio file not found"
+        )
+
+        // To detect language only, set `sampleLength` to 1 and no prefill prompt
+        let optionsDetectOnly = DecodingOptions(task: .transcribe, temperatureFallbackCount: 0, sampleLength: 1, detectLanguage: true)
+        let result: [TranscriptionResult] = try await whisperKit.transcribe(audioPath: audioFilePath, decodeOptions: optionsDetectOnly)
+
+        XCTAssertEqual(result.first?.language, targetLanguage)
+    }
+
+    func testDetectJapaneseOptions() async throws {
+        let optionsPairs: [(options: DecodingOptions, language: String)] = [
+            (DecodingOptions(task: .transcribe, temperatureFallbackCount: 0, usePrefillPrompt: true, detectLanguage: true), "ja"), // recommended usage for transcribing unknown language
+            (DecodingOptions(task: .transcribe, temperatureFallbackCount: 0, usePrefillPrompt: true, detectLanguage: false), "en"), // en is the default prompt language
+            (DecodingOptions(task: .transcribe, temperatureFallbackCount: 0, usePrefillPrompt: true, detectLanguage: nil), "en"), // en is the default prompt language
+            (DecodingOptions(task: .transcribe, temperatureFallbackCount: 0, usePrefillPrompt: false, detectLanguage: true), "ja"), // Unecessary combination, but can be useful if used with low `sampleLength` values to purely detect language and not decode (see above)
+            (DecodingOptions(task: .transcribe, temperatureFallbackCount: 0, usePrefillPrompt: false, detectLanguage: false), "ja"), // no prefill, model will detect language naturally
+            (DecodingOptions(task: .transcribe, temperatureFallbackCount: 0, usePrefillPrompt: false, detectLanguage: nil), "ja"), // no prefill, model will detect language naturally
+        ]
+
+        for (i, option) in optionsPairs.enumerated() {
+            let result = try await XCTUnwrapAsync(
+                try await transcribe(modelPath: tinyModelPath, options: option.options, audioFile: "ja_test_clip.wav"),
+                "Failed to transcribe"
+            )
+
+            let recognizer = NLLanguageRecognizer()
+            recognizer.processString(result.text)
+            let languageCode = recognizer.dominantLanguage!.rawValue
+
+            XCTAssertEqual(
+                languageCode,
+                option.language,
+                "Text language \"\(languageCode)\" at index \(i) did not match expected language \"\(option.language)\""
+            )
+            XCTAssertEqual(
+                result.first?.language,
+                option.language,
+                "Result language \"\(String(describing: result.first?.language))\" at index \(i) did not match expected language \"\(option.language)\""
+            )
+        }
     }
 
     // MARK: - Utils Tests

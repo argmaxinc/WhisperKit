@@ -132,20 +132,13 @@ public extension MLMultiArray {
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public extension XCTestCase {
     func transcribe(
-        with variant: ModelVariant,
+        modelPath: String,
         options: DecodingOptions,
         callback: TranscriptionCallback = nil,
         audioFile: String = "jfk.wav",
         file: StaticString = #file,
         line: UInt = #line
     ) async throws -> [TranscriptionResult] {
-        let modelPath: String
-        switch variant {
-            case .largev3:
-                modelPath = try largev3ModelPath()
-            default:
-                modelPath = try tinyModelPath()
-        }
         let computeOptions = ModelComputeOptions(
             melCompute: .cpuOnly,
             audioEncoderCompute: .cpuOnly,
