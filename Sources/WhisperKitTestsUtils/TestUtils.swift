@@ -136,6 +136,9 @@ public extension XCTestCase {
         options: DecodingOptions,
         callback: TranscriptionCallback = nil,
         audioFile: String = "jfk.wav",
+        featureExtractor: (any FeatureExtracting)? = nil,
+        audioEncoder: (any AudioEncoding)? = nil,
+        textDecoder: (any TextDecoding)? = nil,
         file: StaticString = #file,
         line: UInt = #line
     ) async throws -> [TranscriptionResult] {
@@ -145,7 +148,15 @@ public extension XCTestCase {
             textDecoderCompute: .cpuOnly,
             prefillCompute: .cpuOnly
         )
-        let whisperKit = try await WhisperKit(modelFolder: modelPath, computeOptions: computeOptions, verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(
+            modelFolder: modelPath,
+            computeOptions: computeOptions,
+            featureExtractor: featureExtractor,
+            audioEncoder: audioEncoder,
+            textDecoder: textDecoder,
+            verbose: true,
+            logLevel: .debug
+        )
         trackForMemoryLeaks(on: whisperKit, file: file, line: line)
 
         let audioComponents = audioFile.components(separatedBy: ".")

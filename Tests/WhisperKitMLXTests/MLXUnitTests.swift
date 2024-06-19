@@ -153,7 +153,14 @@ final class MLXUnitTests: XCTestCase {
         let options = DecodingOptions(task: .translate, language: targetLanguage, temperatureFallbackCount: 0)
 
         let result = try await XCTUnwrapAsync(
-            try await transcribe(modelPath: tinyModelPath, options: options, audioFile: "es_test_clip.wav"),
+            try await transcribe(
+                modelPath: tinyModelPath,
+                options: options,
+                audioFile: "es_test_clip.wav",
+                featureExtractor: MLXFeatureExtractor(),
+                audioEncoder: MLXAudioEncoder(),
+                textDecoder: MLXTextDecoder()
+            ),
             "Failed to transcribe"
         )
 
@@ -165,7 +172,14 @@ final class MLXUnitTests: XCTestCase {
         let options = DecodingOptions(task: .transcribe, language: sourceLanguage, temperatureFallbackCount: 0)
 
         let result = try await XCTUnwrapAsync(
-            try await transcribe(modelPath: tinyModelPath, options: options, audioFile: "es_test_clip.wav"),
+            try await transcribe(
+                modelPath: tinyModelPath,
+                options: options,
+                audioFile: "es_test_clip.wav",
+                featureExtractor: MLXFeatureExtractor(),
+                audioEncoder: MLXAudioEncoder(),
+                textDecoder: MLXTextDecoder()
+            ),
             "Failed to transcribe"
         )
 
@@ -176,6 +190,9 @@ final class MLXUnitTests: XCTestCase {
         let targetLanguage = "es"
         let whisperKit = try await WhisperKit(
             modelFolder: tinyModelPath,
+            featureExtractor: MLXFeatureExtractor(),
+            audioEncoder: MLXAudioEncoder(),
+            textDecoder: MLXTextDecoder(),
             verbose: true,
             logLevel: .debug
         )
@@ -197,7 +214,14 @@ final class MLXUnitTests: XCTestCase {
         let options = DecodingOptions(task: .translate, language: targetLanguage, temperatureFallbackCount: 0)
 
         let result = try await XCTUnwrapAsync(
-            try await transcribe(modelPath: tinyModelPath, options: options, audioFile: "ja_test_clip.wav"),
+            try await transcribe(
+                modelPath: tinyModelPath,
+                options: options,
+                audioFile: "ja_test_clip.wav",
+                featureExtractor: MLXFeatureExtractor(),
+                audioEncoder: MLXAudioEncoder(),
+                textDecoder: MLXTextDecoder()
+            ),
             "Failed to transcribe"
         )
 
@@ -209,7 +233,14 @@ final class MLXUnitTests: XCTestCase {
         let options = DecodingOptions(task: .transcribe, language: sourceLanguage, temperatureFallbackCount: 0)
 
         let result = try await XCTUnwrapAsync(
-            try await transcribe(modelPath: tinyModelPath, options: options, audioFile: "ja_test_clip.wav"),
+            try await transcribe(
+                modelPath: tinyModelPath,
+                options: options,
+                audioFile: "ja_test_clip.wav",
+                featureExtractor: MLXFeatureExtractor(),
+                audioEncoder: MLXAudioEncoder(),
+                textDecoder: MLXTextDecoder()
+            ),
             "Failed to transcribe"
         )
 
@@ -220,6 +251,9 @@ final class MLXUnitTests: XCTestCase {
         let targetLanguage = "ja"
         let whisperKit = try await WhisperKit(
             modelFolder: tinyModelPath,
+            featureExtractor: MLXFeatureExtractor(),
+            audioEncoder: MLXAudioEncoder(),
+            textDecoder: MLXTextDecoder(),
             verbose: true,
             logLevel: .debug
         )
@@ -248,7 +282,14 @@ final class MLXUnitTests: XCTestCase {
 
         for (i, option) in optionsPairs.enumerated() {
             let result = try await XCTUnwrapAsync(
-                try await transcribe(modelPath: tinyModelPath, options: option.options, audioFile: "ja_test_clip.wav"),
+                try await transcribe(
+                    modelPath: tinyModelPath,
+                    options: option.options,
+                    audioFile: "ja_test_clip.wav",
+                    featureExtractor: MLXFeatureExtractor(),
+                    audioEncoder: MLXAudioEncoder(),
+                    textDecoder: MLXTextDecoder()
+                ),
                 "Failed to transcribe"
             )
 
