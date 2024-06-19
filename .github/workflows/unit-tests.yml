@@ -62,13 +62,13 @@ jobs:
       - name: Setup environment
         run: make setup
       - name: Setup Cache
-        id: model-cache-v2
+        id: model-cache
         uses: actions/cache@v4
         with:
           path: Sources/WhisperKitTestsUtils/Models
           key: ${{ runner.os }}-models
       - name: Download Models
-        if: steps.model-cache-v2.outputs.cache-hit != 'true'
+        if: steps.model-cache.outputs.cache-hit != 'true'
         run: make download-model MODEL=tiny && make download-mlx-model
       - name: Install and discover destinations
         env:
