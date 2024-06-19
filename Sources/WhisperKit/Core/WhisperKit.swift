@@ -271,7 +271,7 @@ open class WhisperKit {
             Logging.debug("Loaded feature extractor")
         } else if let featureExtractor = featureExtractor as? WhisperMLXModel {
             Logging.debug("Loading MLX feature extractor")
-            try await featureExtractor.loadModel(at: path)
+            try await featureExtractor.loadModel(at: path, configPath: path)
             Logging.debug("Loaded MLX feature extractor")
         }
 
@@ -285,7 +285,10 @@ open class WhisperKit {
             Logging.debug("Loaded audio encoder")
         } else if let audioEncoder = audioEncoder as? WhisperMLXModel {
             Logging.debug("Loading MLX audio encoder")
-            try await audioEncoder.loadModel(at: path)
+            try await audioEncoder.loadModel(
+                at: path.appending(path: "encoder.safetensors"),
+                configPath: path.appending(path: "config.json")
+            )
             Logging.debug("Loaded MLX audio encoder")
         }
 
@@ -299,7 +302,10 @@ open class WhisperKit {
             Logging.debug("Loaded text decoder")
         } else if let textDecoder = textDecoder as? WhisperMLXModel {
             Logging.debug("Loading MLX text decoder")
-            try await textDecoder.loadModel(at: path)
+            try await textDecoder.loadModel(
+                at: path.appending(path: "decoder.safetensors"),
+                configPath: path.appending(path: "config.json")
+            )
             Logging.debug("Loaded MLX text decoder")
         }
 

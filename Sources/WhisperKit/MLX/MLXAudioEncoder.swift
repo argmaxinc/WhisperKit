@@ -28,9 +28,9 @@ public class MLXAudioEncoder: AudioEncoding {
 }
 
 extension MLXAudioEncoder: WhisperMLXModel {
-    public func loadModel(at modelPath: URL) async throws {
-        let parameters = try loadParameters(at: modelPath.appending(path: "weights.safetensors"), forKey: "encoder")
-        let config = try loadConfig(at: modelPath.appending(path: "config.json"))
+    public func loadModel(at modelPath: URL, configPath: URL) async throws {
+        let parameters = try loadParameters(at: modelPath)
+        let config = try loadConfig(at: configPath)
         let encoder = AudioEncoder(
             nMels: config.nMels,
             nCtx: config.nAudioCtx,
@@ -57,11 +57,11 @@ final class AudioEncoder: Module {
     let nLayer: Int
     let dType: MLX.DType
 
-    private let conv1: Conv1d
-    private let conv2: Conv1d
-    private let positionalEmbedding: MLXArray
-    private let blocks: [ResidualAttentionBlock]
-    private let ln_post: LayerNorm
+    @ModuleInfo(key: "conv1") private var conv1: Conv1d
+    @ModuleInfo(key: "conv2") private var conv2: Conv1d
+    @ModuleInfo(key: "blocks") private var blocks: [ResidualAttentionBlock]
+    @ModuleInfo(key: "ln_post") private var lnPost: LayerNorm
+    private let _positionalEmbedding: MLXArray
 
     init(
         nMels: Int,
@@ -78,22 +78,22 @@ final class AudioEncoder: Module {
         self.nLayer = nLayer
         self.dType = dType
 
-        self.conv1 = Conv1d(inputChannels: nMels, outputChannels: nState, kernelSize: 3, padding: 1)
-        self.conv2 = Conv1d(inputChannels: nState, outputChannels: nState, kernelSize: 3, stride: 2, padding: 1)
-        self.positionalEmbedding = sinusoids(length: nCtx, channels: nState).asType(dType)
-        self.blocks = (0..<nLayer).map { _ in ResidualAttentionBlock(nState: nState, nHead: nHead) }
-        self.ln_post = LayerNorm(dimensions: nState)
+        self._conv1.wrappedValue = Conv1d(inputChannels: nMels, outputChannels: nState, kernelSize: 3, padding: 1)
+        self._conv2.wrappedValue = Conv1d(inputChannels: nState, outputChannels: nState, kernelSize: 3, stride: 2, padding: 1)
+        self._blocks.wrappedValue = (0..<nLayer).map { _ in ResidualAttentionBlock(nState: nState, nHead: nHead) }
+        self._lnPost.wrappedValue = LayerNorm(dimensions: nState)
+        self._positionalEmbedding = sinusoids(length: nCtx, channels: nState).asType(dType)
     }
 
     func callAsFunction(_ x: MLXArray) -> MLXArray {
         var x = MLXNN.gelu(conv1(x))
         x = MLXNN.gelu(conv2(x))
-        assert(Array(x.shape[1...]) == positionalEmbedding.shape, "incorrect audio shape")
-        x = x + positionalEmbedding
+        assert(Array(x.shape[1...]) == _positionalEmbedding.shape, "incorrect audio shape")
+        x = x + _positionalEmbedding
         for block in blocks {
             x = block(x).x
         }
-        x = ln_post(x)
+        x = lnPost(x)
         return x
     }
 }

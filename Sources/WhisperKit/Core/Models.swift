@@ -30,7 +30,7 @@ public protocol WhisperMLModel: WhisperModel {
 }
 
 public protocol WhisperMLXModel: WhisperModel {
-    func loadModel(at modelPath: URL) async throws
+    func loadModel(at modelPath: URL, configPath: URL) async throws
 }
 
 public extension WhisperMLModel {

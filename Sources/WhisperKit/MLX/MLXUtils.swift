@@ -94,16 +94,9 @@ func sinusoids(length: Int, channels: Int, maxTimescale: Int = 10000) -> MLXArra
     return MLX.concatenated([MLX.sin(scaledTime), MLX.cos(scaledTime)], axis: 1)
 }
 
-func loadParameters(at url: URL, forKey key: String? = nil) throws -> NestedDictionary<String, MLXArray> {
+func loadParameters(at url: URL) throws -> NestedDictionary<String, MLXArray> {
     let arrays = try MLX.loadArrays(url: url)
-    let params = ModuleParameters.unflattened(arrays)
-    guard let key else {
-        return params
-    }
-    guard let keyParams = params[key] else {
-        throw CocoaError.error(.coderValueNotFound)
-    }
-    return NestedDictionary(item: keyParams)
+    return ModuleParameters.unflattened(arrays)
 }
 
 func loadConfig(at url: URL) throws -> MLXModelConfig {

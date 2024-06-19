@@ -132,27 +132,31 @@ public extension MLMultiArray {
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public extension XCTestCase {
     func transcribe(
-        with variant: ModelVariant,
+        modelPath: String,
         options: DecodingOptions,
         callback: TranscriptionCallback = nil,
         audioFile: String = "jfk.wav",
+        featureExtractor: (any FeatureExtracting)? = nil,
+        audioEncoder: (any AudioEncoding)? = nil,
+        textDecoder: (any TextDecoding)? = nil,
         file: StaticString = #file,
         line: UInt = #line
     ) async throws -> [TranscriptionResult] {
-        let modelPath: String
-        switch variant {
-            case .largev3:
-                modelPath = try largev3ModelPath()
-            default:
-                modelPath = try tinyModelPath()
-        }
         let computeOptions = ModelComputeOptions(
             melCompute: .cpuOnly,
             audioEncoderCompute: .cpuOnly,
             textDecoderCompute: .cpuOnly,
             prefillCompute: .cpuOnly
         )
-        let whisperKit = try await WhisperKit(modelFolder: modelPath, computeOptions: computeOptions, verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(
+            modelFolder: modelPath,
+            computeOptions: computeOptions,
+            featureExtractor: featureExtractor,
+            audioEncoder: audioEncoder,
+            textDecoder: textDecoder,
+            verbose: true,
+            logLevel: .debug
+        )
         trackForMemoryLeaks(on: whisperKit, file: file, line: line)
 
         let audioComponents = audioFile.components(separatedBy: ".")

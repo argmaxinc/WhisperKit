@@ -7,17 +7,17 @@ import MLXNN
 
 final class MultiHeadAttention: Module {
     let nHead: Int
-    let query: Linear
-    let key: Linear
-    let value: Linear
-    let out: Linear
+    @ModuleInfo(key: "query") private var query: Linear
+    @ModuleInfo(key: "key") private var key: Linear
+    @ModuleInfo(key: "value") private var value: Linear
+    @ModuleInfo(key: "out") private var out: Linear
 
     init(nState: Int, nHead: Int) {
         self.nHead = nHead
-        self.query = Linear(nState, nState)
-        self.key = Linear(nState, nState, bias: false)
-        self.value = Linear(nState, nState)
-        self.out = Linear(nState, nState)
+        self._query.wrappedValue = Linear(nState, nState)
+        self._key.wrappedValue = Linear(nState, nState, bias: false)
+        self._value.wrappedValue = Linear(nState, nState)
+        self._out.wrappedValue = Linear(nState, nState)
     }
 
     func callAsFunction(
@@ -69,23 +69,23 @@ final class MultiHeadAttention: Module {
 }
 
 final class ResidualAttentionBlock: Module {
-    let attn: MultiHeadAttention
-    let attn_ln: LayerNorm
-    let mlp1: Linear
-    let mlp2: Linear
-    let mlp_ln: LayerNorm
-    let cross_attn: MultiHeadAttention?
-    let cross_attn_ln: LayerNorm?
+    @ModuleInfo(key: "attn") private var attn: MultiHeadAttention
+    @ModuleInfo(key: "attn_ln") private var attnLn: LayerNorm
+    @ModuleInfo(key: "mlp1") private var mlp1: Linear
+    @ModuleInfo(key: "mlp2") private var mlp2: Linear
+    @ModuleInfo(key: "mlp_ln") private var mlpLn: LayerNorm
+    @ModuleInfo(key: "cross_attn") private var crossAttn: MultiHeadAttention?
+    @ModuleInfo(key: "cross_attn_ln") private var crossAttnLn: LayerNorm?
 
     init(nState: Int, nHead: Int, crossAttention: Bool = false) {
-        self.attn = MultiHeadAttention(nState: nState, nHead: nHead)
-        self.attn_ln = LayerNorm(dimensions: nState)
-        self.cross_attn = crossAttention ? MultiHeadAttention(nState: nState, nHead: nHead) : nil
-        self.cross_attn_ln = crossAttention ? LayerNorm(dimensions: nState) : nil
         let nMlp = nState * 4
-        self.mlp1 = Linear(nState, nMlp)
-        self.mlp2 = Linear(nMlp, nState)
-        self.mlp_ln = LayerNorm(dimensions: nState)
+        self._attn.wrappedValue = MultiHeadAttention(nState: nState, nHead: nHead)
+        self._attnLn.wrappedValue = LayerNorm(dimensions: nState)
+        self._crossAttn.wrappedValue = crossAttention ? MultiHeadAttention(nState: nState, nHead: nHead) : nil
+        self._crossAttnLn.wrappedValue = crossAttention ? LayerNorm(dimensions: nState) : nil
+        self._mlp1.wrappedValue = Linear(nState, nMlp)
+        self._mlp2.wrappedValue = Linear(nMlp, nState)
+        self._mlpLn.wrappedValue = LayerNorm(dimensions: nState)
     }
 
     func callAsFunction(
@@ -95,12 +95,12 @@ final class ResidualAttentionBlock: Module {
         kvCache: KV? = nil,
         crossKvCache: KV? = nil
     ) -> ResidualAttentionBlockResult {
-        let attnResult = attn(attn_ln(x), mask: mask, kvCache: kvCache)
+        let attnResult = attn(attnLn(x), mask: mask, kvCache: kvCache)
         var x = x + attnResult.x
-        if let cross_attn, let cross_attn_ln {
-            let crossAttnResult = cross_attn(cross_attn_ln(x), xa: xa, kvCache: crossKvCache)
+        if let crossAttn, let crossAttnLn {
+            let crossAttnResult = crossAttn(crossAttnLn(x), xa: xa, kvCache: crossKvCache)
             x = x + crossAttnResult.x
-            x = x + mlp2(gelu(mlp1(mlp_ln(x))))
+            x = x + mlp2(gelu(mlp1(mlpLn(x))))
             return ResidualAttentionBlockResult(
                 x: x,
                 kv: attnResult.kv,
@@ -108,7 +108,7 @@ final class ResidualAttentionBlock: Module {
                 crossQk: crossAttnResult.qk
             )
         } else {
-            x = x + mlp2(gelu(mlp1(mlp_ln(x))))
+            x = x + mlp2(gelu(mlp1(mlpLn(x))))
             return ResidualAttentionBlockResult(
                 x: x,
                 kv: attnResult.kv,
