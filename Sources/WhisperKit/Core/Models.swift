@@ -13,7 +13,7 @@ public typealias FloatType = Float16
 public typealias FloatType = Float
 #endif
 
-#if (os(macOS) || targetEnvironment(macCatalyst)) && arch(arm64)
+#if (os(macOS) || targetEnvironment(macCatalyst)) && arch(arm64) && compiler(<6)
 extension Float16: BNNSScalar {}
 extension Float16: MLShapedArrayScalar {}
 #endif

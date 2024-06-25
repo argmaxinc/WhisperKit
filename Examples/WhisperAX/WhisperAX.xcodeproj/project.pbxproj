@@ -25,7 +25,6 @@
 		1683EFEE2B9FACFE002448CD /* WhisperAX Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 161135DE2B3F66DA003C20F6 /* WhisperAX Watch App.app */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		1683EFEF2B9FADFE002448CD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1677AFB42B57618A008C61C0 /* Assets.xcassets */; };
 		1683EFF02B9FADFE002448CD /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1677AFB62B57618A008C61C0 /* Preview Assets.xcassets */; };
-		16D581092B4F7E4E000C0AB0 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = 16D581082B4F7E4E000C0AB0 /* MarkdownUI */; };
 		16EA36CF2B59E550006CA7CF /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 16EA36CE2B59E550006CA7CF /* WhisperKit */; };
 /* End PBXBuildFile section */
 
@@ -134,7 +133,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				16EA36CF2B59E550006CA7CF /* WhisperKit in Frameworks */,
-				16D581092B4F7E4E000C0AB0 /* MarkdownUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -354,7 +352,6 @@
 			);
 			name = WhisperAX;
 			packageProductDependencies = (
-				16D581082B4F7E4E000C0AB0 /* MarkdownUI */,
 				16EA36CE2B59E550006CA7CF /* WhisperKit */,
 			);
 			productName = BasicExample;
@@ -1136,11 +1133,6 @@
 		1611360F2B3F6C68003C20F6 /* WhisperKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = WhisperKit;
-		};
-		16D581082B4F7E4E000C0AB0 /* MarkdownUI */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 16D581062B4F7DCE000C0AB0 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
-			productName = MarkdownUI;
 		};
 		16EA36CE2B59E550006CA7CF /* WhisperKit */ = {
 			isa = XCSwiftPackageProductDependency;
