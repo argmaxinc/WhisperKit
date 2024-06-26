@@ -57,6 +57,14 @@ public protocol TextDecoding {
         options: DecodingOptions,
         temperature: FloatType
     ) async throws -> DecodingResult
+    
+    func detectSilence(
+        from encoderOutput: MLMultiArray,
+        using decoderInputs: DecodingInputs,
+        sampler tokenSampler: TokenSampling,
+        options: DecodingOptions,
+        temperature: FloatType
+    ) async throws -> Float
 
     @available(*, deprecated, message: "Subject to removal in a future version. Use `detectLanguage(from:using:sampler:options:temperature:) async throws -> DecodingResult` instead.")
     @_disfavoredOverload
@@ -340,12 +348,71 @@ public class TextDecoderContextPrefill: WhisperMLModel {
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 open class TextDecoder: TextDecoding, WhisperMLModel {
+    public func detectSilence(
+           from encoderOutput: MLMultiArray,
+           using decoderInputs: DecodingInputs,
+           sampler tokenSampler: TokenSampling,
+           options: DecodingOptions,
+           temperature: FloatType
+       ) async throws -> Float {
+           guard let tokenizer = tokenizer else {
+               throw WhisperError.tokenizerUnavailable()
+           }
+           guard let logitsSize = logitsSize else {
+               throw WhisperError.modelsUnavailable("Failed to read logits size from model")
+           }
+
+           var currentTokens: [Int] = [tokenizer.specialTokens.startOfTranscriptToken]
+           var logProbs: [Float] = [0.0]
+
+           // Initialize the silence-specific logits filter
+           let silenceLogitsFilter = SilenceLogitsFilter(
+               silenceToken: tokenizer.specialTokens.noSpeechToken,
+               logitsDim: logitsSize,
+               sampleBegin: 0
+           )
+
+           // Prepare decoder inputs for the model
+           decoderInputs.inputIds[0] = NSNumber(value: currentTokens[0])
+           decoderInputs.cacheLength[0] = 0
+
+           // Predict logits using the encoder output and decoder inputs
+           let predictedLogits = try await predictLogits(
+               inputIds: decoderInputs.inputIds,
+               cacheLength: decoderInputs.cacheLength,
+               keyCache: decoderInputs.keyCache,
+               valueCache: decoderInputs.valueCache,
+               kvCacheUpdateMask: decoderInputs.kvCacheUpdateMask,
+               encoderOutputEmbeds: encoderOutput,
+               decoderKeyPaddingMask: decoderInputs.decoderKeyPaddingMask
+           )
+
+           guard let logits = predictedLogits?.logits else {
+               throw WhisperError.decodingLogitsFailed()
+           }
+
+           // Filter logits for silence detection
+           let filteredLogits = silenceLogitsFilter.filterLogits(logits, withTokens: currentTokens)
+           
+           // Sample the token to determine if it indicates silence
+           let sampleResult = tokenSampler.update(tokens: currentTokens, logits: filteredLogits, logProbs: logProbs)
+           let nextToken = sampleResult.tokens.last!
+           
+           // Calculate no speech probability
+           let noSpeechLogits = filteredLogits[tokenizer.specialTokens.noSpeechToken].floatValue
+           let noSpeechProb = exp(noSpeechLogits) / (1 + exp(noSpeechLogits))  // Sigmoid function to normalize logits
+           
+           return noSpeechProb
+       }
+    
+    
     public var model: MLModel?
     public var tokenizer: WhisperTokenizer?
     public var prefillData: WhisperMLModel?
     public var isModelMultilingual: Bool = false
     public var shouldEarlyStop = [UUID: Bool]()
     private var languageLogitsFilter: LanguageLogitsFilter?
+    private var silenceLogitsFilter: SilenceLogitsFilter?
 
     public var supportsWordTimestamps: Bool {
         return getModelOutputDimention(model, named: "alignment_heads_weights", position: 0) != nil
@@ -794,8 +861,6 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             temperature = Float(sampler.temperature).rounded(3)
         }
 
-        let noSpeechProb: Float = 0 // TODO: implement no speech prob
-
         // If language is still nil here, check language can be inferred from tokens
         var language = options.language ?? Constants.defaultLanguageCode
         var languageProbs = [String: Float]()
@@ -827,7 +892,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         let decodingFallback = DecodingFallback(
             options: options,
             isFirstTokenLogProbTooLow: isFirstTokenLogProbTooLow,
-            noSpeechProb: noSpeechProb,
+            noSpeechProb: 0,
             compressionRatio: compressionRatio,
             avgLogProb: avgLogProbs
         )
@@ -839,7 +904,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             tokenLogProbs: tokenProbs,
             text: transcript,
             avgLogProb: avgLogProbs,
-            noSpeechProb: noSpeechProb,
+            noSpeechProb: 0,
             temperature: temperature,
             compressionRatio: compressionRatio,
             cache: cache,
