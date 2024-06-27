@@ -159,7 +159,7 @@ final class TranscribeTask {
                 let decodingResult = try await decodeWithFallback(encoderSegment: encoderOutput, decodingOptions: options, callback: decodingCallback)
               
                 // Check for silence detection
-                if decodingResult.noSpeechProb > (options.noSpeechThreshold ?? 0.6) {
+                if decodingResult.noSpeechProb > (options.noSpeechThreshold ?? 0.7) {
                     print("Detected silence with noSpeechProb \(decodingResult.noSpeechProb), skipping segment.")
                     // Skip processing for silent segments
                     break
