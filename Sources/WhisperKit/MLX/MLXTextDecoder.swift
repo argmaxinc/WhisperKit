@@ -15,22 +15,27 @@ public final class MLXTextDecoder: TextDecoding {
     public var logitsSize: Int? {
         decoder?.nState
     }
+
     public var kvCacheEmbedDim: Int? {
         guard let config else { return nil }
         return config.nTextState * config.nTextLayer
     }
+
     public var kvCacheMaxSequenceLength: Int? {
         guard let config else { return nil }
         return config.nTextCtx / 2
     }
+
     public var windowSize: Int? {
         guard let config else { return nil }
         return config.nAudioCtx
     }
+
     public var embedSize: Int? {
         guard let config else { return nil }
         return config.nTextState
     }
+
     private var decoder: TextDecoder?
     private var config: MLXModelConfig?
     private var languageLogitsFilter: LanguageLogitsFilter?

@@ -1,10 +1,10 @@
 //  For licensing see accompanying LICENSE.md file.
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
+import CoreML
 import Foundation
 import MLX
 import MLXNN
-import CoreML
 
 // MARK: - Extensions
 
@@ -58,16 +58,16 @@ extension MLXArray {
 extension MLXArray {
     func multiArrayDataType() -> MLMultiArrayDataType {
         switch dtype {
-        case .bool, .bfloat16, .complex64,
-             .uint8, .uint16, .uint32, .uint64,
-             .int8, .int16, .int64:
-            fatalError("Unsupported type: \(dtype)")
-        case .int32:
-            return .int32
-        case .float16:
-            return .float16
-        case .float32:
-            return .float32
+            case .bool, .bfloat16, .complex64,
+                 .uint8, .uint16, .uint32, .uint64,
+                 .int8, .int16, .int64:
+                fatalError("Unsupported type: \(dtype)")
+            case .int32:
+                return .int32
+            case .float16:
+                return .float16
+            case .float32:
+                return .float32
         }
     }
 }

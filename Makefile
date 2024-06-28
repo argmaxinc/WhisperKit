@@ -89,7 +89,7 @@ download-model:
 	@cd $(MODEL_REPO_DIR) && \
 	git lfs pull --include="openai_whisper-$(MODEL)/*"
 
-download-mlx-model:
+download-mlx-models:
 	@echo "Downloading mlx model $(MODEL)..."
 	@$(MAKE) setup-mlx-model-repo
 	@echo "Fetching mlx model $(MODEL)..."

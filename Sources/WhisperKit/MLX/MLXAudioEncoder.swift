@@ -3,14 +3,15 @@
 
 import CoreML
 import MLX
-import WhisperKit
 import MLXNN
+import WhisperKit
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class MLXAudioEncoder: AudioEncoding {
     public var embedSize: Int? {
         encoder?.nState
     }
+
     private var encoder: AudioEncoder?
 
     public init() {}

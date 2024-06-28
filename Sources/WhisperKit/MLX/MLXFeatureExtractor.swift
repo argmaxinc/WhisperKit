@@ -1,10 +1,10 @@
 //  For licensing see accompanying LICENSE.md file.
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
+import CoreML
 import Foundation
 import MLX
 import MLXFFT
-import CoreML
 import WhisperKit
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
@@ -39,10 +39,10 @@ open class MLXFeatureExtractor: FeatureExtracting {
     }
 }
 
-extension MLXFeatureExtractor {
+public extension MLXFeatureExtractor {
     /// Return the Hanning window.
     /// Taken from [numpy](https://numpy.org/doc/stable/reference/generated/numpy.hanning.html) implementation
-    public static func hanningNumpy(_ size: Int) -> MLXArray {
+    static func hanningNumpy(_ size: Int) -> MLXArray {
         if size < 1 {
             return MLXArray([Float]())
         }
@@ -53,26 +53,26 @@ extension MLXFeatureExtractor {
         return 0.5 + 0.5 * MLX.cos(MLXArray(.pi) * n / Float(size - 1))
     }
 
-    public static func hanning(_ size: Int) -> MLXArray {
+    static func hanning(_ size: Int) -> MLXArray {
         hanningNumpy(size + 1)[..<(-1)]
     }
 
-    public static func pad(
+    static func pad(
         _ x: MLXArray,
         padding: Int,
         padMode: PadMode = .constant
     ) -> MLXArray {
         switch padMode {
-        case .constant:
-            return MLX.padded(x, widths: [IntOrPair((padding, padding))])
-        case .reflect:
-            let prefix = x[1 ..< padding + 1][.stride(by: -1)]
-            let suffix = x[-(padding + 1) ..< -1][.stride(by: -1)]
-            return MLX.concatenated([prefix, x, suffix])
+            case .constant:
+                return MLX.padded(x, widths: [IntOrPair((padding, padding))])
+            case .reflect:
+                let prefix = x[1..<padding + 1][.stride(by: -1)]
+                let suffix = x[-(padding + 1) ..< -1][.stride(by: -1)]
+                return MLX.concatenated([prefix, x, suffix])
         }
     }
 
-    public static func stft(
+    static func stft(
         _ x: MLXArray,
         window: MLXArray,
         nPerSeg: Int = 256,
@@ -95,7 +95,7 @@ extension MLXFeatureExtractor {
 
     /// Compute the log mel spectrogram of audio
     /// Taken from [MLX](https://github.com/ml-explore/mlx-examples/blob/c012eb173f0f632e369ec71f08be777df3aede08/whisper/whisper/audio.py#L130) implementation
-    public static func logMelSpectrogram(
+    static func logMelSpectrogram(
         audio: MLXArray,
         filters: MLXArray,
         nMels: Int = 80,
@@ -130,7 +130,7 @@ extension MLXFeatureExtractor {
     /// with open('mel_filters_128.npy', 'wb') as f:
     ///   np.save(f, n128)
     /// ```
-    public static func loadMelFilters(nMels: Int) -> MLXArray {
+    static func loadMelFilters(nMels: Int) -> MLXArray {
         precondition(nMels == 80 || nMels == 128, "Unsupported nMels: \(nMels)")
         let fileUrl = Bundle.module.url(forResource: "mel_filters_\(nMels)", withExtension: "npy")!
         return try! MLX.loadArray(url: fileUrl)
