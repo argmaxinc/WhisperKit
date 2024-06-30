@@ -391,15 +391,8 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
                throw WhisperError.decodingLogitsFailed()
            }
 
-           // Filter logits for silence detection
-           let filteredLogits = silenceLogitsFilter.filterLogits(logits, withTokens: currentTokens)
-           
-           // Sample the token to determine if it indicates silence
-           let sampleResult = tokenSampler.update(tokens: currentTokens, logits: filteredLogits, logProbs: logProbs)
-           let nextToken = sampleResult.tokens.last!
-           
            // Calculate no speech probability
-           let noSpeechLogits = filteredLogits[tokenizer.specialTokens.noSpeechToken].floatValue
+           let noSpeechLogits = logits[tokenizer.specialTokens.noSpeechToken].floatValue
            let noSpeechProb = exp(noSpeechLogits) / (1 + exp(noSpeechLogits))  // Sigmoid function to normalize logits
            
            return noSpeechProb
