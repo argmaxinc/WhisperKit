@@ -309,9 +309,6 @@ final class TranscribeTask {
                     )
                 }
                         
-            
-        
-              
                 // For a multilingual model, if language is not passed and detectLanguage is true, detect language and set in options
                 if textDecoder.isModelMultilingual, options.language == nil, options.detectLanguage {
                     let languageDecodingResult: DecodingResult? = try? await textDecoder.detectLanguage(
