@@ -202,16 +202,26 @@ struct ContentView: View {
             .toolbar(content: {
                 ToolbarItem {
                     Button {
-                        let fullTranscript = formatSegments(confirmedSegments + unconfirmedSegments, withTimestamps: enableTimestamps).joined(separator: "\n")
-                        #if os(iOS)
-                        UIPasteboard.general.string = fullTranscript
-                        #elseif os(macOS)
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(fullTranscript, forType: .string)
-                        #endif
+                        if (!enableEagerDecoding) {
+                            let fullTranscript = formatSegments(confirmedSegments + unconfirmedSegments, withTimestamps: enableTimestamps).joined(separator: "\n")
+                            #if os(iOS)
+                            UIPasteboard.general.string = fullTranscript
+                            #elseif os(macOS)
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(fullTranscript, forType: .string)
+                            #endif
+                        } else {
+                            #if os(iOS)
+                            UIPasteboard.general.string = confirmedText + hypothesisText
+                            #elseif os(macOS)
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(confirmedText + hypothesisText, forType: .string)
+                            #endif
+                        }
                     } label: {
                         Label("Copy Text", systemImage: "doc.on.doc")
                     }
+                    .keyboardShortcut("c", modifiers: .command)
                     .foregroundColor(.primary)
                     .frame(minWidth: 0, maxWidth: .infinity)
                 }
