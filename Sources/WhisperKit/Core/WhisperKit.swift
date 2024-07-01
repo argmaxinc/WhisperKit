@@ -261,47 +261,55 @@ open class WhisperKit {
 
         Logging.debug("Loading models from \(path.path) with prewarmMode: \(prewarmMode)")
 
-        let logmelUrl = path.appending(path: "MelSpectrogram.mlmodelc")
-        let encoderUrl = path.appending(path: "AudioEncoder.mlmodelc")
-        let decoderUrl = path.appending(path: "TextDecoder.mlmodelc")
-        let decoderPrefillUrl = path.appending(path: "TextDecoderContextPrefill.mlmodelc")
-
-        for item in [logmelUrl, encoderUrl, decoderUrl] {
-            if !FileManager.default.fileExists(atPath: item.path) {
-                throw WhisperError.modelsUnavailable("Model file not found at \(item.path)")
-            }
-        }
-
         if let featureExtractor = featureExtractor as? WhisperMLModel {
             Logging.debug("Loading feature extractor")
             try await featureExtractor.loadModel(
-                at: logmelUrl,
+                at: path.appending(path: "MelSpectrogram.mlmodelc"),
                 computeUnits: modelCompute.melCompute, // hardcoded to use GPU
                 prewarmMode: prewarmMode
             )
             Logging.debug("Loaded feature extractor")
+        } else if let featureExtractor = featureExtractor as? WhisperMLXModel {
+            Logging.debug("Loading MLX feature extractor")
+            try await featureExtractor.loadModel(at: path, configPath: path)
+            Logging.debug("Loaded MLX feature extractor")
         }
 
         if let audioEncoder = audioEncoder as? WhisperMLModel {
             Logging.debug("Loading audio encoder")
             try await audioEncoder.loadModel(
-                at: encoderUrl,
+                at: path.appending(path: "AudioEncoder.mlmodelc"),
                 computeUnits: modelCompute.audioEncoderCompute,
                 prewarmMode: prewarmMode
             )
             Logging.debug("Loaded audio encoder")
+        } else if let audioEncoder = audioEncoder as? WhisperMLXModel {
+            Logging.debug("Loading MLX audio encoder")
+            try await audioEncoder.loadModel(
+                at: path.appending(path: "encoder.safetensors"),
+                configPath: path.appending(path: "config.json")
+            )
+            Logging.debug("Loaded MLX audio encoder")
         }
 
         if let textDecoder = textDecoder as? WhisperMLModel {
             Logging.debug("Loading text decoder")
             try await textDecoder.loadModel(
-                at: decoderUrl,
+                at: path.appending(path: "TextDecoder.mlmodelc"),
                 computeUnits: modelCompute.textDecoderCompute,
                 prewarmMode: prewarmMode
             )
             Logging.debug("Loaded text decoder")
+        } else if let textDecoder = textDecoder as? WhisperMLXModel {
+            Logging.debug("Loading MLX text decoder")
+            try await textDecoder.loadModel(
+                at: path.appending(path: "decoder.safetensors"),
+                configPath: path.appending(path: "config.json")
+            )
+            Logging.debug("Loaded MLX text decoder")
         }
 
+        let decoderPrefillUrl = path.appending(path: "TextDecoderContextPrefill.mlmodelc")
         if FileManager.default.fileExists(atPath: decoderPrefillUrl.path) {
             Logging.debug("Loading text decoder prefill data")
             textDecoder.prefillData = TextDecoderContextPrefill()

@@ -1,6 +1,15 @@
 {
-  "originHash" : "cd17206b47bb810af9459722192530e3838d8e6629a970988e32a432aaa05f6e",
+  "originHash" : "d79abbfb6ab475b8a598546dae36817a774595a09a42974835a6501ef1ab8a77",
   "pins" : [
+    {
+      "identity" : "mlx-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ml-explore/mlx-swift",
+      "state" : {
+        "branch" : "main",
+        "revision" : "7cd3240fb05d9129bcaa6e9d558b2143fcd309c5"
+      }
+    },
     {
       "identity" : "networkimage",
       "kind" : "remoteSourceControl",
@@ -26,6 +35,15 @@
       "state" : {
         "revision" : "ae799d015a5374708f7b4c85f3294c05f2a564e2",
         "version" : "2.3.0"
+      }
+    },
+    {
+      "identity" : "swift-numerics",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-numerics",
+      "state" : {
+        "revision" : "0a5bc04095a675662cf24757cc0640aa2204253b",
+        "version" : "1.0.2"
       }
     },
     {

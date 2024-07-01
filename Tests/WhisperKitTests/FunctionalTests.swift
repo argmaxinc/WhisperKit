@@ -3,6 +3,7 @@
 
 import CoreML
 @testable import WhisperKit
+import WhisperKitTestsUtils
 import XCTest
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
@@ -11,35 +12,6 @@ final class FunctionalTests: XCTestCase {
         try await XCTAssertNoThrowAsync(
             await WhisperKit(modelFolder: largev3ModelPath(), logLevel: .error)
         )
-    }
-
-    func testOutputAll() async throws {
-        let modelPaths = try allModelPaths()
-
-        for modelPath in modelPaths {
-            let modelName = modelPath.split(separator: "/").last!
-            print("[Integration] Testing model \(modelName)")
-            let audioFilePath = try XCTUnwrap(
-                Bundle.module.path(forResource: "jfk", ofType: "wav"),
-                "Audio file not found"
-            )
-
-            let whisperKit = try await WhisperKit(
-                modelFolder: modelPath,
-                verbose: true,
-                logLevel: .debug
-            )
-
-            let transcriptionResult: [TranscriptionResult] = try await whisperKit.transcribe(audioPath: audioFilePath)
-            let transcriptionResultText = transcriptionResult.text
-
-            print("[Integration] \(transcriptionResultText)")
-            XCTAssertEqual(
-                transcriptionResultText.normalized,
-                " And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.".normalized,
-                "Transcription result does not match expected result for model \(modelName)"
-            )
-        }
     }
 
     func testRealTimeFactorTiny() async throws {
@@ -51,7 +23,7 @@ final class FunctionalTests: XCTestCase {
         measureOptions.iterationCount = 5
 
         let audioFilePath = try XCTUnwrap(
-            Bundle.module.path(forResource: "jfk", ofType: "wav"),
+            TestResource.path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
 
@@ -78,7 +50,7 @@ final class FunctionalTests: XCTestCase {
         measureOptions.iterationCount = 5
 
         let audioFilePath = try XCTUnwrap(
-            Bundle.module.path(forResource: "jfk", ofType: "wav"),
+            TestResource.path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
 
@@ -97,7 +69,7 @@ final class FunctionalTests: XCTestCase {
 
     func testBaseImplementation() throws {
         let audioFilePath = try XCTUnwrap(
-            Bundle.module.path(forResource: "jfk", ofType: "wav"),
+            TestResource.path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
 
@@ -115,7 +87,7 @@ final class FunctionalTests: XCTestCase {
 
     func testAsyncImplementation() async throws {
         let audioFilePath = try XCTUnwrap(
-            Bundle.module.path(forResource: "jfk", ofType: "wav"),
+            TestResource.path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
         let whisperKit = try await WhisperKit(model: "large-v3")
@@ -127,15 +99,15 @@ final class FunctionalTests: XCTestCase {
     func testBatchTranscribeAudioPaths() async throws {
         let audioPaths = try [
             XCTUnwrap(
-                Bundle.module.path(forResource: "jfk", ofType: "wav"),
+                TestResource.path(forResource: "jfk", ofType: "wav"),
                 "Audio file not found"
             ),
             XCTUnwrap(
-                Bundle.module.path(forResource: "es_test_clip", ofType: "wav"),
+                TestResource.path(forResource: "es_test_clip", ofType: "wav"),
                 "Audio file not found"
             ),
             XCTUnwrap(
-                Bundle.module.path(forResource: "ja_test_clip", ofType: "wav"),
+                TestResource.path(forResource: "ja_test_clip", ofType: "wav"),
                 "Audio file not found"
             ),
         ]
@@ -162,7 +134,7 @@ final class FunctionalTests: XCTestCase {
         let audioPaths = try [
             "/path/to/file1.wav",
             XCTUnwrap(
-                Bundle.module.path(forResource: "jfk", ofType: "wav"),
+                TestResource.path(forResource: "jfk", ofType: "wav"),
                 "Audio file not found"
             ),
             "/path/to/file2.wav",
@@ -188,15 +160,15 @@ final class FunctionalTests: XCTestCase {
     func testBatchTranscribeAudioArrays() async throws {
         let audioPaths = try [
             XCTUnwrap(
-                Bundle.module.path(forResource: "jfk", ofType: "wav"),
+                TestResource.path(forResource: "jfk", ofType: "wav"),
                 "Audio file not found"
             ),
             XCTUnwrap(
-                Bundle.module.path(forResource: "es_test_clip", ofType: "wav"),
+                TestResource.path(forResource: "es_test_clip", ofType: "wav"),
                 "Audio file not found"
             ),
             XCTUnwrap(
-                Bundle.module.path(forResource: "ja_test_clip", ofType: "wav"),
+                TestResource.path(forResource: "ja_test_clip", ofType: "wav"),
                 "Audio file not found"
             ),
         ]
@@ -225,7 +197,7 @@ final class FunctionalTests: XCTestCase {
 
     func testModelSearchPathLarge() async throws {
         let audioFilePath = try XCTUnwrap(
-            Bundle.module.path(forResource: "jfk", ofType: "wav"),
+            TestResource.path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
 

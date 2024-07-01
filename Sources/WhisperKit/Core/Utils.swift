@@ -149,14 +149,14 @@ public extension WhisperKit {
     }
 }
 
-extension Float {
+public extension Float {
     func rounded(_ decimalPlaces: Int) -> Float {
         let divisor = pow(10.0, Float(decimalPlaces))
         return (self * divisor).rounded() / divisor
     }
 }
 
-extension String {
+public extension String {
     var normalized: String {
         // Trim whitespace and newlines
         let trimmedString = self.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -206,7 +206,7 @@ func prepareSeekClips(contentFrames: Int, decodeOptions: DecodingOptions?) -> [(
 }
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-func initMLMultiArray(shape: [NSNumber], dataType: MLMultiArrayDataType, initialValue: Any) -> MLMultiArray {
+public func initMLMultiArray(shape: [NSNumber], dataType: MLMultiArrayDataType, initialValue: Any) -> MLMultiArray {
     var multiArray: MLMultiArray
     switch dataType {
         case .float16:

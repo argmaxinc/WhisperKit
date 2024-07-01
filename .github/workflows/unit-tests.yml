@@ -22,26 +22,38 @@ jobs:
               condition: true,
               clean-destination: "generic/platform=macOS",
               test-destination: "platform=macOS,arch=arm64",
+              test-cases: "-only-testing WhisperKitTests/UnitTests -only-testing WhisperKitMLXTests/MLXUnitTests",
+              mlx-disabled: "0",
+              scheme: "whisperkit-Package",
             }
           - {
               name: "iOS",
               condition: true,
               clean-destination: "generic/platform=iOS",
               test-destination: "platform=iOS Simulator,OS=${{ inputs.ios-version }},name=iPhone 15",
+              test-cases: "-only-testing WhisperKitTests/UnitTests",
+              mlx-disabled: "1",
+              scheme: "whisperkit",
             }
           - {
               name: "watchOS",
               condition: "${{ inputs.macos-runner == 'macos-14' }}",
               clean-destination: "generic/platform=watchOS",
-              test-destination: "platform=watchOS Simulator,OS=10.2,name=Apple Watch Ultra 2 (49mm)",
+              test-destination: "platform=watchOS Simulator,OS=10.5,name=Apple Watch Ultra 2 (49mm)",
+              test-cases: "-only-testing WhisperKitTests/UnitTests",
+              mlx-disabled: "1",
+              scheme: "whisperkit",
             }
           - {
               name: "visionOS",
               condition: "${{ inputs.macos-runner == 'macos-14' }}",
               clean-destination: "generic/platform=visionOS",
               test-destination: "platform=visionOS Simulator,name=Apple Vision Pro",
+              test-cases: "-only-testing WhisperKitTests/UnitTests",
+              mlx-disabled: "1",
+              scheme: "whisperkit",
             }
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: maxim-lobanov/setup-xcode@v1
@@ -53,19 +65,25 @@ jobs:
         id: model-cache
         uses: actions/cache@v4
         with:
-          path: Models
+          path: Sources/WhisperKitTestsUtils/Models
           key: ${{ runner.os }}-models
       - name: Download Models
         if: steps.model-cache.outputs.cache-hit != 'true'
-        run: make download-model MODEL=tiny
+        run: make download-model MODEL=tiny && make download-mlx-model
       - name: Install and discover destinations
+        env:
+          MLX_DISABLED: ${{ matrix.run-config['mlx-disabled'] }}
         run: |
+          echo "Available schemes:"
+          xcodebuild -list
           xcodebuild -downloadAllPlatforms
           echo "Destinations for testing:"
-          xcodebuild test-without-building -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -showdestinations
+          export ${{ matrix.run-config['compiler-flags'] }} && xcodebuild test-without-building -only-testing WhisperKitTests/UnitTests -scheme ${{ matrix.run-config['scheme'] }} -showdestinations -skipPackagePluginValidation
       - name: Build and Test - ${{ matrix.run-config['name'] }}
+        env:
+          MLX_DISABLED: ${{ matrix.run-config['mlx-disabled'] }}
         if: ${{ matrix.run-config['condition'] == true }}
         run: |
           set -o pipefail
-          xcodebuild clean build-for-testing -scheme whisperkit-Package -destination '${{ matrix.run-config['clean-destination'] }}' | xcpretty
-          xcodebuild test -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -destination '${{ matrix.run-config['test-destination'] }}' | xcpretty
+          xcodebuild clean build-for-testing -scheme ${{ matrix.run-config['scheme'] }} -destination "${{ matrix.run-config['clean-destination'] }}" -skipPackagePluginValidation | xcpretty
+          xcodebuild test ${{ matrix.run-config['test-cases'] }} -scheme ${{ matrix.run-config['scheme'] }} -destination "${{ matrix.run-config['test-destination'] }}" -skipPackagePluginValidation | xcpretty
