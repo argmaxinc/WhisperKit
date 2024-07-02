@@ -769,9 +769,12 @@ open class WhisperKit {
         }
         try Task.checkCancellation()
 
+        let childProgress = Progress()
+        progress.totalUnitCount += 1
+        progress.addChild(childProgress, withPendingUnitCount: 1)
         let transcribeTask = TranscribeTask(
             currentTimings: currentTimings,
-            progress: progress,
+            progress: childProgress,
             audioEncoder: audioEncoder,
             featureExtractor: featureExtractor,
             segmentSeeker: segmentSeeker,
