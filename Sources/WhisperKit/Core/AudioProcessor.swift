@@ -236,8 +236,8 @@ public class AudioProcessor: NSObject, AudioProcessing {
 
         let frameCount = AVAudioFrameCount(audioFile.length)
 
-        // Read audio in 10mb increments to reduce the memory spike for large audio files
-        let maxReadFrameSize: AVAudioFrameCount = 10_000_000
+        // Read audio in 100mb increments to reduce the memory spike for large audio files
+        let maxReadFrameSize: AVAudioFrameCount = 100_000_000
         guard let inputBuffer = AVAudioPCMBuffer(pcmFormat: audioFile.processingFormat, frameCapacity: min(frameCount, maxReadFrameSize)),
               let outputBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: AVAudioFrameCount(newFrameLength))
         else {
