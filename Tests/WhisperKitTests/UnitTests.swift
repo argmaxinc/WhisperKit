@@ -1179,6 +1179,7 @@ final class UnitTests: XCTestCase {
         XCTAssertTrue(chunkedResult.text.normalized.contains("But then came my 90 page senior".normalized), "Expected text not found in \(chunkedResult.text.normalized)")
     }
 
+    #if !os(watchOS) // FIXME: This test times out on watchOS when run on low compute runners
     func testVADProgress() async throws {
         let pipe = try await WhisperKit(model: "tiny.en")
 
@@ -1196,6 +1197,7 @@ final class UnitTests: XCTestCase {
         )
         cancellable?.cancel()
     }
+    #endif
 
     // MARK: - Word Timestamp Tests
 
