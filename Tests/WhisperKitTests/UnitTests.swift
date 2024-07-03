@@ -1,6 +1,7 @@
 //  For licensing see accompanying LICENSE.md file.
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
+import Combine
 import AVFoundation
 import CoreML
 import Hub
@@ -1176,6 +1177,24 @@ final class UnitTests: XCTestCase {
 
         XCTAssertTrue(testResult.text.normalized.contains("But then came my 90 page senior".normalized), "Expected text not found in \(testResult.text.normalized)")
         XCTAssertTrue(chunkedResult.text.normalized.contains("But then came my 90 page senior".normalized), "Expected text not found in \(chunkedResult.text.normalized)")
+    }
+
+    func testVADProgress() async throws {
+        let pipe = try await WhisperKit(model: "tiny.en")
+
+        let cancellable: AnyCancellable? = pipe.progress.publisher(for: \.fractionCompleted)
+            .removeDuplicates()
+            .withPrevious()
+            .sink { previous, current in
+                if let previous {
+                    XCTAssertLessThan(previous, current)
+                }
+            }
+        _ = try await pipe.transcribe(
+            audioPath: Bundle.module.path(forResource: "ted_60", ofType: "m4a")!,
+            decodeOptions: .init(chunkingStrategy: .vad)
+        )
+        cancellable?.cancel()
     }
 
     // MARK: - Word Timestamp Tests
