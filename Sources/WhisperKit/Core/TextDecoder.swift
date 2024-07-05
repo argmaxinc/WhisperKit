@@ -348,55 +348,56 @@ public class TextDecoderContextPrefill: WhisperMLModel {
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 open class TextDecoder: TextDecoding, WhisperMLModel {
+    func softmax(_ logits: MLMultiArray) -> [Float] {
+        let count = logits.count
+        var expValues = [Float](repeating: 0.0, count: count)
+        var sumExpValues: Float = 0.0
+        
+        for i in 0..<count {
+            let expValue = exp(logits[i].floatValue)
+            expValues[i] = expValue
+            sumExpValues += expValue
+        }
+        let softmaxProbs = expValues.map { $0 / sumExpValues }
+        
+        return softmaxProbs
+    }
+    
+    func calculateNoSpeechProb(logits: MLMultiArray, noSpeechTokenIndex: Int) -> Float {
+        let softmaxProbs = softmax(logits)
+        let noSpeechProb = softmaxProbs[noSpeechTokenIndex]
+        
+        return noSpeechProb
+    }
+     
     public func detectSilence(
-           from encoderOutput: MLMultiArray,
-           using decoderInputs: DecodingInputs,
-           sampler tokenSampler: TokenSampling,
-           options: DecodingOptions,
-           temperature: FloatType
-       ) async throws -> Float {
-           guard let tokenizer = tokenizer else {
-               throw WhisperError.tokenizerUnavailable()
-           }
-           guard let logitsSize = logitsSize else {
-               throw WhisperError.modelsUnavailable("Failed to read logits size from model")
-           }
+        from encoderOutput: MLMultiArray,
+        using decoderInputs: DecodingInputs,
+        sampler tokenSampler: TokenSampling,
+        options: DecodingOptions,
+        temperature: FloatType
+    ) async throws -> Float {
+        let noSpeechTokenIndex = 50362
 
-           var currentTokens: [Int] = [tokenizer.specialTokens.startOfTranscriptToken]
-           var logProbs: [Float] = [0.0]
+        let predictedLogits = try await self.predictLogits(
+            inputIds: decoderInputs.inputIds,
+            cacheLength: decoderInputs.cacheLength,
+            keyCache: decoderInputs.keyCache,
+            valueCache: decoderInputs.valueCache,
+            kvCacheUpdateMask: decoderInputs.kvCacheUpdateMask,
+            encoderOutputEmbeds: encoderOutput,
+            decoderKeyPaddingMask: decoderInputs.decoderKeyPaddingMask
+        )
 
-           // Initialize the silence-specific logits filter
-           let silenceLogitsFilter = SilenceLogitsFilter(
-               silenceToken: tokenizer.specialTokens.noSpeechToken,
-               logitsDim: logitsSize,
-               sampleBegin: 0
-           )
+        guard let logitsArray = predictedLogits?.logits else {
+            throw WhisperError.decodingLogitsFailed("Unable to decode logits")
+        }
 
-           // Prepare decoder inputs for the model
-           decoderInputs.inputIds[0] = NSNumber(value: currentTokens[0])
-           decoderInputs.cacheLength[0] = 0
+        let noSpeechProb = calculateNoSpeechProb(logits: logitsArray, noSpeechTokenIndex: noSpeechTokenIndex)
 
-           // Predict logits using the encoder output and decoder inputs
-           let predictedLogits = try await predictLogits(
-               inputIds: decoderInputs.inputIds,
-               cacheLength: decoderInputs.cacheLength,
-               keyCache: decoderInputs.keyCache,
-               valueCache: decoderInputs.valueCache,
-               kvCacheUpdateMask: decoderInputs.kvCacheUpdateMask,
-               encoderOutputEmbeds: encoderOutput,
-               decoderKeyPaddingMask: decoderInputs.decoderKeyPaddingMask
-           )
-
-           guard let logits = predictedLogits?.logits else {
-               throw WhisperError.decodingLogitsFailed()
-           }
-
-           // Calculate no speech probability
-           let noSpeechLogits = logits[tokenizer.specialTokens.noSpeechToken].floatValue
-           let noSpeechProb = exp(noSpeechLogits) / (1 + exp(noSpeechLogits))  // Sigmoid function to normalize logits
+        return noSpeechProb
            
-           return noSpeechProb
-       }
+    }
     
     
     public var model: MLModel?
@@ -405,7 +406,6 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
     public var isModelMultilingual: Bool = false
     public var shouldEarlyStop = [UUID: Bool]()
     private var languageLogitsFilter: LanguageLogitsFilter?
-    private var silenceLogitsFilter: SilenceLogitsFilter?
 
     public var supportsWordTimestamps: Bool {
         return getModelOutputDimention(model, named: "alignment_heads_weights", position: 0) != nil
@@ -609,6 +609,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         var currentTokens: [Int] = decoderInputs.initialPrompt
         var nextToken: Int = decoderInputs.initialPrompt.last!
         var logProbs: [Float] = Array(repeating: 0, count: currentTokens.count)
+        let noSpeechProb: Float = 0.0
 
         // Logits filters
         var logitsFilters: [any LogitsFiltering] = []
@@ -622,7 +623,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         }
 
         if !options.supressTokens.isEmpty {
-            logitsFilters.append(SuppressTokensFilter(suppressTokens: options.supressTokens))
+            logitsFilters.append(SuppressTokensFilter(suppressTokens: options.supressTokens, noSpeechTokenIndex: 50362))
         }
 
         if !options.withoutTimestamps {
@@ -700,6 +701,30 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             var logits = decoderOutput.logits!
             for filter in logitsFilters {
                 logits = filter.filterLogits(logits, withTokens: currentTokens)
+            }
+            
+            if tokenIndex == intialPromptIndex {
+               //print(tokenizer.specialTokens.noSpeechToken) //it prints 50257
+               let noSpeechTokenIndex = 50362  // I think from models index for the "no speech" token is 50362?
+               let noSpeechProb = calculateNoSpeechProb(logits: logits, noSpeechTokenIndex: noSpeechTokenIndex)
+        
+               if let threshold = options.noSpeechThreshold, noSpeechProb > threshold {
+                   print("Detected silence with noSpeechProb \(noSpeechProb), skipping segment.")
+                   return DecodingResult(
+                       language: Constants.defaultLanguageCode,
+                       languageProbs: [:],
+                       tokens: [],
+                       tokenLogProbs: [],
+                       text: "",
+                       avgLogProb: 0.0,
+                       noSpeechProb: noSpeechProb,
+                       temperature: 0.0,
+                       compressionRatio: 0.0,
+                       cache: nil,
+                       timings: TranscriptionTimings(),
+                       fallback: nil
+                   )
+               }
             }
 
             let filteringTime = Date().timeIntervalSince(nonInferenceStartTime)
@@ -885,7 +910,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         let decodingFallback = DecodingFallback(
             options: options,
             isFirstTokenLogProbTooLow: isFirstTokenLogProbTooLow,
-            noSpeechProb: 0,
+            noSpeechProb: noSpeechProb,
             compressionRatio: compressionRatio,
             avgLogProb: avgLogProbs
         )
@@ -897,7 +922,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             tokenLogProbs: tokenProbs,
             text: transcript,
             avgLogProb: avgLogProbs,
-            noSpeechProb: 0,
+            noSpeechProb: noSpeechProb,
             temperature: temperature,
             compressionRatio: compressionRatio,
             cache: cache,
