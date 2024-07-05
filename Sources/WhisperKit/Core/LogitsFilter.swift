@@ -14,16 +14,24 @@ public protocol LogitsFiltering {
 open class SuppressTokensFilter: LogitsFiltering {
     let suppressTokens: [Int]
     private let suppressTokenIndexes: [[NSNumber]]
+    private let noSpeechTokenIndex: Int
 
-    public init(suppressTokens: [Int]) {
+    public init(suppressTokens: [Int], noSpeechTokenIndex: Int = 50362) {
         self.suppressTokens = suppressTokens
+        self.noSpeechTokenIndex = noSpeechTokenIndex
         self.suppressTokenIndexes = suppressTokens.map { [0, 0, $0 as NSNumber] }
     }
 
     public func filterLogits(_ logits: MLMultiArray, withTokens tokens: [Int]) -> MLMultiArray {
-        logits.fill(indexes: suppressTokenIndexes, with: -FloatType.infinity)
-        return logits
-    }
+            let noSpeechTokenIndexPath = [0, 0, noSpeechTokenIndex as NSNumber]
+            logits[noSpeechTokenIndexPath] = NSNumber(value: -Float.infinity)
+
+            for indexPath in suppressTokenIndexes {
+                logits[indexPath] = NSNumber(value: -Float.infinity)
+            }
+            
+            return logits
+        }
 }
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
@@ -272,40 +280,6 @@ open class LanguageLogitsFilter: LogitsFiltering {
         var indexes: [[NSNumber]] = []
         for i in 0..<logitsDim {
             if !allLanguageTokens.contains(i) {
-                indexes.append([0, 0, i as NSNumber])
-            }
-        }
-        return indexes
-    }
-}
-
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-open class SilenceLogitsFilter: LogitsFiltering {
-    let silenceToken: Int
-    let logitsDim: Int
-    let sampleBegin: Int
-    let nonSilenceTokenIndexes: [[NSNumber]]
-
-    public init(silenceToken: Int, logitsDim: Int, sampleBegin: Int) {
-        self.silenceToken = silenceToken
-        self.logitsDim = logitsDim
-        self.sampleBegin = sampleBegin
-        self.nonSilenceTokenIndexes = SilenceLogitsFilter.getNonSilenceTokenIndexes(logitsDim: self.logitsDim, silenceToken: self.silenceToken)
-    }
-
-    /// Retain the logits that correspond to silence tokens and suppress non-silence tokens
-    public func filterLogits(_ logits: MLMultiArray, withTokens tokens: [Int]) -> MLMultiArray {
-        guard tokens.count == sampleBegin else {
-            return logits
-        }
-        logits.fill(indexes: nonSilenceTokenIndexes, with: -FloatType.infinity)
-        return logits
-    }
-
-    private static func getNonSilenceTokenIndexes(logitsDim: Int, silenceToken: Int) -> [[NSNumber]] {
-        var indexes: [[NSNumber]] = []
-        for i in 0..<logitsDim {
-            if i != silenceToken {
                 indexes.append([0, 0, i as NSNumber])
             }
         }
