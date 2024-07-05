@@ -158,11 +158,17 @@ final class TranscribeTask {
                 // Send to decoder to predict text tokens with fallback
                 let decodingResult = try await decodeWithFallback(encoderSegment: encoderOutput, decodingOptions: options, callback: decodingCallback)
               
-                // Check for silence detection
-                if decodingResult.noSpeechProb > (options.noSpeechThreshold ?? 0.7) {
-                    print("Detected silence with noSpeechProb \(decodingResult.noSpeechProb), skipping segment.")
-                    // Skip processing for silent segments
-                    break
+                let noSpeechProb = try await textDecoder.detectSilence(
+                    from: encoderOutput,
+                    using: decoderInputs,
+                    sampler: GreedyTokenSampler(temperature: 0, eotToken: tokenizer.specialTokens.endToken, decodingOptions: options),
+                    options: options,
+                    temperature: 0
+                )
+
+                if noSpeechProb > (options.noSpeechThreshold ?? 0.6) && decodingResult.avgLogProb < (options.logProbThreshold ?? -1.0) {
+                    seek += segmentSize
+                    continue
                 }
 
                 // MARK: Windowing
@@ -276,39 +282,7 @@ final class TranscribeTask {
                 let tokenSampler = GreedyTokenSampler(temperature: temp, eotToken: tokenizer.specialTokens.endToken, decodingOptions: options)
 
                 var currentDecodingOptions = options
-                
-                if i == 0 && options.ignorePrefillPromptForNoSpeechDetection {
-                    currentDecodingOptions.usePrefillPrompt = false
-                }
-                  
-                // Detect silence in the first pass
-                let noSpeechProb = try await textDecoder.detectSilence(
-                    from: encoderOutput,
-                    using: decoderInputs,
-                    sampler: tokenSampler,
-                    options: options,
-                    temperature: temp
-                )
-                      
-                // Skip segment if noSpeechProb exceeds threshold
-                if let threshold = options.noSpeechThreshold, noSpeechProb > threshold {
-                    Logging.info("Detected silence with noSpeechProb \(noSpeechProb), skipping segment.")
-                    return DecodingResult(
-                        language: Constants.defaultLanguageCode,
-                        languageProbs: [:],
-                        tokens: [],
-                        tokenLogProbs: [],
-                        text: "",
-                        avgLogProb: 0.0,
-                        noSpeechProb: noSpeechProb,
-                        temperature: Float(temp),
-                        compressionRatio: 0.0,
-                        cache: nil,
-                        timings: TranscriptionTimings(),
-                        fallback: nil
-                    )
-                }
-                        
+      
                 // For a multilingual model, if language is not passed and detectLanguage is true, detect language and set in options
                 if textDecoder.isModelMultilingual, options.language == nil, options.detectLanguage {
                     let languageDecodingResult: DecodingResult? = try? await textDecoder.detectLanguage(
