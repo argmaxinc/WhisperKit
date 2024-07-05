@@ -292,8 +292,6 @@ public struct DecodingOptions {
     public var noSpeechThreshold: Float?
     public var concurrentWorkerCount: Int
     public var chunkingStrategy: ChunkingStrategy?
-    public var ignorePrefillPromptForNoSpeechDetection: Bool
-
 
     public init(
         verbose: Bool = false,
@@ -319,10 +317,9 @@ public struct DecodingOptions {
         compressionRatioThreshold: Float? = 2.4,
         logProbThreshold: Float? = -1.0,
         firstTokenLogProbThreshold: Float? = -1.5,
-        noSpeechThreshold: Float? = 0.7,
+        noSpeechThreshold: Float? = 0.6,
         concurrentWorkerCount: Int = 0,
-        chunkingStrategy: ChunkingStrategy? = nil,
-        ignorePrefillPromptForNoSpeechDetection: Bool = true
+        chunkingStrategy: ChunkingStrategy? = nil
     ) {
         self.verbose = verbose
         self.task = task
@@ -350,7 +347,6 @@ public struct DecodingOptions {
         self.noSpeechThreshold = noSpeechThreshold
         self.concurrentWorkerCount = concurrentWorkerCount
         self.chunkingStrategy = chunkingStrategy
-        self.ignorePrefillPromptForNoSpeechDetection = ignorePrefillPromptForNoSpeechDetection
     }
 }
 
