@@ -181,6 +181,72 @@ extension String {
     }
 }
 
+extension AVAudioPCMBuffer {
+    // Appends the contents of another buffer to the current buffer
+    func appendContents(of buffer: AVAudioPCMBuffer) -> Bool {
+        return appendContents(of: buffer, startingFrame: 0, frameCount: buffer.frameLength)
+    }
+
+    // Appends a specific range of frames from another buffer to the current buffer
+    func appendContents(of buffer: AVAudioPCMBuffer, startingFrame: AVAudioFramePosition, frameCount: AVAudioFrameCount) -> Bool {
+        guard format == buffer.format else {
+            Logging.debug("Format mismatch")
+            return false
+        }
+
+        guard startingFrame + AVAudioFramePosition(frameCount) <= AVAudioFramePosition(buffer.frameLength) else {
+            Logging.debug("Insufficient audio in buffer")
+            return false
+        }
+
+        guard frameLength + frameCount <= frameCapacity else {
+            Logging.debug("Insufficient space in buffer")
+            return false
+        }
+
+        guard let destination = floatChannelData, let source = buffer.floatChannelData else {
+            Logging.debug("Failed to access float channel data")
+            return false
+        }
+
+        memcpy(destination.pointee.advanced(by: stride * Int(frameLength)),
+               source.pointee.advanced(by: stride * Int(startingFrame)),
+               Int(frameCount) * stride * MemoryLayout<Float>.size)
+
+        frameLength += frameCount
+        return true
+    }
+
+    // Convenience initializer to concatenate multiple buffers into one
+    convenience init?(concatenating buffers: [AVAudioPCMBuffer]) {
+        guard !buffers.isEmpty else {
+            print("Buffers array should not be empty")
+            return nil
+        }
+
+        let totalFrames = buffers.reduce(0) { $0 + $1.frameLength }
+
+        guard let firstBuffer = buffers.first else {
+            print("Failed to get the first buffer")
+            return nil
+        }
+
+        self.init(pcmFormat: firstBuffer.format, frameCapacity: totalFrames)
+
+        for buffer in buffers {
+            if !appendContents(of: buffer) {
+                print("Failed to append buffer")
+                return nil
+            }
+        }
+    }
+
+    // Computed property to determine the stride for float channel data
+    private var stride: Int {
+        return Int(format.streamDescription.pointee.mBytesPerFrame) / MemoryLayout<Float>.size
+    }
+}
+
 // MARK: - Helpers
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
