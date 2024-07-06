@@ -220,14 +220,14 @@ extension AVAudioPCMBuffer {
     // Convenience initializer to concatenate multiple buffers into one
     convenience init?(concatenating buffers: [AVAudioPCMBuffer]) {
         guard !buffers.isEmpty else {
-            print("Buffers array should not be empty")
+            Logging.debug("Buffers array should not be empty")
             return nil
         }
 
         let totalFrames = buffers.reduce(0) { $0 + $1.frameLength }
 
         guard let firstBuffer = buffers.first else {
-            print("Failed to get the first buffer")
+            Logging.debug("Failed to get the first buffer")
             return nil
         }
 
@@ -235,7 +235,7 @@ extension AVAudioPCMBuffer {
 
         for buffer in buffers {
             if !appendContents(of: buffer) {
-                print("Failed to append buffer")
+                Logging.debug("Failed to append buffer")
                 return nil
             }
         }
