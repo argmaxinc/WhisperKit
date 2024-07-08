@@ -609,7 +609,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         var currentTokens: [Int] = decoderInputs.initialPrompt
         var nextToken: Int = decoderInputs.initialPrompt.last!
         var logProbs: [Float] = Array(repeating: 0, count: currentTokens.count)
-        let noSpeechProb: Float = 0.0
+        var noSpeechProb: Float = 0.0
 
         // Logits filters
         var logitsFilters: [any LogitsFiltering] = []
@@ -706,7 +706,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             if tokenIndex == intialPromptIndex {
                //print(tokenizer.specialTokens.noSpeechToken) //it prints 50257
                let noSpeechTokenIndex = 50362  // I think from models index for the "no speech" token is 50362?
-               let noSpeechProb = calculateNoSpeechProb(logits: logits, noSpeechTokenIndex: noSpeechTokenIndex)
+               noSpeechProb = calculateNoSpeechProb(logits: logits, noSpeechTokenIndex: noSpeechTokenIndex)
         
                if let threshold = options.noSpeechThreshold, noSpeechProb > threshold {
                    print("Detected silence with noSpeechProb \(noSpeechProb), skipping segment.")
