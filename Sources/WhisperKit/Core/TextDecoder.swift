@@ -623,7 +623,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         }
 
         if !options.supressTokens.isEmpty {
-            logitsFilters.append(SuppressTokensFilter(suppressTokens: options.supressTokens, noSpeechTokenIndex: 50362))
+            logitsFilters.append(SuppressTokensFilter(suppressTokens: options.supressTokens))
         }
 
         if !options.withoutTimestamps {
