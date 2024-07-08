@@ -157,16 +157,8 @@ final class TranscribeTask {
                 try Task.checkCancellation()
                 // Send to decoder to predict text tokens with fallback
                 let decodingResult = try await decodeWithFallback(encoderSegment: encoderOutput, decodingOptions: options, callback: decodingCallback)
-              
-                let noSpeechProb = try await textDecoder.detectSilence(
-                    from: encoderOutput,
-                    using: decoderInputs,
-                    sampler: GreedyTokenSampler(temperature: 0, eotToken: tokenizer.specialTokens.endToken, decodingOptions: options),
-                    options: options,
-                    temperature: 0
-                )
 
-                if noSpeechProb > (options.noSpeechThreshold ?? 0.6) && decodingResult.avgLogProb < (options.logProbThreshold ?? -1.0) {
+                if decodingResult.noSpeechProb > (options.noSpeechThreshold ?? 0.6) && decodingResult.avgLogProb < (options.logProbThreshold ?? -1.0) {
                     seek += segmentSize
                     continue
                 }
