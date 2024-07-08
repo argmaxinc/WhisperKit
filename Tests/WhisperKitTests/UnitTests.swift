@@ -688,7 +688,7 @@ final class UnitTests: XCTestCase {
             //print("Test case: \(audioFileName), Expecting speech: \(expectingSpeech), Calculated silence probability: \(silenceProbability)")
             // calculated noSpeechProb values for silent and non-silent clips are 0.002598221 and 0.26186648.
             // Given these values, a threshold of 0.6 might be too high to accurately distinguish between
-            // silence and speech.Based on the debug values, here I picked a threshold of 0.3 or 0.2
+            // silence and speech.Based on the debug values, here I picked a threshold of 0.2
             if expectingSpeech {
                 XCTAssertGreaterThan(silenceProbability, 0.2, "Expected speech, but detected silence for \(audioFileName) with probability \(silenceProbability)")
             } else {
