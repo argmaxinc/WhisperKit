@@ -707,24 +707,28 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
                //print(tokenizer.specialTokens.noSpeechToken) //it prints 50257
                let noSpeechTokenIndex = 50362  // I think from models index for the "no speech" token is 50362?
                noSpeechProb = calculateNoSpeechProb(logits: logits, noSpeechTokenIndex: noSpeechTokenIndex)
+
+               let avgLogProb = logProbs.reduce(0, +) / Float(logProbs.count)
         
                if let threshold = options.noSpeechThreshold, noSpeechProb > threshold {
-                   print("Detected silence with noSpeechProb \(noSpeechProb), skipping segment.")
-                   return DecodingResult(
-                       language: Constants.defaultLanguageCode,
-                       languageProbs: [:],
-                       tokens: [],
-                       tokenLogProbs: [],
-                       text: "",
-                       avgLogProb: 0.0,
-                       noSpeechProb: noSpeechProb,
-                       temperature: 0.0,
-                       compressionRatio: 0.0,
-                       cache: nil,
-                       timings: TranscriptionTimings(),
-                       fallback: nil
-                   )
-               }
+                    if options.logProbThreshold == nil || avgLogProb < options.logProbThreshold! {
+                        print("Detected silence with noSpeechProb \(noSpeechProb) and avgLogProb \(avgLogProb), skipping segment.")
+                        return DecodingResult(
+                           language: Constants.defaultLanguageCode,
+                           languageProbs: [:],
+                           tokens: [],
+                           tokenLogProbs: [],
+                           text: "",
+                           avgLogProb: avgLogProb,
+                           noSpeechProb: noSpeechProb,
+                           temperature: 0.0,
+                           compressionRatio: 0.0,
+                           cache: nil,
+                           timings: TranscriptionTimings(),
+                           fallback: nil
+                       )
+                    }
+                }
             }
 
             let filteringTime = Date().timeIntervalSince(nonInferenceStartTime)
