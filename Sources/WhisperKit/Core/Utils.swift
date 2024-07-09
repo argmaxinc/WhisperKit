@@ -209,9 +209,11 @@ extension AVAudioPCMBuffer {
             return false
         }
 
-        memcpy(destination.pointee.advanced(by: stride * Int(frameLength)),
-               source.pointee.advanced(by: stride * Int(startingFrame)),
-               Int(frameCount) * stride * MemoryLayout<Float>.size)
+        let calculatedStride = stride
+        let destinationPointer = destination.pointee.advanced(by: calculatedStride * Int(frameLength))
+        let sourcePointer = source.pointee.advanced(by: calculatedStride * Int(startingFrame))
+
+        memcpy(destinationPointer, sourcePointer, Int(frameCount) * calculatedStride * MemoryLayout<Float>.size)
 
         frameLength += frameCount
         return true
@@ -732,6 +734,28 @@ public func compressionRatio(of text: String) -> Float {
     }
 }
 
+public func logCurrentMemoryUsage(_ message: String) {
+    let memoryUsage = getMemoryUsage()
+    Logging.debug("\(message) - Memory usage: \(memoryUsage) MB")
+}
+
+public func getMemoryUsage() -> UInt64 {
+    var info = mach_task_basic_info()
+    var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
+
+    let kerr: kern_return_t = withUnsafeMutablePointer(to: &info) {
+        $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
+            task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count)
+        }
+    }
+
+    guard kerr == KERN_SUCCESS else {
+        return 0 // If the call fails, return 0
+    }
+
+    return info.resident_size / 1024 / 1024 // Convert to MB
+}
+
 // MARK: - Singletons
 
 public class Logging {
@@ -740,6 +764,8 @@ public class Logging {
 
     public typealias LoggingCallback = (_ message: String) -> Void
     var loggingCallback: LoggingCallback?
+
+    private let logger = OSLog(subsystem: Bundle.main.bundleIdentifier ?? "com.argmax.whisperkit", category: "WhisperKit")
 
     public enum LogLevel: Int {
         case debug = 1
@@ -754,30 +780,30 @@ public class Logging {
 
     private init() {}
 
-    public func log(_ items: Any..., separator: String = " ", terminator: String = "\n") {
+    public func log(_ items: Any..., separator: String = " ", terminator: String = "\n", type: OSLogType) {
         let message = items.map { "\($0)" }.joined(separator: separator)
         if let logger = loggingCallback {
             logger(message)
         } else {
-            print("[WhisperKit] \(message)", terminator: terminator)
+            os_log("%{public}@", log: logger, type: type, message)
         }
     }
 
     public static func debug(_ items: Any..., separator: String = " ", terminator: String = "\n") {
         if shared.logLevel.shouldLog(level: .debug) {
-            shared.log(items, separator: separator, terminator: terminator)
+            shared.log(items, separator: separator, terminator: terminator, type: .debug)
         }
     }
 
     public static func info(_ items: Any..., separator: String = " ", terminator: String = "\n") {
         if shared.logLevel.shouldLog(level: .info) {
-            shared.log(items, separator: separator, terminator: terminator)
+            shared.log(items, separator: separator, terminator: terminator, type: .info)
         }
     }
 
     public static func error(_ items: Any..., separator: String = " ", terminator: String = "\n") {
         if shared.logLevel.shouldLog(level: .error) {
-            shared.log(items, separator: separator, terminator: terminator)
+            shared.log(items, separator: separator, terminator: terminator, type: .error)
         }
     }
 }

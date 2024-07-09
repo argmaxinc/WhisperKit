@@ -34,7 +34,7 @@ open class WhisperKit {
 
     /// Progress
     public private(set) var currentTimings: TranscriptionTimings
-    public let progress = Progress()
+    public private(set) var progress = Progress()
 
     /// Configuration
     public var modelFolder: URL?
@@ -748,6 +748,8 @@ open class WhisperKit {
             }
         }
 
+        progress = Progress()
+
         return transcribeResults
     }
 
@@ -781,14 +783,17 @@ open class WhisperKit {
             textDecoder: textDecoder,
             tokenizer: tokenizer
         )
+
         let transcribeTaskResult = try await transcribeTask.run(
             audioArray: audioArray,
             decodeOptions: decodeOptions,
             callback: callback
         )
+
         if let decodeOptions, decodeOptions.verbose {
             transcribeTaskResult.logTimings()
         }
+
         return [transcribeTaskResult]
     }
 }

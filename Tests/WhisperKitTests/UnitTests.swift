@@ -39,6 +39,16 @@ final class UnitTests: XCTestCase {
         XCTAssertNotNil(audioBuffer, "Failed to load audio file at path: \(audioFilePath)")
         XCTAssertEqual(audioBuffer.format.sampleRate, 16000)
         XCTAssertEqual(audioBuffer.format.channelCount, 1)
+        XCTAssertEqual(audioBuffer.frameLength, 176000)
+        XCTAssertEqual(audioBuffer.frameLength, 11 * 16000)
+
+        let audioBufferWithStartTime = try AudioProcessor.loadAudio(fromPath: audioFilePath, startTime: 1.2)
+        XCTAssertEqual(audioBufferWithStartTime.frameLength, AVAudioFrameCount(156800))
+        XCTAssertEqual(audioBufferWithStartTime.frameLength, AVAudioFrameCount(16000 * (11 - 1.2)))
+
+        let audioBufferWithStartTimeAndEndTime = try AudioProcessor.loadAudio(fromPath: audioFilePath, startTime: 1.2, endTime: 3.4)
+        XCTAssertEqual(audioBufferWithStartTimeAndEndTime.frameLength, AVAudioFrameCount(35200))
+        XCTAssertEqual(audioBufferWithStartTimeAndEndTime.frameLength, AVAudioFrameCount(16000 * (3.4 - 1.2)))
     }
 
     func testAudioPad() {
