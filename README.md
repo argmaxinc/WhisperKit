@@ -47,12 +47,12 @@ Check out the demo app on [TestFlight](https://testflight.apple.com/join/LPVOyJZ
 
 WhisperKit can be integrated into your Swift project using the Swift Package Manager.
 
-### Prerequisites
+#### Prerequisites
 
 - macOS 14.0 or later.
 - Xcode 15.0 or later.
 
-### Steps
+#### Steps
 
 1. Open your Swift project in Xcode.
 2. Navigate to `File` > `Add Package Dependencies...`.
