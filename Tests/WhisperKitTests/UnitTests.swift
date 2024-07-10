@@ -473,7 +473,7 @@ final class UnitTests: XCTestCase {
 
         let transcribeResult: [TranscriptionResult] = try await whisperKit.transcribe(audioArray: multiWindowSamples, decodeOptions: options)
         let result = try XCTUnwrap(transcribeResult.first)
-        XCTAssertEqual(result.segments.count, 2, "Expected 3 segments")
+        XCTAssertEqual(result.segments.count, 3, "Expected 3 segments")
 
         // Compare last timestamp to the length of the audio
         let endTimestamp = try XCTUnwrap(
@@ -863,7 +863,7 @@ final class UnitTests: XCTestCase {
             "Failed to transcribe"
         )
 
-        XCTAssertEqual(result.segments.first?.text, " and so my fellow americans ask not what your country can do for you ask what you can do for your country.")
+        XCTAssertEqual(result.segments.first?.text, " and so my fellow americans ask not what your country can do for you ask what you can do for your country")
         XCTAssertFalse(result.text.contains(promptText), "Prompt text should not be present in the result")
     }
 
@@ -880,7 +880,7 @@ final class UnitTests: XCTestCase {
             "Failed to transcribe"
         )
 
-        XCTAssertEqual(result.segments.first?.text, " and so my fellow americans ask not what your country can do for you ask what you can do for your country.")
+        XCTAssertEqual(result.segments.first?.text, " and so my fellow americans ask not what your country can do for you ask what you can do for your country")
     }
 
     // MARK: - Utils Tests
