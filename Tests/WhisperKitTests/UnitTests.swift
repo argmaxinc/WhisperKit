@@ -863,7 +863,7 @@ final class UnitTests: XCTestCase {
             "Failed to transcribe"
         )
 
-        XCTAssertEqual(result.segments.first?.text, " and so my fellow americans ask not what your country can do for you ask what you can do for your country")
+        XCTAssertEqual(result.segments.first?.text, " and so my fellow americans ask not what your country can do for you ask what you can do for your country.")
         XCTAssertFalse(result.text.contains(promptText), "Prompt text should not be present in the result")
     }
 
