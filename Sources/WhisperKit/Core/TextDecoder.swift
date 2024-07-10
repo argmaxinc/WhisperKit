@@ -204,13 +204,13 @@ public extension TextDecoding {
             // Add prompt tokens
             if let promptTokens = options.promptTokens {
                 let maxPromptLen = (Constants.maxTokenContext / 2) - 1
-                let trimmedPromptTokens = Array(promptTokens.suffix(maxPromptLen))
+                let trimmedPromptTokens = Array(promptTokens.suffix(maxPromptLen)).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
                 prefillTokens = [tokenizer.specialTokens.startOfPreviousToken] + trimmedPromptTokens + prefillTokens
             }
 
             // Add prefix tokens
             if let prefixTokens = options.prefixTokens {
-                let trimmedPrefixTokens = Array(prefixTokens.suffix(Constants.maxTokenContext / 2))
+                let trimmedPrefixTokens = Array(prefixTokens.suffix(Constants.maxTokenContext / 2)).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
                 prefillTokens.append(contentsOf: trimmedPrefixTokens)
             }
         }
