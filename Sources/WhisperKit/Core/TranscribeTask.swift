@@ -200,6 +200,9 @@ final class TranscribeTask {
                     timings.decodingWordTimestamps += Date().timeIntervalSince(wordTimestampsStart)
                     timings.totalTimestampAlignmentRuns += 1
 
+                    // Filter out zero length segments
+                    currentSegments = currentSegments?.filter { $0.end > $0.start }
+
                     // Update seek point with new (more accurate) segments
                     if let lastSpeechTimestamp = currentSegments?.last?.end {
                         seek = max(seek, Int(lastSpeechTimestamp * Float(WhisperKit.sampleRate)))
