@@ -999,10 +999,11 @@ final class UnitTests: XCTestCase {
                 transcribeToken: 100,
                 translateToken: 101
             ),
-            sampleBegin: 2,
+            sampleBegin: 0,
             maxInitialTimestampIndex: nil,
             isModelMultilingual: false
         )
+
         let logits1 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2])
         let result1 = tokensFilter1.filterLogits(logits1, withTokens: [])
         XCTAssertEqual(result1.data(for: 2), [1.1, 5.2, -.infinity, 0.4, 0.2, 0.1, 0.2])
@@ -1015,12 +1016,13 @@ final class UnitTests: XCTestCase {
                 transcribeToken: 100,
                 translateToken: 101
             ),
-            sampleBegin: 2,
+            sampleBegin: 0,
             maxInitialTimestampIndex: nil,
             isModelMultilingual: false
         )
+
         let logits2 = try MLMultiArray.logits([1.1, 0.2, 0.3, 0.4, 0.2, 0.1, 0.2])
-        let result2 = tokensFilter2.filterLogits(logits2, withTokens: [])
+        let result2 = tokensFilter2.filterLogits(logits2, withTokens:  [])
         XCTAssertEqual(result2.data(for: 2), [-.infinity, -.infinity, -.infinity, -.infinity, 0.2, 0.1, 0.2])
     }
 
@@ -1034,7 +1036,7 @@ final class UnitTests: XCTestCase {
                 transcribeToken: 100,
                 translateToken: 101
             ),
-            sampleBegin: 2,
+            sampleBegin: 0,
             maxInitialTimestampIndex: nil,
             isModelMultilingual: true
         )
@@ -1050,7 +1052,7 @@ final class UnitTests: XCTestCase {
                 transcribeToken: 100,
                 translateToken: 101
             ),
-            sampleBegin: 2,
+            sampleBegin: 0,
             maxInitialTimestampIndex: nil,
             isModelMultilingual: true
         )
@@ -1066,7 +1068,7 @@ final class UnitTests: XCTestCase {
                 transcribeToken: 100,
                 translateToken: 101
             ),
-            sampleBegin: 2,
+            sampleBegin: 0,
             maxInitialTimestampIndex: nil,
             isModelMultilingual: true
         )
@@ -1600,7 +1602,7 @@ final class UnitTests: XCTestCase {
         var results: [TranscriptionResult?] = []
         var prevResult: TranscriptionResult?
         var lastAgreedSeconds: Float = 0.0
-        let agreementCountNeeded = 2
+        let agreementCountNeeded = 4
         var hypothesisWords: [WordTiming] = []
         var prevWords: [WordTiming] = []
         var lastAgreedWords: [WordTiming] = []
