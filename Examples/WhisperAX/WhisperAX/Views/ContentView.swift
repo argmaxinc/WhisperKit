@@ -1277,6 +1277,7 @@ struct ContentView: View {
             usePrefillCache: enableCachePrefill,
             skipSpecialTokens: !enableSpecialCharacters,
             withoutTimestamps: !enableTimestamps,
+            wordTimestamps: true,
             clipTimestamps: seekClip,
             chunkingStrategy: chunkingStrategy
         )
