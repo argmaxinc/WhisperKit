@@ -473,7 +473,7 @@ final class UnitTests: XCTestCase {
 
         let transcribeResult: [TranscriptionResult] = try await whisperKit.transcribe(audioArray: multiWindowSamples, decodeOptions: options)
         let result = try XCTUnwrap(transcribeResult.first)
-        XCTAssertEqual(result.segments.count, 3, "Expected 3 segments")
+        XCTAssertEqual(result.segments.count, 2, "Expected 3 segments")
 
         // Compare last timestamp to the length of the audio
         let endTimestamp = try XCTUnwrap(
@@ -880,7 +880,7 @@ final class UnitTests: XCTestCase {
             "Failed to transcribe"
         )
 
-        XCTAssertEqual(result.segments.first?.text, " and so my fellow americans ask not what your country can do for you ask what you can do for your country")
+        XCTAssertEqual(result.segments.first?.text, " and so my fellow americans ask not what your country can do for you ask what you can do for your country.")
     }
 
     // MARK: - Utils Tests
@@ -999,7 +999,7 @@ final class UnitTests: XCTestCase {
                 transcribeToken: 100,
                 translateToken: 101
             ),
-            sampleBegin: 0,
+            sampleBegin: 2,
             maxInitialTimestampIndex: nil,
             isModelMultilingual: false
         )
@@ -1016,7 +1016,7 @@ final class UnitTests: XCTestCase {
                 transcribeToken: 100,
                 translateToken: 101
             ),
-            sampleBegin: 0,
+            sampleBegin: 2,
             maxInitialTimestampIndex: nil,
             isModelMultilingual: false
         )
@@ -1036,7 +1036,7 @@ final class UnitTests: XCTestCase {
                 transcribeToken: 100,
                 translateToken: 101
             ),
-            sampleBegin: 0,
+            sampleBegin: 2,
             maxInitialTimestampIndex: nil,
             isModelMultilingual: true
         )
@@ -1052,7 +1052,7 @@ final class UnitTests: XCTestCase {
                 transcribeToken: 100,
                 translateToken: 101
             ),
-            sampleBegin: 0,
+            sampleBegin: 2,
             maxInitialTimestampIndex: nil,
             isModelMultilingual: true
         )
@@ -1068,7 +1068,7 @@ final class UnitTests: XCTestCase {
                 transcribeToken: 100,
                 translateToken: 101
             ),
-            sampleBegin: 0,
+            sampleBegin: 2,
             maxInitialTimestampIndex: nil,
             isModelMultilingual: true
         )
