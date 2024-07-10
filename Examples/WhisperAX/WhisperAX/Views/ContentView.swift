@@ -1231,13 +1231,13 @@ struct ContentView: View {
     // MARK: - Transcribe Logic
 
     func transcribeCurrentFile(path: String) async throws {
-        var audioFileSamples: [Float] = []
-
-        // Load and convert buffer within a limited scope
-        try autoreleasepool {
-            let audioFileBuffer = try AudioProcessor.loadAudio(fromPath: path)
-            audioFileSamples = AudioProcessor.convertBufferToArray(buffer: audioFileBuffer)
-        }
+        // Load and convert buffer in a limited scope
+        let audioFileSamples = try await Task {
+            try autoreleasepool {
+                let audioFileBuffer = try AudioProcessor.loadAudio(fromPath: path)
+                return AudioProcessor.convertBufferToArray(buffer: audioFileBuffer)
+            }
+        }.value
 
         let transcription = try await transcribeAudioSamples(audioFileSamples)
 

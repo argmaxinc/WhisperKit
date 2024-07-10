@@ -74,6 +74,15 @@ public protocol AudioProcessing {
 
 /// Overrideable default methods for AudioProcessing
 public extension AudioProcessing {
+    /// Loads and converts audio data from a specified file paths.
+    /// - Parameter audioPaths: The file paths of the audio files.
+    /// - Returns: `AVAudioPCMBuffer` containing the audio data.
+    public static func loadAudioAsync(fromPath audioFilePath: String) async throws -> AVAudioPCMBuffer {
+        return try await Task {
+            return try AudioProcessor.loadAudio(fromPath: audioFilePath)
+        }.value
+    }
+
     func startRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)?) throws {
         try startRecordingLive(inputDeviceID: inputDeviceID, callback: callback)
     }
@@ -248,8 +257,6 @@ public class AudioProcessor: NSObject, AudioProcessing {
             return batchResult.map { $0.result }
         }
     }
-
-
 
     /// Resamples audio from a file to a specified sample rate and channel count.
     /// - Parameters:
