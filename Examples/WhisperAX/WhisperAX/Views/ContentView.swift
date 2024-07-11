@@ -1255,7 +1255,7 @@ struct ContentView: View {
                     confirmedText += hypothesisText
                     hypothesisText = ""
                 }
-                
+
                 if unconfirmedSegments.count > 0 {
                     confirmedSegments.append(contentsOf: unconfirmedSegments)
                     unconfirmedSegments = []
@@ -1631,18 +1631,20 @@ struct ContentView: View {
                     eagerResults.append(transcription)
                 }
             }
+
+            await MainActor.run {
+                let finalWords = confirmedWords.map { $0.word }.joined()
+                confirmedText = finalWords
+
+                // Accept the final hypothesis because it is the last of the available audio
+                let lastHypothesis = lastAgreedWords + findLongestDifferentSuffix(prevWords, hypothesisWords)
+                hypothesisText = lastHypothesis.map { $0.word }.joined()
+            }
         } catch {
             Logging.error("[EagerMode] Error: \(error)")
+            finalizeText()
         }
 
-        await MainActor.run {
-            let finalWords = confirmedWords.map { $0.word }.joined()
-            confirmedText = finalWords
-
-            // Accept the final hypothesis because it is the last of the available audio
-            let lastHypothesis = lastAgreedWords + findLongestDifferentSuffix(prevWords, hypothesisWords)
-            hypothesisText = lastHypothesis.map { $0.word }.joined()
-        }
 
         let mergedResult = mergeTranscriptionResults(eagerResults, confirmedWords: confirmedWords)
 
