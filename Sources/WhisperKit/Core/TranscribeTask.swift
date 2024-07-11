@@ -97,7 +97,6 @@ final class TranscribeTask {
 
         let totalSeekDuration = seekClips.reduce(0) { $0 + ($1.end - $1.start) }
         progress.totalUnitCount = Int64(totalSeekDuration)
-        defer { progress.completedUnitCount = progress.totalUnitCount }
 
         let startDecodeLoopTime = CFAbsoluteTimeGetCurrent()
         for (seekClipStart, seekClipEnd) in seekClips {
@@ -245,10 +244,16 @@ final class TranscribeTask {
                     maxTokenContext: decodeOptions?.sampleLength ?? Constants.maxTokenContext
                 )
 
+                // Update the progress
                 let clipProgress = min(seek, seekClipEnd) - seekClipStart
                 progress.completedUnitCount = previousSeekProgress + Int64(clipProgress)
             }
         }
+
+        // Transcription completed
+        progress.completedUnitCount = progress.totalUnitCount
+
+        // MARK: - Decode with Fallback Logic
 
         func decodeWithFallback(
             encoderSegment encoderOutput: MLMultiArray,

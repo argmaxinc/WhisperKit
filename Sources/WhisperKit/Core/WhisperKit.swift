@@ -624,6 +624,7 @@ open class WhisperKit {
             // Append the results of each batch to the final result array
             result.append(contentsOf: partialResult)
         }
+
         return result
     }
 
@@ -748,8 +749,6 @@ open class WhisperKit {
             }
         }
 
-        progress = Progress()
-
         return transcribeResults
     }
 
@@ -792,6 +791,11 @@ open class WhisperKit {
 
         if let decodeOptions, decodeOptions.verbose {
             transcribeTaskResult.logTimings()
+        }
+
+        if progress.isFinished {
+            // Reset progress if it is completed
+            progress = Progress()
         }
 
         return [transcribeTaskResult]
