@@ -31,6 +31,12 @@ extension Array where Element == Result<[TranscriptionResult], Swift.Error> {
     }
 }
 
+public extension Array where Element == TranscriptionSegment {
+    func contains(segment: TranscriptionSegment) -> Bool {
+        return self.contains { $0.start == segment.start }
+    }
+}
+
 extension MLMultiArray {
     /// Calculate the linear offset by summing the products of each dimension’s index with the dimension’s stride.
     /// More info [here](https://developer.apple.com/documentation/coreml/mlmultiarray/2879231-subscript)

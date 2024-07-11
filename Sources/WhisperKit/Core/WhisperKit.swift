@@ -768,11 +768,11 @@ open class WhisperKit {
             // Tokenizer required for decoding
             throw WhisperError.tokenizerUnavailable()
         }
-        try Task.checkCancellation()
 
         let childProgress = Progress()
         progress.totalUnitCount += 1
         progress.addChild(childProgress, withPendingUnitCount: 1)
+
         let transcribeTask = TranscribeTask(
             currentTimings: currentTimings,
             progress: childProgress,
@@ -783,21 +783,32 @@ open class WhisperKit {
             tokenizer: tokenizer
         )
 
-        let transcribeTaskResult = try await transcribeTask.run(
-            audioArray: audioArray,
-            decodeOptions: decodeOptions,
-            callback: callback
-        )
+        do {
+            try Task.checkCancellation()
 
-        if let decodeOptions, decodeOptions.verbose {
-            transcribeTaskResult.logTimings()
+            let transcribeTaskResult = try await transcribeTask.run(
+                audioArray: audioArray,
+                decodeOptions: decodeOptions,
+                callback: callback
+            )
+
+            if let decodeOptions, decodeOptions.verbose {
+                transcribeTaskResult.logTimings()
+            }
+
+            if progress.isFinished {
+                // Reset progress if it is completed
+                progress = Progress()
+            }
+
+            return [transcribeTaskResult]
+        } catch {
+            // Handle cancellation
+            if error is CancellationError {
+                // Reset progress when cancelled
+                progress = Progress()
+            }
+            throw error
         }
-
-        if progress.isFinished {
-            // Reset progress if it is completed
-            progress = Progress()
-        }
-
-        return [transcribeTaskResult]
     }
 }

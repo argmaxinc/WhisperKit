@@ -735,7 +735,9 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
                         let shouldContinue = callback(result)
                         if let shouldContinue = shouldContinue, !shouldContinue, !isPrefill {
                             Logging.debug("Early stopping")
-                            self.shouldEarlyStop[windowUUID] = true
+                            if self.shouldEarlyStop.keys.contains(windowUUID) {
+                                self.shouldEarlyStop[windowUUID] = true
+                            }
                         }
                     }
                 }
@@ -757,7 +759,9 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         }
         
         // Cleanup the early stop flag after loop completion
-        shouldEarlyStop.removeValue(forKey: windowUUID)
+        if shouldEarlyStop.removeValue(forKey: windowUUID) == nil {
+            Logging.error("Early stop flag not found for window: \(windowUUID)")
+        }
 
         let cache = DecodingCache(
             keyCache: decoderInputs.keyCache,
