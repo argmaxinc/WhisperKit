@@ -718,7 +718,7 @@ struct ContentView: View {
                 }
                 .disabled(!(whisperKit?.modelVariant.isMultilingual ?? false))
             } label: {
-                Label("Language", systemImage: "globe")
+                Label("Source Language", systemImage: "globe")
             }
             .padding(.horizontal)
             .padding(.top)
