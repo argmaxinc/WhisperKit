@@ -97,7 +97,7 @@ struct ContentView: View {
     @State private var showAdvancedOptions: Bool = false
     @State private var transcriptionTask: Task<Void, Never>? = nil
     @State private var selectedCategoryId: MenuItem.ID?
-    @State private var transcribeFileTask: Task<Void, Never>? = nil
+    @State private var transcribeTask: Task<Void, Never>? = nil
 
     struct MenuItem: Identifiable, Hashable {
         var id = UUID()
@@ -122,7 +122,7 @@ struct ContentView: View {
     // MARK: Views
 
     func resetState() {
-        transcribeFileTask?.cancel()
+        transcribeTask?.cancel()
         isRecording = false
         isTranscribing = false
         whisperKit?.audioProcessor.stopRecording()
@@ -311,15 +311,27 @@ struct ContentView: View {
             .textSelection(.enabled)
             .padding()
             if let whisperKit,
-               !isRecording,
-               !isTranscribing,
-               whisperKit.progress.fractionCompleted > 0,
+               !isStreamMode,
+               isTranscribing,
+               let task = transcribeTask,
+               !task.isCancelled,
                whisperKit.progress.fractionCompleted < 1
             {
-                ProgressView(whisperKit.progress)
-                    .progressViewStyle(.linear)
-                    .labelsHidden()
-                    .padding(.horizontal)
+                HStack {
+                    ProgressView(whisperKit.progress)
+                        .progressViewStyle(.linear)
+                        .labelsHidden()
+                        .padding(.horizontal)
+
+                    Button {
+                        transcribeTask?.cancel()
+                        transcribeTask = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(BorderlessButtonStyle())
+                }
             }
         }
     }
@@ -706,7 +718,7 @@ struct ContentView: View {
                 }
                 .disabled(!(whisperKit?.modelVariant.isMultilingual ?? false))
             } label: {
-                Label("Language", systemImage: "globe")
+                Label("Source Language", systemImage: "globe")
             }
             .padding(.horizontal)
             .padding(.top)
@@ -1149,12 +1161,14 @@ struct ContentView: View {
     func transcribeFile(path: String) {
         resetState()
         whisperKit?.audioProcessor = AudioProcessor()
-        self.transcribeFileTask = Task {
+        self.transcribeTask = Task {
+            isTranscribing = true
             do {
                 try await transcribeCurrentFile(path: path)
             } catch {
                 print("File selection error: \(error.localizedDescription)")
             }
+            isTranscribing = false
         }
     }
 
@@ -1218,11 +1232,33 @@ struct ContentView: View {
 
         // If not looping, transcribe the full buffer
         if !loop {
-            Task {
+            self.transcribeTask = Task {
+                isTranscribing = true
                 do {
                     try await transcribeCurrentBuffer()
                 } catch {
                     print("Error: \(error.localizedDescription)")
+                }
+                finalizeText()
+                isTranscribing = false
+            }
+        }
+
+        finalizeText()
+    }
+
+    func finalizeText() {
+        // Finalize unconfirmed text
+        Task {
+            await MainActor.run {
+                if hypothesisText != "" {
+                    confirmedText += hypothesisText
+                    hypothesisText = ""
+                }
+
+                if unconfirmedSegments.count > 0 {
+                    confirmedSegments.append(contentsOf: unconfirmedSegments)
+                    unconfirmedSegments = []
                 }
             }
         }
@@ -1231,8 +1267,14 @@ struct ContentView: View {
     // MARK: - Transcribe Logic
 
     func transcribeCurrentFile(path: String) async throws {
-        let audioFileBuffer = try AudioProcessor.loadAudio(fromPath: path)
-        let audioFileSamples = AudioProcessor.convertBufferToArray(buffer: audioFileBuffer)
+        // Load and convert buffer in a limited scope
+        let audioFileSamples = try await Task {
+            try autoreleasepool {
+                let audioFileBuffer = try AudioProcessor.loadAudio(fromPath: path)
+                return AudioProcessor.convertBufferToArray(buffer: audioFileBuffer)
+            }
+        }.value
+
         let transcription = try await transcribeAudioSamples(audioFileSamples)
 
         await MainActor.run {
@@ -1258,7 +1300,7 @@ struct ContentView: View {
 
         let languageCode = Constants.languages[selectedLanguage, default: Constants.defaultLanguageCode]
         let task: DecodingTask = selectedTask == "transcribe" ? .transcribe : .translate
-        let seekClip: [Float] = []
+        let seekClip: [Float] = [lastConfirmedSegmentEndSeconds]
 
         let options = DecodingOptions(
             verbose: true,
@@ -1271,6 +1313,7 @@ struct ContentView: View {
             usePrefillCache: enableCachePrefill,
             skipSpecialTokens: !enableSpecialCharacters,
             withoutTimestamps: !enableTimestamps,
+            wordTimestamps: true,
             clipTimestamps: seekClip,
             chunkingStrategy: chunkingStrategy
         )
@@ -1279,7 +1322,7 @@ struct ContentView: View {
         let decodingCallback: ((TranscriptionProgress) -> Bool?) = { (progress: TranscriptionProgress) in
             DispatchQueue.main.async {
                 let fallbacks = Int(progress.timings.totalDecodingFallbacks)
-                let chunkId = progress.windowId
+                let chunkId = isStreamMode ? 0 : progress.windowId
 
                 // First check if this is a new window for the same chunk, append if so
                 var updatedChunk = (chunkText: [progress.text], fallbacks: fallbacks)
@@ -1292,7 +1335,7 @@ struct ContentView: View {
                         // This is either a new window or a fallback (only in streaming mode)
                         if fallbacks == currentChunk.fallbacks && isStreamMode {
                             // New window (since fallbacks havent changed)
-                            updatedChunk.chunkText = currentChunk.chunkText + [progress.text]
+                            updatedChunk.chunkText = [updatedChunk.chunkText.first ?? "" + progress.text]
                         } else {
                             // Fallback, overwrite the previous bad text
                             updatedChunk.chunkText[currentChunk.chunkText.endIndex - 1] = progress.text
@@ -1419,6 +1462,7 @@ struct ContentView: View {
             // Run realtime transcribe using word timestamps for segmentation
             let transcription = try await transcribeEagerMode(Array(currentBuffer))
             await MainActor.run {
+                currentText = ""
                 self.tokensPerSecond = transcription?.timings.tokensPerSecond ?? 0
                 self.firstTokenTime = transcription?.timings.firstTokenTime ?? 0
                 self.pipelineStart = transcription?.timings.pipelineStart ?? 0
@@ -1464,10 +1508,13 @@ struct ContentView: View {
                     // Update lastConfirmedSegmentEnd based on the last confirmed segment
                     if let lastConfirmedSegment = confirmedSegmentsArray.last, lastConfirmedSegment.end > lastConfirmedSegmentEndSeconds {
                         lastConfirmedSegmentEndSeconds = lastConfirmedSegment.end
+                        print("Last confirmed segment end: \(lastConfirmedSegmentEndSeconds)")
 
                         // Add confirmed segments to the confirmedSegments array
-                        if !self.confirmedSegments.contains(confirmedSegmentsArray) {
-                            self.confirmedSegments.append(contentsOf: confirmedSegmentsArray)
+                        for segment in confirmedSegmentsArray {
+                            if !self.confirmedSegments.contains(segment: segment) {
+                                self.confirmedSegments.append(segment)
+                            }
                         }
                     }
 
@@ -1584,18 +1631,20 @@ struct ContentView: View {
                     eagerResults.append(transcription)
                 }
             }
+
+            await MainActor.run {
+                let finalWords = confirmedWords.map { $0.word }.joined()
+                confirmedText = finalWords
+
+                // Accept the final hypothesis because it is the last of the available audio
+                let lastHypothesis = lastAgreedWords + findLongestDifferentSuffix(prevWords, hypothesisWords)
+                hypothesisText = lastHypothesis.map { $0.word }.joined()
+            }
         } catch {
             Logging.error("[EagerMode] Error: \(error)")
+            finalizeText()
         }
 
-        await MainActor.run {
-            let finalWords = confirmedWords.map { $0.word }.joined()
-            confirmedText = finalWords
-
-            // Accept the final hypothesis because it is the last of the available audio
-            let lastHypothesis = lastAgreedWords + findLongestDifferentSuffix(prevWords, hypothesisWords)
-            hypothesisText = lastHypothesis.map { $0.word }.joined()
-        }
 
         let mergedResult = mergeTranscriptionResults(eagerResults, confirmedWords: confirmedWords)
 

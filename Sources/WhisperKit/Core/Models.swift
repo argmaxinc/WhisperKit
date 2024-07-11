@@ -520,35 +520,34 @@ public struct TranscriptionResult: Codable {
         let decodingLoopInfo = formatTimeWithPercentage(timings.decodingLoop, totalLoops, fullDecodingDuration)
 
         // Logging
-        Logging.info("---- Transcription Timings ----")
-
-        Logging.info("Audio Load:          \(audioLoadTime)")
-        Logging.info("Audio Processing:    \(audioProcTime)")
-        Logging.info("Mels:                \(logmelsTime)")
-        Logging.info("Encoding:            \(encodingTime)")
-        Logging.info("Matrices Init:       \(decodingInitTime)")
-        Logging.info("Prefill:             \(prefillInfo)")
-        Logging.info("Decoding:            \(predictionsInfo)")
-        Logging.info("Non-inference:       \(nonPredTimeInfo)")
-        Logging.info("- Logit Filtering:   \(filteringInfo)")
-        Logging.info("- Sampling:          \(samplingInfo)")
-        Logging.info("- Kv Caching:        \(kvCachingInfo)")
-        Logging.info("- Word Timestamps:   \(wordTimestampInfo)")
-        Logging.info("- Windowing:         \(windowingInfo)")
-        Logging.info("Fallbacks:           \(fallbackInfo)")
-        Logging.info("Decoding Full Loop:  \(decodingLoopInfo)")
-        Logging.info("-------------------------------")
-
-        // Summary statistics
-        Logging.info("Model Load Time:               \(String(format: "%.2f", timings.modelLoading)) seconds")
-        Logging.info("Inference Duration (Global):   \(String(format: "%.2f", timings.fullPipeline)) seconds")
-        Logging.info("- Decoding Loop (Avg/window):  \(String(format: "%.2f", decodeTimePerWindow)) seconds")
-        Logging.info("- Audio Windows:               \(String(format: "%.2f", timings.totalAudioProcessingRuns))")
-        Logging.info("Time to first token:           \(String(format: "%.2f", timeToFirstToken)) seconds")
-        Logging.info("Total Tokens:                  \(totalTokens)")
-        Logging.info("Tokens per Second:             \(String(format: "%.2f", tokensPerSecond)) tok/s")
-        Logging.info("Real Time Factor:              \(String(format: "%.3f", rtf))")
-        Logging.info("Fallbacks:                     \(timings.totalDecodingFallbacks)")
+        Logging.info("""
+        ---- Transcription Timings ----
+        Audio Load:          \(audioLoadTime)
+        Audio Processing:    \(audioProcTime)
+        Mels:                \(logmelsTime)
+        Encoding:            \(encodingTime)
+        Matrices Init:       \(decodingInitTime)
+        Prefill:             \(prefillInfo)
+        Decoding:            \(predictionsInfo)
+        Non-inference:       \(nonPredTimeInfo)
+        - Logit Filtering:   \(filteringInfo)
+        - Sampling:          \(samplingInfo)
+        - Kv Caching:        \(kvCachingInfo)
+        - Word Timestamps:   \(wordTimestampInfo)
+        - Windowing:         \(windowingInfo)
+        Fallbacks:           \(fallbackInfo)
+        Decoding Full Loop:  \(decodingLoopInfo)
+        -------------------------------
+        Model Load Time:               \(String(format: "%.2f", timings.modelLoading)) seconds
+        Inference Duration (Global):   \(String(format: "%.2f", timings.fullPipeline)) seconds
+        - Decoding Loop (Avg/window):  \(String(format: "%.2f", decodeTimePerWindow)) seconds
+        - Audio Windows:               \(String(format: "%.2f", timings.totalAudioProcessingRuns))
+        Time to first token:           \(String(format: "%.2f", timeToFirstToken)) seconds
+        Total Tokens:                  \(totalTokens)
+        Tokens per Second:             \(String(format: "%.2f", tokensPerSecond)) tok/s
+        Real Time Factor:              \(String(format: "%.3f", rtf))
+        Fallbacks:                     \(timings.totalDecodingFallbacks)
+        """)
     }
 }
 
