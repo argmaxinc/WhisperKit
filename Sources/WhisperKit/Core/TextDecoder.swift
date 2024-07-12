@@ -206,13 +206,13 @@ public extension TextDecoding {
             // Add prompt tokens
             if let promptTokens = options.promptTokens {
                 let maxPromptLen = (Constants.maxTokenContext / 2) - 1
-                let trimmedPromptTokens = Array(promptTokens.suffix(maxPromptLen))
+                let trimmedPromptTokens = Array(promptTokens.suffix(maxPromptLen)).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
                 prefillTokens = [tokenizer.specialTokens.startOfPreviousToken] + trimmedPromptTokens + prefillTokens
             }
 
             // Add prefix tokens
             if let prefixTokens = options.prefixTokens {
-                let trimmedPrefixTokens = Array(prefixTokens.suffix(Constants.maxTokenContext / 2))
+                let trimmedPrefixTokens = Array(prefixTokens.suffix(Constants.maxTokenContext / 2)).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
                 prefillTokens.append(contentsOf: trimmedPrefixTokens)
             }
         }
@@ -617,7 +617,9 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         var hasAlignment = false
         var isFirstTokenLogProbTooLow = false
         let windowUUID = UUID()
-        shouldEarlyStop[windowUUID] = false
+        DispatchQueue.main.sync {
+            shouldEarlyStop[windowUUID] = false
+        }
         for tokenIndex in prefilledIndex..<loopCount {
             let loopStart = Date()
 
@@ -773,7 +775,9 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
                         let shouldContinue = callback(result)
                         if let shouldContinue = shouldContinue, !shouldContinue, !isPrefill {
                             Logging.debug("Early stopping")
-                            self.shouldEarlyStop[windowUUID] = true
+                            if self.shouldEarlyStop.keys.contains(windowUUID) {
+                                self.shouldEarlyStop[windowUUID] = true
+                            }
                         }
                     }
                 }
@@ -795,7 +799,9 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         }
         
         // Cleanup the early stop flag after loop completion
-        shouldEarlyStop.removeValue(forKey: windowUUID)
+        if shouldEarlyStop.removeValue(forKey: windowUUID) == nil {
+            Logging.error("Early stop flag not found for window: \(windowUUID)")
+        }
 
         let cache = DecodingCache(
             keyCache: decoderInputs.keyCache,
