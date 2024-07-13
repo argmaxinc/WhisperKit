@@ -94,5 +94,5 @@ jobs:
         if: ${{ matrix.run-config['condition'] == true }}
         run: |
           set -o pipefail
-          xcodebuild clean build-for-testing -scheme whisperkit-Package -destination '${{ matrix.run-config['clean-destination'] }}' | xcpretty
-          xcodebuild test -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -destination '${{ matrix.run-config['test-destination'] }}'
+          xcodebuild clean build-for-testing -scheme whisperkit-Package -destination '${{ matrix.run-config['clean-destination'] }}' -skipPackagePluginValidation | xcpretty
+          xcodebuild test -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -destination '${{ matrix.run-config['test-destination'] }}' -skipPackagePluginValidation
