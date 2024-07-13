@@ -96,7 +96,7 @@ final class UnitTests: XCTestCase {
         Logging.shared.logLevel = .debug
 
         let audioFileURL = try XCTUnwrap(
-            Bundle.module.url(forResource: "jfk", withExtension: "wav"),
+            TestResource.url(forResource: "jfk", withExtension: "wav"),
             "Audio file not found"
         )
         let audioFile = try AVAudioFile(forReading: audioFileURL)
@@ -1269,7 +1269,7 @@ final class UnitTests: XCTestCase {
                 }
             }
         _ = try await pipe.transcribe(
-            audioPath: Bundle.module.path(forResource: "ted_60", ofType: "m4a")!,
+            audioPath: TestResource.path(forResource: "ted_60", ofType: "m4a")!,
             decodeOptions: .init(chunkingStrategy: .vad)
         )
         cancellable?.cancel()

@@ -25,35 +25,6 @@ final class RegressionTests: XCTestCase {
         }
     }
     
-    func testOutputAll() async throws {
-        let modelPaths = try allModelPaths()
-
-        for modelPath in modelPaths {
-            let modelName = modelPath.split(separator: "/").last!
-            print("[Integration] Testing model \(modelName)")
-            let audioFilePath = try XCTUnwrap(
-                TestResource.path(forResource: "jfk", ofType: "wav"),
-                "Audio file not found"
-            )
-
-            let whisperKit = try await WhisperKit(
-                modelFolder: modelPath,
-                verbose: true,
-                logLevel: .debug
-            )
-
-            let transcriptionResult: [TranscriptionResult] = try await whisperKit.transcribe(audioPath: audioFilePath)
-            let transcriptionResultText = transcriptionResult.text
-
-            print("[Integration] \(transcriptionResultText)")
-            XCTAssertEqual(
-                transcriptionResultText.normalized,
-                " And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.".normalized,
-                "Transcription result does not match expected result for model \(modelName)"
-            )
-        }
-    }
-
     func downloadTestAudio(completion: @escaping (Bool) -> Void) {
         Task {
             do {
@@ -153,7 +124,7 @@ final class RegressionTests: XCTestCase {
             let modelName = modelPath.split(separator: "/").last!
             print("[Integration] Testing model \(modelName)")
             let audioFilePath = try XCTUnwrap(
-                Bundle.module.path(forResource: "jfk", ofType: "wav"),
+                TestResource.path(forResource: "jfk", ofType: "wav"),
                 "Audio file not found"
             )
 
