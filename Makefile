@@ -32,10 +32,7 @@ setup:
 
 
 setup-huggingface-cli:
-	@if huggingface-cli whoami; then \
-		echo "Already logged in to Hugging Face."; \
-		huggingface-cli whoami \
-	else \
+	@if huggingface-cli whoami 2>&1 | grep -q "Not logged in"; then \
 		echo "Not logged in to Hugging Face."; \
 		if [ -z "$$HF_TOKEN" ]; then \
 			echo "Environment variable HF_TOKEN is not set. Running normal login."; \
@@ -44,6 +41,9 @@ setup-huggingface-cli:
 			echo "Using HF_TOKEN from environment variable."; \
 			huggingface-cli login --token $$HF_TOKEN; \
 		fi; \
+	else \
+		echo "Already logged in to Hugging Face."; \
+		huggingface-cli whoami; \
 	fi
 
 
