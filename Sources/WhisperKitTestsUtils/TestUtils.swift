@@ -176,9 +176,9 @@ public extension XCTestCase {
     }
 
     func tinyMLXModelPath() throws -> String {
-        let modelDir = "mlx/whisper-tiny-mlx"
+        let modelDir = "whisperkit-mlx/openai_whisper-tiny"
         guard let modelPath = Bundle.module.urls(forResourcesWithExtension: "safetensors", subdirectory: modelDir)?.first?.deletingLastPathComponent().path else {
-            throw TestError.missingFile("Failed to load model, ensure \"Models/\(modelDir)\" exists via Makefile command: `make download-models`")
+            throw TestError.missingFile("Failed to load model, ensure \"Models/\(modelDir)\" exists via Makefile command: `make download-mlx-models`")
         }
         return modelPath
     }

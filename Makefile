@@ -5,10 +5,10 @@ PYTHON_COMMAND := python3
 
 # Define model repository and directories
 MODEL_REPO := argmaxinc/whisperkit-coreml
-MLX_MODEL_REPO := jkrukowski/whisper-tiny-mlx-safetensors
-MLX_MODEL_REPO_DIR := ./Sources/WhisperKitTestsUtils/Models/mlx/whisper-tiny-mlx
-MODEL_REPO_DIR := ./Sources/WhisperKitTestsUtils/Models/whisperkit-coreml
-BASE_COMPILED_DIR := ./Sources/WhisperKitTestsUtils/Models
+MODEL_REPO_DIR := ./Models/whisperkit-coreml
+MLX_MODEL_REPO := argmaxinc/whisperkit-mlx
+MLX_MODEL_REPO_DIR := ./Models/whisperkit-mlx
+BASE_COMPILED_DIR := ./Models
 
 
 setup:
@@ -76,6 +76,7 @@ download-models: setup-model-repo
 	@echo "Downloading all models..."
 	@cd $(MODEL_REPO_DIR) && \
 	git lfs pull
+	@echo "CoreML models downloaded to $(MODEL_REPO_DIR)"
 
 # Download a specific model
 download-model:
@@ -88,6 +89,7 @@ download-model:
 	@echo "Fetching model $(MODEL)..."
 	@cd $(MODEL_REPO_DIR) && \
 	git lfs pull --include="openai_whisper-$(MODEL)/*"
+	@echo "CoreML model $(MODEL) downloaded to $(MODEL_REPO_DIR)/openai_whisper-$(MODEL)"
 
 download-mlx-models:
 	@echo "Downloading mlx model $(MODEL)..."
@@ -95,6 +97,7 @@ download-mlx-models:
 	@echo "Fetching mlx model $(MODEL)..."
 	@cd $(MLX_MODEL_REPO_DIR) && \
 	git lfs pull
+	@echo "MLX models downloaded to $(MLX_MODEL_REPO_DIR)"
 
 build:
 	@echo "Building WhisperKit..."
