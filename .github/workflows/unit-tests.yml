@@ -14,8 +14,6 @@ jobs:
   unit-tests:
     name: "${{ matrix.run-config['name'] }} on ${{ inputs.macos-runner }}"
     runs-on: ${{ inputs.macos-runner }}
-    env: 
-      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     strategy:
       matrix:
         run-config:
@@ -71,10 +69,7 @@ jobs:
           key: ${{ runner.os }}-models
       - name: Download Models
         if: steps.model-cache.outputs.cache-hit != 'true'
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          make setup-huggingface-cli
           make download-model MODEL=tiny 
           make download-mlx-model MODEL=tiny
       - name: Install and discover destinations
