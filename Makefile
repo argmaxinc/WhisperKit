@@ -34,6 +34,7 @@ setup:
 setup-huggingface-cli:
 	@if huggingface-cli whoami; then \
 		echo "Already logged in to Hugging Face."; \
+		huggingface-cli whoami \
 	else \
 		echo "Not logged in to Hugging Face."; \
 		if [ -z "$$HF_TOKEN" ]; then \
@@ -84,7 +85,7 @@ download-models: setup-model-repo
 # Download a specific model
 download-model: setup-model-repo
 	@if [ -z "$(MODEL)" ]; then \
-		echo "Error: MODEL is not set. Usage: make download-model MODEL=base"; \
+		echo "Error: MODEL is not set. Usage: make download-model MODEL=tiny"; \
 		exit 1; \
 	fi
 	@echo "Downloading model $(MODEL)..."
@@ -102,7 +103,7 @@ download-mlx-models: setup-mlx-model-repo
 
 download-mlx-model: setup-mlx-model-repo
 	@if [ -z "$(MODEL)" ]; then \
-		echo "Error: MODEL is not set. Usage: make download-mlx-model MODEL=base"; \
+		echo "Error: MODEL is not set. Usage: make download-mlx-model MODEL=tiny"; \
 		exit 1; \
 	fi
 	@echo "Downloading mlx model $(MODEL)..."

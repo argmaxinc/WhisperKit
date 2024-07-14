@@ -14,6 +14,8 @@ jobs:
   unit-tests:
     name: "${{ matrix.run-config['name'] }} on ${{ inputs.macos-runner }}"
     runs-on: ${{ inputs.macos-runner }}
+    env: 
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     strategy:
       matrix:
         run-config:
