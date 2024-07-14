@@ -1,14 +1,15 @@
-.PHONY: setup setup-huggingface-cli setup-model-repo download-models download-model build build-cli test clean-package-caches
+.PHONY: setup setup-huggingface-cli setup-model-repo download-models download-model download-mlx-models download-mlx-model build build-cli test clean-package-caches
 
 PIP_COMMAND := pip3
 PYTHON_COMMAND := python3
 
 # Define model repository and directories
 MODEL_REPO := argmaxinc/whisperkit-coreml
-MODEL_REPO_DIR := ./Models/whisperkit-coreml
 MLX_MODEL_REPO := argmaxinc/whisperkit-mlx
+
+MODEL_REPO_DIR := ./Models/whisperkit-coreml
 MLX_MODEL_REPO_DIR := ./Models/whisperkit-mlx
-BASE_COMPILED_DIR := ./Models
+BASE_MODEL_DIR := ./Models
 
 
 setup:
@@ -47,7 +48,7 @@ setup-huggingface-cli:
 
 setup-model-repo:
 	@echo "Setting up repository..."
-	@mkdir -p $(BASE_COMPILED_DIR)
+	@mkdir -p $(BASE_MODEL_DIR)
 	@if [ -d "$(MODEL_REPO_DIR)/.git" ]; then \
 		echo "Repository exists, resetting..."; \
 		export GIT_LFS_SKIP_SMUDGE=1; \
@@ -60,7 +61,7 @@ setup-model-repo:
 
 setup-mlx-model-repo:
 	@echo "Setting up mlx repository..."
-	@mkdir -p $(BASE_COMPILED_DIR)
+	@mkdir -p $(BASE_MODEL_DIR)
 	@if [ -d "$(MLX_MODEL_REPO_DIR)/.git" ]; then \
 		echo "Repository exists, resetting..."; \
 		export GIT_LFS_SKIP_SMUDGE=1; \
@@ -71,6 +72,7 @@ setup-mlx-model-repo:
 		git clone https://huggingface.co/$(MLX_MODEL_REPO) $(MLX_MODEL_REPO_DIR); \
 	fi
 
+
 # Download all models
 download-models: setup-model-repo
 	@echo "Downloading all models..."
@@ -78,26 +80,35 @@ download-models: setup-model-repo
 	git lfs pull
 	@echo "CoreML models downloaded to $(MODEL_REPO_DIR)"
 
+
 # Download a specific model
-download-model:
+download-model: setup-model-repo
 	@if [ -z "$(MODEL)" ]; then \
 		echo "Error: MODEL is not set. Usage: make download-model MODEL=base"; \
 		exit 1; \
 	fi
 	@echo "Downloading model $(MODEL)..."
-	@$(MAKE) setup-model-repo
-	@echo "Fetching model $(MODEL)..."
 	@cd $(MODEL_REPO_DIR) && \
 	git lfs pull --include="openai_whisper-$(MODEL)/*"
 	@echo "CoreML model $(MODEL) downloaded to $(MODEL_REPO_DIR)/openai_whisper-$(MODEL)"
 
-download-mlx-models:
-	@echo "Downloading mlx model $(MODEL)..."
-	@$(MAKE) setup-mlx-model-repo
-	@echo "Fetching mlx model $(MODEL)..."
+
+download-mlx-models: setup-mlx-model-repo
+	@echo "Downloading all mlx models..."
 	@cd $(MLX_MODEL_REPO_DIR) && \
 	git lfs pull
 	@echo "MLX models downloaded to $(MLX_MODEL_REPO_DIR)"
+
+
+download-mlx-model: setup-mlx-model-repo
+	@if [ -z "$(MODEL)" ]; then \
+		echo "Error: MODEL is not set. Usage: make download-mlx-model MODEL=base"; \
+		exit 1; \
+	fi
+	@echo "Downloading mlx model $(MODEL)..."
+	@cd $(MLX_MODEL_REPO_DIR) && \
+	git lfs pull --include="openai_whisper-$(MODEL)/*"
+	@echo "MLX model $(MODEL) downloaded to $(MLX_MODEL_REPO_DIR)/openai_whisper-mlx-$(MODEL)"
 
 build:
 	@echo "Building WhisperKit..."

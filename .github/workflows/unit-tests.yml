@@ -69,7 +69,10 @@ jobs:
           key: ${{ runner.os }}-models
       - name: Download Models
         if: steps.model-cache.outputs.cache-hit != 'true'
-        run: make download-model MODEL=tiny && make download-mlx-models
+        run: |
+          make setup-huggingface-cli
+          make download-model MODEL=tiny 
+          make download-mlx-model MODEL=tiny
       - name: Install and discover destinations
         env:
           MLX_DISABLED: ${{ matrix.run-config['mlx-disabled'] }}
