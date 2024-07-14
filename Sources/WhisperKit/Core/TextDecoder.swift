@@ -589,8 +589,9 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         var hasAlignment = false
         var isFirstTokenLogProbTooLow = false
         let windowUUID = UUID()
-        DispatchQueue.main.sync {
-            shouldEarlyStop[windowUUID] = false
+        DispatchQueue.global().async { [weak self] in
+            guard let self = self else { return }
+            self.shouldEarlyStop[windowUUID] = false
         }
         for tokenIndex in prefilledIndex..<loopCount {
             let loopStart = Date()
