@@ -1,6 +1,7 @@
 import CoreML
 import Hub
 @testable import WhisperKit
+import WhisperKitTestsUtils
 import XCTest
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
@@ -23,7 +24,7 @@ final class RegressionTests: XCTestCase {
             wait(for: [expectation], timeout: 30)
         }
     }
-
+    
     func downloadTestAudio(completion: @escaping (Bool) -> Void) {
         Task {
             do {
@@ -123,7 +124,7 @@ final class RegressionTests: XCTestCase {
             let modelName = modelPath.split(separator: "/").last!
             print("[Integration] Testing model \(modelName)")
             let audioFilePath = try XCTUnwrap(
-                Bundle.module.path(forResource: "jfk", ofType: "wav"),
+                TestResource.path(forResource: "jfk", ofType: "wav"),
                 "Audio file not found"
             )
 
