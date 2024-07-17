@@ -11,10 +11,9 @@ import MLXNN
 extension MLMultiArray {
     func asMLXArray<T: MLShapedArrayScalar & HasDType>(_ type: T.Type) -> MLXArray {
         let shape = shape.map(\.intValue)
-        let strides = strides.map(\.intValue)
         return withUnsafeBufferPointer(ofType: T.self) { ptr in
             let buffer = UnsafeBufferPointer(start: ptr.baseAddress, count: shape.reduce(1, *))
-            return asStrided(MLXArray(buffer, shape), shape, strides: strides)
+            return MLXArray(buffer, shape)
         }
     }
 }

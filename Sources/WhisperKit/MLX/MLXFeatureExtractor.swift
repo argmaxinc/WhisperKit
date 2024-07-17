@@ -103,9 +103,6 @@ public extension MLXFeatureExtractor {
         nFFT: Int = 400,
         hopLength: Int = 160
     ) -> MLXArray {
-        let device = MLX.Device.defaultDevice()
-        MLX.Device.setDefault(device: .cpu)
-        defer { MLX.Device.setDefault(device: device) }
         let window = hanning(nFFT)
         let freqs = stft(audio, window: window, nPerSeg: nFFT, nOverlap: hopLength)
         let magnitudes = freqs[..<(-1)].abs().square()

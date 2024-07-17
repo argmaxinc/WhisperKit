@@ -58,7 +58,7 @@ func mlxDependencies() -> [PackageDescription.Package.Dependency] {
         return []
     } else {
         return [
-            .package(url: "https://github.com/ml-explore/mlx-swift", branch: "main"),
+            .package(url: "https://github.com/ml-explore/mlx-swift", exact: "0.16.0"),
         ]
     }
 }
