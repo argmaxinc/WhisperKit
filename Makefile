@@ -1,4 +1,4 @@
-.PHONY: setup setup-huggingface-cli setup-model-repo download-models download-model download-mlx-models download-mlx-model build build-cli test clean-package-caches
+.PHONY: setup setup-huggingface-cli setup-model-repo download-models download-model download-mlx-models download-mlx-model build build-cli test mlx-test clean-package-caches
 
 PIP_COMMAND := pip3
 PYTHON_COMMAND := python3
@@ -7,9 +7,9 @@ PYTHON_COMMAND := python3
 MODEL_REPO := argmaxinc/whisperkit-coreml
 MLX_MODEL_REPO := argmaxinc/whisperkit-mlx
 
-MODEL_REPO_DIR := ./Models/whisperkit-coreml
-MLX_MODEL_REPO_DIR := ./Models/whisperkit-mlx
-BASE_MODEL_DIR := ./Models
+MODEL_REPO_DIR := ./Sources/WhisperKitTestsUtils/Models/whisperkit-coreml
+MLX_MODEL_REPO_DIR := ./Sources/WhisperKitTestsUtils/Models/whisperkit-mlx
+BASE_MODEL_DIR := ./Sources/WhisperKitTestsUtils/Models
 
 
 setup:
@@ -59,6 +59,7 @@ setup-model-repo:
 		export GIT_LFS_SKIP_SMUDGE=1; \
 		git clone https://huggingface.co/$(MODEL_REPO) $(MODEL_REPO_DIR); \
 	fi
+
 
 setup-mlx-model-repo:
 	@echo "Setting up mlx repository..."
@@ -111,19 +112,38 @@ download-mlx-model: setup-mlx-model-repo
 	git lfs pull --include="openai_whisper-$(MODEL)/*"
 	@echo "MLX model $(MODEL) downloaded to $(MLX_MODEL_REPO_DIR)/openai_whisper-mlx-$(MODEL)"
 
+
 build:
 	@echo "Building WhisperKit..."
-	@swift build -v
+	@xcodebuild CLANG_ENABLE_CODE_COVERAGE=NO VALID_ARCHS=arm64 clean build \
+		-configuration Release \
+		-scheme whisperkit-Package \
+		-destination generic/platform=macOS \
+		-derivedDataPath .build/.xcodebuild/ \
+		-clonedSourcePackagesDirPath .build/ \
+		-skipPackagePluginValidation
 
 
 build-cli:
 	@echo "Building WhisperKit CLI..."
-	@swift build -c release --product whisperkit-cli
+	@xcodebuild CLANG_ENABLE_CODE_COVERAGE=NO VALID_ARCHS=arm64 clean build \
+		-configuration Release \
+		-scheme whisperkit-cli \
+		-destination generic/platform=macOS \
+		-derivedDataPath .build/.xcodebuild/ \
+		-clonedSourcePackagesDirPath .build/ \
+		-skipPackagePluginValidation
 
 
 test:
 	@echo "Running tests..."
-	@swift test -v
+	@xcodebuild clean build-for-testing test \
+		-scheme whisperkit-Package \
+		-only-testing WhisperKitMLXTests/MLXUnitTests \
+		-only-testing WhisperKitTests/UnitTests \
+		-destination 'platform=macOS,arch=arm64' \
+		-skipPackagePluginValidation
+
 
 clean-package-caches:
 	@trash ~/Library/Caches/org.swift.swiftpm/repositories

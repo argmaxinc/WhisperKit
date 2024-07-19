@@ -154,7 +154,7 @@ final class MLXUnitTests: XCTestCase {
 
         let result = try await XCTUnwrapAsync(
             try await transcribe(
-                modelPath: tinyModelPath,
+                mlxModelPath: tinyModelPath,
                 options: options,
                 audioFile: "es_test_clip.wav",
                 featureExtractor: MLXFeatureExtractor(),
@@ -173,7 +173,7 @@ final class MLXUnitTests: XCTestCase {
 
         let result = try await XCTUnwrapAsync(
             try await transcribe(
-                modelPath: tinyModelPath,
+                mlxModelPath: tinyModelPath,
                 options: options,
                 audioFile: "es_test_clip.wav",
                 featureExtractor: MLXFeatureExtractor(),
@@ -189,7 +189,7 @@ final class MLXUnitTests: XCTestCase {
     func testDetectSpanish() async throws {
         let targetLanguage = "es"
         let whisperKit = try await WhisperKit(
-            modelFolder: tinyModelPath,
+            mlxModelFolder: tinyModelPath,
             featureExtractor: MLXFeatureExtractor(),
             audioEncoder: MLXAudioEncoder(),
             textDecoder: MLXTextDecoder(),
@@ -215,7 +215,7 @@ final class MLXUnitTests: XCTestCase {
 
         let result = try await XCTUnwrapAsync(
             try await transcribe(
-                modelPath: tinyModelPath,
+                mlxModelPath: tinyModelPath,
                 options: options,
                 audioFile: "ja_test_clip.wav",
                 featureExtractor: MLXFeatureExtractor(),
@@ -234,7 +234,7 @@ final class MLXUnitTests: XCTestCase {
 
         let result = try await XCTUnwrapAsync(
             try await transcribe(
-                modelPath: tinyModelPath,
+                mlxModelPath: tinyModelPath,
                 options: options,
                 audioFile: "ja_test_clip.wav",
                 featureExtractor: MLXFeatureExtractor(),
@@ -250,7 +250,7 @@ final class MLXUnitTests: XCTestCase {
     func testDetectJapanese() async throws {
         let targetLanguage = "ja"
         let whisperKit = try await WhisperKit(
-            modelFolder: tinyModelPath,
+            mlxModelFolder: tinyModelPath,
             featureExtractor: MLXFeatureExtractor(),
             audioEncoder: MLXAudioEncoder(),
             textDecoder: MLXTextDecoder(),
@@ -283,7 +283,7 @@ final class MLXUnitTests: XCTestCase {
         for (i, option) in optionsPairs.enumerated() {
             let result = try await XCTUnwrapAsync(
                 try await transcribe(
-                    modelPath: tinyModelPath,
+                    mlxModelPath: tinyModelPath,
                     options: option.options,
                     audioFile: "ja_test_clip.wav",
                     featureExtractor: MLXFeatureExtractor(),

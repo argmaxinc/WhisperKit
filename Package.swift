@@ -28,8 +28,7 @@ func products() -> [PackageDescription.Product] {
 }
 
 func mlxProducts() -> [PackageDescription.Product] {
-    let isMLXDisabled = ProcessInfo.processInfo.environment["MLX_DISABLED"] == "1"
-    if isMLXDisabled {
+    if isMLXDisabled() {
         return []
     } else {
         return [
@@ -53,12 +52,11 @@ func dependencies() -> [PackageDescription.Package.Dependency] {
 }
 
 func mlxDependencies() -> [PackageDescription.Package.Dependency] {
-    let isMLXDisabled = ProcessInfo.processInfo.environment["MLX_DISABLED"] == "1"
-    if isMLXDisabled {
+    if isMLXDisabled() {
         return []
     } else {
         return [
-            .package(url: "https://github.com/ml-explore/mlx-swift", exact: "0.16.0"),
+            .package(url: "https://github.com/ml-explore/mlx-swift", revision: "d6d9472da5bf7ec2654e8914bd1d15622f45b6a9"),
         ]
     }
 }
@@ -78,21 +76,10 @@ func targets() -> [PackageDescription.Target] {
                 "WhisperKit",
                 .product(name: "Transformers", package: "swift-transformers"),
             ],
-            path: ".",
-            exclude: [
-                "Examples",
-                "Sources/WhisperKit",
-                "Sources/WhisperKitCLI",
-                "Tests",
-                "Makefile",
-                "README.md",
-                "LICENSE",
-                "CONTRIBUTING.md",
-            ],
             resources: [
-                .copy("Models/whisperkit-coreml"),
-                .copy("Models/whisperkit-mlx"),
-                .process("Sources/WhisperKitTestsUtils/Resources")
+                .copy("Models/whisperkit-coreml/"),
+                .copy("Models/whisperkit-mlx/"),
+                .process("Resources")
             ]
         ),
         .testTarget(
@@ -107,8 +94,7 @@ func targets() -> [PackageDescription.Target] {
 }
 
 func mlxTargets() -> [PackageDescription.Target] {
-    let isMLXDisabled = ProcessInfo.processInfo.environment["MLX_DISABLED"] == "1"
-    if isMLXDisabled {
+    if isMLXDisabled() {
         return []
     } else {
         return [
@@ -145,4 +131,8 @@ func mlxTargets() -> [PackageDescription.Target] {
             )
         ]
     }
+}
+
+func isMLXDisabled() -> Bool {
+    ProcessInfo.processInfo.environment["MLX_DISABLED"] == "1"
 }

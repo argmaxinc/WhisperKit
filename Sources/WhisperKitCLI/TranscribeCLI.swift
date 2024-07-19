@@ -305,12 +305,47 @@ struct TranscribeCLI: AsyncParsableCommand {
                 nil
             }
 
+        let mlxModelName: String? =
+            if let modelVariant = cliArguments.mlxModel {
+                cliArguments.mlxModelPrefix + "*" + modelVariant
+            } else {
+                nil
+            }
+
+        let featureExtractor: FeatureExtracting =
+            switch cliArguments.featureExtractorType {
+            case .coreML:
+                FeatureExtractor()
+            case .mlx:
+                MLXFeatureExtractor()
+            }
+
+        let audioEncoder: AudioEncoding =
+            switch cliArguments.audioEncoderType {
+            case .coreML:
+                AudioEncoder()
+            case .mlx:
+                MLXAudioEncoder()
+            }
+
+        let textDecoder: TextDecoding =
+            switch cliArguments.textDecoderType {
+            case .coreML:
+                TextDecoder()
+            case .mlx:
+                MLXTextDecoder()
+            }
+
         return try await WhisperKit(
             model: modelName,
+            mlxModel: mlxModelName,
             downloadBase: downloadModelFolder,
             modelFolder: cliArguments.modelPath,
             tokenizerFolder: downloadTokenizerFolder,
             computeOptions: computeOptions,
+            featureExtractor: featureExtractor,
+            audioEncoder: audioEncoder,
+            textDecoder: textDecoder,
             verbose: cliArguments.verbose,
             logLevel: .debug,
             load: true,

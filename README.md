@@ -36,7 +36,7 @@ Check out the demo app on [TestFlight](https://testflight.apple.com/join/LPVOyJZ
   - [Quick Example](#quick-example)
   - [Model Selection](#model-selection)
   - [Generating Models](#generating-models)
-  - [Swift CLI](#swift-cli)
+  - [Testing](#testing)
 - [Contributing \& Roadmap](#contributing--roadmap)
 - [License](#license)
 - [Citation](#citation)
@@ -66,7 +66,7 @@ You can install `WhisperKit` command line app using [Homebrew](https://brew.sh) 
 
 ```bash
 brew install whisperkit-cli
-```  
+```
 
 ## Getting Started
 
@@ -80,11 +80,11 @@ This example demonstrates how to transcribe a local audio file:
 import WhisperKit
 
 // Initialize WhisperKit with default settings
-Task {
-   let pipe = try? await WhisperKit()
-   let transcription = try? await pipe!.transcribe(audioPath: "path/to/your/audio.{wav,mp3,m4a,flac}")?.text
-    print(transcription)
-}
+let pipe = try await WhisperKit()
+// Transcribe the audio file
+let transcription = try await pipe.transcribe(audioPath: "path/to/your/audio.{wav,mp3,m4a,flac}")?.text
+// Print the transcription
+print(transcription)
 ```
 
 ### Model Selection
@@ -92,64 +92,68 @@ Task {
 WhisperKit automatically downloads the recommended model for the device if not specified. You can also select a specific model by passing in the model name:
 
 ```swift
-let pipe = try? await WhisperKit(model: "large-v3")
+let pipe = try await WhisperKit(model: "large-v3")
 ```
 
 This method also supports glob search, so you can use wildcards to select a model:
 
 ```swift
-let pipe = try? await WhisperKit(model: "distil*large-v3")
+let pipe = try await WhisperKit(model: "distil*large-v3")
 ```
 
 Note that the model search must return a single model from the source repo, otherwise an error will be thrown.
 
 For a list of available models, see our [HuggingFace repo](https://huggingface.co/argmaxinc/whisperkit-coreml).
+For MLX models, see [here](https://huggingface.co/argmaxinc/whisperkit-mlx).
 
 ### Generating Models
 
 WhisperKit also comes with the supporting repo [`whisperkittools`](https://github.com/argmaxinc/whisperkittools) which lets you create and deploy your own fine tuned versions of Whisper in CoreML format to HuggingFace. Once generated, they can be loaded by simply changing the repo name to the one used to upload the model:
 
 ```swift
-let pipe = try? await WhisperKit(model: "large-v3", modelRepo: "username/your-model-repo")
+let pipe = try await WhisperKit(model: "large-v3", modelRepo: "username/your-model-repo")
 ```
 
-### Swift CLI
+### Backend Selection
 
-The Swift CLI allows for quick testing and debugging outside of an Xcode project. To install it, run the following:
+WhisperKit supports both CoreML and MLX backends. By default, it uses CoreML, but you can switch some or all pipeline components to MLX.
+Available pipeline components are:
+- `featureExtractor`, `FeatureExtractor` is used by default, use `MLXFeatureExtractor` to switch to MLX
+- `audioEncoder`, `AudioEncoder` is used by default, use `MLXAudioEncoder` to switch to MLX
+- `textDecoder`, `TextDecoder` is used by default, use `MLXTextDecoder` to switch to MLX
+
+Here is an example of how to switch the `featureExtractor` and `audioEncoder` to MLX and keep the `textDecoder` as CoreML:
+
+```swift
+let pipe = try await WhisperKit(
+  model: "tiny", 
+  mlxModel: "tiny", 
+  featureExtractor: MLXFeatureExtractor(),
+  audioEncoder: MLXAudioEncoder()
+)
+```
+
+### Testing
+
+If you want to run the unit tests locally, first clone the repo:
 
 ```bash
 git clone https://github.com/argmaxinc/whisperkit.git
 cd whisperkit
 ```
 
-Then, setup the environment and download your desired model.
+download the required models:
 
 ```bash
 make setup
-make download-model MODEL=large-v3
+make download-model MODEL=tiny
+make download-mlx-model MODEL=tiny
 ```
 
-**Note**:
-
-1. This will download only the model specified by `MODEL` (see what's available in our [HuggingFace repo](https://huggingface.co/argmaxinc/whisperkit-coreml), where we use the prefix `openai_whisper-{MODEL}`)
-2. Before running `download-model`, make sure [git-lfs](https://git-lfs.com) is installed
-
-If you would like download all available models to your local folder, use this command instead:
+and then run the tests:
 
 ```bash
-make download-models
-```
-
-You can then run them via the CLI with:
-
-```bash
-swift run whisperkit-cli transcribe --model-path "Models/whisperkit-coreml/openai_whisper-large-v3" --audio-path "path/to/your/audio.{wav,mp3,m4a,flac}" 
-```
-
-Which should print a transcription of the audio file. If you would like to stream the audio directly from a microphone, use:
-
-```bash
-swift run whisperkit-cli transcribe --model-path "Models/whisperkit-coreml/openai_whisper-large-v3" --stream
+make test
 ```
 
 ## Contributing & Roadmap

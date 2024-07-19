@@ -1,7 +1,7 @@
 import CoreML
 import Combine
 import Foundation
-@testable import WhisperKit
+import WhisperKit
 import XCTest
 
 public enum TestError: Error {
@@ -133,7 +133,8 @@ public extension MLMultiArray {
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public extension XCTestCase {
     func transcribe(
-        modelPath: String,
+        modelPath: String? = nil,
+        mlxModelPath: String? = nil,
         options: DecodingOptions,
         callback: TranscriptionCallback = nil,
         audioFile: String = "jfk.wav",
@@ -151,6 +152,7 @@ public extension XCTestCase {
         )
         let whisperKit = try await WhisperKit(
             modelFolder: modelPath,
+            mlxModelFolder: mlxModelPath,
             computeOptions: computeOptions,
             featureExtractor: featureExtractor,
             audioEncoder: audioEncoder,
@@ -170,7 +172,7 @@ public extension XCTestCase {
     func tinyModelPath() throws -> String {
         let modelDir = "whisperkit-coreml/openai_whisper-tiny"
         guard let modelPath = Bundle.module.urls(forResourcesWithExtension: "mlmodelc", subdirectory: modelDir)?.first?.deletingLastPathComponent().path else {
-            throw TestError.missingFile("Failed to load model, ensure \"Models/\(modelDir)\" exists via Makefile command: `make download-models`")
+            throw TestError.missingFile("Failed to load model, ensure \"Models/\(modelDir)\" exists via Makefile command: `make download-model MODEL=tiny`")
         }
         return modelPath
     }
@@ -178,7 +180,7 @@ public extension XCTestCase {
     func tinyMLXModelPath() throws -> String {
         let modelDir = "whisperkit-mlx/openai_whisper-tiny"
         guard let modelPath = Bundle.module.urls(forResourcesWithExtension: "safetensors", subdirectory: modelDir)?.first?.deletingLastPathComponent().path else {
-            throw TestError.missingFile("Failed to load model, ensure \"Models/\(modelDir)\" exists via Makefile command: `make download-mlx-models`")
+            throw TestError.missingFile("Failed to load model, ensure \"Models/\(modelDir)\" exists via Makefile command: `make download-mlx-model MODEL=tiny`")
         }
         return modelPath
     }
