@@ -75,6 +75,8 @@ jobs:
           echo "Available schemes:"
           xcodebuild -list
           xcodebuild -downloadAllPlatforms
+          echo "Destinations for testing:"
+          export ${{ matrix.run-config['compiler-flags'] }} && xcodebuild test-without-building -only-testing WhisperKitTests/UnitTests -scheme ${{ matrix.run-config['scheme'] }} -showdestinations -skipPackagePluginValidation
       - name: Boot Simulator and Wait
         if: ${{ matrix.run-config['name'] != 'macOS' }} && ${{ inputs.macos-runner == 'macos-14' }}
         # Slower runners require some time to fully boot the simulator
