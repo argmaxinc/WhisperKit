@@ -76,25 +76,27 @@ open class WhisperKit {
         self.useBackgroundDownloadSession = useBackgroundDownloadSession
         currentTimings = TranscriptionTimings()
         Logging.shared.logLevel = verbose ? logLevel : .none
+        if let modelFolder {
+            self.modelFolder = URL(fileURLWithPath: modelFolder)
+        } else if download, let model {
+            self.modelFolder = try await Self.download(
+                variant: model,
+                downloadBase: downloadBase,
+                useBackgroundSession: useBackgroundDownloadSession,
+                from: modelRepo
+            )
+        }
 
-        // Determine the model variant to use
-        let modelVariant = model ?? WhisperKit.recommendedModels().default
-        self.modelFolder = try await setupModels(
-            model: modelVariant,
-            downloadBase: downloadBase,
-            modelRepo: modelRepo,
-            modelFolder: modelFolder,
-            download: download
-        )
-
-        let mlxModelVariant = mlxModel ?? "openai_whisper-base"
-        self.mlxModelFolder = try await setupModels(
-            model: mlxModelVariant,
-            downloadBase: downloadBase,
-            modelRepo: mlxModelRepo,
-            modelFolder: mlxModelFolder,
-            download: download
-        )
+        if let mlxModelFolder {
+            self.mlxModelFolder = URL(fileURLWithPath: mlxModelFolder)
+        } else if download, let mlxModel {
+            self.mlxModelFolder = try await Self.download(
+                variant: mlxModel,
+                downloadBase: downloadBase,
+                useBackgroundSession: useBackgroundDownloadSession,
+                from: mlxModelRepo
+            )
+        }
 
         if let prewarm = prewarm, prewarm {
             Logging.info("Prewarming models...")
@@ -223,37 +225,6 @@ open class WhisperKit {
         } catch {
             Logging.debug(error)
             throw error
-        }
-    }
-
-    /// Sets up the model folder either from a local path or by downloading from a repository.
-    public func setupModels(
-        model: String,
-        downloadBase: URL? = nil,
-        modelRepo: String,
-        modelFolder: String?,
-        download: Bool
-    ) async throws -> URL? {
-        // If a local model folder is provided, use it; otherwise, download the model
-        if let modelFolder {
-            return URL(fileURLWithPath: modelFolder)
-        } else if download {
-            do {
-                return try await Self.download(
-                    variant: model,
-                    downloadBase: downloadBase,
-                    useBackgroundSession: useBackgroundDownloadSession,
-                    from: modelRepo
-                )
-            } catch {
-                // Handle errors related to model downloading
-                throw WhisperError.modelsUnavailable("""
-                Model not found. Please check the model or repo name and try again.
-                Error: \(error)
-                """)
-            }
-        } else {
-            return nil
         }
     }
 
