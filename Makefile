@@ -1,4 +1,4 @@
-.PHONY: setup setup-huggingface-cli setup-model-repo download-models download-model download-mlx-models download-mlx-model build build-cli test mlx-test clean-package-caches
+.PHONY: setup setup-huggingface-cli setup-model-repo download-models download-model download-mlx-models download-mlx-model build build-cli test clean-package-caches
 
 PIP_COMMAND := pip3
 PYTHON_COMMAND := python3
