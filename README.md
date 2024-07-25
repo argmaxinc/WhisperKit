@@ -79,8 +79,8 @@ This example demonstrates how to transcribe a local audio file:
 ```swift
 import WhisperKit
 
-// Initialize WhisperKit with default settings
-let pipe = try await WhisperKit()
+// Initialize WhisperKit by passing the model name (WhisperKit will automatically download it):
+let pipe = try await WhisperKit(model: "tiny")
 // Transcribe the audio file
 let transcription = try await pipe.transcribe(audioPath: "path/to/your/audio.{wav,mp3,m4a,flac}")?.text
 // Print the transcription
