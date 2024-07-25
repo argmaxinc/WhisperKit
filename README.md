@@ -89,7 +89,7 @@ print(transcription)
 
 ### Model Selection
 
-WhisperKit automatically downloads the recommended model for the device if not specified. You can also select a specific model by passing in the model name:
+You have to specify the model by passing the model name:
 
 ```swift
 let pipe = try await WhisperKit(model: "large-v3")
@@ -105,6 +105,12 @@ Note that the model search must return a single model from the source repo, othe
 
 For a list of available models, see our [HuggingFace repo](https://huggingface.co/argmaxinc/whisperkit-coreml).
 For MLX models, see [here](https://huggingface.co/argmaxinc/whisperkit-mlx).
+
+If you want to get the recommended model for your device, you can use the following method:
+
+```swift
+print(WhisperKit.recommendedModel())
+```
 
 ### Generating Models
 

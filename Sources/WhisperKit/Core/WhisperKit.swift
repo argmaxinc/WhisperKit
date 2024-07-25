@@ -235,8 +235,9 @@ open class WhisperKit {
     public func loadModels(
         prewarmMode: Bool = false
     ) async throws {
-        modelState = prewarmMode ? .prewarming : .loading
+        assert(modelFolder != nil || mlxModelFolder != nil, "Please specify `modelFolder` or `mlxModelFolder`")
 
+        modelState = prewarmMode ? .prewarming : .loading
         let modelLoadStart = CFAbsoluteTimeGetCurrent()
 
         Logging.debug("Loading models with prewarmMode: \(prewarmMode)")
