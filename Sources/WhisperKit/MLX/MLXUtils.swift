@@ -36,6 +36,19 @@ extension MLXArray {
 }
 
 extension MLXArray {
+    var contiguousStrides: [Int] {
+        var contiguousStrides = [1]
+        var stride = 1
+        for dimension in shape.dropFirst().reversed() {
+            stride = stride * dimension
+            contiguousStrides.append(stride)
+        }
+        contiguousStrides.reverse()
+        return contiguousStrides
+    }
+}
+
+extension MLXArray {
     func asMLMultiArray() throws -> MLMultiArray {
         let dataType = multiArrayDataType()
         // a buffer to be passed to CoreML
@@ -45,11 +58,12 @@ extension MLXArray {
             let destination = UnsafeMutableRawBufferPointer(start: buffer, count: nbytes)
             ptr.copyBytes(to: destination)
         }
+        // `contiguousStrides` has to used, see the [discussion](https://github.com/ml-explore/mlx-swift/issues/117)
         return try MLMultiArray(
             dataPointer: buffer,
             shape: shape.map { NSNumber(value: $0) },
             dataType: dataType,
-            strides: strides.map { NSNumber(value: $0) },
+            strides: contiguousStrides.map { NSNumber(value: $0) },
             deallocator: { $0.deallocate() }
         )
     }

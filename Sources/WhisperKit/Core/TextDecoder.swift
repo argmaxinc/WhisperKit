@@ -482,6 +482,8 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         return getModelInputDimention(model, named: "encoder_output_embeds", position: 1)
     }
 
+    public init() {}
+
     /// Override default so we an unload the prefill data as well
     public func unloadModel() {
         model = nil
