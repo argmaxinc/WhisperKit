@@ -155,15 +155,15 @@ public extension WhisperKit {
     }
 }
 
-extension Float {
-    func rounded(_ decimalPlaces: Int) -> Float {
+public extension Float {
+    public func rounded(_ decimalPlaces: Int) -> Float {
         let divisor = pow(10.0, Float(decimalPlaces))
         return (self * divisor).rounded() / divisor
     }
 }
 
-extension String {
-    var normalized: String {
+public extension String {
+    public var normalized: String {
         // Trim whitespace and newlines
         let trimmedString = self.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -182,7 +182,7 @@ extension String {
         return singleSpacedString
     }
 
-    func trimmingSpecialTokenCharacters() -> String {
+    public func trimmingSpecialTokenCharacters() -> String {
         trimmingCharacters(in: Constants.specialTokenCharacters)
     }
 }

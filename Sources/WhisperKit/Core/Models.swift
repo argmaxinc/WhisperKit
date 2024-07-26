@@ -188,17 +188,31 @@ public enum DecodingTask: CustomStringConvertible, CaseIterable {
 }
 
 public struct DecodingInputs {
-    var initialPrompt: [Int]
-    var inputIds: MLMultiArray
-    var cacheLength: MLMultiArray
-    var keyCache: MLMultiArray
-    var valueCache: MLMultiArray
-    var alignmentWeights: MLMultiArray
-    var kvCacheUpdateMask: MLMultiArray
-    var decoderKeyPaddingMask: MLMultiArray
-    var prefillKeyCache: MLMultiArray
-    var prefillValueCache: MLMultiArray
 
+    public var initialPrompt: [Int]
+    public var inputIds: MLMultiArray
+    public var cacheLength: MLMultiArray
+    public var keyCache: MLMultiArray
+    public var valueCache: MLMultiArray
+    public var alignmentWeights: MLMultiArray
+    public var kvCacheUpdateMask: MLMultiArray
+    public var decoderKeyPaddingMask: MLMultiArray
+    public var prefillKeyCache: MLMultiArray
+    public var prefillValueCache: MLMultiArray
+
+    public init(initialPrompt: [Int], inputIds: MLMultiArray, cacheLength: MLMultiArray, keyCache: MLMultiArray, valueCache: MLMultiArray, alignmentWeights: MLMultiArray, kvCacheUpdateMask: MLMultiArray, decoderKeyPaddingMask: MLMultiArray, prefillKeyCache: MLMultiArray, prefillValueCache: MLMultiArray) {
+        self.initialPrompt = initialPrompt
+        self.inputIds = inputIds
+        self.cacheLength = cacheLength
+        self.keyCache = keyCache
+        self.valueCache = valueCache
+        self.alignmentWeights = alignmentWeights
+        self.kvCacheUpdateMask = kvCacheUpdateMask
+        self.decoderKeyPaddingMask = decoderKeyPaddingMask
+        self.prefillKeyCache = prefillKeyCache
+        self.prefillValueCache = prefillValueCache
+    }
+    
     func reset(prefilledCacheSize: Int, maxTokenContext: Int) {
         // NOTE: Because we have a mask on the kvcache,
         // we can simply shift the masks without touching the data,
@@ -223,9 +237,16 @@ public struct DecodingInputs {
 }
 
 public struct DecodingCache {
-    var keyCache: MLMultiArray?
-    var valueCache: MLMultiArray?
-    var alignmentWeights: MLMultiArray?
+
+    public var keyCache: MLMultiArray?
+    public var valueCache: MLMultiArray?
+    public var alignmentWeights: MLMultiArray?
+    public init(keyCache: MLMultiArray? = nil, valueCache: MLMultiArray? = nil, alignmentWeights: MLMultiArray? = nil) {
+        self.keyCache = keyCache
+        self.valueCache = valueCache
+        self.alignmentWeights = alignmentWeights
+    }
+    
 }
 
 public enum ChunkingStrategy: String, CaseIterable {
@@ -390,6 +411,7 @@ public extension DecodingFallback {
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public struct DecodingResult {
+
     public var language: String
     public var languageProbs: [String: Float]
     public var tokens: [Int]
@@ -417,6 +439,22 @@ public struct DecodingResult {
                               timings: nil,
                               fallback: nil)
     }
+
+    public init(language: String, languageProbs: [String : Float], tokens: [Int], tokenLogProbs: [[Int : Float]], text: String, avgLogProb: Float, noSpeechProb: Float, temperature: Float, compressionRatio: Float, cache: DecodingCache? = nil, timings: TranscriptionTimings? = nil, fallback: DecodingFallback? = nil) {
+        self.language = language
+        self.languageProbs = languageProbs
+        self.tokens = tokens
+        self.tokenLogProbs = tokenLogProbs
+        self.text = text
+        self.avgLogProb = avgLogProb
+        self.noSpeechProb = noSpeechProb
+        self.temperature = temperature
+        self.compressionRatio = compressionRatio
+        self.cache = cache
+        self.timings = timings
+        self.fallback = fallback
+    }
+    
 }
 
 public enum WhisperError: Error, LocalizedError, Equatable {
@@ -581,6 +619,7 @@ public struct WordTiming: Hashable, Codable {
 }
 
 public struct TranscriptionProgress {
+
     public var timings: TranscriptionTimings
     public var text: String
     public var tokens: [Int]
@@ -588,6 +627,17 @@ public struct TranscriptionProgress {
     public var avgLogprob: Float?
     public var compressionRatio: Float?
     public var windowId: Int = 0
+    
+    public init(timings: TranscriptionTimings, text: String, tokens: [Int], temperature: Float? = nil, avgLogprob: Float? = nil, compressionRatio: Float? = nil, windowId: Int = 0) {
+        self.timings = timings
+        self.text = text
+        self.tokens = tokens
+        self.temperature = temperature
+        self.avgLogprob = avgLogprob
+        self.compressionRatio = compressionRatio
+        self.windowId = windowId
+    }
+    
 }
 
 /// Callback to receive progress updates during transcription.
