@@ -3,6 +3,7 @@ import Hub
 @testable import WhisperKit
 import XCTest
 import Foundation
+import UniformTypeIdentifiers
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 final class RegressionTests: XCTestCase {
@@ -187,14 +188,14 @@ final class RegressionTests: XCTestCase {
         }
         
         do {
-            let attachment = try XCTAttachment(data: JSONEncoder().encode(resultJSON), uniformTypeIdentifier: "json")
+            let jsonData = try JSONEncoder().encode(resultJSON)
+            let attachment = XCTAttachment(data: jsonData, uniformTypeIdentifier: UTType.json.identifier)
             attachment.lifetime = .keepAlways
             attachment.name = "\(device)_\(model)_\(iso8601DateTimeString).json"
             add(attachment)
         } catch {
             XCTFail("Failed with error: \(error)")
         }
-        
     }
 
     func testRegressionAndLatencyForAllModels() async throws {
@@ -211,7 +212,7 @@ final class RegressionTests: XCTestCase {
         while currentDevice.last?.isWhitespace == true { currentDevice = String(currentDevice.dropLast())}
         do {
             allModels = try await WhisperKit.fetchAvailableModels()
-            allModels = ["tiny"]
+            allModels = ["tiny", "base"]
         } catch {
             XCTFail("Failed to fetch available models: \(error.localizedDescription)")
         }
@@ -229,7 +230,8 @@ final class RegressionTests: XCTestCase {
         }
         let testReport = TestReport(device: currentDevice, modelsTested: allModels, failureInfo: failureInfo)
         do {
-            let attachment = try XCTAttachment(data: testReport.jsonData(), uniformTypeIdentifier: "json")
+            let jsonData = try testReport.jsonData()
+            let attachment = XCTAttachment(data: jsonData, uniformTypeIdentifier: UTType.json.identifier)
             attachment.lifetime = .keepAlways
             attachment.name = "\(currentDevice)_summary_\(iso8601DateTimeString).json"
             add(attachment)
