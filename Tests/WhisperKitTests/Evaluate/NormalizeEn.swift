@@ -269,7 +269,8 @@ class EnglishNumberNormalizer{
             
             if currentWithoutPrefix.range(of: #"^\d+(\.\d+)?$"#, options: .regularExpression) != nil {
                 // arabic numbers (potentially with signs and fractions)
-                if let f = Fraction(currentWithoutPrefix) {
+                // if let f = Double(currentWithoutPrefix)
+                if let f = Decimal(string: currentWithoutPrefix) {
                     if var v = value, v.hasSuffix(".") {
                         v = v + current
                         value = v
@@ -278,7 +279,8 @@ class EnglishNumberNormalizer{
                         results.append(output(v))
                     }
                 prefix = hasPrefix ? String(current.first!) : prefix
-                value = f.denominator == 1 ? String(f.numerator) : currentWithoutPrefix
+//                value = f.denominator == 1 ? String(f.numerator) : currentWithoutPrefix
+                value = f.isInteger ? f.floored().toString() : currentWithoutPrefix
                 } else {
                     fatalError("Converting the fraction failed")
                 }
@@ -301,14 +303,17 @@ class EnglishNumberNormalizer{
                         value = v + String(ones)
                     }
                 } else if ones < 10 {
-                    if var v = value, Int(v) != nil, Int(v)! % 10 == 0 {
-                        value = String(Int(v)! + ones)
+                    //if var v = value, Int(v) != nil, Int(v)! % 10 == 0
+                    if var v = value, let f = Decimal(string: v), f.remainder(dividingBy: 10) == 0 {
+                        //value = String(Int(v)! + ones)
+                        value = (f + Decimal(ones)).integerPart()
                     } else {
                         value = value! + String(ones)
                     }
                 } else {
-                    if var v = value, Int(v)! % 100 == 0 {
-                        value = String(Int(v)! + ones)
+                    //if var v = value, Int(v)! % 100 == 0
+                    if var v = value, let f = Decimal(string: v), f.remainder(dividingBy: 100) == 0{
+                        value = (f + Decimal(ones)).integerPart()
                     } else {
                         value = value! + String(ones)
                     }
@@ -324,14 +329,18 @@ class EnglishNumberNormalizer{
                         results.append(output("\(v)\(ones)\(suffix)"))
                     }
                 } else if ones < 10 {
-                    if let v = value, Int(v)! % 10 == 0 {
-                        results.append(output("\(Int(v)! + ones)\(suffix)"))
+//                  if let v = value, Int(v)! % 10 == 0
+                    if let v = value, let f = Decimal(string: v), f.remainder(dividingBy: 10) == 0 {
+//                      results.append(output("\(Int(v)! + ones)\(suffix)"))
+                        results.append(output("\((f + Decimal(ones)).integerPart())\(suffix)"))
                     } else {
                         results.append(output("\(value!)\(ones)\(suffix)"))
                     }
                 } else {
-                    if let v = value, Int(v)! % 100 == 0 {
-                        results.append(output("\(Int(v)! + ones)\(suffix)"))
+//                  if let v = value, Int(v)! % 100 == 0
+                    if let v = value, let f = Decimal(string: v), f.remainder(dividingBy: 100) == 0{
+//                      results.append(output("\(Int(v)! + ones)\(suffix)"))
+                        results.append(output("\((f + Decimal(ones)).integerPart())\(suffix)"))
                     } else {
                         results.append(output("\(value!)\(ones)\(suffix)"))
                     }
@@ -343,8 +352,10 @@ class EnglishNumberNormalizer{
                 } else if let v = value, !v.isEmpty {
                     value = v + String(tens)
                 } else {
-                    if let v = value, Int(v)! % 100 == 0 {
-                        value = String(Int(v)! + tens)
+//                  if let v = value, Int(v)! % 100 == 0
+                    if let v = value, let f = Decimal(string: v), f.remainder(dividingBy: 100) == 0{
+//                      value = String(Int(v)! + tens)
+                        value = (f + Decimal(tens)).integerPart()
                     } else {
                         value = value! + String(tens)
                     }
@@ -352,9 +363,12 @@ class EnglishNumberNormalizer{
             } else if let (tens, suffix) = self.tensSuffixed[current] {
                 if value == nil {
                     results.append(output("\(tens)\(suffix)"))
-                } else if let v = value, !v.isEmpty {
-                    if Int(v)! % 100 == 0 {
-                        results.append(output("\(Int(v)! + tens)\(suffix)"))
+                }
+                // else if let v = value, !v.isEmpty
+                else if let v = value, !v.isEmpty, let f = Decimal(string: v){
+                    if f.remainder(dividingBy: 100) == 0 {
+//                      results.append(output("\(Int(v)! + tens)\(suffix)"))
+                        results.append(output("\((f + Decimal(tens)).integerPart())\(suffix)"))
                     } else {
                         results.append(output("\(value!)\(tens)\(suffix)"))
                     }
@@ -364,27 +378,29 @@ class EnglishNumberNormalizer{
             } else if let multiplier = self.multipliers[current] {
                 if value == nil {
                     value = String(multiplier)
-                } else if var v = value, let f = Fraction(v), let p = f * multiplier{
-                    if p.denominator == 1 {
-                        value = String(p.numerator)
+                } else if var v = value, let f = Decimal(string: v){
+                    var p = f * Decimal(multiplier)
+                    if p.isInteger{
+                        value = p.integerPart()
                     } else {
                         value = v
                         results.append(output(v))
                     }
                 } else if var v = value{
-                    let before = Int(v)! / 1000 * 1000
-                    let residual = Int(v)! % 1000
-                    value = "\(before + residual * multiplier)"
+                    let before = Decimal(string: v)! / 1000 * 1000
+                    let residual = Decimal(string: v)!.remainder(dividingBy: 1000)
+                    value = "\(before + residual * Decimal(multiplier))"
                 }
             } else if let (multiplier, suffix) = self.multipliersSuffixed[current] {
                 if value == nil {
                     results.append(output("\(multiplier)\(suffix)"))
-                } else if let v = value, let f = Fraction(v), f * multiplier == Fraction(numerator: 1, denominator: 1) {
-                    results.append(output("\(f.numerator)\(suffix)"))
+                }
+                else if let v = value, let f = Decimal(string: v), (f * Decimal(multiplier)).isInteger{
+                    results.append(output("\(f.integerPart())\(suffix)"))
                 } else if var value{
-                    let before = Int(value)! / 1000 * 1000
-                    let residual = Int(value)! % 1000
-                    value = "\(before + residual * multiplier)"
+                    let before = Decimal(string: value)! / 1000 * 1000
+                    let residual = Decimal(string: value)!.remainder(dividingBy: 1000)
+                    value = "\(before + residual * Decimal(multiplier))"
                     results.append(output("\(value)\(suffix)"))
                 }
                 value = nil
@@ -751,5 +767,54 @@ private extension String {
             let range = NSRange(self.startIndex..., in: self)
             self = regex.stringByReplacingMatches(in: self, options: [], range: range, withTemplate: replaceWith)
         } catch { return }
+    }
+}
+
+private extension Double{
+    func isDenominatorCloseToOne(tolerance: Double = 1e-9) -> Bool {
+        let fractionalPart = self - floor(self)
+        return fractionalPart < tolerance || fractionalPart > (1 - tolerance)
+    }
+}
+
+private extension Decimal {
+    var isInteger: Bool {
+        return self == self.floored()
+    }
+    
+    func floored() -> Decimal {
+        let nsDecimalNumber = NSDecimalNumber(decimal: self)
+        let flooredNumber = nsDecimalNumber.rounding(
+            accordingToBehavior: NSDecimalNumberHandler(
+                roundingMode: .down,
+                scale: 0,
+                raiseOnExactness: false,
+                raiseOnOverflow: false,
+                raiseOnUnderflow: false,
+                raiseOnDivideByZero: false
+            )
+        )
+        return flooredNumber.decimalValue
+    }
+    
+    func toString() -> String {
+        return "\(self)"
+    }
+    
+    func integerPart() -> String{
+        return String(self.toString().split(separator: ".").first ?? "0")
+    }
+    
+    func remainder(dividingBy divisor: Decimal) -> Decimal {
+        let decimalNumber = NSDecimalNumber(decimal: self)
+        let divisorNumber = NSDecimalNumber(decimal: divisor)
+        
+        let quotient = decimalNumber.dividing(by: divisorNumber, withBehavior: nil)
+        let roundedQuotient = quotient.rounding(accordingToBehavior: NSDecimalNumberHandler(roundingMode: .down, scale: 0, raiseOnExactness: false, raiseOnOverflow: false, raiseOnUnderflow: false, raiseOnDivideByZero: false))
+        
+        let product = roundedQuotient.multiplying(by: divisorNumber)
+        let remainder = decimalNumber.subtracting(product)
+        
+        return remainder.decimalValue
     }
 }
