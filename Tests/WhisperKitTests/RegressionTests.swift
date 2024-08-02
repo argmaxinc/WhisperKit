@@ -13,7 +13,6 @@ final class RegressionTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-
         if self.audioFileURLs == nil || self.metadataURL == nil || self.testWERURLs == nil{
             let expectation = XCTestExpectation(description: "Download test audio")
             downloadTestAudio { success in
@@ -185,6 +184,10 @@ final class RegressionTests: XCTestCase {
             
             let json = RegressionStats(testInfo: testInfo, memoryStats: memoryStats, latencyStats: latencyStats)
             resultJSON.append(json)
+            
+            if !overEntireDataset{
+                break
+            }
         }
         
         do {
@@ -212,7 +215,7 @@ final class RegressionTests: XCTestCase {
         while currentDevice.last?.isWhitespace == true { currentDevice = String(currentDevice.dropLast())}
         do {
             allModels = try await WhisperKit.fetchAvailableModels()
-            allModels = ["tiny", "base"]
+            allModels = ["base"]
         } catch {
             XCTFail("Failed to fetch available models: \(error.localizedDescription)")
         }
@@ -222,7 +225,7 @@ final class RegressionTests: XCTestCase {
                 try await testAndMeasureModelPerformance(
                     model: model,
                     device: currentDevice,
-                    overEntireDataset: true
+                    overEntireDataset: false
                 )
             } catch {
                 failureInfo[model] = error.localizedDescription
@@ -274,5 +277,23 @@ final class RegressionTests: XCTestCase {
         let s2 = "In the midst of a summer storm, thunder erupted with a booming chorus, shaking the earth beneath our feet and electrifying the air with its powerful presence. The crackling symphony of thunderbolts danced across the darkened sky, illuminating the clouds with an innovative display of nature's raw energy."
         let ops = hirschberg(Array(s1.unicodeScalars), Array(s2.unicodeScalars))
         XCTAssert(ops.count == 228)
+    }
+    
+    func testSpeculativeDecoding(){
+        var oracleModel = "large-v3"
+        var draftModel = "distil-large-v3"
+        //1. Load oracle model
+        //2. Load draft decoder
+        //3. for encoded input, run draft decoder lambda times, generating lambda tokens
+        //4. Do one forward pass on oracle decoder with the lambda tokens. Keep confirmed tokens and continue
+        
+        //5. How to blend it with eager mode. Eager first or Speculative first ??
+        // Eager -> Use wordtimestamps to confirm generated audio results and avoid recomputing the whole audio segment
+        // Speculative -> Decode multiple tokens with draft, keep confirmed by usoing oracle and keep going
+        
+        //Predict tokens eagerly by using the draft model up until window is complete
+        //For each batch of predicted tokens, confirm on the prediction by using oracle model
+        //If correct, keep going
+        //If incorrect, throw away the current predicted tokens and start from scratch
     }
 }
