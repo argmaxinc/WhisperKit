@@ -269,7 +269,6 @@ class EnglishNumberNormalizer{
             
             if currentWithoutPrefix.range(of: #"^\d+(\.\d+)?$"#, options: .regularExpression) != nil {
                 // arabic numbers (potentially with signs and fractions)
-                // if let f = Double(currentWithoutPrefix)
                 if let f = Decimal(string: currentWithoutPrefix) {
                     if var v = value, v.hasSuffix(".") {
                         v = v + current
@@ -279,7 +278,6 @@ class EnglishNumberNormalizer{
                         results.append(output(v))
                     }
                 prefix = hasPrefix ? String(current.first!) : prefix
-//                value = f.denominator == 1 ? String(f.numerator) : currentWithoutPrefix
                 value = f.isInteger ? f.floored().toString() : currentWithoutPrefix
                 } else {
                     fatalError("Converting the fraction failed")
@@ -303,9 +301,7 @@ class EnglishNumberNormalizer{
                         value = v + String(ones)
                     }
                 } else if ones < 10 {
-                    //if var v = value, Int(v) != nil, Int(v)! % 10 == 0
                     if var v = value, let f = Decimal(string: v), f.remainder(dividingBy: 10) == 0 {
-                        //value = String(Int(v)! + ones)
                         value = (f + Decimal(ones)).integerPart()
                     } else {
                         value = value! + String(ones)
@@ -329,17 +325,13 @@ class EnglishNumberNormalizer{
                         results.append(output("\(v)\(ones)\(suffix)"))
                     }
                 } else if ones < 10 {
-//                  if let v = value, Int(v)! % 10 == 0
                     if let v = value, let f = Decimal(string: v), f.remainder(dividingBy: 10) == 0 {
-//                      results.append(output("\(Int(v)! + ones)\(suffix)"))
                         results.append(output("\((f + Decimal(ones)).integerPart())\(suffix)"))
                     } else {
                         results.append(output("\(value!)\(ones)\(suffix)"))
                     }
                 } else {
-//                  if let v = value, Int(v)! % 100 == 0
                     if let v = value, let f = Decimal(string: v), f.remainder(dividingBy: 100) == 0{
-//                      results.append(output("\(Int(v)! + ones)\(suffix)"))
                         results.append(output("\((f + Decimal(ones)).integerPart())\(suffix)"))
                     } else {
                         results.append(output("\(value!)\(ones)\(suffix)"))
@@ -352,9 +344,7 @@ class EnglishNumberNormalizer{
                 } else if let v = value, !v.isEmpty {
                     value = v + String(tens)
                 } else {
-//                  if let v = value, Int(v)! % 100 == 0
                     if let v = value, let f = Decimal(string: v), f.remainder(dividingBy: 100) == 0{
-//                      value = String(Int(v)! + tens)
                         value = (f + Decimal(tens)).integerPart()
                     } else {
                         value = value! + String(tens)
@@ -364,10 +354,8 @@ class EnglishNumberNormalizer{
                 if value == nil {
                     results.append(output("\(tens)\(suffix)"))
                 }
-                // else if let v = value, !v.isEmpty
                 else if let v = value, !v.isEmpty, let f = Decimal(string: v){
                     if f.remainder(dividingBy: 100) == 0 {
-//                      results.append(output("\(Int(v)! + tens)\(suffix)"))
                         results.append(output("\((f + Decimal(tens)).integerPart())\(suffix)"))
                     } else {
                         results.append(output("\(value!)\(tens)\(suffix)"))

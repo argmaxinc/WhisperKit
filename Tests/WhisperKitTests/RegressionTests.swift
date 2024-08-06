@@ -215,6 +215,7 @@ final class RegressionTests: XCTestCase {
         while currentDevice.last?.isWhitespace == true { currentDevice = String(currentDevice.dropLast())}
         do {
             allModels = try await WhisperKit.fetchAvailableModels()
+            // TODO: Remove after testing
             allModels = ["base"]
         } catch {
             XCTFail("Failed to fetch available models: \(error.localizedDescription)")
@@ -243,24 +244,6 @@ final class RegressionTests: XCTestCase {
         }
     }
     
-
-    
-    func testFractions(){
-        XCTAssert(Fraction(numerator: 10, denominator: 0) == nil)
-        XCTAssert(Fraction(numerator: 10, denominator: 10) != nil)
-        XCTAssert(Fraction("3/7") == Fraction(numerator: 3, denominator: 7))
-        XCTAssert(Fraction("1/2") == Fraction(numerator: 2, denominator: 4))
-        XCTAssert(Fraction("100") == Fraction(numerator: 100, denominator: 1))
-        XCTAssert(Fraction(numerator: 5, denominator: -8) == Fraction(numerator: -5, denominator: 8))
-        XCTAssert(Fraction(numerator: -5, denominator: -8) == Fraction(numerator: 5, denominator: 8))
-        XCTAssert(Fraction("3.1415") == Fraction(numerator: 6283, denominator: 2000))
-        XCTAssert(Fraction("-47e-2") == Fraction(numerator: -47, denominator: 100))
-        XCTAssert(Fraction(2.25) == Fraction(numerator: 9, denominator: 4))
-        XCTAssert(Fraction(2.25)! * Fraction(numerator: 100, denominator: 5)! == Fraction(numerator: 45, denominator: 1))
-        XCTAssert(Fraction(2.25)! * 100 == Fraction(numerator: 225, denominator: 1))
-        XCTAssert(Fraction(2.25)! + Fraction(1.25)! == Fraction(numerator: 7, denominator: 2))
-    }
-    
     func testLargeWER(){
         let texts = getWERTestData()
         if let originalText = texts.0, let generatedText = texts.1{
@@ -279,21 +262,4 @@ final class RegressionTests: XCTestCase {
         XCTAssert(ops.count == 228)
     }
     
-    func testSpeculativeDecoding(){
-        var oracleModel = "large-v3"
-        var draftModel = "distil-large-v3"
-        //1. Load oracle model
-        //2. Load draft decoder
-        //3. for encoded input, run draft decoder lambda times, generating lambda tokens
-        //4. Do one forward pass on oracle decoder with the lambda tokens. Keep confirmed tokens and continue
-        
-        //5. How to blend it with eager mode. Eager first or Speculative first ??
-        // Eager -> Use wordtimestamps to confirm generated audio results and avoid recomputing the whole audio segment
-        // Speculative -> Decode multiple tokens with draft, keep confirmed by usoing oracle and keep going
-        
-        //Predict tokens eagerly by using the draft model up until window is complete
-        //For each batch of predicted tokens, confirm on the prediction by using oracle model
-        //If correct, keep going
-        //If incorrect, throw away the current predicted tokens and start from scratch
-    }
 }
