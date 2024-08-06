@@ -1,7 +1,7 @@
 //  For licensing see accompanying LICENSE.md file.
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
-@testable import Basic_Watch_App
+@testable import WhisperAX_Watch_App
 import XCTest
 
 final class WhisperAX_Watch_AppTests: XCTestCase {

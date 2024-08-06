@@ -82,12 +82,12 @@ struct TranscribeCLI: AsyncParsableCommand {
         }
 
         var options = decodingOptions(task: task)
-        if let promptText = cliArguments.prompt, let tokenizer = whisperKit.tokenizer {
+        if let promptText = cliArguments.prompt, promptText.count > 0, let tokenizer = whisperKit.tokenizer {
             options.promptTokens = tokenizer.encode(text: " " + promptText.trimmingCharacters(in: .whitespaces)).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
             options.usePrefillPrompt = true
         }
 
-        if let prefixText = cliArguments.prefix, let tokenizer = whisperKit.tokenizer {
+        if let prefixText = cliArguments.prefix, prefixText.count > 0, let tokenizer = whisperKit.tokenizer {
             options.prefixTokens = tokenizer.encode(text: " " + prefixText.trimmingCharacters(in: .whitespaces)).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
             options.usePrefillPrompt = true
         }

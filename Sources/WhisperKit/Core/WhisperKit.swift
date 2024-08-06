@@ -34,7 +34,7 @@ open class WhisperKit {
 
     /// Progress
     public private(set) var currentTimings: TranscriptionTimings
-    public let progress = Progress()
+    public private(set) var progress = Progress()
 
     /// Configuration
     public var modelFolder: URL?
@@ -405,7 +405,7 @@ open class WhisperKit {
             throw WhisperError.tokenizerUnavailable()
         }
 
-        let options = DecodingOptions()
+        let options = DecodingOptions(verbose: Logging.shared.logLevel != .none)
         let decoderInputs = try textDecoder.prepareDecoderInputs(withPrompt: [tokenizer.specialTokens.startOfTranscriptToken])
         decoderInputs.kvCacheUpdateMask[0] = 1.0
         decoderInputs.decoderKeyPaddingMask[0] = 0.0
@@ -624,6 +624,7 @@ open class WhisperKit {
             // Append the results of each batch to the final result array
             result.append(contentsOf: partialResult)
         }
+
         return result
     }
 
@@ -767,25 +768,47 @@ open class WhisperKit {
             // Tokenizer required for decoding
             throw WhisperError.tokenizerUnavailable()
         }
-        try Task.checkCancellation()
+
+        let childProgress = Progress()
+        progress.totalUnitCount += 1
+        progress.addChild(childProgress, withPendingUnitCount: 1)
 
         let transcribeTask = TranscribeTask(
             currentTimings: currentTimings,
-            progress: progress,
+            progress: childProgress,
             audioEncoder: audioEncoder,
             featureExtractor: featureExtractor,
             segmentSeeker: segmentSeeker,
             textDecoder: textDecoder,
             tokenizer: tokenizer
         )
-        let transcribeTaskResult = try await transcribeTask.run(
-            audioArray: audioArray,
-            decodeOptions: decodeOptions,
-            callback: callback
-        )
-        if let decodeOptions, decodeOptions.verbose {
-            transcribeTaskResult.logTimings()
+
+        do {
+            try Task.checkCancellation()
+
+            let transcribeTaskResult = try await transcribeTask.run(
+                audioArray: audioArray,
+                decodeOptions: decodeOptions,
+                callback: callback
+            )
+
+            if let decodeOptions, decodeOptions.verbose {
+                transcribeTaskResult.logTimings()
+            }
+
+            if progress.isFinished {
+                // Reset progress if it is completed
+                progress = Progress()
+            }
+
+            return [transcribeTaskResult]
+        } catch {
+            // Handle cancellation
+            if error is CancellationError {
+                // Reset progress when cancelled
+                progress = Progress()
+            }
+            throw error
         }
-        return [transcribeTaskResult]
     }
 }

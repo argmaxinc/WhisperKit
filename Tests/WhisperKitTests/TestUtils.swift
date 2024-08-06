@@ -1,4 +1,5 @@
 import CoreML
+import Combine
 import Foundation
 @testable import WhisperKit
 import XCTest
@@ -272,5 +273,13 @@ extension Collection where Element == TranscriptionResult {
 extension Collection where Element == TranscriptionResult {
     var segments: [TranscriptionSegment] {
         flatMap(\.segments)
+    }
+}
+
+extension Publisher {
+    public func withPrevious() -> AnyPublisher<(previous: Output?, current: Output), Failure> {
+        scan((Output?, Output)?.none) { ($0?.1, $1) }
+            .compactMap { $0 }
+            .eraseToAnyPublisher()
     }
 }

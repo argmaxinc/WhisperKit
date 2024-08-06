@@ -41,7 +41,7 @@ jobs:
               clean-destination: "generic/platform=visionOS",
               test-destination: "platform=visionOS Simulator,name=Apple Vision Pro",
             }
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: maxim-lobanov/setup-xcode@v1
@@ -63,9 +63,18 @@ jobs:
           xcodebuild -downloadAllPlatforms
           echo "Destinations for testing:"
           xcodebuild test-without-building -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -showdestinations
+      - name: Boot Simulator and Wait
+        if: ${{ matrix.run-config['name'] != 'macOS' }} && ${{ inputs.macos-runner == 'macos-14' }}
+        # Slower runners require some time to fully boot the simulator
+        # Parse the simulator name from the destination string, boot it, and wait
+        run: |
+          simulator_name=$(echo '${{ matrix.run-config['test-destination'] }}' | sed -n 's/.*name=\([^,]*\).*/\1/p')
+          xcrun simctl boot "$simulator_name" || true
+          sleep 15
+          xcrun simctl list devices
       - name: Build and Test - ${{ matrix.run-config['name'] }}
         if: ${{ matrix.run-config['condition'] == true }}
         run: |
           set -o pipefail
           xcodebuild clean build-for-testing -scheme whisperkit-Package -destination '${{ matrix.run-config['clean-destination'] }}' | xcpretty
-          xcodebuild test -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -destination '${{ matrix.run-config['test-destination'] }}' | xcpretty
+          xcodebuild test -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -destination '${{ matrix.run-config['test-destination'] }}'
