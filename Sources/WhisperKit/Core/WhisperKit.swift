@@ -319,22 +319,6 @@ open class WhisperKit {
             Logging.debug("Loaded text decoder prefill data")
         }
 
-        if let audioEncoder = audioEncoder as? WhisperMLModel {
-            Logging.debug("Loading audio encoder")
-            let encoderLoadStart = modelLoadStart // CFAbsoluteTimeGetCurrent()
-
-            try await audioEncoder.loadModel(
-                at: encoderUrl,
-                computeUnits: modelCompute.audioEncoderCompute,
-                prewarmMode: prewarmMode
-            )
-            let encoderLoadEnd = CFAbsoluteTimeGetCurrent()
-
-            currentTimings.encoderLoadTime = encoderLoadEnd - encoderLoadStart
-
-            Logging.debug("Loaded audio encoder")
-        }
-
         if let textDecoder = textDecoder as? WhisperMLModel {
             Logging.debug("Loading text decoder")
             let decoderLoadStart = modelLoadStart //CFAbsoluteTimeGetCurrent()
@@ -350,6 +334,21 @@ open class WhisperKit {
             Logging.debug("Loaded text decoder")
         }
 
+        if let audioEncoder = audioEncoder as? WhisperMLModel {
+            Logging.debug("Loading audio encoder")
+            let encoderLoadStart = modelLoadStart // CFAbsoluteTimeGetCurrent()
+
+            try await audioEncoder.loadModel(
+                at: encoderUrl,
+                computeUnits: modelCompute.audioEncoderCompute,
+                prewarmMode: prewarmMode
+            )
+            let encoderLoadEnd = CFAbsoluteTimeGetCurrent()
+
+            currentTimings.encoderLoadTime = encoderLoadEnd - encoderLoadStart
+
+            Logging.debug("Loaded audio encoder")
+        }
 
         if prewarmMode {
             modelState = .prewarmed
