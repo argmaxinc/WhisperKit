@@ -536,6 +536,8 @@ public struct TranscriptionResult: Codable {
         // NOTE: this is a relative value for percentage calculations
         let fullDecodingDuration = max(timings.decodingLoop, timings.fullPipeline) * 1000 // Convert to milliseconds
 
+        let encoderLoadTime = timings.encoderLoadTime
+        let decoderLoadTime = timings.decoderLoadTime
         let audioLoadTime = formatTimeWithPercentage(timings.audioLoading, 1, fullDecodingDuration)
         let audioProcTime = formatTimeWithPercentage(timings.audioProcessing, timings.totalAudioProcessingRuns, fullDecodingDuration)
         let logmelsTime = formatTimeWithPercentage(timings.logmels, timings.totalLogmelRuns, fullDecodingDuration)
@@ -650,6 +652,8 @@ public struct TranscriptionTimings: Codable {
     public var firstTokenTime: CFAbsoluteTime
     public var inputAudioSeconds: TimeInterval
     public var modelLoading: TimeInterval
+    public var encoderLoadTime: TimeInterval
+    public var decoderLoadTime: TimeInterval
     public var audioLoading: TimeInterval
     public var audioProcessing: TimeInterval
     public var logmels: TimeInterval
@@ -690,6 +694,8 @@ public struct TranscriptionTimings: Codable {
 
     /// Initialize with all time intervals set to zero.
     public init(modelLoading: TimeInterval = 0,
+                encoderLoadTime: TimeInterval = 0,
+                decoderLoadTime: TimeInterval = 0,
                 audioLoading: TimeInterval = 0,
                 audioProcessing: TimeInterval = 0,
                 logmels: TimeInterval = 0,
@@ -719,6 +725,8 @@ public struct TranscriptionTimings: Codable {
         self.firstTokenTime = Double.greatestFiniteMagnitude
         self.inputAudioSeconds = 0.001
         self.modelLoading = modelLoading
+        self.encoderLoadTime = encoderLoadTime
+        self.decoderLoadTime = decoderLoadTime
         self.audioLoading = audioLoading
         self.audioProcessing = audioProcessing
         self.logmels = logmels

@@ -621,6 +621,8 @@ public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirm
     // Update the merged timings with non-overlapping time values
     var mergedTimings = TranscriptionTimings(
         modelLoading: validResults.map { $0.timings.modelLoading }.max() ?? 0,
+        encoderLoadTime: validResults.map { $0.timings.encoderLoadTime }.max() ?? 0,
+        decoderLoadTime: validResults.map { $0.timings.decoderLoadTime }.max() ?? 0,
         audioLoading: validResults.map { $0.timings.audioLoading }.reduce(0, +),
         audioProcessing: validResults.map { $0.timings.audioProcessing }.reduce(0, +),
         logmels: validResults.map { $0.timings.logmels }.reduce(0, +),
