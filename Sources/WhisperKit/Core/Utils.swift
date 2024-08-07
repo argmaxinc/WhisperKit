@@ -155,14 +155,14 @@ public extension WhisperKit {
     }
 }
 
-extension Float {
+public extension Float {
     func rounded(_ decimalPlaces: Int) -> Float {
         let divisor = pow(10.0, Float(decimalPlaces))
         return (self * divisor).rounded() / divisor
     }
 }
 
-extension String {
+public extension String {
     var normalized: String {
         // Trim whitespace and newlines
         let trimmedString = self.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -188,12 +188,12 @@ extension String {
 }
 
 extension AVAudioPCMBuffer {
-    // Appends the contents of another buffer to the current buffer
+    /// Appends the contents of another buffer to the current buffer
     func appendContents(of buffer: AVAudioPCMBuffer) -> Bool {
         return appendContents(of: buffer, startingFrame: 0, frameCount: buffer.frameLength)
     }
 
-    // Appends a specific range of frames from another buffer to the current buffer
+    /// Appends a specific range of frames from another buffer to the current buffer
     func appendContents(of buffer: AVAudioPCMBuffer, startingFrame: AVAudioFramePosition, frameCount: AVAudioFrameCount) -> Bool {
         guard format == buffer.format else {
             Logging.debug("Format mismatch")
@@ -225,7 +225,7 @@ extension AVAudioPCMBuffer {
         return true
     }
 
-    // Convenience initializer to concatenate multiple buffers into one
+    /// Convenience initializer to concatenate multiple buffers into one
     convenience init?(concatenating buffers: [AVAudioPCMBuffer]) {
         guard !buffers.isEmpty else {
             Logging.debug("Buffers array should not be empty")
@@ -249,7 +249,7 @@ extension AVAudioPCMBuffer {
         }
     }
 
-    // Computed property to determine the stride for float channel data
+    /// Computed property to determine the stride for float channel data
     private var stride: Int {
         return Int(format.streamDescription.pointee.mBytesPerFrame) / MemoryLayout<Float>.size
     }

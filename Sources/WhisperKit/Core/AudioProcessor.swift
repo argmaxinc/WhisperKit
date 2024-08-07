@@ -80,7 +80,7 @@ public extension AudioProcessing {
     @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
     static func loadAudioAsync(fromPath audioFilePath: String) async throws -> AVAudioPCMBuffer {
         return try await Task {
-            return try AudioProcessor.loadAudio(fromPath: audioFilePath)
+            try AudioProcessor.loadAudio(fromPath: audioFilePath)
         }.value
     }
 
@@ -305,7 +305,8 @@ public class AudioProcessor: NSObject, AudioProcessing {
                 try audioFile.read(into: inputBuffer, frameCount: framesToRead)
                 guard let resampledChunk = resampleAudio(fromBuffer: inputBuffer,
                                                          toSampleRate: outputFormat.sampleRate,
-                                                         channelCount: outputFormat.channelCount) else {
+                                                         channelCount: outputFormat.channelCount)
+                else {
                     Logging.error("Failed to resample audio chunk")
                     return nil
                 }
