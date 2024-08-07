@@ -329,7 +329,7 @@ open class WhisperKit {
             )
             let decoderLoadEnd = CFAbsoluteTimeGetCurrent()
 
-            currentTimings.decoderLoadTime = (decoderLoadEnd - decoderLoadStart) - currentTimings.encoderLoadTime
+            currentTimings.decoderLoadTime = (decoderLoadEnd - decoderLoadStart)
 
             Logging.debug("Loaded text decoder")
         }
@@ -345,7 +345,7 @@ open class WhisperKit {
             )
             let encoderLoadEnd = CFAbsoluteTimeGetCurrent()
 
-            currentTimings.encoderLoadTime = encoderLoadEnd - encoderLoadStart
+            currentTimings.encoderLoadTime = encoderLoadEnd - encoderLoadStart - currentTimings.decoderLoadTime
 
             Logging.debug("Loaded audio encoder")
         }
