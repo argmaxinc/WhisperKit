@@ -28,8 +28,9 @@ class TestInfo: JSONCodable {
     let timeElapsedInSeconds: TimeInterval
     let timings: TranscriptionTimings?
     let transcript: String?
+    let wer: Double
 
-    init(device: String, audioFile: String, model: String, date: String, timeElapsedInSeconds: TimeInterval, timings: TranscriptionTimings?, transcript: String?) {
+    init(device: String, audioFile: String, model: String, date: String, timeElapsedInSeconds: TimeInterval, timings: TranscriptionTimings?, transcript: String?, wer: Double) {
         self.device = device
         self.audioFile = audioFile
         self.model = model
@@ -37,6 +38,7 @@ class TestInfo: JSONCodable {
         self.timeElapsedInSeconds = timeElapsedInSeconds
         self.timings = timings
         self.transcript = transcript
+        self.wer = wer
     }
 }
 
