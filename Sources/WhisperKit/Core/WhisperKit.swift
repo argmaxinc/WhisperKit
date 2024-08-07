@@ -261,10 +261,36 @@ open class WhisperKit {
 
         Logging.debug("Loading models from \(path.path) with prewarmMode: \(prewarmMode)")
 
-        let logmelUrl = path.appending(path: "MelSpectrogram.mlmodelc")
-        let encoderUrl = path.appending(path: "AudioEncoder.mlmodelc")
-        let decoderUrl = path.appending(path: "TextDecoder.mlmodelc")
-        let decoderPrefillUrl = path.appending(path: "TextDecoderContextPrefill.mlmodelc")
+        var logmelUrl = path.appending(path: "MelSpectrogram.mlmodelc")
+        var encoderUrl = path.appending(path: "AudioEncoder.mlmodelc")
+        var decoderUrl = path.appending(path: "TextDecoder.mlmodelc")
+        var decoderPrefillUrl = path.appending(path: "TextDecoderContextPrefill.mlmodelc")
+
+        var logmelMLPackageUrl = path.appending(path: "MelSpectrogram.mlpackage/Data/com.apple.CoreML/model.mlmodel")
+        var encoderMLPackageUrl = path.appending(path: "AudioEncoder.mlpackage/Data/com.apple.CoreML/model.mlmodel")
+        var decoderMLPackageUrl = path.appending(path: "TextDecoder.mlpackage/Data/com.apple.CoreML/model.mlmodel")
+        var decoderPrefillMLPackageUrl = path.appending(path: "TextDecoderContextPrefill/Data/com.apple.CoreML/model.mlmodel")
+
+        let encoderMLModelc: Bool = FileManager.default.fileExists(atPath: encoderUrl.path)
+        let encoderMLPackage: Bool = FileManager.default.fileExists(atPath: encoderMLPackageUrl.path)
+
+        let decoderMLModelc: Bool = FileManager.default.fileExists(atPath: decoderUrl.path)
+        let decoderMLPackage: Bool = FileManager.default.fileExists(atPath: decoderMLPackageUrl.path)
+
+        let logmelMLModelc: Bool = FileManager.default.fileExists(atPath: logmelUrl.path)
+        let logmelMLPackage: Bool = FileManager.default.fileExists(atPath: logmelMLPackageUrl.path)
+
+        // Swap to mlpackage only if the following is true: we found the mlmodel within the mlpackage, and we did not find a .mlmodelc
+        let swapURLIfTrue: (Bool, Bool, URL, URL) -> URL = { foundMLPackage, foundMLModelc, mlPackageURL, mlModelcUrl in
+            if (foundMLPackage && !foundMLModelc) {
+                return mlPackageURL
+            }
+            return mlModelcUrl
+        }
+
+        encoderUrl = swapURLIfTrue(encoderMLPackage, encoderMLModelc, encoderMLPackageUrl, encoderUrl)
+        decoderUrl = swapURLIfTrue(decoderMLPackage, decoderMLModelc, decoderMLPackageUrl, decoderUrl)
+        logmelUrl = swapURLIfTrue(logmelMLPackage, logmelMLModelc, logmelMLPackageUrl, logmelUrl)
 
         for item in [logmelUrl, encoderUrl, decoderUrl] {
             if !FileManager.default.fileExists(atPath: item.path) {
@@ -282,26 +308,6 @@ open class WhisperKit {
             Logging.debug("Loaded feature extractor")
         }
 
-        if let audioEncoder = audioEncoder as? WhisperMLModel {
-            Logging.debug("Loading audio encoder")
-            try await audioEncoder.loadModel(
-                at: encoderUrl,
-                computeUnits: modelCompute.audioEncoderCompute,
-                prewarmMode: prewarmMode
-            )
-            Logging.debug("Loaded audio encoder")
-        }
-
-        if let textDecoder = textDecoder as? WhisperMLModel {
-            Logging.debug("Loading text decoder")
-            try await textDecoder.loadModel(
-                at: decoderUrl,
-                computeUnits: modelCompute.textDecoderCompute,
-                prewarmMode: prewarmMode
-            )
-            Logging.debug("Loaded text decoder")
-        }
-
         if FileManager.default.fileExists(atPath: decoderPrefillUrl.path) {
             Logging.debug("Loading text decoder prefill data")
             textDecoder.prefillData = TextDecoderContextPrefill()
@@ -312,6 +318,38 @@ open class WhisperKit {
             )
             Logging.debug("Loaded text decoder prefill data")
         }
+
+        if let audioEncoder = audioEncoder as? WhisperMLModel {
+            Logging.debug("Loading audio encoder")
+            let encoderLoadStart = modelLoadStart // CFAbsoluteTimeGetCurrent()
+
+            try await audioEncoder.loadModel(
+                at: encoderUrl,
+                computeUnits: modelCompute.audioEncoderCompute,
+                prewarmMode: prewarmMode
+            )
+            let encoderLoadEnd = CFAbsoluteTimeGetCurrent()
+
+            currentTimings.encoderLoadTime = encoderLoadEnd - encoderLoadStart
+
+            Logging.debug("Loaded audio encoder")
+        }
+
+        if let textDecoder = textDecoder as? WhisperMLModel {
+            Logging.debug("Loading text decoder")
+            let decoderLoadStart = modelLoadStart //CFAbsoluteTimeGetCurrent()
+            try await textDecoder.loadModel(
+                at: decoderUrl,
+                computeUnits: modelCompute.textDecoderCompute,
+                prewarmMode: prewarmMode
+            )
+            let decoderLoadEnd = CFAbsoluteTimeGetCurrent()
+
+            currentTimings.decoderLoadTime = (decoderLoadEnd - decoderLoadStart) - currentTimings.encoderLoadTime
+
+            Logging.debug("Loaded text decoder")
+        }
+
 
         if prewarmMode {
             modelState = .prewarmed
