@@ -26,11 +26,11 @@ open class WhisperKit {
     public var segmentSeeker: any SegmentSeeking
 
     /// Shapes
-    public static var sampleRate: Int = 16000
-    public static var hopLength: Int = 160
-    public static var chunkLength: Int = 30 // seconds
-    public static var windowSamples: Int = 480_000 // sampleRate * chunkLength
-    public static var secondsPerTimeToken = Float(0.02)
+    public static let sampleRate: Int = 16000
+    public static let hopLength: Int = 160
+    public static let chunkLength: Int = 30 // seconds
+    public static let windowSamples: Int = 480_000 // sampleRate * chunkLength
+    public static let secondsPerTimeToken = Float(0.02)
 
     /// Progress
     public private(set) var currentTimings: TranscriptionTimings
