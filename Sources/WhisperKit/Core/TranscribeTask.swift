@@ -157,6 +157,11 @@ final class TranscribeTask {
                 // Send to decoder to predict text tokens with fallback
                 let decodingResult = try await decodeWithFallback(encoderSegment: encoderOutput, decodingOptions: options, callback: decodingCallback)
 
+                if decodingResult.noSpeechProb > (options.noSpeechThreshold ?? 0.6) && decodingResult.avgLogProb < (options.logProbThreshold ?? -1.0) {
+                    seek += segmentSize
+                    continue
+                }
+
                 // MARK: Windowing
 
                 // At this point we have a completed window aka segment
@@ -277,6 +282,7 @@ final class TranscribeTask {
                 let tokenSampler = GreedyTokenSampler(temperature: temp, eotToken: tokenizer.specialTokens.endToken, decodingOptions: options)
 
                 var currentDecodingOptions = options
+      
                 // For a multilingual model, if language is not passed and detectLanguage is true, detect language and set in options
                 if textDecoder.isModelMultilingual, options.language == nil, options.detectLanguage {
                     let languageDecodingResult: DecodingResult? = try? await textDecoder.detectLanguage(
