@@ -61,7 +61,7 @@ jobs:
         id: model-cache
         uses: actions/cache@v4
         with:
-          path: Sources/WhisperKitTestsUtils/Models
+          path: Models
           key: ${{ runner.os }}-models
       - name: Download Models
         if: steps.model-cache.outputs.cache-hit != 'true'
