@@ -76,27 +76,17 @@ open class WhisperKit {
         self.useBackgroundDownloadSession = useBackgroundDownloadSession
         currentTimings = TranscriptionTimings()
         Logging.shared.logLevel = verbose ? logLevel : .none
-        if let modelFolder {
-            self.modelFolder = URL(fileURLWithPath: modelFolder)
-        } else if download, let model {
-            self.modelFolder = try await Self.download(
-                variant: model,
-                downloadBase: downloadBase,
-                useBackgroundSession: useBackgroundDownloadSession,
-                from: modelRepo
-            )
-        }
 
-        if let mlxModelFolder {
-            self.mlxModelFolder = URL(fileURLWithPath: mlxModelFolder)
-        } else if download, let mlxModel {
-            self.mlxModelFolder = try await Self.download(
-                variant: mlxModel,
-                downloadBase: downloadBase,
-                useBackgroundSession: useBackgroundDownloadSession,
-                from: mlxModelRepo
-            )
-        }
+        try await setupModels(
+            model: model,
+            mlxModel: mlxModel,
+            downloadBase: downloadBase,
+            modelRepo: modelRepo,
+            modelFolder: modelFolder,
+            mlxModelRepo: mlxModelRepo,
+            mlxModelFolder: mlxModelFolder,
+            download: download
+        )
 
         if let prewarm = prewarm, prewarm {
             Logging.info("Prewarming models...")
@@ -225,6 +215,65 @@ open class WhisperKit {
         } catch {
             Logging.debug(error)
             throw error
+        }
+    }
+
+    /// Sets up the model folder either from a local path or by downloading from a repository.
+    public func setupModels(
+        model: String?,
+        mlxModel: String? = nil,
+        downloadBase: URL? = nil,
+        modelRepo: String = "argmaxinc/whisperkit-coreml",
+        modelFolder: String? = nil,
+        mlxModelRepo: String = "argmaxinc/whisperkit-mlx",
+        mlxModelFolder: String? = nil,
+        download: Bool
+    ) async throws {
+        // If no model is provided, use the recommended model
+        var modelVariant = model
+        if model == nil, mlxModel == nil, mlxModelFolder == nil {
+            // Determine the model variant to use by default
+            modelVariant = WhisperKit.recommendedModels().default
+        }
+
+        // If a local model folder is provided, use it; otherwise, download the model
+        if let modelFolder {
+            self.modelFolder = URL(fileURLWithPath: modelFolder)
+        } else if download, let modelVariant {
+            do {
+                self.modelFolder = try await Self.download(
+                    variant: modelVariant,
+                    downloadBase: downloadBase,
+                    useBackgroundSession: useBackgroundDownloadSession,
+                    from: modelRepo
+                )
+            } catch {
+                // Handle errors related to model downloading
+                throw WhisperError.modelsUnavailable("""
+                CoreML Model not found. Please check the model or repo name and try again.
+                Error: \(error)
+                """)
+            }
+        }
+
+        // Same for MLX
+        if let mlxModelFolder {
+            self.mlxModelFolder = URL(fileURLWithPath: mlxModelFolder)
+        } else if download, let mlxModel {
+            do {
+                self.mlxModelFolder = try await Self.download(
+                    variant: mlxModel,
+                    downloadBase: downloadBase,
+                    useBackgroundSession: useBackgroundDownloadSession,
+                    from: mlxModelRepo
+                )
+            } catch {
+                // Handle errors related to model downloading
+                throw WhisperError.modelsUnavailable("""
+                MLX Model not found. Please check the model or repo name and try again.
+                Error: \(error)
+                """)
+            }
         }
     }
 

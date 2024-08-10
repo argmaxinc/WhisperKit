@@ -110,7 +110,7 @@ download-mlx-model: setup-mlx-model-repo
 	@echo "Downloading mlx model $(MODEL)..."
 	@cd $(MLX_MODEL_REPO_DIR) && \
 	git lfs pull --include="openai_whisper-$(MODEL)/*"
-	@echo "MLX model $(MODEL) downloaded to $(MLX_MODEL_REPO_DIR)/openai_whisper-mlx-$(MODEL)"
+	@echo "MLX model $(MODEL) downloaded to $(MLX_MODEL_REPO_DIR)/openai_whisper-$(MODEL)"
 
 
 build:
