@@ -4,71 +4,41 @@
 import PackageDescription
 import Foundation
 
-// NOTE: `MLX` doesn't support `watchOS` yet, that's why we control the build using the `MLX_DISABLED` environment variable.
-// To manualy build for `watchOS` use:
-// `export MLX_DISABLED=1 && xcodebuild clean build-for-testing -scheme whisperkit -sdk watchos10.4 -destination 'platform=watchOS Simulator' -skipPackagePluginValidation`
 let package = Package(
     name: "whisperkit",
     platforms: [
         .iOS(.v16),
-        .macOS("13.3")
+        .macOS("13.3"),
+        .watchOS(.v10)
     ],
-    products: products() + mlxProducts(),
-    dependencies: dependencies() + mlxDependencies(),
-    targets: targets() + mlxTargets()
-)
-
-func products() -> [PackageDescription.Product] {
-    return [
+    products: [
         .library(
             name: "WhisperKit",
             targets: ["WhisperKit"]
-        )
-    ]
-}
-
-func mlxProducts() -> [PackageDescription.Product] {
-    if isMLXDisabled() {
-        return []
-    } else {
-        return [
-            .library(
-                name: "WhisperKitMLX",
-                targets: ["WhisperKitMLX"]
-            ),
-            .executable(
-                name: "whisperkit-cli",
-                targets: ["WhisperKitCLI"]
-            ),
-        ]
-    }
-}
-
-func dependencies() -> [PackageDescription.Package.Dependency] {
-    return [
+        ),
+        .executable(
+            name: "whisperkit-cli",
+            targets: ["WhisperKitCLI"]
+        ),
+    ] + mlxProducts(),
+    dependencies: [
         .package(url: "https://github.com/huggingface/swift-transformers.git", exact: "0.1.7"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", exact: "1.3.0"),
-    ]
-}
-
-func mlxDependencies() -> [PackageDescription.Package.Dependency] {
-    if isMLXDisabled() {
-        return []
-    } else {
-        return [
-            .package(url: "https://github.com/ml-explore/mlx-swift", exact: "0.16.0"),
-        ]
-    }
-}
-
-func targets() -> [PackageDescription.Target] {
-    return [
+    ] + mlxDependencies(),
+    targets: [
         .target(
             name: "WhisperKit",
             dependencies: [
                 .product(name: "Transformers", package: "swift-transformers"),
             ],
             path: "Sources/WhisperKit/Core"
+        ),
+        .executableTarget(
+            name: "WhisperKitCLI",
+            dependencies: [
+                "WhisperKit",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ] + mlxCLIDependencies()
         ),
         .target(
             name: "WhisperKitTestsUtils",
@@ -101,48 +71,65 @@ func targets() -> [PackageDescription.Target] {
                 .product(name: "Transformers", package: "swift-transformers"),
             ]
         )
+    ] + mlxTargets()
+)
+
+// MARK: - MLX Helper Functions
+
+func mlxProducts() -> [Product] {
+    guard !isMLXDisabled() else { return [] }
+    return [
+        .library(
+            name: "WhisperKitMLX",
+            targets: ["WhisperKitMLX"]
+        ),
     ]
 }
 
-func mlxTargets() -> [PackageDescription.Target] {
-    if isMLXDisabled() {
-        return []
-    } else {
-        return [
-            .executableTarget(
-                name: "WhisperKitCLI",
-                dependencies: [
-                    "WhisperKit",
-                    "WhisperKitMLX",
-                    .product(name: "ArgumentParser", package: "swift-argument-parser"),
-                ]
-            ),
-            .target(
-                name: "WhisperKitMLX",
-                dependencies: [
-                    "WhisperKit",
-                    .product(name: "MLX", package: "mlx-swift"),
-                    .product(name: "MLXFFT", package: "mlx-swift"),
-                    .product(name: "MLXNN", package: "mlx-swift")
-                ],
-                path: "Sources/WhisperKit/MLX",
-                resources: [
-                    .copy("Resources/mel_filters_80.npy"),
-                    .copy("Resources/mel_filters_128.npy")
-                ]
-            ),
-            .testTarget(
-                name: "WhisperKitMLXTests",
-                dependencies: [
-                    "WhisperKit",
-                    "WhisperKitMLX",
-                    "WhisperKitTestsUtils",
-                    .product(name: "Transformers", package: "swift-transformers"),
-                ]
-            )
-        ]
-    }
+func mlxDependencies() -> [Package.Dependency] {
+    guard !isMLXDisabled() else { return [] }
+    return [
+        .package(url: "https://github.com/ml-explore/mlx-swift", exact: "0.16.0"),
+    ]
 }
+
+func mlxCLIDependencies() -> [Target.Dependency] {
+    guard !isMLXDisabled() else { return [] }
+    return ["WhisperKitMLX"]
+}
+
+func mlxTargets() -> [Target] {
+    guard !isMLXDisabled() else { return [] }
+    return [
+        .target(
+            name: "WhisperKitMLX",
+            dependencies: [
+                "WhisperKit",
+                .product(name: "MLX", package: "mlx-swift"),
+                .product(name: "MLXFFT", package: "mlx-swift"),
+                .product(name: "MLXNN", package: "mlx-swift")
+            ],
+            path: "Sources/WhisperKit/MLX",
+            resources: [
+                .copy("Resources/mel_filters_80.npy"),
+                .copy("Resources/mel_filters_128.npy")
+            ]
+        ),
+        .testTarget(
+            name: "WhisperKitMLXTests",
+            dependencies: [
+                "WhisperKit",
+                "WhisperKitMLX",
+                "WhisperKitTestsUtils",
+                .product(name: "Transformers", package: "swift-transformers"),
+            ]
+        )
+    ]
+}
+
+// NOTE: `MLX` doesn't support `watchOS` yet, that's why we control the build using the `MLX_DISABLED` environment variable.
+// To manualy build for `watchOS` use:
+// `export MLX_DISABLED=1 && xcodebuild clean build-for-testing -scheme whisperkit -sdk watchos10.4 -destination 'platform=watchOS Simulator' -skipPackagePluginValidation`
 
 func isMLXDisabled() -> Bool {
     ProcessInfo.processInfo.environment["MLX_DISABLED"] == "1"
