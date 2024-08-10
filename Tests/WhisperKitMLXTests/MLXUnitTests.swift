@@ -423,19 +423,19 @@ final class MLXUnitTests: XCTestCase {
 
     func testAdditiveCausalMask() {
         let result1 = additiveCausalMask(0)
-        XCTAssertEqual(result1.shape, [0 ,0])
-        XCTAssertEqual(result1.dtype, .float32)
+        XCTAssertEqual(result1.shape, [0 ,0], "Array shape should be [0, 0]")
+        XCTAssertEqual(result1.dtype, .float32, "Array type should be .float32")
 
         let result2 = additiveCausalMask(3)
-        XCTAssertEqual(result2.shape, [3 ,3])
-        XCTAssertEqual(result2.dtype, .float32)
+        XCTAssertEqual(result2.shape, [3 ,3], "Array shape should be [3, 3]")
+        XCTAssertEqual(result2.dtype, .float32, "Array type should be .float32")
         XCTAssertEqual(result2[0].asArray(Float.self), [0.0, -1e9, -1e9], accuracy: accuracy)
         XCTAssertEqual(result2[1].asArray(Float.self), [0.0, 0.0, -1e9], accuracy: accuracy)
         XCTAssertEqual(result2[2].asArray(Float.self), [0.0, 0.0, 0.0], accuracy: accuracy)
 
         let result3 = additiveCausalMask(4)
-        XCTAssertEqual(result3.shape, [4 ,4])
-        XCTAssertEqual(result3.dtype, .float32)
+        XCTAssertEqual(result3.shape, [4 ,4], "Array shape should be [4, 4]")
+        XCTAssertEqual(result3.dtype, .float32, "Array type should be .float32")
         XCTAssertEqual(result3[0].asArray(Float.self), [0.0, -1e9, -1e9, -1e9], accuracy: accuracy)
         XCTAssertEqual(result3[1].asArray(Float.self), [0.0, 0.0, -1e9, -1e9], accuracy: accuracy)
         XCTAssertEqual(result3[2].asArray(Float.self), [0.0, 0.0, 0.0, -1e9], accuracy: accuracy)
