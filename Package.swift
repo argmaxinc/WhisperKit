@@ -16,11 +16,9 @@ let package = Package(
             name: "WhisperKit",
             targets: ["WhisperKit"]
         ),
-        .executable(
-            name: "whisperkit-cli",
-            targets: ["WhisperKitCLI"]
-        ),
-    ] + mlxProducts(),
+    ] 
+    + cliProducts()
+    + mlxProducts(),
     dependencies: [
         .package(url: "https://github.com/huggingface/swift-transformers.git", exact: "0.1.7"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", exact: "1.3.0"),
@@ -32,13 +30,6 @@ let package = Package(
                 .product(name: "Transformers", package: "swift-transformers"),
             ],
             path: "Sources/WhisperKit/Core"
-        ),
-        .executableTarget(
-            name: "WhisperKitCLI",
-            dependencies: [
-                "WhisperKit",
-                .product(name: "ArgumentParser", package: "swift-argument-parser"),
-            ] + mlxCLIDependencies()
         ),
         .target(
             name: "WhisperKitTestsUtils",
@@ -71,11 +62,39 @@ let package = Package(
                 .product(name: "Transformers", package: "swift-transformers"),
             ]
         )
-    ] + mlxTargets()
+    ] 
+    + cliTargets()
+    + mlxTargets()
 )
 
 // MARK: - MLX Helper Functions
 
+// CLI
+func cliProducts() -> [Product] {
+    guard !isMLXDisabled() else { return [] }
+    return [
+        .executable(
+            name: "whisperkit-cli",
+            targets: ["WhisperKitCLI"]
+        ),
+    ]
+}
+
+func cliTargets() -> [Target] {
+    guard !isMLXDisabled() else { return [] }
+    return [
+        .executableTarget(
+            name: "WhisperKitCLI",
+            dependencies: [
+                "WhisperKit",
+                "WhisperKitMLX",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ]
+        ),
+    ]
+}
+
+// MLX 
 func mlxProducts() -> [Product] {
     guard !isMLXDisabled() else { return [] }
     return [
@@ -91,11 +110,6 @@ func mlxDependencies() -> [Package.Dependency] {
     return [
         .package(url: "https://github.com/ml-explore/mlx-swift", exact: "0.16.0"),
     ]
-}
-
-func mlxCLIDependencies() -> [Target.Dependency] {
-    guard !isMLXDisabled() else { return [] }
-    return ["WhisperKitMLX"]
 }
 
 func mlxTargets() -> [Target] {
@@ -129,7 +143,7 @@ func mlxTargets() -> [Target] {
 
 // NOTE: `MLX` doesn't support `watchOS` yet, that's why we control the build using the `MLX_DISABLED` environment variable.
 // To manualy build for `watchOS` use:
-// `export MLX_DISABLED=1 && xcodebuild clean build-for-testing -scheme whisperkit -sdk watchos10.4 -destination 'platform=watchOS Simulator' -skipPackagePluginValidation`
+// `export MLX_DISABLED=1 && xcodebuild clean build-for-testing -scheme whisperkit -sdk watchos10.4 -destination 'platform=watchOS Simulator,OS=10.5,name=Apple Watch Ultra 2 (49mm)' -skipPackagePluginValidation`
 
 func isMLXDisabled() -> Bool {
     ProcessInfo.processInfo.environment["MLX_DISABLED"] == "1"
