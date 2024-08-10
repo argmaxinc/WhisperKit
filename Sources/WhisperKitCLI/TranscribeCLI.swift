@@ -312,6 +312,7 @@ struct TranscribeCLI: AsyncParsableCommand {
             computeOptions: computeOptions,
             verbose: cliArguments.verbose,
             logLevel: .debug,
+            prewarm: false,
             load: true,
             useBackgroundDownloadSession: false
         )
