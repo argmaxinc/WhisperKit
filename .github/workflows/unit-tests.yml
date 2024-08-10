@@ -64,7 +64,7 @@ jobs:
           path: Models
           key: ${{ runner.os }}-models
       - name: Download Models
-        if: steps.model-cache.outputs.cache-hit != 'true'
+        # if: steps.model-cache.outputs.cache-hit != 'true'
         run: |
           make download-model MODEL=tiny 
           make download-mlx-model MODEL=tiny
