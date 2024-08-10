@@ -9,6 +9,7 @@ DerivedData/
 **/*.xcscheme
 .netrc
 .env
+/.vscode
 
 # Core ML Model Files
 Models

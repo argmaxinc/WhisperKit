@@ -60,6 +60,7 @@ setup-model-repo:
 		git clone https://huggingface.co/$(MODEL_REPO) $(MODEL_REPO_DIR); \
 	fi
 
+
 setup-mlx-model-repo:
 	@echo "Setting up mlx repository..."
 	@mkdir -p $(BASE_MODEL_DIR)
@@ -109,21 +110,40 @@ download-mlx-model: setup-mlx-model-repo
 	@echo "Downloading mlx model $(MODEL)..."
 	@cd $(MLX_MODEL_REPO_DIR) && \
 	git lfs pull --include="openai_whisper-$(MODEL)/*"
-	@echo "MLX model $(MODEL) downloaded to $(MLX_MODEL_REPO_DIR)/openai_whisper-mlx-$(MODEL)"
+	@echo "MLX model $(MODEL) downloaded to $(MLX_MODEL_REPO_DIR)/openai_whisper-$(MODEL)"
+
 
 build:
 	@echo "Building WhisperKit..."
-	@swift build -v
+	@xcodebuild CLANG_ENABLE_CODE_COVERAGE=NO VALID_ARCHS=arm64 clean build \
+		-configuration Release \
+		-scheme whisperkit-Package \
+		-destination generic/platform=macOS \
+		-derivedDataPath .build/.xcodebuild/ \
+		-clonedSourcePackagesDirPath .build/ \
+		-skipPackagePluginValidation
 
 
 build-cli:
 	@echo "Building WhisperKit CLI..."
-	@swift build -c release --product whisperkit-cli
+	@xcodebuild CLANG_ENABLE_CODE_COVERAGE=NO VALID_ARCHS=arm64 clean build \
+		-configuration Release \
+		-scheme whisperkit-cli \
+		-destination generic/platform=macOS \
+		-derivedDataPath .build/.xcodebuild/ \
+		-clonedSourcePackagesDirPath .build/ \
+		-skipPackagePluginValidation
 
 
 test:
 	@echo "Running tests..."
-	@swift test -v
+	@xcodebuild clean build-for-testing test \
+		-scheme whisperkit-Package \
+		-only-testing WhisperKitMLXTests/MLXUnitTests \
+		-only-testing WhisperKitTests/UnitTests \
+		-destination 'platform=macOS,arch=arm64' \
+		-skipPackagePluginValidation
+
 
 clean-package-caches:
 	@trash ~/Library/Caches/org.swift.swiftpm/repositories

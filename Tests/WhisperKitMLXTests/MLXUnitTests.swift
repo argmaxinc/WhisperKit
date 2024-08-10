@@ -154,7 +154,7 @@ final class MLXUnitTests: XCTestCase {
 
         let result = try await XCTUnwrapAsync(
             try await transcribe(
-                modelPath: tinyModelPath,
+                mlxModelPath: tinyModelPath,
                 options: options,
                 audioFile: "es_test_clip.wav",
                 featureExtractor: MLXFeatureExtractor(),
@@ -173,7 +173,7 @@ final class MLXUnitTests: XCTestCase {
 
         let result = try await XCTUnwrapAsync(
             try await transcribe(
-                modelPath: tinyModelPath,
+                mlxModelPath: tinyModelPath,
                 options: options,
                 audioFile: "es_test_clip.wav",
                 featureExtractor: MLXFeatureExtractor(),
@@ -189,7 +189,7 @@ final class MLXUnitTests: XCTestCase {
     func testDetectSpanish() async throws {
         let targetLanguage = "es"
         let whisperKit = try await WhisperKit(
-            modelFolder: tinyModelPath,
+            mlxModelFolder: tinyModelPath,
             featureExtractor: MLXFeatureExtractor(),
             audioEncoder: MLXAudioEncoder(),
             textDecoder: MLXTextDecoder(),
@@ -215,7 +215,7 @@ final class MLXUnitTests: XCTestCase {
 
         let result = try await XCTUnwrapAsync(
             try await transcribe(
-                modelPath: tinyModelPath,
+                mlxModelPath: tinyModelPath,
                 options: options,
                 audioFile: "ja_test_clip.wav",
                 featureExtractor: MLXFeatureExtractor(),
@@ -234,7 +234,7 @@ final class MLXUnitTests: XCTestCase {
 
         let result = try await XCTUnwrapAsync(
             try await transcribe(
-                modelPath: tinyModelPath,
+                mlxModelPath: tinyModelPath,
                 options: options,
                 audioFile: "ja_test_clip.wav",
                 featureExtractor: MLXFeatureExtractor(),
@@ -250,7 +250,7 @@ final class MLXUnitTests: XCTestCase {
     func testDetectJapanese() async throws {
         let targetLanguage = "ja"
         let whisperKit = try await WhisperKit(
-            modelFolder: tinyModelPath,
+            mlxModelFolder: tinyModelPath,
             featureExtractor: MLXFeatureExtractor(),
             audioEncoder: MLXAudioEncoder(),
             textDecoder: MLXTextDecoder(),
@@ -283,7 +283,7 @@ final class MLXUnitTests: XCTestCase {
         for (i, option) in optionsPairs.enumerated() {
             let result = try await XCTUnwrapAsync(
                 try await transcribe(
-                    modelPath: tinyModelPath,
+                    mlxModelPath: tinyModelPath,
                     options: option.options,
                     audioFile: "ja_test_clip.wav",
                     featureExtractor: MLXFeatureExtractor(),
@@ -312,19 +312,35 @@ final class MLXUnitTests: XCTestCase {
 
     // MARK: - Utils Tests
 
+    func testContiguousStrides() {
+        let count = 24
+        let arr1 = MLXArray(0..<count, [count]).asType(Int32.self)
+        XCTAssertEqual(arr1.contiguousStrides, [1])
+
+        let arr2 = MLXArray(0..<count, [2, count / 2]).asType(Int32.self)
+        XCTAssertEqual(arr2.contiguousStrides, [12, 1])
+
+        let arr3 = MLXArray(0..<count, [2, count / 2]).asType(Int32.self).asMLXInput()
+        XCTAssertEqual(arr3.contiguousStrides, [24, 2, 1])
+    }
+
     func testArrayConversion() throws {
         let count = 16
         let arr1 = MLXArray(0..<count, [2, count / 2]).asType(Int32.self)
         let arr2 = try arr1.asMLMultiArray().asMLXArray(Int32.self)
+        XCTAssertEqual(arr2.contiguousStrides, [8, 1])
         XCTAssertTrue(MLX.allClose(arr1, arr2).item(), "Array conversion failed")
 
         let arr3 = arr1.asMLXOutput().asMLXInput()
+        XCTAssertEqual(arr3.contiguousStrides, [16, 8, 1])
         XCTAssertTrue(MLX.allClose(arr1, arr3).item(), "Input output conversion failed")
 
         let arr4 = try arr1.asMLXOutput().asMLXInput().asMLMultiArray().asMLXArray(Int32.self)
+        XCTAssertEqual(arr4.contiguousStrides, [16, 8, 1])
         XCTAssertTrue(MLX.allClose(arr1, arr4).item(), "Complex conversion failed")
 
         let arr5 = try arr1.asMLXOutput().asMLMultiArray().asMLXArray(Int32.self).asMLXInput()
+        XCTAssertEqual(arr5.contiguousStrides, [16, 8, 1])
         XCTAssertTrue(MLX.allClose(arr1, arr5).item(), "Complex conversion failed")
     }
 
@@ -407,19 +423,19 @@ final class MLXUnitTests: XCTestCase {
 
     func testAdditiveCausalMask() {
         let result1 = additiveCausalMask(0)
-        XCTAssertEqual(result1.shape, [0 ,0])
-        XCTAssertEqual(result1.dtype, .float32)
+        XCTAssertEqual(result1.shape, [0 ,0], "Array shape should be [0, 0]")
+        XCTAssertEqual(result1.dtype, .float32, "Array type should be .float32")
 
         let result2 = additiveCausalMask(3)
-        XCTAssertEqual(result2.shape, [3 ,3])
-        XCTAssertEqual(result2.dtype, .float32)
+        XCTAssertEqual(result2.shape, [3 ,3], "Array shape should be [3, 3]")
+        XCTAssertEqual(result2.dtype, .float32, "Array type should be .float32")
         XCTAssertEqual(result2[0].asArray(Float.self), [0.0, -1e9, -1e9], accuracy: accuracy)
         XCTAssertEqual(result2[1].asArray(Float.self), [0.0, 0.0, -1e9], accuracy: accuracy)
         XCTAssertEqual(result2[2].asArray(Float.self), [0.0, 0.0, 0.0], accuracy: accuracy)
 
         let result3 = additiveCausalMask(4)
-        XCTAssertEqual(result3.shape, [4 ,4])
-        XCTAssertEqual(result3.dtype, .float32)
+        XCTAssertEqual(result3.shape, [4 ,4], "Array shape should be [4, 4]")
+        XCTAssertEqual(result3.dtype, .float32, "Array type should be .float32")
         XCTAssertEqual(result3[0].asArray(Float.self), [0.0, -1e9, -1e9, -1e9], accuracy: accuracy)
         XCTAssertEqual(result3[1].asArray(Float.self), [0.0, 0.0, -1e9, -1e9], accuracy: accuracy)
         XCTAssertEqual(result3[2].asArray(Float.self), [0.0, 0.0, 0.0, -1e9], accuracy: accuracy)

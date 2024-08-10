@@ -3,6 +3,11 @@
 
 import ArgumentParser
 
+enum ModelType: String, Decodable, ExpressibleByArgument {
+    case coreML = "coreml"
+    case mlx = "mlx"
+}
+
 struct CLIArguments: ParsableArguments {
     @Option(help: "Paths to audio files")
     var audioPath = [String]()
@@ -16,14 +21,32 @@ struct CLIArguments: ParsableArguments {
     @Option(help: "Model to download if no modelPath is provided")
     var model: String?
 
+    @Option(help: "Path of MLX model files")
+    var mlxModelPath: String?
+
+    @Option(help: "MLX Model to download if no mlxModelPath is provided")
+    var mlxModel: String?
+
     @Option(help: "Text to add in front of the model name to specify between different types of the same variant (values: \"openai\", \"distil\")")
     var modelPrefix: String = "openai"
+
+    @Option(help: "Text to add in front of the mlx model name to specify between different types of the same variant (values: \"openai\")")
+    var mlxModelPrefix: String = "openai"
 
     @Option(help: "Path to save the downloaded model")
     var downloadModelPath: String?
 
     @Option(help: "Path to save the downloaded tokenizer files")
     var downloadTokenizerPath: String?
+
+    @Option(help: "Which feature extractor to use (supported: `coreml` and `mlx`)")
+    var featureExtractorType: ModelType = .coreML
+
+    @Option(help: "Which audio encoder to use (supported: `coreml` and `mlx`)")
+    var audioEncoderType: ModelType = .coreML
+
+    @Option(help: "Which text decoder to use (supported: `coreml` and `mlx`)")
+    var textDecoderType: ModelType = .coreML
 
     @Option(help: "Compute units for audio encoder model with {all,cpuOnly,cpuAndGPU,cpuAndNeuralEngine,random}")
     var audioEncoderComputeUnits: ComputeUnits = .cpuAndNeuralEngine

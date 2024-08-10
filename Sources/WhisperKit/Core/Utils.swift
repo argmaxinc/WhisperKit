@@ -44,7 +44,7 @@ extension MLMultiArray {
     ///  - index: The index of the element
     ///  - strides: The precomputed strides of the multi-array, if not provided, it will be computed. It's a performance optimization to avoid recomputing the strides every time when accessing the multi-array with multiple indexes.
     @inline(__always)
-    func linearOffset(for index: [NSNumber], strides strideInts: [Int]? = nil) -> Int {
+    public func linearOffset(for index: [NSNumber], strides strideInts: [Int]? = nil) -> Int {
         var linearOffset = 0
         let strideInts = strideInts ?? strides.map { $0.intValue }
         for (dimension, stride) in zip(index, strideInts) {
