@@ -201,27 +201,28 @@ extension AVAudioPCMBuffer {
         }
 
         guard startingFrame + AVAudioFramePosition(frameCount) <= AVAudioFramePosition(buffer.frameLength) else {
-            Logging.debug("Insufficient audio in buffer")
-            return false
-        }
-
-        guard frameLength + frameCount <= frameCapacity else {
-            Logging.debug("Insufficient space in buffer")
+            Logging.error("Insufficient audio in buffer")
             return false
         }
 
         guard let destination = floatChannelData, let source = buffer.floatChannelData else {
-            Logging.debug("Failed to access float channel data")
+            Logging.error("Failed to access float channel data")
             return false
+        }
+
+        var calculatedFrameCount = frameCount
+        if frameLength + frameCount > frameCapacity {
+            Logging.debug("Insufficient space in buffer, reducing frame count to fit")
+            calculatedFrameCount = frameCapacity - frameLength
         }
 
         let calculatedStride = stride
         let destinationPointer = destination.pointee.advanced(by: calculatedStride * Int(frameLength))
         let sourcePointer = source.pointee.advanced(by: calculatedStride * Int(startingFrame))
 
-        memcpy(destinationPointer, sourcePointer, Int(frameCount) * calculatedStride * MemoryLayout<Float>.size)
+        memcpy(destinationPointer, sourcePointer, Int(calculatedFrameCount) * calculatedStride * MemoryLayout<Float>.size)
 
-        frameLength += frameCount
+        frameLength += calculatedFrameCount
         return true
     }
 
