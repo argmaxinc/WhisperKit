@@ -76,10 +76,21 @@ func targets() -> [PackageDescription.Target] {
                 "WhisperKit",
                 .product(name: "Transformers", package: "swift-transformers"),
             ],
+            path: ".",
+            exclude: [
+                "Examples",
+                "Sources/WhisperKit",
+                "Sources/WhisperKitCLI",
+                "Tests",
+                "Makefile",
+                "README.md",
+                "LICENSE",
+                "CONTRIBUTING.md",
+            ],
             resources: [
-                .copy("Models/whisperkit-coreml/"),
-                .copy("Models/whisperkit-mlx/"),
-                .process("Resources")
+                .copy("Models/whisperkit-coreml"),
+                .copy("Models/whisperkit-mlx"),
+                .process("Sources/WhisperKitTestsUtils/Resources")
             ]
         ),
         .testTarget(

@@ -7,9 +7,9 @@ PYTHON_COMMAND := python3
 MODEL_REPO := argmaxinc/whisperkit-coreml
 MLX_MODEL_REPO := argmaxinc/whisperkit-mlx
 
-MODEL_REPO_DIR := ./Sources/WhisperKitTestsUtils/Models/whisperkit-coreml
-MLX_MODEL_REPO_DIR := ./Sources/WhisperKitTestsUtils/Models/whisperkit-mlx
-BASE_MODEL_DIR := ./Sources/WhisperKitTestsUtils/Models
+MODEL_REPO_DIR := ./Models/whisperkit-coreml
+MLX_MODEL_REPO_DIR := ./Models/whisperkit-mlx
+BASE_MODEL_DIR := ./Models
 
 
 setup:

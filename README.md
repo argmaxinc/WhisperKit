@@ -109,7 +109,13 @@ For MLX models, see [here](https://huggingface.co/argmaxinc/whisperkit-mlx).
 If you want to get the recommended model for your device, you can use the following method:
 
 ```swift
-print(WhisperKit.recommendedModel())
+print(WhisperKit.recommendedModels())
+```
+
+it should print the default and a list of disabled models, e.g.: 
+
+```bash
+(default: "openai_whisper-base", disabled: ["openai_whisper-large-v2_turbo", "openai_whisper-large-v2_turbo_955MB", "openai_whisper-large-v3_turbo", "openai_whisper-large-v3_turbo_954MB", "distil-whisper_distil-large-v3_turbo_600MB", "distil-whisper_distil-large-v3_turbo"])
 ```
 
 ### Generating Models
