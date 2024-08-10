@@ -36,6 +36,8 @@ Check out the demo app on [TestFlight](https://testflight.apple.com/join/LPVOyJZ
   - [Quick Example](#quick-example)
   - [Model Selection](#model-selection)
   - [Generating Models](#generating-models)
+  - [Swift CLI](#swift-cli)
+  - [Backend Selection](#backend-selection)
   - [Testing](#testing)
 - [Contributing \& Roadmap](#contributing--roadmap)
 - [License](#license)
@@ -126,6 +128,45 @@ WhisperKit also comes with the supporting repo [`whisperkittools`](https://githu
 let pipe = try await WhisperKit(model: "large-v3", modelRepo: "username/your-model-repo")
 ```
 
+### Swift CLI
+
+The Swift CLI allows for quick testing and debugging outside of an Xcode project. To install it, run the following:
+
+```bash
+git clone https://github.com/argmaxinc/whisperkit.git
+cd whisperkit
+```
+
+Then, setup the environment and download your desired model.
+
+```bash
+make setup
+make download-model MODEL=large-v3
+```
+
+**Note**:
+
+1. This will download only the model specified by `MODEL` (see what's available in our [HuggingFace repo](https://huggingface.co/argmaxinc/whisperkit-coreml), where we use the prefix `openai_whisper-{MODEL}`)
+2. Before running `download-model`, make sure [git-lfs](https://git-lfs.com) is installed
+
+If you would like download all available models to your local folder, use this command instead:
+
+```bash
+make download-models
+```
+
+You can then run them via the CLI with:
+
+```bash
+swift run whisperkit-cli transcribe --model-path "Models/whisperkit-coreml/openai_whisper-large-v3" --audio-path "path/to/your/audio.{wav,mp3,m4a,flac}" 
+```
+
+Which should print a transcription of the audio file. If you would like to stream the audio directly from a microphone, use:
+
+```bash
+swift run whisperkit-cli transcribe --model-path "Models/whisperkit-coreml/openai_whisper-large-v3" --stream
+```
+
 ### Backend Selection
 
 WhisperKit supports both CoreML and MLX backends. By default, it uses CoreML, but you can switch some or all pipeline components to MLX.
@@ -144,6 +185,11 @@ let pipe = try await WhisperKit(
   audioEncoder: MLXAudioEncoder()
 )
 ```
+
+**Note**:
+
+`swift run` and `swift test` commands won't work when the `mlx` backend is selected.
+SwiftPM (command line) cannot build the Metal shaders so the ultimate build has to be done via Xcode.
 
 ### Testing
 
