@@ -3,6 +3,18 @@ import WhisperKit
 import MachO
 import CoreML
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
+#if canImport(IOKit)
+import IOKit.ps
+#endif
+
+#if os(watchOS)
+import WatchKit
+#endif
+
 // MARK: RegressionStats
 
 class RegressionStats: JSONCodable {
@@ -285,15 +297,6 @@ class SystemMemoryCheckerAdvanced: NSObject {
         return SystemMemoryUsage(totalAvailableGB: availableMemory, totalUsedGB: usedMemory, appAllocatedGB: appAllocatedGB, appUsedGB: appUsedGB, swapUsedGB: swapUsedGB)
     }
 }
-
-import Foundation
-#if canImport(UIKit)
-import UIKit
-#endif
-
-#if canImport(IOKit)
-import IOKit.ps
-#endif
 
 class BatteryLevelChecker: NSObject {
     static func getBatteryLevel() -> Float? {
