@@ -2,6 +2,7 @@
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
 import Accelerate
+import AVFAudio
 import CoreML
 import Hub
 import NaturalLanguage
@@ -188,16 +189,29 @@ public enum DecodingTask: CustomStringConvertible, CaseIterable {
 }
 
 public struct DecodingInputs {
-    var initialPrompt: [Int]
-    var inputIds: MLMultiArray
-    var cacheLength: MLMultiArray
-    var keyCache: MLMultiArray
-    var valueCache: MLMultiArray
-    var alignmentWeights: MLMultiArray
-    var kvCacheUpdateMask: MLMultiArray
-    var decoderKeyPaddingMask: MLMultiArray
-    var prefillKeyCache: MLMultiArray
-    var prefillValueCache: MLMultiArray
+    public var initialPrompt: [Int]
+    public var inputIds: MLMultiArray
+    public var cacheLength: MLMultiArray
+    public var keyCache: MLMultiArray
+    public var valueCache: MLMultiArray
+    public var alignmentWeights: MLMultiArray
+    public var kvCacheUpdateMask: MLMultiArray
+    public var decoderKeyPaddingMask: MLMultiArray
+    public var prefillKeyCache: MLMultiArray
+    public var prefillValueCache: MLMultiArray
+
+    public init(initialPrompt: [Int], inputIds: MLMultiArray, cacheLength: MLMultiArray, keyCache: MLMultiArray, valueCache: MLMultiArray, alignmentWeights: MLMultiArray, kvCacheUpdateMask: MLMultiArray, decoderKeyPaddingMask: MLMultiArray, prefillKeyCache: MLMultiArray, prefillValueCache: MLMultiArray) {
+        self.initialPrompt = initialPrompt
+        self.inputIds = inputIds
+        self.cacheLength = cacheLength
+        self.keyCache = keyCache
+        self.valueCache = valueCache
+        self.alignmentWeights = alignmentWeights
+        self.kvCacheUpdateMask = kvCacheUpdateMask
+        self.decoderKeyPaddingMask = decoderKeyPaddingMask
+        self.prefillKeyCache = prefillKeyCache
+        self.prefillValueCache = prefillValueCache
+    }
 
     func reset(prefilledCacheSize: Int, maxTokenContext: Int) {
         // NOTE: Because we have a mask on the kvcache,
@@ -223,9 +237,14 @@ public struct DecodingInputs {
 }
 
 public struct DecodingCache {
-    var keyCache: MLMultiArray?
-    var valueCache: MLMultiArray?
-    var alignmentWeights: MLMultiArray?
+    public var keyCache: MLMultiArray?
+    public var valueCache: MLMultiArray?
+    public var alignmentWeights: MLMultiArray?
+    public init(keyCache: MLMultiArray? = nil, valueCache: MLMultiArray? = nil, alignmentWeights: MLMultiArray? = nil) {
+        self.keyCache = keyCache
+        self.valueCache = valueCache
+        self.alignmentWeights = alignmentWeights
+    }
 }
 
 public enum ChunkingStrategy: String, CaseIterable {
@@ -417,6 +436,21 @@ public struct DecodingResult {
                               timings: nil,
                               fallback: nil)
     }
+
+    public init(language: String, languageProbs: [String: Float], tokens: [Int], tokenLogProbs: [[Int: Float]], text: String, avgLogProb: Float, noSpeechProb: Float, temperature: Float, compressionRatio: Float, cache: DecodingCache? = nil, timings: TranscriptionTimings? = nil, fallback: DecodingFallback? = nil) {
+        self.language = language
+        self.languageProbs = languageProbs
+        self.tokens = tokens
+        self.tokenLogProbs = tokenLogProbs
+        self.text = text
+        self.avgLogProb = avgLogProb
+        self.noSpeechProb = noSpeechProb
+        self.temperature = temperature
+        self.compressionRatio = compressionRatio
+        self.cache = cache
+        self.timings = timings
+        self.fallback = fallback
+    }
 }
 
 public enum WhisperError: Error, LocalizedError, Equatable {
@@ -539,6 +573,10 @@ public struct TranscriptionResult: Codable {
         Decoding Full Loop:  \(decodingLoopInfo)
         -------------------------------
         Model Load Time:               \(String(format: "%.2f", timings.modelLoading)) seconds
+        - Prewarm:                     \(String(format: "%.2f", timings.prewarmLoadTime)) seconds
+        - Encoder:                     \(String(format: "%.2f", timings.encoderLoadTime)) seconds
+        - Decoder:                     \(String(format: "%.2f", timings.decoderLoadTime)) seconds
+        - Tokenizer:                   \(String(format: "%.2f", timings.tokenizerLoadTime)) seconds
         Inference Duration (Global):   \(String(format: "%.2f", timings.fullPipeline)) seconds
         - Decoding Loop (Avg/window):  \(String(format: "%.2f", decodeTimePerWindow)) seconds
         - Audio Windows:               \(String(format: "%.2f", timings.totalAudioProcessingRuns))
@@ -588,6 +626,16 @@ public struct TranscriptionProgress {
     public var avgLogprob: Float?
     public var compressionRatio: Float?
     public var windowId: Int = 0
+
+    public init(timings: TranscriptionTimings, text: String, tokens: [Int], temperature: Float? = nil, avgLogprob: Float? = nil, compressionRatio: Float? = nil, windowId: Int = 0) {
+        self.timings = timings
+        self.text = text
+        self.tokens = tokens
+        self.temperature = temperature
+        self.avgLogprob = avgLogprob
+        self.compressionRatio = compressionRatio
+        self.windowId = windowId
+    }
 }
 
 /// Callback to receive progress updates during transcription.
@@ -607,6 +655,10 @@ public struct TranscriptionTimings: Codable {
     public var firstTokenTime: CFAbsoluteTime
     public var inputAudioSeconds: TimeInterval
     public var modelLoading: TimeInterval
+    public var prewarmLoadTime: TimeInterval
+    public var encoderLoadTime: TimeInterval
+    public var decoderLoadTime: TimeInterval
+    public var tokenizerLoadTime: TimeInterval
     public var audioLoading: TimeInterval
     public var audioProcessing: TimeInterval
     public var logmels: TimeInterval
@@ -647,6 +699,10 @@ public struct TranscriptionTimings: Codable {
 
     /// Initialize with all time intervals set to zero.
     public init(modelLoading: TimeInterval = 0,
+                prewarmLoadTime: TimeInterval = 0,
+                encoderLoadTime: TimeInterval = 0,
+                decoderLoadTime: TimeInterval = 0,
+                tokenizerLoadTime: TimeInterval = 0,
                 audioLoading: TimeInterval = 0,
                 audioProcessing: TimeInterval = 0,
                 logmels: TimeInterval = 0,
@@ -676,6 +732,10 @@ public struct TranscriptionTimings: Codable {
         self.firstTokenTime = Double.greatestFiniteMagnitude
         self.inputAudioSeconds = 0.001
         self.modelLoading = modelLoading
+        self.prewarmLoadTime = prewarmLoadTime
+        self.encoderLoadTime = encoderLoadTime
+        self.decoderLoadTime = decoderLoadTime
+        self.tokenizerLoadTime = tokenizerLoadTime
         self.audioLoading = audioLoading
         self.audioProcessing = audioProcessing
         self.logmels = logmels
@@ -1401,4 +1461,6 @@ public enum Constants {
     public static let languageCodes: Set<String> = Set(languages.values)
 
     public static let defaultLanguageCode: String = "en"
+
+    public static let defaultAudioReadFrameSize: AVAudioFrameCount = 1_323_000 // 30s of audio at commonly found 44.1khz sample rate
 }

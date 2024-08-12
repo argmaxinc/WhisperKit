@@ -760,7 +760,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
                 break
             }
         }
-        
+
         // Cleanup the early stop flag after loop completion
         if shouldEarlyStop.removeValue(forKey: windowUUID) == nil {
             Logging.error("Early stop flag not found for window: \(windowUUID)")

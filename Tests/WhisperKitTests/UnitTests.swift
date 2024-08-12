@@ -1,8 +1,8 @@
 //  For licensing see accompanying LICENSE.md file.
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
-import Combine
 import AVFoundation
+import Combine
 import CoreML
 import Hub
 import NaturalLanguage
@@ -12,6 +12,10 @@ import XCTest
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 final class UnitTests: XCTestCase {
+    override func setUp() async throws {
+        Logging.shared.logLevel = .debug
+    }
+
     // MARK: - Model Loading Test
 
     func testInit() async throws {
@@ -39,16 +43,47 @@ final class UnitTests: XCTestCase {
         XCTAssertNotNil(audioBuffer, "Failed to load audio file at path: \(audioFilePath)")
         XCTAssertEqual(audioBuffer.format.sampleRate, 16000)
         XCTAssertEqual(audioBuffer.format.channelCount, 1)
-        XCTAssertEqual(audioBuffer.frameLength, 176000)
+        XCTAssertEqual(audioBuffer.frameLength, 176_000)
         XCTAssertEqual(audioBuffer.frameLength, 11 * 16000)
 
         let audioBufferWithStartTime = try AudioProcessor.loadAudio(fromPath: audioFilePath, startTime: 1.2)
-        XCTAssertEqual(audioBufferWithStartTime.frameLength, AVAudioFrameCount(156800))
+        XCTAssertEqual(audioBufferWithStartTime.frameLength, AVAudioFrameCount(156_800))
         XCTAssertEqual(audioBufferWithStartTime.frameLength, AVAudioFrameCount(16000 * (11 - 1.2)))
 
         let audioBufferWithStartTimeAndEndTime = try AudioProcessor.loadAudio(fromPath: audioFilePath, startTime: 1.2, endTime: 3.4)
         XCTAssertEqual(audioBufferWithStartTimeAndEndTime.frameLength, AVAudioFrameCount(35200))
         XCTAssertEqual(audioBufferWithStartTimeAndEndTime.frameLength, AVAudioFrameCount(16000 * (3.4 - 1.2)))
+    }
+
+    func testAudioFileLoadingWithResampling() throws {
+        let audioFilePath = try XCTUnwrap(
+            Bundle.module.path(forResource: "jfk_441khz", ofType: "m4a"),
+            "Audio file not found"
+        )
+        let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
+        XCTAssertNotNil(audioBuffer, "Failed to load audio file at path: \(audioFilePath)")
+        XCTAssertEqual(audioBuffer.format.sampleRate, 16000)
+        XCTAssertEqual(audioBuffer.format.channelCount, 1)
+        XCTAssertEqual(audioBuffer.frameLength, 176_000)
+
+        // Test start time and end time with varying max frame sizes
+        let audioBufferWithStartTime1 = try AudioProcessor.loadAudio(fromPath: audioFilePath, startTime: 1.2)
+        XCTAssertEqual(audioBufferWithStartTime1.frameLength, AVAudioFrameCount(156_800))
+        XCTAssertEqual(audioBufferWithStartTime1.frameLength, AVAudioFrameCount(16000 * (11 - 1.2)))
+
+        let audioBufferWithStartTimeAndEndTime1 = try AudioProcessor.loadAudio(fromPath: audioFilePath, startTime: 1.2, endTime: 3.4)
+        XCTAssertEqual(audioBufferWithStartTimeAndEndTime1.frameLength, AVAudioFrameCount(35200))
+        XCTAssertEqual(audioBufferWithStartTimeAndEndTime1.frameLength, AVAudioFrameCount(16000 * (3.4 - 1.2)))
+
+        // NOTE: depending on frameSize, the final frame lengths will match due to integer division between sample rates
+        let frameSize = AVAudioFrameCount(10024)
+        let audioBufferWithStartTime2 = try AudioProcessor.loadAudio(fromPath: audioFilePath, startTime: 1.2, maxReadFrameSize: frameSize)
+        XCTAssertEqual(audioBufferWithStartTime2.frameLength, AVAudioFrameCount(156_800))
+        XCTAssertEqual(audioBufferWithStartTime2.frameLength, AVAudioFrameCount(16000 * (11 - 1.2)))
+
+        let audioBufferWithStartTimeAndEndTime2 = try AudioProcessor.loadAudio(fromPath: audioFilePath, startTime: 1.2, endTime: 3.4, maxReadFrameSize: frameSize)
+        XCTAssertEqual(audioBufferWithStartTimeAndEndTime2.frameLength, AVAudioFrameCount(35200))
+        XCTAssertEqual(audioBufferWithStartTimeAndEndTime2.frameLength, AVAudioFrameCount(16000 * (3.4 - 1.2)))
     }
 
     func testAudioPad() {
@@ -85,8 +120,6 @@ final class UnitTests: XCTestCase {
     }
 
     func testAudioResampleFromFile() throws {
-        Logging.shared.logLevel = .debug
-
         let audioFileURL = try XCTUnwrap(
             Bundle.module.url(forResource: "jfk", withExtension: "wav"),
             "Audio file not found"
@@ -95,7 +128,7 @@ final class UnitTests: XCTestCase {
 
         let targetSampleRate = 16000.0
         let targetChannelCount: AVAudioChannelCount = 1
-        let smallMaxReadFrameSize: AVAudioFrameCount = 10_000 // Small chunk size to test chunking logic
+        let smallMaxReadFrameSize: AVAudioFrameCount = 10000 // Small chunk size to test chunking logic
 
         let resampledAudio = AudioProcessor.resampleAudio(
             fromFile: audioFile,
@@ -1187,7 +1220,6 @@ final class UnitTests: XCTestCase {
 
     func testVADAudioChunker() async throws {
         let chunker = VADAudioChunker()
-        Logging.shared.logLevel = .debug
 
         let singleChunkPath = try XCTUnwrap(
             Bundle.module.path(forResource: "jfk", ofType: "wav"),
