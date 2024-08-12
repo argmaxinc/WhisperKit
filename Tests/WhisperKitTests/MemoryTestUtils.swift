@@ -297,10 +297,13 @@ import IOKit.ps
 
 class BatteryLevelChecker: NSObject {
     static func getBatteryLevel() -> Float? {
-        #if os(iOS) || os(watchOS) || os(visionOS)
+        #if os(iOS) || os(visionOS)
         UIDevice.current.isBatteryMonitoringEnabled = true
         let batteryLevel = UIDevice.current.batteryLevel
         UIDevice.current.isBatteryMonitoringEnabled = false
+        return batteryLevel >= 0 ? batteryLevel * 100 : nil
+        #elseif os(watchOS)
+        let batteryLevel = WKInterfaceDevice.current().batteryLevel
         return batteryLevel >= 0 ? batteryLevel * 100 : nil
         #elseif os(macOS)
         return getMacOSBatteryLevel()
