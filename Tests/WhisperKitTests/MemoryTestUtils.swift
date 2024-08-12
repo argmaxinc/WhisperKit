@@ -297,7 +297,7 @@ import IOKit.ps
 
 class BatteryLevelChecker: NSObject {
     static func getBatteryLevel() -> Float? {
-        #if os(iOS) || os(watchOS)
+        #if os(iOS) || os(watchOS) || os(visionOS)
         UIDevice.current.isBatteryMonitoringEnabled = true
         let batteryLevel = UIDevice.current.batteryLevel
         UIDevice.current.isBatteryMonitoringEnabled = false
@@ -309,6 +309,7 @@ class BatteryLevelChecker: NSObject {
         #endif
     }
     
+    #if os(macOS)
     private static func getMacOSBatteryLevel() -> Float? {
         let snapshot = IOPSCopyPowerSourcesInfo().takeRetainedValue()
         let sources = IOPSCopyPowerSourcesList(snapshot).takeRetainedValue() as [CFTypeRef]
@@ -322,6 +323,7 @@ class BatteryLevelChecker: NSObject {
         }
         return nil
     }
+    #endif
 }
 
 struct DiskSpace: Codable {
@@ -339,8 +341,8 @@ struct SystemMemoryUsage: Codable {
 
 class DiskSpaceChecker: NSObject {
     static func getDiskSpace() -> DiskSpace {
-        #if os(iOS) || os(watchOS)
-        return getiOSOrWatchOSDiskSpace()
+        #if os(iOS) || os(watchOS) || os(visionOS)
+        return getMobileOSDiskSpace()
         #elseif os(macOS)
         return getMacOSDiskSpace()
         #else
@@ -348,7 +350,8 @@ class DiskSpaceChecker: NSObject {
         #endif
     }
     
-    private static func getiOSOrWatchOSDiskSpace() -> DiskSpace {
+    #if os(iOS) || os(watchOS) || os(visionOS)
+    private static func getMobileOSDiskSpace() -> DiskSpace {
         let fileManager = FileManager.default
         do {
             let attributes = try fileManager.attributesOfFileSystem(forPath: NSHomeDirectory())
@@ -364,7 +367,9 @@ class DiskSpaceChecker: NSObject {
         }
         return DiskSpace(totalSpaceGB: nil, freeSpaceGB: nil)
     }
+    #endif
     
+    #if os(macOS)
     private static func getMacOSDiskSpace() -> DiskSpace {
         let fileManager = FileManager.default
         do {
@@ -382,7 +387,9 @@ class DiskSpaceChecker: NSObject {
         }
         return DiskSpace(totalSpaceGB: nil, freeSpaceGB: nil)
     }
+    #endif
 }
+
 
 
 private extension MLComputeUnits{
