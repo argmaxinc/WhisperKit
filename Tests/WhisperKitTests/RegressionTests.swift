@@ -110,7 +110,7 @@ final class RegressionTests: XCTestCase {
         for audioFilePath in audioFilePaths{
             let startTime = Date()
             
-            var currentMemoryValues = [Float]()
+            var currentAppMemoryValues = [Float]()
             var currentTPSValues = [Float]()
             
             let memoryStats = MemoryStats(
@@ -129,29 +129,45 @@ final class RegressionTests: XCTestCase {
             let callback = {
                 (result: TranscriptionProgress) -> Bool in
                 count += 1
-                let currentMemory = SystemMemoryChecker.getMemoryUsed()
+                let currentMemory = AppMemoryChecker.getMemoryUsed()
                 let timeTaken = CFAbsoluteTimeGetCurrent() - lastTimeStamp
                 lastTimeStamp = CFAbsoluteTimeGetCurrent()
                 let currentTPS = Double(1/timeTaken)
                 
                 if currentMemory != 0 {
-                    currentMemoryValues.append(Float(currentMemory))
+                    currentAppMemoryValues.append(Float(currentMemory))
                 }
                 if !currentTPS.isNaN {
                     currentTPSValues.append(Float(currentTPS))
                 }
                 if count % 100 == 1 {
                     let timeElapsed = Date().timeIntervalSince(startTime)
-                    memoryStats.measure(from: currentMemoryValues, timeElapsed: timeElapsed)
+                    memoryStats.measure(from: currentAppMemoryValues, timeElapsed: timeElapsed)
                     latencyStats.measure(from: currentTPSValues, timeElapsed: timeElapsed)
-                    currentMemoryValues = []
+                    currentAppMemoryValues = []
                     currentTPSValues = []
                 }
                 return true
             }
             
             let whisperKit = try await WhisperKit(model: model)
-            memoryStats.preTranscribeMemory = Float(SystemMemoryChecker.getMemoryUsed())
+            memoryStats.preTranscribeMemory = Float(AppMemoryChecker.getMemoryUsed())
+            
+            var systemMemory: [SystemMemoryUsage] = []
+            var diskSpace: [DiskSpace] = []
+            var batteryLevel: [Float] = []
+            var timerTimeElapsed: [TimeInterval] = []
+            // DispatchSourceTimer to collect memory usage asynchronously
+            let timerQueue = DispatchQueue(label: "com.example.SystemStatTimerQueue")
+            let timer = DispatchSource.makeTimerSource(queue: timerQueue)
+            timer.schedule(deadline: .now(), repeating: 1.0)
+            timer.setEventHandler {
+                systemMemory.append(SystemMemoryCheckerAdvanced.getMemoryUsage())
+                diskSpace.append(DiskSpaceChecker.getDiskSpace())
+                batteryLevel.append(BatteryLevelChecker.getBatteryLevel() ?? -1)
+                timerTimeElapsed.append(Date().timeIntervalSince(startTime))
+            }
+            timer.resume()
             
             let transcriptionResult = try await XCTUnwrapAsync(
                 await whisperKit.transcribe(audioPath: audioFilePath, callback: callback).first,
@@ -159,7 +175,7 @@ final class RegressionTests: XCTestCase {
             )
             XCTAssert(transcriptionResult.text.isEmpty == false, "Transcription failed")
             
-            memoryStats.postTranscribeMemory = Float(SystemMemoryChecker.getMemoryUsed())
+            memoryStats.postTranscribeMemory = Float(AppMemoryChecker.getMemoryUsed())
             
             var wer = -Double.infinity
             if let filename = audioFilePath.split(separator: "/").last,let originalTranscript = getTranscript(filename: String(filename)){
@@ -181,8 +197,23 @@ final class RegressionTests: XCTestCase {
                 transcript: transcriptionResult.text,
                 wer: wer
             )
-            
-            let json = RegressionStats(testInfo: testInfo, memoryStats: memoryStats, latencyStats: latencyStats)
+            let staticAttributes = StaticAttributes(
+                encoderCompute: whisperKit.modelCompute.audioEncoderCompute,
+                decoderCompute: whisperKit.modelCompute.textDecoderCompute
+            )
+            let systemMeasurements = SystemMeasurements(
+                systemMemory: systemMemory,
+                diskSpace: diskSpace,
+                batteryLevel: batteryLevel,
+                timeElapsed: timerTimeElapsed
+            )
+            let json = RegressionStats(
+                testInfo: testInfo,
+                memoryStats: memoryStats,
+                latencyStats: latencyStats,
+                staticAttributes: staticAttributes,
+                systemMeasurements: systemMeasurements
+            )
             resultJSON.append(json)
             
             if !overEntireDataset{
