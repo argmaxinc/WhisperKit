@@ -39,6 +39,11 @@ open class MLXFeatureExtractor: FeatureExtracting {
     }
 }
 
+extension MLXFeatureExtractor: WhisperMLXModel {
+    public func loadModel(at modelPath: URL, configPath: URL) async throws {}
+    public func unloadModel() {}
+}
+
 public extension MLXFeatureExtractor {
     /// Return the Hanning window.
     /// Taken from [numpy](https://numpy.org/doc/stable/reference/generated/numpy.hanning.html) implementation
@@ -103,9 +108,6 @@ public extension MLXFeatureExtractor {
         nFFT: Int = 400,
         hopLength: Int = 160
     ) -> MLXArray {
-        let device = MLX.Device.defaultDevice()
-        MLX.Device.setDefault(device: .cpu)
-        defer { MLX.Device.setDefault(device: device) }
         let window = hanning(nFFT)
         let freqs = stft(audio, window: window, nPerSeg: nFFT, nOverlap: hopLength)
         let magnitudes = freqs[..<(-1)].abs().square()

@@ -37,6 +37,8 @@ Check out the demo app on [TestFlight](https://testflight.apple.com/join/LPVOyJZ
   - [Model Selection](#model-selection)
   - [Generating Models](#generating-models)
   - [Swift CLI](#swift-cli)
+  - [Backend Selection](#backend-selection)
+  - [Testing](#testing)
 - [Contributing \& Roadmap](#contributing--roadmap)
 - [License](#license)
 - [Citation](#citation)
@@ -66,7 +68,7 @@ You can install `WhisperKit` command line app using [Homebrew](https://brew.sh) 
 
 ```bash
 brew install whisperkit-cli
-```  
+```
 
 ## Getting Started
 
@@ -79,38 +81,51 @@ This example demonstrates how to transcribe a local audio file:
 ```swift
 import WhisperKit
 
-// Initialize WhisperKit with default settings
-Task {
-   let pipe = try? await WhisperKit()
-   let transcription = try? await pipe!.transcribe(audioPath: "path/to/your/audio.{wav,mp3,m4a,flac}")?.text
-    print(transcription)
-}
+// Initialize WhisperKit by passing the model name (WhisperKit will automatically download it):
+let pipe = try await WhisperKit(model: "tiny")
+// Transcribe the audio file
+let transcription = try await pipe.transcribe(audioPath: "path/to/your/audio.{wav,mp3,m4a,flac}")?.text
+// Print the transcription
+print(transcription)
 ```
 
 ### Model Selection
 
-WhisperKit automatically downloads the recommended model for the device if not specified. You can also select a specific model by passing in the model name:
+You have to specify the model by passing the model name:
 
 ```swift
-let pipe = try? await WhisperKit(model: "large-v3")
+let pipe = try await WhisperKit(model: "large-v3")
 ```
 
 This method also supports glob search, so you can use wildcards to select a model:
 
 ```swift
-let pipe = try? await WhisperKit(model: "distil*large-v3")
+let pipe = try await WhisperKit(model: "distil*large-v3")
 ```
 
 Note that the model search must return a single model from the source repo, otherwise an error will be thrown.
 
 For a list of available models, see our [HuggingFace repo](https://huggingface.co/argmaxinc/whisperkit-coreml).
+For MLX models, see [here](https://huggingface.co/argmaxinc/whisperkit-mlx).
+
+If you want to get the recommended model for your device, you can use the following method:
+
+```swift
+print(WhisperKit.recommendedModels())
+```
+
+it should print the default and a list of disabled models, e.g.: 
+
+```bash
+(default: "openai_whisper-base", disabled: ["openai_whisper-large-v2_turbo", "openai_whisper-large-v2_turbo_955MB", "openai_whisper-large-v3_turbo", "openai_whisper-large-v3_turbo_954MB", "distil-whisper_distil-large-v3_turbo_600MB", "distil-whisper_distil-large-v3_turbo"])
+```
 
 ### Generating Models
 
 WhisperKit also comes with the supporting repo [`whisperkittools`](https://github.com/argmaxinc/whisperkittools) which lets you create and deploy your own fine tuned versions of Whisper in CoreML format to HuggingFace. Once generated, they can be loaded by simply changing the repo name to the one used to upload the model:
 
 ```swift
-let pipe = try? await WhisperKit(model: "large-v3", modelRepo: "username/your-model-repo")
+let pipe = try await WhisperKit(model: "large-v3", modelRepo: "username/your-model-repo")
 ```
 
 ### Swift CLI
@@ -150,6 +165,53 @@ Which should print a transcription of the audio file. If you would like to strea
 
 ```bash
 swift run whisperkit-cli transcribe --model-path "Models/whisperkit-coreml/openai_whisper-large-v3" --stream
+```
+
+### Backend Selection
+
+WhisperKit supports both CoreML and MLX backends. By default, it uses CoreML, but you can switch some or all pipeline components to MLX.
+Available pipeline components are:
+- `featureExtractor`, `FeatureExtractor` is used by default, use `MLXFeatureExtractor` to switch to MLX
+- `audioEncoder`, `AudioEncoder` is used by default, use `MLXAudioEncoder` to switch to MLX
+- `textDecoder`, `TextDecoder` is used by default, use `MLXTextDecoder` to switch to MLX
+
+Here is an example of how to switch the `featureExtractor` and `audioEncoder` to MLX and keep the `textDecoder` as CoreML:
+
+```swift
+let pipe = try await WhisperKit(
+  model: "tiny", 
+  mlxModel: "tiny", 
+  featureExtractor: MLXFeatureExtractor(),
+  audioEncoder: MLXAudioEncoder()
+)
+```
+
+**Note**:
+
+`swift run` and `swift test` commands won't work when the `mlx` backend is selected.
+SwiftPM (command line) cannot build the Metal shaders so the ultimate build has to be done via Xcode.
+
+### Testing
+
+If you want to run the unit tests locally, first clone the repo:
+
+```bash
+git clone https://github.com/argmaxinc/whisperkit.git
+cd whisperkit
+```
+
+download the required models:
+
+```bash
+make setup
+make download-model MODEL=tiny
+make download-mlx-model MODEL=tiny
+```
+
+and then run the tests:
+
+```bash
+make test
 ```
 
 ## Contributing & Roadmap

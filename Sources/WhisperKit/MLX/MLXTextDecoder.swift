@@ -13,7 +13,7 @@ public final class MLXTextDecoder: TextDecoding {
     public var isModelMultilingual: Bool = false
     public let supportsWordTimestamps: Bool = false
     public var logitsSize: Int? {
-        decoder?.nState
+        decoder?.nVocab
     }
 
     public var kvCacheEmbedDim: Int? {
