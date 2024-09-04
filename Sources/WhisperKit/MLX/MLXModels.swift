@@ -3,6 +3,8 @@
 
 import Foundation
 import MLX
+import MLXNN
+import WhisperKit
 
 public enum PadMode {
     case constant

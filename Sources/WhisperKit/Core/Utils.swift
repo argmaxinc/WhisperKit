@@ -107,6 +107,19 @@ extension MLModel {
 }
 
 public extension MLComputeUnits {
+    /// Compute unit for MLX-based models.
+    ///
+    /// This compute unit is specifically designed for use with MLX-based models in WhisperKit.
+    ///
+    /// - Important: This is a custom compute unit and will not be recognized by MLModel instances.
+    static let mlx: MLComputeUnits = {
+        guard let unit = MLComputeUnits(rawValue: 99) else { // Prevent overlap with future values
+            Logging.error("Failed to create MLComputeUnits for MLX. Defaulting to .cpuAndGPU.")
+            return .cpuAndGPU
+        }
+        return unit
+    }()
+
     var description: String {
         switch self {
             case .cpuOnly:
@@ -117,6 +130,8 @@ public extension MLComputeUnits {
                 return "all"
             case .cpuAndNeuralEngine:
                 return "cpuAndNeuralEngine"
+            case .mlx:
+                return "mlx"
             @unknown default:
                 return "unknown"
         }

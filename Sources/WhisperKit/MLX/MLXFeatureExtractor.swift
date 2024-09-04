@@ -8,7 +8,7 @@ import MLXFFT
 import WhisperKit
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-open class MLXFeatureExtractor: FeatureExtracting {
+open class MLXFeatureExtractor: FeatureExtracting, WhisperMLXModel {
     public let melCount: Int?
     private let nFFT: Int
     private let hopLength: Int
@@ -37,10 +37,12 @@ open class MLXFeatureExtractor: FeatureExtracting {
         )
         return try output.asType(FloatType.self).asMLXOutput().asMLMultiArray()
     }
-}
 
-extension MLXFeatureExtractor: WhisperMLXModel {
-    public func loadModel(at modelPath: URL, configPath: URL) async throws {}
+    // Stubs for WhisperMLXModel protocol, not needed
+    public typealias MLXModuleType = NSObject
+    public var model: NSObject?
+
+    public func loadModel(at modelPath: URL, configPath: URL?) async throws {}
     public func unloadModel() {}
 }
 

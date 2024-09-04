@@ -8,12 +8,13 @@ import WhisperKit
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public final class MLXTextDecoder: TextDecoding {
+    public var model: TextDecoderModule?
     public var tokenizer: (any WhisperTokenizer)?
     public var prefillData: (any WhisperMLModel)?
     public var isModelMultilingual: Bool = false
     public let supportsWordTimestamps: Bool = false
     public var logitsSize: Int? {
-        decoder?.nVocab
+        model?.nVocab
     }
 
     public var kvCacheEmbedDim: Int? {
@@ -36,7 +37,6 @@ public final class MLXTextDecoder: TextDecoding {
         return config.nTextState
     }
 
-    private var decoder: TextDecoder?
     private var config: MLXModelConfig?
     private var languageLogitsFilter: LanguageLogitsFilter?
 
@@ -117,12 +117,12 @@ public final class MLXTextDecoder: TextDecoding {
         encoderOutputEmbeds: MLMultiArray,
         decoderKeyPaddingMask: MLMultiArray
     ) async throws -> (logits: MLMultiArray?, cache: DecodingCache?)? {
-        guard let decoder else {
+        guard let model else {
             return nil
         }
         let tokens = inputIds.asMLXArray(Int32.self)
         let audioFeatures = encoderOutputEmbeds.asMLXArray(FloatType.self).asMLXInput()
-        let result = decoder(
+        let result = model(
             tokens,
             xa: audioFeatures,
             kvCache: Self.toKvCache(keyCache: keyCache, valueCache: valueCache)
@@ -462,10 +462,10 @@ public final class MLXTextDecoder: TextDecoding {
 }
 
 extension MLXTextDecoder: WhisperMLXModel {
-    public func loadModel(at modelPath: URL, configPath: URL) async throws {
+    public func loadModel(at modelPath: URL, configPath: URL?) async throws {
         let parameters = try loadParameters(at: modelPath)
         let config = try loadConfig(at: configPath)
-        let decoder = TextDecoder(
+        let decoder = TextDecoderModule(
             nVocab: config.nVocab,
             nCtx: config.nTextCtx,
             nState: config.nTextState,
@@ -475,19 +475,19 @@ extension MLXTextDecoder: WhisperMLXModel {
         )
         let loadedDecoder = try decoder.update(parameters: parameters, verify: [.noUnusedKeys])
         MLX.eval(loadedDecoder)
-        self.decoder = loadedDecoder
+        self.model = loadedDecoder
         self.config = config
     }
 
     public func unloadModel() {
-        decoder = nil
+        model = nil
         config = nil
         prefillData = nil
         languageLogitsFilter = nil
     }
 }
 
-final class TextDecoder: Module {
+public class TextDecoderModule: Module {
     let nVocab: Int
     let nCtx: Int
     let nState: Int

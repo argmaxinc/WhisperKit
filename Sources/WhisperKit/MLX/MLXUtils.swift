@@ -5,6 +5,7 @@ import CoreML
 import Foundation
 import MLX
 import MLXNN
+import WhisperKit
 
 // MARK: - Extensions
 
@@ -113,7 +114,10 @@ func loadParameters(at url: URL) throws -> NestedDictionary<String, MLXArray> {
     return ModuleParameters.unflattened(arrays)
 }
 
-func loadConfig(at url: URL) throws -> MLXModelConfig {
+func loadConfig(at configPath: URL?) throws -> MLXModelConfig {
+    guard let url = configPath else {
+        throw WhisperError.modelsUnavailable("Config path must be specified for MLX models")
+    }
     let configDecoder = JSONDecoder()
     configDecoder.keyDecodingStrategy = .convertFromSnakeCase
     return try configDecoder.decode(MLXModelConfig.self, from: Data(contentsOf: url))

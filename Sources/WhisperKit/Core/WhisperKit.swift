@@ -165,6 +165,7 @@ open class WhisperKit {
         return sortedModels
     }
 
+    @MainActor
     public static func download(
         variant: String,
         downloadBase: URL? = nil,
@@ -299,7 +300,7 @@ open class WhisperKit {
                 prewarmMode: prewarmMode
             )
             Logging.debug("Loaded feature extractor")
-        } else if let path = mlxModelFolder, let featureExtractor = featureExtractor as? WhisperMLXModel {
+        } else if let path = mlxModelFolder, let featureExtractor = featureExtractor as? (any WhisperMLXModel) {
             Logging.debug("Loading MLX feature extractor from \(path.path)")
             try await featureExtractor.loadModel(at: path, configPath: path)
             Logging.debug("Loaded MLX feature extractor")
@@ -313,7 +314,7 @@ open class WhisperKit {
                 prewarmMode: prewarmMode
             )
             Logging.debug("Loaded audio encoder")
-        } else if let path = mlxModelFolder, let audioEncoder = audioEncoder as? WhisperMLXModel {
+        } else if let path = mlxModelFolder, let audioEncoder = audioEncoder as? (any WhisperMLXModel) {
             Logging.debug("Loading MLX audio encoder from \(path.path)")
             try await audioEncoder.loadModel(
                 at: path.appending(path: "encoder.safetensors"),
@@ -330,7 +331,7 @@ open class WhisperKit {
                 prewarmMode: prewarmMode
             )
             Logging.debug("Loaded text decoder")
-        } else if let path = mlxModelFolder, let textDecoder = textDecoder as? WhisperMLXModel {
+        } else if let path = mlxModelFolder, let textDecoder = textDecoder as? (any WhisperMLXModel) {
             Logging.debug("Loading MLX text decoder from \(path.path)")
             try await textDecoder.loadModel(
                 at: path.appending(path: "decoder.safetensors"),

@@ -7,32 +7,32 @@ import MLXNN
 import WhisperKit
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-public class MLXAudioEncoder: AudioEncoding {
-    public var embedSize: Int? {
-        encoder?.nState
-    }
+public class MLXAudioEncoder: AudioEncoding, WhisperMLXModel {
+    public var model: AudioEncoderModule?
 
-    private var encoder: AudioEncoder?
+    public var embedSize: Int? {
+        model?.nState
+    }
 
     public init() {}
 
     public func encodeFeatures(_ features: MLMultiArray) async throws -> MLMultiArray? {
-        guard let encoder else {
+        guard let model else {
             throw WhisperError.modelsUnavailable()
         }
         try Task.checkCancellation()
         let inputArray = features.asMLXArray(FloatType.self)
         let input = inputArray.asMLXInput()
-        let output = encoder(input)
+        let output = model(input)
         return try output.asMLXOutput().asMLMultiArray()
     }
 }
 
-extension MLXAudioEncoder: WhisperMLXModel {
-    public func loadModel(at modelPath: URL, configPath: URL) async throws {
+extension MLXAudioEncoder {
+    public func loadModel(at modelPath: URL, configPath: URL?) async throws {
         let parameters = try loadParameters(at: modelPath)
         let config = try loadConfig(at: configPath)
-        let encoder = AudioEncoder(
+        let encoder = AudioEncoderModule(
             nMels: config.nMels,
             nCtx: config.nAudioCtx,
             nState: config.nAudioState,
@@ -42,15 +42,19 @@ extension MLXAudioEncoder: WhisperMLXModel {
         )
         let loadedEncoder = try encoder.update(parameters: parameters, verify: [.noUnusedKeys])
         MLX.eval(loadedEncoder)
-        self.encoder = encoder
+        self.model = encoder
     }
 
     public func unloadModel() {
-        encoder = nil
+        model = nil
+    }
+
+    public var modelState: ModelState {
+        return model == nil ? .unloaded : .loaded
     }
 }
 
-final class AudioEncoder: Module {
+public class AudioEncoderModule: MLXNN.Module {
     let nMels: Int
     let nCtx: Int
     let nState: Int

@@ -18,41 +18,6 @@ extension Float16: BNNSScalar {}
 extension Float16: MLShapedArrayScalar {}
 #endif
 
-// MARK: - CoreML
-
-public protocol WhisperModel: AnyObject {
-    func unloadModel()
-}
-
-public protocol WhisperMLModel: WhisperModel {
-    var model: MLModel? { get set }
-    func loadModel(at modelPath: URL, computeUnits: MLComputeUnits, prewarmMode: Bool) async throws
-}
-
-public protocol WhisperMLXModel: WhisperModel {
-    func loadModel(at modelPath: URL, configPath: URL) async throws
-}
-
-public extension WhisperMLModel {
-    func loadModel(at modelPath: URL, computeUnits: MLComputeUnits, prewarmMode: Bool = false) async throws {
-        let loadedModel = try await Task {
-            let modelConfig = MLModelConfiguration()
-            modelConfig.computeUnits = computeUnits
-            return try await MLModel.load(contentsOf: modelPath, configuration: modelConfig)
-        }.value
-
-        model = prewarmMode ? nil : loadedModel
-    }
-
-    func unloadModel() {
-        model = nil
-    }
-
-    var modelState: ModelState {
-        return model == nil ? .unloaded : .loaded
-    }
-}
-
 // MARK: - Whisper Models
 
 public enum ModelVariant: CustomStringConvertible, CaseIterable {
@@ -168,6 +133,74 @@ public struct ModelComputeOptions {
         } else {
             self.audioEncoderCompute = audioEncoderCompute ?? .cpuAndGPU
         }
+    }
+}
+
+public struct ModelInfo: Identifiable, Hashable {
+    public let id = UUID()
+    public let name: String
+    public let engine: ModelEngine
+    public let url: URL
+
+    public init(name: String, engine: ModelEngine, url: URL) {
+        self.name = name
+        self.engine = engine
+        self.url = url
+    }
+}
+
+public enum ModelEngine: String, Codable {
+    case coreML = "coreml"
+    case mlx = "mlx"
+}
+
+public protocol WhisperModel: AnyObject {
+    func unloadModel()
+    var modelState: ModelState { get }
+}
+
+// MARK: - CoreML
+
+public protocol WhisperMLModel: WhisperModel {
+    var model: MLModel? { get set }
+    func loadModel(at modelPath: URL, computeUnits: MLComputeUnits, prewarmMode: Bool) async throws
+}
+
+public extension WhisperMLModel {
+    func loadModel(at modelPath: URL, computeUnits: MLComputeUnits, prewarmMode: Bool = false) async throws {
+        let loadedModel = try await Task {
+            let modelConfig = MLModelConfiguration()
+            modelConfig.computeUnits = computeUnits
+            return try await MLModel.load(contentsOf: modelPath, configuration: modelConfig)
+        }.value
+
+        model = prewarmMode ? nil : loadedModel
+    }
+
+    func unloadModel() {
+        model = nil
+    }
+
+    var modelState: ModelState {
+        return model == nil ? .unloaded : .loaded
+    }
+}
+
+// MARK: MLX
+
+public protocol WhisperMLXModel: WhisperModel {
+    associatedtype MLXModuleType
+    var model: MLXModuleType? { get set }
+    func loadModel(at modelPath: URL, configPath: URL?) async throws
+}
+
+public extension WhisperMLXModel {
+    func unloadModel() {
+        model = nil
+    }
+
+    var modelState: ModelState {
+        return model == nil ? .unloaded : .loaded
     }
 }
 

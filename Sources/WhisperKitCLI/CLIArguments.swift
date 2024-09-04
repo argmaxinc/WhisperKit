@@ -2,10 +2,12 @@
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
 import ArgumentParser
+import WhisperKitMLX
 
-enum ModelType: String, Decodable, ExpressibleByArgument {
-    case coreML = "coreml"
-    case mlx = "mlx"
+extension ModelType: ExpressibleByArgument {
+    public init?(argument: String) {
+        self.init(rawValue: argument.lowercased())
+    }
 }
 
 struct CLIArguments: ParsableArguments {
