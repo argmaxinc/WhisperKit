@@ -36,37 +36,43 @@ extension MLXArray {
     }
 }
 
-extension MLXArray {
-    var contiguousStrides: [Int] {
-        var contiguousStrides = [1]
-        var stride = 1
-        for dimension in shape.dropFirst().reversed() {
-            stride = stride * dimension
-            contiguousStrides.append(stride)
-        }
-        contiguousStrides.reverse()
-        return contiguousStrides
-    }
-}
+//extension MLXArray {
+//    var contiguousStrides: [Int] {
+//        var contiguousStrides = [1]
+//        var stride = 1
+//        for dimension in shape.dropFirst().reversed() {
+//            stride = stride * dimension
+//            contiguousStrides.append(stride)
+//        }
+//        contiguousStrides.reverse()
+//        return contiguousStrides
+//    }
+//}
 
 extension MLXArray {
     func asMLMultiArray() throws -> MLMultiArray {
+
         let dataType = multiArrayDataType()
         // a buffer to be passed to CoreML
         let buffer = UnsafeMutableRawPointer.allocate(byteCount: nbytes, alignment: 8)
         // copy the data from the MLXArray backing into buffer
-        asData(noCopy: true).withUnsafeBytes { ptr in
+        let dataStartTime = CFAbsoluteTimeGetCurrent()
+        asData(access: .noCopy).data.withUnsafeBytes { ptr in
             let destination = UnsafeMutableRawBufferPointer(start: buffer, count: nbytes)
             ptr.copyBytes(to: destination)
         }
         // `contiguousStrides` has to used, see the [discussion](https://github.com/ml-explore/mlx-swift/issues/117)
-        return try MLMultiArray(
+        let time = Date()
+        let outputArray = try MLMultiArray(
             dataPointer: buffer,
             shape: shape.map { NSNumber(value: $0) },
             dataType: dataType,
-            strides: contiguousStrides.map { NSNumber(value: $0) },
+            strides: strides.map { NSNumber(value: $0) },
             deallocator: { $0.deallocate() }
         )
+        Logging.debug("Time to convert to multi array: \(Date().timeIntervalSince(time))")
+
+        return outputArray
     }
 }
 

@@ -7,9 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		161136102B3F6C68003C20F6 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1611360F2B3F6C68003C20F6 /* WhisperKit */; };
 		1612D45D2C87D9ED009BB384 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1612D45C2C87D9ED009BB384 /* WhisperKit */; };
 		1612D45F2C87D9ED009BB384 /* WhisperKitMLX in Frameworks */ = {isa = PBXBuildFile; productRef = 1612D45E2C87D9ED009BB384 /* WhisperKitMLX */; };
+		167209782C88BF3F0010BE5F /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 167209772C88BF3F0010BE5F /* WhisperKit */; };
 		1677AFC22B57618A008C61C0 /* WhisperAXApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1677AFAB2B57618A008C61C0 /* WhisperAXApp.swift */; };
 		1677AFC42B57618A008C61C0 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1677AFAE2B57618A008C61C0 /* Preview Assets.xcassets */; };
 		1677AFC92B57618A008C61C0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1677AFB42B57618A008C61C0 /* Assets.xcassets */; };
@@ -111,7 +111,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				161136102B3F6C68003C20F6 /* WhisperKit in Frameworks */,
+				167209782C88BF3F0010BE5F /* WhisperKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -296,7 +296,7 @@
 			);
 			name = "WhisperAX Watch App";
 			packageProductDependencies = (
-				1611360F2B3F6C68003C20F6 /* WhisperKit */,
+				167209772C88BF3F0010BE5F /* WhisperKit */,
 			);
 			productName = "Basic Watch App";
 			productReference = 161135DE2B3F66DA003C20F6 /* WhisperAX Watch App.app */;
@@ -441,7 +441,6 @@
 			);
 			mainGroup = 167B34552B05431E0076F261;
 			packageReferences = (
-				16D581062B4F7DCE000C0AB0 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
 				1612D45B2C87D9ED009BB384 /* XCLocalSwiftPackageReference "../../../WhisperKit" */,
 			);
 			productRefGroup = 167B345F2B05431E0076F261 /* Products */;
@@ -1121,17 +1120,6 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		16D581062B4F7DCE000C0AB0 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.3.0;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
 /* Begin XCSwiftPackageProductDependency section */
 		1612D45C2C87D9ED009BB384 /* WhisperKit */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -1140,6 +1128,11 @@
 		1612D45E2C87D9ED009BB384 /* WhisperKitMLX */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = WhisperKitMLX;
+		};
+		167209772C88BF3F0010BE5F /* WhisperKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1612D45B2C87D9ED009BB384 /* XCLocalSwiftPackageReference "../../../WhisperKit" */;
+			productName = WhisperKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

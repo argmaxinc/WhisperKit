@@ -108,7 +108,7 @@ func mlxProducts() -> [Product] {
 func mlxDependencies() -> [Package.Dependency] {
     guard !isMLXDisabled() else { return [] }
     return [
-        .package(url: "https://github.com/ml-explore/mlx-swift", exact: "0.16.0"),
+        .package(url: "https://github.com/davidkoski/mlx-swift", revision: "3314bc684f0ccab1793be54acddaea16c0501d3c"),
     ]
 }
 
