@@ -4,23 +4,23 @@
 import Foundation
 
 /// A base class for Voice Activity Detection (VAD), used to identify and separate segments of audio that contain human speech from those that do not.
-///Subclasses must implement the `voiceActivity(in:)` method to provide specific voice activity detection functionality.
+/// Subclasses must implement the `voiceActivity(in:)` method to provide specific voice activity detection functionality.
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 class VoiceActivityDetector {
     /// The sample rate of the audio signal, in samples per second.
     var sampleRate: Int
-    
+
     /// The length of each frame in samples.
     var frameLengthSamples: Int
-    
+
     // The number of samples overlapping between consecutive frames.
     var frameOverlapSamples: Int
-    
+
     /// Initializes a new `VoiceActivityDetector` instance with the specified parameters.
     /// - Parameters:
-    /// - sampleRate: The sample rate of the audio signal in samples per second. Defaults to 16000.
-    /// - frameLengthSamples: The length of each frame in samples.
-    /// - frameOverlapSamples: The number of samples overlapping between consecutive frames. Defaults to 0.
+    ///   - sampleRate: The sample rate of the audio signal in samples per second. Defaults to 16000.
+    ///   - frameLengthSamples: The length of each frame in samples.
+    ///   - frameOverlapSamples: The number of samples overlapping between consecutive frames. Defaults to 0.
     /// - Note: Subclasses should override the `voiceActivity(in:)` method to provide specific VAD functionality.
     init(
         sampleRate: Int = 16000,
@@ -31,7 +31,7 @@ class VoiceActivityDetector {
         self.frameLengthSamples = frameLengthSamples
         self.frameOverlapSamples = frameOverlapSamples
     }
-    
+
     /// Analyzes the provided audio waveform to determine which segments contain voice activity.
     /// - Parameter waveform: An array of `Float` values representing the audio waveform.
     /// - Returns: An array of `Bool` values where `true` indicates the presence of voice activity and `false` indicates silence.
@@ -45,15 +45,15 @@ class VoiceActivityDetector {
     func calculateActiveChunks(in waveform: [Float]) -> [(startIndex: Int, endIndex: Int)] {
         let vad: [Bool] = voiceActivity(in: waveform)
         var result = [(startIndex: Int, endIndex: Int)]()
-        
+
         // Temporary variables to hold the start of the current non-silent segment
         var currentStartIndex: Int?
-        
+
         for (index, vadChunk) in vad.enumerated() {
             if vadChunk {
                 let chunkStart = index * frameLengthSamples
                 let chunkEnd = min(chunkStart + frameLengthSamples, waveform.count)
-                
+
                 if currentStartIndex != nil {
                     // If we already have a starting point, just update the end point in the last added segment
                     result[result.count - 1].endIndex = chunkEnd
@@ -67,21 +67,21 @@ class VoiceActivityDetector {
                 currentStartIndex = nil
             }
         }
-        
+
         return result
     }
-    
+
     /// Converts a voice activity index to the corresponding audio sample index.
     /// - Parameter index: The voice activity index to convert.
     /// - Returns: The corresponding audio sample index.
     func voiceActivityIndexToAudioSampleIndex(_ index: Int) -> Int {
         return index * frameLengthSamples
     }
-    
+
     func voiceActivityIndexToSeconds(_ index: Int) -> Float {
         return Float(voiceActivityIndexToAudioSampleIndex(index)) / Float(sampleRate)
     }
-    
+
     /// Identifies the longest continuous period of silence within the provided voice activity detection results.
     /// - Parameter vadResult: An array of `Bool` values representing voice activity detection results.
     /// - Returns: A tuple containing the start and end indices of the longest silence period, or `nil` if no silence is found.
@@ -116,41 +116,41 @@ class VoiceActivityDetector {
             return nil
         }
     }
-    
+
     // MARK - Utility
-    
+
     func voiceActivityClipTimestamps(in waveform: [Float]) -> [Float] {
         let nonSilentChunks = calculateActiveChunks(in: waveform)
         var clipTimestamps = [Float]()
-        
+
         for chunk in nonSilentChunks {
             let startTimestamp = Float(chunk.startIndex) / Float(sampleRate)
             let endTimestamp = Float(chunk.endIndex) / Float(sampleRate)
-            
+
             clipTimestamps.append(contentsOf: [startTimestamp, endTimestamp])
         }
-        
+
         return clipTimestamps
     }
-    
+
     func calculateNonSilentSeekClips(in waveform: [Float]) -> [(start: Int, end: Int)] {
         let clipTimestamps = voiceActivityClipTimestamps(in: waveform)
         let options = DecodingOptions(clipTimestamps: clipTimestamps)
         let seekClips = prepareSeekClips(contentFrames: waveform.count, decodeOptions: options)
         return seekClips
     }
-    
+
     func calculateSeekTimestamps(in waveform: [Float]) -> [(startTime: Float, endTime: Float)] {
         let nonSilentChunks = calculateActiveChunks(in: waveform)
         var seekTimestamps = [(startTime: Float, endTime: Float)]()
-        
+
         for chunk in nonSilentChunks {
             let startTimestamp = Float(chunk.startIndex) / Float(sampleRate)
             let endTimestamp = Float(chunk.endIndex) / Float(sampleRate)
-            
+
             seekTimestamps.append(contentsOf: [(startTime: startTimestamp, endTime: endTimestamp)])
         }
-        
+
         return seekTimestamps
     }
 }
