@@ -78,7 +78,7 @@ public extension MLXFeatureExtractor {
                 return MLX.concatenated([prefix, x, suffix])
         }
     }
-
+    
     static func stft(
         _ x: MLXArray,
         window: MLXArray,

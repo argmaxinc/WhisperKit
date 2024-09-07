@@ -31,11 +31,11 @@ public struct KV {
 
 public struct MLXDecodingCache {
     public var kvCache: [KV]
-    public var alignmentWeights: MLXArray?
+    public var alignmentWeights: [MLXArray?]
 
     public init(
         kvCache: [KV],
-        alignmentWeights: MLXArray?
+        alignmentWeights: [MLXArray?]
     ) {
         self.kvCache = kvCache
         self.alignmentWeights = alignmentWeights
@@ -45,6 +45,7 @@ public struct MLXDecodingCache {
 struct TextDecoderResult {
     var logits: MLXArray
     var kvCache: [KV]
+    var alignmentWeights: [MLXArray?]
 }
 
 struct ResidualAttentionBlockResult {

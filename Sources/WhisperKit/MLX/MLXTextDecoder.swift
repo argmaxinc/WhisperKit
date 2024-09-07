@@ -140,7 +140,7 @@ public final class MLXTextDecoder: TextDecoding {
 
         let decodingCache = MLXDecodingCache(
             kvCache: result.kvCache,
-            alignmentWeights: nil
+            alignmentWeights: result.alignmentWeights
         )
         Logging.debug("Time to cache time: \(Date().timeIntervalSince(time2))")
 
@@ -320,7 +320,8 @@ public final class MLXTextDecoder: TextDecoding {
                 decoderInputs.kvCacheUpdateMask[tokenIndex + 1] = 1
 
                 // Update alignment weights for token if present
-//                if let newAlignmentWeights = decoderOutput.cache?.alignmentWeights {
+                // TODO: use correct alignment heads
+//                if let newAlignmentWeights = try decoderOutput.cache?.alignmentWeights {
 //                    hasAlignment = true
 //                    for column in 0..<decoderInputs.alignmentWeights.shape[1].intValue {
 //                        let alignmentWeightIndex = [tokenIndex + 1, column] as [NSNumber] // +1 to account for SOT
@@ -556,21 +557,25 @@ public class TextDecoderModule: Module {
         var x = x[.newAxis, .ellipsis]
         x = tokenEmbedding(x) + positionalEmbedding[offset..<offset + x.shape[x.shape.count - 1]]
         var kvCache: [KV?] = kvCache ?? Array(repeating: nil, count: blocks.count)
+        var crossQK: [MLXArray?] = Array(repeating: nil, count: blocks.count)
+
         for (index, block) in blocks.enumerated() {
             let result = block(x, xa: xa, mask: _mask, kvCache: kvCache[index])
             x = result.x
             kvCache[index] = result.kv
+            crossQK[index] = result.crossQk
         }
         x = ln(x)
         return TextDecoderResult(
             logits: tokenEmbedding.asLinear(x),
-            kvCache: kvCache.compactMap { $0 }
+            kvCache: kvCache.compactMap { $0 },
+            alignmentWeights: crossQK.compactMap { $0 }
         )
     }
 }
 
-// class FastLayerNorm: LayerNorm {
-//     override func callAsFunction(_ x: MLXArray) -> MLXArray {
-//         MLXFast.layerNorm(x, weight: weight, bias: bias, eps: 1e-5)
-//     }
-// }
+class FastLayerNorm: LayerNorm {
+    override func callAsFunction(_ x: MLXArray) -> MLXArray {
+        MLXFast.layerNorm(x, weight: weight, bias: bias, eps: 1e-5)
+    }
+}
