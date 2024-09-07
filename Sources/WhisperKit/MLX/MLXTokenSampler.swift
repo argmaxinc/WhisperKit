@@ -1,12 +1,12 @@
 //  For licensing see accompanying LICENSE.md file.
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
+import CoreML
+import Foundation
 import MLX
 import MLXNN
 import MLXRandom
 import WhisperKit
-import Foundation
-import CoreML
 
 open class MLXGreedyTokenSampler: TokenSampling {
     public var temperature: Float
@@ -38,7 +38,7 @@ open class MLXGreedyTokenSampler: TokenSampling {
             let sortedIndices = MLX.argSort(softmaxOutput, axis: -1)
 
             // Implement top-k selection (argSort is ascending)
-            let topKIndices = MLXArray(-decodingOptions.topK ..< 0)
+            let topKIndices = MLXArray(-decodingOptions.topK..<0)
             let sortedProbs = take(softmaxOutput, sortedIndices, axis: -1)
             let bestValues = sortedProbs.take(topKIndices, axis: -1)
             let bestIndices = sortedIndices.take(topKIndices, axis: -1)

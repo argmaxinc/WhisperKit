@@ -38,7 +38,7 @@ open class MLXFeatureExtractor: FeatureExtracting, WhisperMLXModel {
         return try output.asType(FloatType.self).asMLXOutput().asMLMultiArray()
     }
 
-    // Stubs for WhisperMLXModel protocol, not needed
+    /// Stubs for WhisperMLXModel protocol, not needed
     public typealias MLXModuleType = NSObject
     public var model: NSObject?
 
@@ -78,7 +78,7 @@ public extension MLXFeatureExtractor {
                 return MLX.concatenated([prefix, x, suffix])
         }
     }
-    
+
     static func stft(
         _ x: MLXArray,
         window: MLXArray,

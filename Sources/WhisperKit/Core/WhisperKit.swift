@@ -440,7 +440,7 @@ open class WhisperKit {
         guard textDecoder.isModelMultilingual else {
             throw WhisperError.decodingFailed("Language detection not supported for this model")
         }
-        
+
         // Tokenizer required for decoding
         guard let tokenizer else {
             throw WhisperError.tokenizerUnavailable()

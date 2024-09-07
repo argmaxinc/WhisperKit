@@ -5,7 +5,6 @@ import CoreML
 import MLX
 import MLXNN
 import WhisperKit
-import MLXFast
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public final class MLXTextDecoder: TextDecoding {
@@ -603,11 +602,5 @@ public class TextDecoderModule: Module {
             kvCache: kvCache.compactMap { $0 },
             alignmentWeights: crossQK.compactMap { $0 }
         )
-    }
-}
-
-class FastLayerNorm: LayerNorm {
-    override func callAsFunction(_ x: MLXArray) -> MLXArray {
-        MLXFast.layerNorm(x, weight: weight, bias: bias, eps: 1e-5)
     }
 }

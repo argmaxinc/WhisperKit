@@ -36,18 +36,6 @@ extension MLXArray {
     }
 }
 
-//extension MLXArray {
-//    var contiguousStrides: [Int] {
-//        var contiguousStrides = [1]
-//        var stride = 1
-//        for dimension in shape.dropFirst().reversed() {
-//            stride = stride * dimension
-//            contiguousStrides.append(stride)
-//        }
-//        contiguousStrides.reverse()
-//        return contiguousStrides
-//    }
-//}
 
 extension MLXArray {
     func asMLMultiArray() throws -> MLMultiArray {

@@ -151,7 +151,7 @@ public struct ModelInfo: Identifiable, Hashable {
 
 public enum ModelEngine: String, Codable {
     case coreML = "coreml"
-    case mlx = "mlx"
+    case mlx
 }
 
 public protocol WhisperModel: AnyObject {
@@ -479,9 +479,9 @@ public struct DecodingResult {
 
     public init(
         language: String,
-        languageProbs: [String : Float],
+        languageProbs: [String: Float],
         tokens: [Int],
-        tokenLogProbs: [[Int : Float]],
+        tokenLogProbs: [[Int: Float]],
         text: String,
         avgLogProb: Float,
         noSpeechProb: Float,

@@ -21,15 +21,15 @@ public protocol TextDecoding {
         withPrompt initialPrompt: [Int]
     ) throws -> DecodingInputs
 
-   func predictLogits(
-       inputIds: MLMultiArray,
-       cacheLength: MLMultiArray,
-       keyCache: MLMultiArray?,
-       valueCache: MLMultiArray?,
-       kvCacheUpdateMask: MLMultiArray,
-       encoderOutputEmbeds: MLMultiArray,
-       decoderKeyPaddingMask: MLMultiArray
-   ) async throws -> (logits: MLMultiArray?, cache: DecodingCache?)?
+    func predictLogits(
+        inputIds: MLMultiArray,
+        cacheLength: MLMultiArray,
+        keyCache: MLMultiArray?,
+        valueCache: MLMultiArray?,
+        kvCacheUpdateMask: MLMultiArray,
+        encoderOutputEmbeds: MLMultiArray,
+        decoderKeyPaddingMask: MLMultiArray
+    ) async throws -> (logits: MLMultiArray?, cache: DecodingCache?)?
 
     func prefillKVCache(
         withTask task: MLMultiArray,
@@ -503,7 +503,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         guard let model, let keyCache, let valueCache else {
             return nil
         }
-        
+
         let modelInputs = TextDecoderInput(
             input_ids: inputIds,
             cache_length: cacheLength,
@@ -800,7 +800,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
                 break
             }
         }
-        
+
         // Cleanup the early stop flag after loop completion
         if shouldEarlyStop.removeValue(forKey: windowUUID) == nil {
             Logging.error("Early stop flag not found for window: \(windowUUID)")

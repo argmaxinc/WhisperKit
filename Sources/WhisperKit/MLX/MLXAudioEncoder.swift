@@ -28,8 +28,8 @@ public class MLXAudioEncoder: AudioEncoding, WhisperMLXModel {
     }
 }
 
-extension MLXAudioEncoder {
-    public func loadModel(at modelPath: URL, configPath: URL?) async throws {
+public extension MLXAudioEncoder {
+    func loadModel(at modelPath: URL, configPath: URL?) async throws {
         let parameters = try loadParameters(at: modelPath)
         let config = try loadConfig(at: configPath)
         let encoder = AudioEncoderModule(
@@ -45,11 +45,11 @@ extension MLXAudioEncoder {
         self.model = encoder
     }
 
-    public func unloadModel() {
+    func unloadModel() {
         model = nil
     }
 
-    public var modelState: ModelState {
+    var modelState: ModelState {
         return model == nil ? .unloaded : .loaded
     }
 }
