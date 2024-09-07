@@ -2,9 +2,10 @@
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
 import ArgumentParser
+import WhisperKit
 import WhisperKitMLX
 
-extension ModelType: ExpressibleByArgument {
+extension ModelEngine: ExpressibleByArgument {
     public init?(argument: String) {
         self.init(rawValue: argument.lowercased())
     }
@@ -42,13 +43,13 @@ struct CLIArguments: ParsableArguments {
     var downloadTokenizerPath: String?
 
     @Option(help: "Which feature extractor to use (supported: `coreml` and `mlx`)")
-    var featureExtractorType: ModelType = .coreML
+    var featureExtractorType: ModelEngine = .coreML
 
     @Option(help: "Which audio encoder to use (supported: `coreml` and `mlx`)")
-    var audioEncoderType: ModelType = .coreML
+    var audioEncoderType: ModelEngine = .coreML
 
     @Option(help: "Which text decoder to use (supported: `coreml` and `mlx`)")
-    var textDecoderType: ModelType = .coreML
+    var textDecoderType: ModelEngine = .coreML
 
     @Option(help: "Compute units for audio encoder model with {all,cpuOnly,cpuAndGPU,cpuAndNeuralEngine,random}")
     var audioEncoderComputeUnits: ComputeUnits = .cpuAndNeuralEngine

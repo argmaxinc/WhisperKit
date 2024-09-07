@@ -51,7 +51,6 @@ extension MLXArray {
 
 extension MLXArray {
     func asMLMultiArray() throws -> MLMultiArray {
-
         let dataType = multiArrayDataType()
         // a buffer to be passed to CoreML
         let buffer = UnsafeMutableRawPointer.allocate(byteCount: nbytes, alignment: 8)
@@ -61,7 +60,6 @@ extension MLXArray {
             let destination = UnsafeMutableRawBufferPointer(start: buffer, count: nbytes)
             ptr.copyBytes(to: destination)
         }
-        // `contiguousStrides` has to used, see the [discussion](https://github.com/ml-explore/mlx-swift/issues/117)
         let time = Date()
         let outputArray = try MLMultiArray(
             dataPointer: buffer,
@@ -70,13 +68,12 @@ extension MLXArray {
             strides: strides.map { NSNumber(value: $0) },
             deallocator: { $0.deallocate() }
         )
-        Logging.debug("Time to convert to multi array: \(Date().timeIntervalSince(time))")
 
         return outputArray
     }
 }
 
-extension MLXArray {
+public extension MLXArray {
     func multiArrayDataType() -> MLMultiArrayDataType {
         switch dtype {
             case .bool, .bfloat16, .complex64,

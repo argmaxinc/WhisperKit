@@ -312,35 +312,35 @@ final class MLXUnitTests: XCTestCase {
 
     // MARK: - Utils Tests
 
-    func testContiguousStrides() {
+    func testStrides() {
         let count = 24
         let arr1 = MLXArray(0..<count, [count]).asType(Int32.self)
-        XCTAssertEqual(arr1.contiguousStrides, [1])
+        XCTAssertEqual(arr1.asData(access: .noCopy).strides, [1])
 
         let arr2 = MLXArray(0..<count, [2, count / 2]).asType(Int32.self)
-        XCTAssertEqual(arr2.contiguousStrides, [12, 1])
+        XCTAssertEqual(arr2.asData(access: .noCopy).strides, [12, 1])
 
         let arr3 = MLXArray(0..<count, [2, count / 2]).asType(Int32.self).asMLXInput()
-        XCTAssertEqual(arr3.contiguousStrides, [24, 2, 1])
+        XCTAssertEqual(arr3.asData(access: .noCopy).strides, [12, 1, 12])
     }
 
     func testArrayConversion() throws {
         let count = 16
         let arr1 = MLXArray(0..<count, [2, count / 2]).asType(Int32.self)
         let arr2 = try arr1.asMLMultiArray().asMLXArray(Int32.self)
-        XCTAssertEqual(arr2.contiguousStrides, [8, 1])
+        XCTAssertEqual(arr2.asData(access: .noCopy).strides, [8, 1])
         XCTAssertTrue(MLX.allClose(arr1, arr2).item(), "Array conversion failed")
 
         let arr3 = arr1.asMLXOutput().asMLXInput()
-        XCTAssertEqual(arr3.contiguousStrides, [16, 8, 1])
+        XCTAssertEqual(arr3.asData(access: .noCopy).strides, [16, 8, 1])
         XCTAssertTrue(MLX.allClose(arr1, arr3).item(), "Input output conversion failed")
 
         let arr4 = try arr1.asMLXOutput().asMLXInput().asMLMultiArray().asMLXArray(Int32.self)
-        XCTAssertEqual(arr4.contiguousStrides, [16, 8, 1])
+        XCTAssertEqual(arr4.asData(access: .noCopy).strides, [16, 8, 1])
         XCTAssertTrue(MLX.allClose(arr1, arr4).item(), "Complex conversion failed")
 
         let arr5 = try arr1.asMLXOutput().asMLMultiArray().asMLXArray(Int32.self).asMLXInput()
-        XCTAssertEqual(arr5.contiguousStrides, [16, 8, 1])
+        XCTAssertEqual(arr5.asData(access: .noCopy).strides, [16, 8, 1])
         XCTAssertTrue(MLX.allClose(arr1, arr5).item(), "Complex conversion failed")
     }
 

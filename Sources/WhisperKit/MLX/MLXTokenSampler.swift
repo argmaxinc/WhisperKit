@@ -6,25 +6,9 @@ import MLXNN
 import MLXRandom
 import WhisperKit
 import Foundation
+import CoreML
 
-public protocol MLXTokenSampling {
-    func update(tokens: [Int], logits: MLXArray, logProbs: [Float]) -> SamplingResult
-    func finalize(tokens: [Int], logProbs: [Float]) -> SamplingResult
-}
-
-public struct SamplingResult {
-    public var tokens: [Int]
-    public var logProbs: [Float]
-    public var completed: Bool
-
-    public init(tokens: [Int], logProbs: [Float], completed: Bool) {
-        self.tokens = tokens
-        self.logProbs = logProbs
-        self.completed = completed
-    }
-}
-
-open class MLXGreedyTokenSampler: MLXTokenSampling {
+open class MLXGreedyTokenSampler: TokenSampling {
     public var temperature: Float
     public var eotToken: Int
     public var decodingOptions: DecodingOptions
@@ -33,6 +17,10 @@ open class MLXGreedyTokenSampler: MLXTokenSampling {
         self.temperature = temperature
         self.eotToken = eotToken
         self.decodingOptions = decodingOptions
+    }
+
+    public func update(tokens: [Int], logits: MLMultiArray, logProbs: [Float]) -> SamplingResult {
+        return update(tokens: tokens, logits: logits.asMLXArray(FloatType.self), logProbs: logProbs)
     }
 
     public func update(tokens: [Int], logits: MLXArray, logProbs: [Float]) -> SamplingResult {

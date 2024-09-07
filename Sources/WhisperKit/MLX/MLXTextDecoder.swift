@@ -8,7 +8,7 @@ import WhisperKit
 import MLXFast
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-public final class MLXTextDecoder: TextDecoding {   
+public final class MLXTextDecoder: TextDecoding {
     public var model: TextDecoderModule?
     public var tokenizer: (any WhisperTokenizer)?
     public var prefillData: (any WhisperMLModel)?
@@ -42,6 +42,16 @@ public final class MLXTextDecoder: TextDecoding {
     private var languageLogitsFilter: LanguageLogitsFilter?
 
     public init() {}
+
+    private static func toKvCache(keyCache: MLMultiArray?, valueCache: MLMultiArray?) -> [KV]? {
+        guard let keyCache, let valueCache else {
+            return nil
+        }
+        let keyCacheMlx = keyCache.asMLXArray(FloatType.self)
+        let valueCacheMlx = valueCache.asMLXArray(FloatType.self)
+
+        return toKvCache(keyCache: keyCacheMlx, valueCache: valueCacheMlx)
+    }
 
     private static func toKvCache(keyCache: MLXArray?, valueCache: MLXArray?) -> [KV]? {
         guard let keyCache, let valueCache else {
@@ -111,40 +121,65 @@ public final class MLXTextDecoder: TextDecoding {
     public func predictLogits(
         inputIds: MLMultiArray,
         cacheLength: MLMultiArray,
-        keyCache: MLXArray?,
-        valueCache: MLXArray?,
+        keyCache: MLMultiArray?,
+        valueCache: MLMultiArray?,
         kvCacheUpdateMask: MLMultiArray,
         encoderOutputEmbeds: MLMultiArray,
         decoderKeyPaddingMask: MLMultiArray
-    ) async throws -> (logits: MLXArray?, cache: MLXDecodingCache?)? {
-        let time3 = Date()
+    ) async throws -> (logits: MLMultiArray?, cache: DecodingCache?)? {
+        let result = try await predictLogits(
+            inputIds: inputIds,
+            cacheLength: cacheLength,
+            keyCache: keyCache?.asMLXArray(FloatType.self),
+            valueCache: valueCache?.asMLXArray(FloatType.self),
+            kvCacheUpdateMask: kvCacheUpdateMask,
+            encoderOutputEmbeds: encoderOutputEmbeds.asMLXArray(FloatType.self).asMLXInput(),
+            decoderKeyPaddingMask: decoderKeyPaddingMask
+        )
 
+        guard let result = result,
+              let keyCacheResult = result.cache?.kvCache.map(\.k),
+              let valueCacheResult = result.cache?.kvCache.map(\.v)
+        else { return nil }
+
+        let keyCache = try? MLX.stacked(keyCacheResult).asMLMultiArray()
+        let valueCache = try? MLX.stacked(valueCacheResult).asMLMultiArray()
+        let decodingCache = DecodingCache(
+            keyCache: keyCache,
+            valueCache: valueCache,
+            alignmentWeights: nil
+        )
+
+        let logits = try? result.logits?.asMLMultiArray()
+
+        return (logits, decodingCache)
+    }
+
+    public func predictLogits(
+        inputIds: MLMultiArray,
+        cacheLength: MLMultiArray,
+        keyCache: MLXArray?,
+        valueCache: MLXArray?,
+        kvCacheUpdateMask: MLMultiArray,
+        encoderOutputEmbeds: MLXArray,
+        decoderKeyPaddingMask: MLMultiArray
+    ) async throws -> (logits: MLXArray?, cache: MLXDecodingCache?)? {
         guard let model else {
             return nil
         }
         let tokens = inputIds.asMLXArray(Int32.self)
-        let audioFeatures = encoderOutputEmbeds.asMLXArray(FloatType.self).asMLXInput()
-        Logging.debug("Time to prepare input time: \(Date().timeIntervalSince(time3))")
-
-        let time = Date()
         let result = model(
             tokens,
-            xa: audioFeatures,
+            xa: encoderOutputEmbeds,
             kvCache: Self.toKvCache(keyCache: keyCache, valueCache: valueCache)
         )
-        MLX.eval(result.logits)
-
-        Logging.debug("Time to Inference time: \(Date().timeIntervalSince(time))")
-
-        let time2 = Date()
 
         let decodingCache = MLXDecodingCache(
             kvCache: result.kvCache,
             alignmentWeights: result.alignmentWeights
         )
-        Logging.debug("Time to cache time: \(Date().timeIntervalSince(time2))")
 
-        return try (result.logits, decodingCache)
+        return (result.logits, decodingCache)
     }
 
     public func decodeText(
@@ -160,7 +195,6 @@ public final class MLXTextDecoder: TextDecoding {
         }
 
         let tokenSampler = MLXGreedyTokenSampler(temperature: Float(options.temperature), eotToken: tokenizer.specialTokens.endToken, decodingOptions: options)
-
 
         // Single loop variables
         var timings = TranscriptionTimings()
@@ -210,6 +244,7 @@ public final class MLXTextDecoder: TextDecoding {
         var isFirstTokenLogProbTooLow = false
         var keyCache = decoderInputs.keyCache?.asMLXArray(FloatType.self)
         var valueCache = decoderInputs.valueCache?.asMLXArray(FloatType.self)
+        let encoderOutput = encoderOutput.asMLXArray(FloatType.self).asMLXInput()
         for tokenIndex in prefilledIndex..<loopCount {
             let loopStart = Date()
 
@@ -245,14 +280,14 @@ public final class MLXTextDecoder: TextDecoding {
                 decoderKeyPaddingMask: decoderInputs.decoderKeyPaddingMask
             )
 
-            let decodingInferenceTime = Date().timeIntervalSince(inferenceTime)
-            timings.decodingPredictions += decodingInferenceTime
-
-            Logging.debug("Time to inference: \(decodingInferenceTime)")
-
             guard let decoderOutput = predictedLogits else {
                 throw WhisperError.decodingLogitsFailed("Unable to decode logits")
             }
+
+            var logits = try decoderOutput.logits!.asMLMultiArray()
+
+            let decodingInferenceTime = Date().timeIntervalSince(inferenceTime)
+            timings.decodingPredictions += decodingInferenceTime
 
             let kvStartTime = Date()
 
@@ -268,10 +303,9 @@ public final class MLXTextDecoder: TextDecoding {
             let nonInferenceStartTime = Date()
 
             // Update predicted token as current
-//            var logits = try decoderOutput.logits!.asMLMultiArray()
-//            for filter in logitsFilters {
-//                logits = filter.filterLogits(logits, withTokens: currentTokens)
-//            }
+            for filter in logitsFilters {
+                logits = filter.filterLogits(logits, withTokens: currentTokens)
+            }
 
             let filteringTime = Date().timeIntervalSince(nonInferenceStartTime)
             timings.decodingFiltering += filteringTime
@@ -279,9 +313,7 @@ public final class MLXTextDecoder: TextDecoding {
             // MARK: Sampling
 
             let samplingStartTime = Date()
-
-            var logits = try decoderOutput.logits!//.asMLMultiArray()
-            let sampleResult = tokenSampler.update(tokens: currentTokens, logits: logits, logProbs: logProbs)
+            let sampleResult = tokenSampler.update(tokens: currentTokens, logits: logits.asMLXArray(FloatType.self), logProbs: logProbs)
 
             nextToken = sampleResult.tokens.last!
             let nextTokenLogProb = sampleResult.logProbs.last!
@@ -320,7 +352,7 @@ public final class MLXTextDecoder: TextDecoding {
                 decoderInputs.kvCacheUpdateMask[tokenIndex + 1] = 1
 
                 // Update alignment weights for token if present
-                // TODO: use correct alignment heads
+                // TODO: use alignment heads
 //                if let newAlignmentWeights = try decoderOutput.cache?.alignmentWeights {
 //                    hasAlignment = true
 //                    for column in 0..<decoderInputs.alignmentWeights.shape[1].intValue {

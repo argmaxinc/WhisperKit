@@ -21,15 +21,15 @@ public protocol TextDecoding {
         withPrompt initialPrompt: [Int]
     ) throws -> DecodingInputs
 
-//    func predictLogits(
-//        inputIds: MLMultiArray,
-//        cacheLength: MLMultiArray,
-//        keyCache: MLMultiArray?,
-//        valueCache: MLMultiArray?,
-//        kvCacheUpdateMask: MLMultiArray,
-//        encoderOutputEmbeds: MLMultiArray,
-//        decoderKeyPaddingMask: MLMultiArray
-//    ) async throws -> (logits: MLMultiArray?, cache: DecodingCache?)?
+   func predictLogits(
+       inputIds: MLMultiArray,
+       cacheLength: MLMultiArray,
+       keyCache: MLMultiArray?,
+       valueCache: MLMultiArray?,
+       kvCacheUpdateMask: MLMultiArray,
+       encoderOutputEmbeds: MLMultiArray,
+       decoderKeyPaddingMask: MLMultiArray
+   ) async throws -> (logits: MLMultiArray?, cache: DecodingCache?)?
 
     func prefillKVCache(
         withTask task: MLMultiArray,
@@ -376,63 +376,61 @@ public extension TextDecoding {
         let inferenceTime = Date()
 
         Logging.debug("Detecting language...")
-//        let predictedLogits = try await textDecoder.predictLogits(
-//            inputIds: decoderInputs.inputIds,
-//            cacheLength: decoderInputs.cacheLength,
-//            keyCache: decoderInputs.keyCache,
-//            valueCache: decoderInputs.valueCache,
-//            kvCacheUpdateMask: decoderInputs.kvCacheUpdateMask,
-//            encoderOutputEmbeds: encoderOutput,
-//            decoderKeyPaddingMask: decoderInputs.decoderKeyPaddingMask
-//        )
-//
-//        guard let decoderOutput = predictedLogits else {
-//            Logging.error("Unable to decode logits")
-//            throw WhisperError.decodingLogitsFailed()
-//        }
-//
-//        let decodingInferenceTime = Date().timeIntervalSince(inferenceTime)
-//        timings.decodingPredictions += decodingInferenceTime
-//
-//        // MARK: Non-inference
-//
-//        // Update predicted token as current
-//        let logits = languageLogitsFilter.filterLogits(decoderOutput.logits!, withTokens: currentTokens)
-//
-//        // MARK: Sampling
-//
-//        let samplingStartTime = Date()
-//
-//        let sampleResult = tokenSampler.update(tokens: currentTokens, logits: logits, logProbs: logProbs)
-//
-//        nextToken = sampleResult.tokens.last!
-//        logProbs = sampleResult.logProbs
-//
-//        let samplingTime = Date().timeIntervalSince(samplingStartTime)
-//        timings.decodingSampling += samplingTime
-//
-//        var languageProbs = [String: Float]()
-//        for (tokenIndex, token) in sampleResult.tokens.enumerated() {
-//            if tokenizer.allLanguageTokens.contains(token) {
-//                let language = tokenizer.decode(tokens: [token]).trimmingSpecialTokenCharacters()
-//                languageProbs[language] = sampleResult.logProbs[tokenIndex]
-//            }
-//        }
-//
-//        let sampledLanguage = tokenizer.decode(tokens: [nextToken]).trimmingSpecialTokenCharacters()
-//        let detectedLanguage: String
-//        if Constants.languageCodes.contains(sampledLanguage) {
-//            detectedLanguage = sampledLanguage
-//            Logging.debug("Detected language: \(sampledLanguage)")
-//        } else {
-//            detectedLanguage = Constants.defaultLanguageCode
-//            Logging.error("Detected language \(sampledLanguage) is not supported, defaulting to \(Constants.defaultLanguageCode)")
-//        }
+        let predictedLogits = try await textDecoder.predictLogits(
+            inputIds: decoderInputs.inputIds,
+            cacheLength: decoderInputs.cacheLength,
+            keyCache: decoderInputs.keyCache,
+            valueCache: decoderInputs.valueCache,
+            kvCacheUpdateMask: decoderInputs.kvCacheUpdateMask,
+            encoderOutputEmbeds: encoderOutput,
+            decoderKeyPaddingMask: decoderInputs.decoderKeyPaddingMask
+        )
+
+        guard let decoderOutput = predictedLogits else {
+            Logging.error("Unable to decode logits")
+            throw WhisperError.decodingLogitsFailed()
+        }
+
+        let decodingInferenceTime = Date().timeIntervalSince(inferenceTime)
+        timings.decodingPredictions += decodingInferenceTime
+
+        // MARK: Non-inference
+
+        // Update predicted token as current
+        let logits = languageLogitsFilter.filterLogits(decoderOutput.logits!, withTokens: currentTokens)
+
+        // MARK: Sampling
+
+        let samplingStartTime = Date()
+
+        let sampleResult = tokenSampler.update(tokens: currentTokens, logits: logits, logProbs: logProbs)
+
+        nextToken = sampleResult.tokens.last!
+        logProbs = sampleResult.logProbs
+
+        let samplingTime = Date().timeIntervalSince(samplingStartTime)
+        timings.decodingSampling += samplingTime
+
+        var languageProbs = [String: Float]()
+        for (tokenIndex, token) in sampleResult.tokens.enumerated() {
+            if tokenizer.allLanguageTokens.contains(token) {
+                let language = tokenizer.decode(tokens: [token]).trimmingSpecialTokenCharacters()
+                languageProbs[language] = sampleResult.logProbs[tokenIndex]
+            }
+        }
+
+        let sampledLanguage = tokenizer.decode(tokens: [nextToken]).trimmingSpecialTokenCharacters()
+        let detectedLanguage: String
+        if Constants.languageCodes.contains(sampledLanguage) {
+            detectedLanguage = sampledLanguage
+            Logging.debug("Detected language: \(sampledLanguage)")
+        } else {
+            detectedLanguage = Constants.defaultLanguageCode
+            Logging.error("Detected language \(sampledLanguage) is not supported, defaulting to \(Constants.defaultLanguageCode)")
+        }
         return DecodingResult(
-//            language: detectedLanguage,
-//            languageProbs: languageProbs,
-            language: Constants.defaultLanguageCode,
-            languageProbs: [:],
+            language: detectedLanguage,
+            languageProbs: languageProbs,
             tokens: [],
             tokenLogProbs: [],
             text: "",
