@@ -18,6 +18,7 @@ final class UnitTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         self.tinyModelPath = try tinyModelPath()
+        Logging.shared.logLevel = .debug
     }
 
     // MARK: - Model Loading Test
@@ -59,6 +60,37 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(audioBufferWithStartTimeAndEndTime.frameLength, AVAudioFrameCount(16000 * (3.4 - 1.2)))
     }
 
+    func testAudioFileLoadingWithResampling() throws {
+        let audioFilePath = try XCTUnwrap(
+            Bundle.module.path(forResource: "jfk_441khz", ofType: "m4a"),
+            "Audio file not found"
+        )
+        let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
+        XCTAssertNotNil(audioBuffer, "Failed to load audio file at path: \(audioFilePath)")
+        XCTAssertEqual(audioBuffer.format.sampleRate, 16000)
+        XCTAssertEqual(audioBuffer.format.channelCount, 1)
+        XCTAssertEqual(audioBuffer.frameLength, 176_000)
+
+        // Test start time and end time with varying max frame sizes
+        let audioBufferWithStartTime1 = try AudioProcessor.loadAudio(fromPath: audioFilePath, startTime: 1.2)
+        XCTAssertEqual(audioBufferWithStartTime1.frameLength, AVAudioFrameCount(156_800))
+        XCTAssertEqual(audioBufferWithStartTime1.frameLength, AVAudioFrameCount(16000 * (11 - 1.2)))
+
+        let audioBufferWithStartTimeAndEndTime1 = try AudioProcessor.loadAudio(fromPath: audioFilePath, startTime: 1.2, endTime: 3.4)
+        XCTAssertEqual(audioBufferWithStartTimeAndEndTime1.frameLength, AVAudioFrameCount(35200))
+        XCTAssertEqual(audioBufferWithStartTimeAndEndTime1.frameLength, AVAudioFrameCount(16000 * (3.4 - 1.2)))
+
+        // NOTE: depending on frameSize, the final frame lengths will match due to integer division between sample rates
+        let frameSize = AVAudioFrameCount(10024)
+        let audioBufferWithStartTime2 = try AudioProcessor.loadAudio(fromPath: audioFilePath, startTime: 1.2, maxReadFrameSize: frameSize)
+        XCTAssertEqual(audioBufferWithStartTime2.frameLength, AVAudioFrameCount(156_800))
+        XCTAssertEqual(audioBufferWithStartTime2.frameLength, AVAudioFrameCount(16000 * (11 - 1.2)))
+
+        let audioBufferWithStartTimeAndEndTime2 = try AudioProcessor.loadAudio(fromPath: audioFilePath, startTime: 1.2, endTime: 3.4, maxReadFrameSize: frameSize)
+        XCTAssertEqual(audioBufferWithStartTimeAndEndTime2.frameLength, AVAudioFrameCount(35200))
+        XCTAssertEqual(audioBufferWithStartTimeAndEndTime2.frameLength, AVAudioFrameCount(16000 * (3.4 - 1.2)))
+    }
+
     func testAudioPad() {
         let audioSamples = [Float](repeating: 0.0, count: 1000)
         let paddedSamples = AudioProcessor.padOrTrimAudio(fromArray: audioSamples, startAt: 0, toLength: 1600)
@@ -93,8 +125,6 @@ final class UnitTests: XCTestCase {
     }
 
     func testAudioResampleFromFile() throws {
-        Logging.shared.logLevel = .debug
-
         let audioFileURL = try XCTUnwrap(
             TestResource.url(forResource: "jfk", withExtension: "wav"),
             "Audio file not found"
@@ -991,7 +1021,7 @@ final class UnitTests: XCTestCase {
         let result1 = tokensFilter1.filterLogits(logits1, withTokens: [])
         XCTAssertEqual(result1.data(for: 2), [-.infinity, -.infinity, 0.3, -.infinity, 0.5, -.infinity, 0.7])
 
-        let tokensFilter2 = LanguageLogitsFilter(allLanguageTokens: [2, 4, 6], logitsDim: 7, sampleBegin: 0)
+        let tokensFilter2 = LanguageLogitsFilter(allLanguageTokens: [2, 4, 6], logitsDim: 7, sampleBegin: 2)
         let logits2 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
         let result2 = tokensFilter2.filterLogits(logits2, withTokens: [1])
         XCTAssertEqual(result2.data(for: 2), [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
@@ -1195,7 +1225,6 @@ final class UnitTests: XCTestCase {
 
     func testVADAudioChunker() async throws {
         let chunker = VADAudioChunker()
-        Logging.shared.logLevel = .debug
 
         let singleChunkPath = try XCTUnwrap(
             TestResource.path(forResource: "jfk", ofType: "wav"),

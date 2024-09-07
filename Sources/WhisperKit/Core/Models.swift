@@ -2,6 +2,7 @@
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
 import Accelerate
+import AVFAudio
 import CoreML
 import Hub
 import NaturalLanguage
@@ -641,6 +642,10 @@ public struct TranscriptionResult: Codable {
         Decoding Full Loop:  \(decodingLoopInfo)
         -------------------------------
         Model Load Time:               \(String(format: "%.2f", timings.modelLoading)) seconds
+        - Prewarm:                     \(String(format: "%.2f", timings.prewarmLoadTime)) seconds
+        - Encoder:                     \(String(format: "%.2f", timings.encoderLoadTime)) seconds
+        - Decoder:                     \(String(format: "%.2f", timings.decoderLoadTime)) seconds
+        - Tokenizer:                   \(String(format: "%.2f", timings.tokenizerLoadTime)) seconds
         Inference Duration (Global):   \(String(format: "%.2f", timings.fullPipeline)) seconds
         - Decoding Loop (Avg/window):  \(String(format: "%.2f", decodeTimePerWindow)) seconds
         - Audio Windows:               \(String(format: "%.2f", timings.totalAudioProcessingRuns))
@@ -706,6 +711,7 @@ public struct TranscriptionProgress {
         self.temperature = temperature
         self.avgLogprob = avgLogprob
         self.compressionRatio = compressionRatio
+        self.windowId = windowId
     }
 }
 
@@ -726,6 +732,10 @@ public struct TranscriptionTimings: Codable {
     public var firstTokenTime: CFAbsoluteTime
     public var inputAudioSeconds: TimeInterval
     public var modelLoading: TimeInterval
+    public var prewarmLoadTime: TimeInterval
+    public var encoderLoadTime: TimeInterval
+    public var decoderLoadTime: TimeInterval
+    public var tokenizerLoadTime: TimeInterval
     public var audioLoading: TimeInterval
     public var audioProcessing: TimeInterval
     public var logmels: TimeInterval
@@ -766,6 +776,10 @@ public struct TranscriptionTimings: Codable {
 
     /// Initialize with all time intervals set to zero.
     public init(modelLoading: TimeInterval = 0,
+                prewarmLoadTime: TimeInterval = 0,
+                encoderLoadTime: TimeInterval = 0,
+                decoderLoadTime: TimeInterval = 0,
+                tokenizerLoadTime: TimeInterval = 0,
                 audioLoading: TimeInterval = 0,
                 audioProcessing: TimeInterval = 0,
                 logmels: TimeInterval = 0,
@@ -795,6 +809,10 @@ public struct TranscriptionTimings: Codable {
         self.firstTokenTime = Double.greatestFiniteMagnitude
         self.inputAudioSeconds = 0.001
         self.modelLoading = modelLoading
+        self.prewarmLoadTime = prewarmLoadTime
+        self.encoderLoadTime = encoderLoadTime
+        self.decoderLoadTime = decoderLoadTime
+        self.tokenizerLoadTime = tokenizerLoadTime
         self.audioLoading = audioLoading
         self.audioProcessing = audioProcessing
         self.logmels = logmels
@@ -1520,4 +1538,6 @@ public enum Constants {
     public static let languageCodes: Set<String> = Set(languages.values)
 
     public static let defaultLanguageCode: String = "en"
+
+    public static let defaultAudioReadFrameSize: AVAudioFrameCount = 1_323_000 // 30s of audio at commonly found 44.1khz sample rate
 }
