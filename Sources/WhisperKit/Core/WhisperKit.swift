@@ -170,10 +170,11 @@ open class WhisperKit {
         variant: String,
         downloadBase: URL? = nil,
         useBackgroundSession: Bool = false,
+        hfToken: String? = nil,
         from repo: String = "argmaxinc/whisperkit-coreml",
         progressCallback: ((Progress) -> Void)? = nil
     ) async throws -> URL {
-        let hubApi = HubApi(downloadBase: downloadBase, useBackgroundSession: useBackgroundSession)
+        let hubApi = HubApi(downloadBase: downloadBase, hfToken: hfToken, useBackgroundSession: useBackgroundSession)
         let repo = Hub.Repo(id: repo, type: .models)
         let modelSearchPath = "*\(variant.description)/*"
         do {

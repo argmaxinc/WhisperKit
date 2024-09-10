@@ -141,15 +141,15 @@ public final class MLXTextDecoder: TextDecoding {
               let valueCacheResult = result.cache?.kvCache.map(\.v)
         else { return nil }
 
-        let keyCache = try? MLX.stacked(keyCacheResult).asMLMultiArray()
-        let valueCache = try? MLX.stacked(valueCacheResult).asMLMultiArray()
+        let keyCache = try MLX.stacked(keyCacheResult).asMLMultiArray()
+        let valueCache = try MLX.stacked(valueCacheResult).asMLMultiArray()
         let decodingCache = DecodingCache(
             keyCache: keyCache,
             valueCache: valueCache,
             alignmentWeights: nil
         )
 
-        let logits = try? result.logits?.asMLMultiArray()
+        let logits = try result.logits?.asMLMultiArray()
 
         return (logits, decodingCache)
     }
