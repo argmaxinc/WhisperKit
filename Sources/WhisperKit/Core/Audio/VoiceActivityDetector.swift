@@ -6,15 +6,15 @@ import Foundation
 /// A base class for Voice Activity Detection (VAD), used to identify and separate segments of audio that contain human speech from those that do not.
 /// Subclasses must implement the `voiceActivity(in:)` method to provide specific voice activity detection functionality.
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-class VoiceActivityDetector {
+open class VoiceActivityDetector {
     /// The sample rate of the audio signal, in samples per second.
-    var sampleRate: Int
+    public let sampleRate: Int
 
     /// The length of each frame in samples.
-    var frameLengthSamples: Int
+    public let frameLengthSamples: Int
 
-    // The number of samples overlapping between consecutive frames.
-    var frameOverlapSamples: Int
+    /// The number of samples overlapping between consecutive frames.
+    public let frameOverlapSamples: Int
 
     /// Initializes a new `VoiceActivityDetector` instance with the specified parameters.
     /// - Parameters:
@@ -22,7 +22,7 @@ class VoiceActivityDetector {
     ///   - frameLengthSamples: The length of each frame in samples.
     ///   - frameOverlapSamples: The number of samples overlapping between consecutive frames. Defaults to 0.
     /// - Note: Subclasses should override the `voiceActivity(in:)` method to provide specific VAD functionality.
-    init(
+    public init(
         sampleRate: Int = 16000,
         frameLengthSamples: Int,
         frameOverlapSamples: Int = 0
@@ -35,14 +35,14 @@ class VoiceActivityDetector {
     /// Analyzes the provided audio waveform to determine which segments contain voice activity.
     /// - Parameter waveform: An array of `Float` values representing the audio waveform.
     /// - Returns: An array of `Bool` values where `true` indicates the presence of voice activity and `false` indicates silence.
-    func voiceActivity(in waveform: [Float]) -> [Bool] {
+    open func voiceActivity(in waveform: [Float]) -> [Bool] {
         fatalError("`voiceActivity` must be implemented by subclass")
     }
 
     /// Calculates and returns a list of active audio chunks, each represented by a start and end index.
     /// - Parameter waveform: An array of `Float` values representing the audio waveform.
     /// - Returns: An array of tuples where each tuple contains the start and end indices of an active audio chunk.
-    func calculateActiveChunks(in waveform: [Float]) -> [(startIndex: Int, endIndex: Int)] {
+    public func calculateActiveChunks(in waveform: [Float]) -> [(startIndex: Int, endIndex: Int)] {
         let vad: [Bool] = voiceActivity(in: waveform)
         var result = [(startIndex: Int, endIndex: Int)]()
 
@@ -74,18 +74,18 @@ class VoiceActivityDetector {
     /// Converts a voice activity index to the corresponding audio sample index.
     /// - Parameter index: The voice activity index to convert.
     /// - Returns: The corresponding audio sample index.
-    func voiceActivityIndexToAudioSampleIndex(_ index: Int) -> Int {
+    public func voiceActivityIndexToAudioSampleIndex(_ index: Int) -> Int {
         return index * frameLengthSamples
     }
 
-    func voiceActivityIndexToSeconds(_ index: Int) -> Float {
+    public func voiceActivityIndexToSeconds(_ index: Int) -> Float {
         return Float(voiceActivityIndexToAudioSampleIndex(index)) / Float(sampleRate)
     }
 
     /// Identifies the longest continuous period of silence within the provided voice activity detection results.
     /// - Parameter vadResult: An array of `Bool` values representing voice activity detection results.
     /// - Returns: A tuple containing the start and end indices of the longest silence period, or `nil` if no silence is found.
-    func findLongestSilence(in vadResult: [Bool]) -> (startIndex: Int, endIndex: Int)? {
+    public func findLongestSilence(in vadResult: [Bool]) -> (startIndex: Int, endIndex: Int)? {
         var longestStartIndex: Int?
         var longestEndIndex: Int?
         var longestCount = 0

@@ -2,7 +2,7 @@
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
 import CoreML
-@testable import WhisperKit
+import WhisperKit
 import XCTest
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)

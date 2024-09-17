@@ -717,13 +717,14 @@ open class WhisperKit {
         let isChunkable = audioArray.count > WhisperKit.windowSamples
         switch (isChunkable, decodeOptions?.chunkingStrategy) {
             case (true, .vad):
-                // We have some audio that will require multiple windows and a strategy to chunk them
-                let chunker = VADAudioChunker()
-                let audioChunks: [AudioChunk] = try await chunker.chunkAll(
-                    audioArray: audioArray,
-                    maxChunkLength: WhisperKit.windowSamples,
-                    decodeOptions: decodeOptions
-                )
+            // We have some audio that will require multiple windows and a strategy to chunk them
+            let vad = decodeOptions?.voiceActivityDetector ?? EnergyVAD()
+            let chunker = VADAudioChunker(vad: vad)
+            let audioChunks: [AudioChunk] = try await chunker.chunkAll(
+                audioArray: audioArray,
+                maxChunkLength: WhisperKit.windowSamples,
+                decodeOptions: decodeOptions
+            )
 
                 // Reset the seek times since we've already chunked the audio
                 var chunkedOptions = decodeOptions
