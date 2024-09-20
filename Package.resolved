@@ -3,9 +3,10 @@
     {
       "identity" : "mlx-swift",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/davidkoski/mlx-swift.git",
+      "location" : "https://github.com/ml-explore/mlx-swift",
       "state" : {
-        "revision" : "3314bc684f0ccab1793be54acddaea16c0501d3c"
+        "revision" : "f27763bef455d76f9455e9dfc6704a6b2859fa26",
+        "version" : "0.16.2"
       }
     },
     {

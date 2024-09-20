@@ -16,7 +16,7 @@ let package = Package(
             name: "WhisperKit",
             targets: ["WhisperKit"]
         ),
-    ] + (!isMLXDisabled() ? [
+    ] + (isMLXEnabled() ? [
         .executable(
             name: "whisperkit-cli",
             targets: ["WhisperKitCLI"]
@@ -29,8 +29,8 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/huggingface/swift-transformers.git", exact: "0.1.7"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", exact: "1.3.0"),
-    ] + (!isMLXDisabled() ? [
-        .package(url: "https://github.com/davidkoski/mlx-swift.git", revision: "3314bc684f0ccab1793be54acddaea16c0501d3c"),
+    ] + (isMLXEnabled() ? [
+        .package(url: "https://github.com/ml-explore/mlx-swift", exact: "0.16.2"),
     ] : []),
     targets: [
         .target(
@@ -71,7 +71,7 @@ let package = Package(
                 .process("Sources/WhisperKitTestsUtils/Resources")
             ]
         ),
-    ] + (!isMLXDisabled() ? [
+    ] + (isMLXEnabled() ? [
         .target(
             name: "WhisperKitMLX",
             dependencies: [
@@ -108,8 +108,15 @@ let package = Package(
 
 // NOTE: `MLX` doesn't support `watchOS` yet, that's why we control the build using the `MLX_DISABLED` environment variable.
 // To manualy build for `watchOS` use:
-// `export MLX_DISABLED=1 && xcodebuild clean build-for-testing -scheme whisperkit -sdk watchos10.4 -destination 'platform=watchOS Simulator,OS=10.5,name=Apple Watch Ultra 2 (49mm)' -skipPackagePluginValidation`
+// MLX_DISABLED=1 xcodebuild clean build-for-testing -scheme whisperkit -sdk watchos -destination 'platform=watchOS Simulator,name=Apple Watch Ultra 2 (49mm)' -skipPackagePluginValidation
+// or with swift build:
+// MLX_DISABLED=1 swift build -c release
 
-func isMLXDisabled() -> Bool {
-    ProcessInfo.processInfo.environment["MLX_DISABLED"] == "1"
+func isMLXEnabled() -> Bool {
+    if let disabledValue = ProcessInfo.processInfo.environment["MLX_DISABLED"] {
+        return disabledValue.lowercased() == "true" || disabledValue == "1"
+    }
+
+    // Default enabled
+    return true
 }

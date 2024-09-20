@@ -62,7 +62,7 @@ final class UnitTests: XCTestCase {
 
     func testAudioFileLoadingWithResampling() throws {
         let audioFilePath = try XCTUnwrap(
-            Bundle.module.path(forResource: "jfk_441khz", ofType: "m4a"),
+            TestResource.path(forResource: "jfk_441khz", ofType: "m4a"),
             "Audio file not found"
         )
         let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)

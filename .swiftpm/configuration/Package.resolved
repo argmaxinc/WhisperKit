@@ -1,18 +1,6 @@
 {
   "pins" : [
     {
-<<<<<<< HEAD
-      "identity" : "mlx-swift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/ml-explore/mlx-swift",
-      "state" : {
-        "revision" : "597aaa5f465b4b9a17c8646b751053f84e37925b",
-        "version" : "0.16.0"
-      }
-    },
-    {
-=======
->>>>>>> main
       "identity" : "swift-argument-parser",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-argument-parser.git",
@@ -22,18 +10,6 @@
       }
     },
     {
-<<<<<<< HEAD
-      "identity" : "swift-numerics",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-numerics",
-      "state" : {
-        "revision" : "0a5bc04095a675662cf24757cc0640aa2204253b",
-        "version" : "1.0.2"
-      }
-    },
-    {
-=======
->>>>>>> main
       "identity" : "swift-transformers",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/huggingface/swift-transformers.git",
