@@ -3,6 +3,7 @@
 
 import SwiftUI
 import WhisperKit
+import WhisperKitMLX
 #if canImport(UIKit)
 import UIKit
 #elseif canImport(AppKit)
@@ -21,14 +22,15 @@ struct ContentView: View {
     @State var currentText: String = ""
     @State var currentChunks: [Int: (chunkText: [String], fallbacks: Int)] = [:]
     // TODO: Make this configurable in the UI
-    @State var modelStorage: String = "huggingface/models/argmaxinc/whisperkit-coreml"
+    @State var modelStorage: String = "huggingface/models"
 
     // MARK: Model management
 
     @State private var modelState: ModelState = .unloaded
-    @State private var localModels: [String] = []
-    @State private var localModelPath: String = ""
+    @State private var localModels: [ModelInfo] = []
     @State private var availableModels: [String] = []
+    @State private var localModelPath: String = ""
+    @State private var localMLXModelPath: String = ""
     @State private var availableLanguages: [String] = []
     @State private var disabledModels: [String] = WhisperKit.recommendedModels().disabled
 
@@ -38,6 +40,7 @@ struct ContentView: View {
     @AppStorage("selectedTask") private var selectedTask: String = "transcribe"
     @AppStorage("selectedLanguage") private var selectedLanguage: String = "english"
     @AppStorage("repoName") private var repoName: String = "argmaxinc/whisperkit-coreml"
+    @AppStorage("mlxRepoName") private var mlxRepoName: String = "argmaxinc/whisperkit-mlx"
     @AppStorage("enableTimestamps") private var enableTimestamps: Bool = true
     @AppStorage("enablePromptPrefill") private var enablePromptPrefill: Bool = true
     @AppStorage("enableCachePrefill") private var enableCachePrefill: Bool = true
@@ -353,13 +356,15 @@ struct ContentView: View {
                         Picker("", selection: $selectedModel) {
                             ForEach(availableModels, id: \.self) { model in
                                 HStack {
-                                    let modelIcon = localModels.contains { $0 == model.description } ? "checkmark.circle" : "arrow.down.circle.dotted"
-                                    Text("\(Image(systemName: modelIcon)) \(model.description.components(separatedBy: "_").dropFirst().joined(separator: " "))").tag(model.description)
+                                    let modelIcon = localModels.contains(where: { $0.name == model.description }) ? "checkmark.circle" : "arrow.down.circle.dotted"
+                                    let modelName: String = model.description.components(separatedBy: "_").dropFirst().joined(separator: " ")
+                                    Text("\(Image(systemName: modelIcon)) \(modelName)").tag(model.description)
                                 }
                             }
                         }
                         .pickerStyle(MenuPickerStyle())
-                        .onChange(of: selectedModel, initial: false) { _, _ in
+                        .onChange(of: selectedModel, initial: false) { _, newValue in
+                            print("Selected model: \(newValue)")
                             modelState = .unloaded
                         }
                     } else {
@@ -376,13 +381,15 @@ struct ContentView: View {
                     .help("Delete model")
                     .buttonStyle(BorderlessButtonStyle())
                     .disabled(localModels.count == 0)
-                    .disabled(!localModels.contains(selectedModel))
+                    .disabled(!localModels.contains(where: { $0.name == selectedModel }))
 
                     #if os(macOS)
                     Button(action: {
-                        let folderURL = whisperKit?.modelFolder ?? (localModels.contains(selectedModel) ? URL(fileURLWithPath: localModelPath) : nil)
-                        if let folder = folderURL {
-                            NSWorkspace.shared.open(folder)
+                        if let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+                            let modelPath = documents.appendingPathComponent(modelStorage)
+                            if modelPath.hasDirectoryPath {
+                                NSWorkspace.shared.open(modelPath)
+                            }
                         }
                     }, label: {
                         Image(systemName: "folder")
@@ -442,7 +449,7 @@ struct ContentView: View {
             VStack(alignment: .leading) {
                 HStack {
                     Image(systemName: "circle.fill")
-                        .foregroundStyle((whisperKit?.audioEncoder as? WhisperMLModel)?.modelState == .loaded ? .green : (modelState == .unloaded ? .red : .yellow))
+                        .foregroundStyle((whisperKit?.audioEncoder as? WhisperModel)?.modelState == .loaded ? .green : (modelState == .unloaded ? .red : .yellow))
                         .symbolEffect(.variableColor, isActive: modelState != .loaded && modelState != .unloaded)
                     Text("Audio Encoder")
                     Spacer()
@@ -450,6 +457,7 @@ struct ContentView: View {
                         Text("CPU").tag(MLComputeUnits.cpuOnly)
                         Text("GPU").tag(MLComputeUnits.cpuAndGPU)
                         Text("Neural Engine").tag(MLComputeUnits.cpuAndNeuralEngine)
+                        Text("MLX").tag(MLComputeUnits.mlx)
                     }
                     .onChange(of: encoderComputeUnits, initial: false) { _, _ in
                         loadModel(selectedModel)
@@ -459,7 +467,7 @@ struct ContentView: View {
                 }
                 HStack {
                     Image(systemName: "circle.fill")
-                        .foregroundStyle((whisperKit?.textDecoder as? WhisperMLModel)?.modelState == .loaded ? .green : (modelState == .unloaded ? .red : .yellow))
+                        .foregroundStyle((whisperKit?.textDecoder as? WhisperModel)?.modelState == .loaded ? .green : (modelState == .unloaded ? .red : .yellow))
                         .symbolEffect(.variableColor, isActive: modelState != .loaded && modelState != .unloaded)
                     Text("Text Decoder")
                     Spacer()
@@ -467,6 +475,7 @@ struct ContentView: View {
                         Text("CPU").tag(MLComputeUnits.cpuOnly)
                         Text("GPU").tag(MLComputeUnits.cpuAndGPU)
                         Text("Neural Engine").tag(MLComputeUnits.cpuAndNeuralEngine)
+                        Text("MLX").tag(MLComputeUnits.mlx)
                     }
                     .onChange(of: decoderComputeUnits, initial: false) { _, _ in
                         loadModel(selectedModel)
@@ -520,7 +529,6 @@ struct ContentView: View {
     var controlsView: some View {
         VStack {
             basicSettingsView
-
             if let selectedCategoryId, let item = menu.first(where: { $0.id == selectedCategoryId }) {
                 switch item.name {
                     case "Transcribe":
@@ -934,28 +942,33 @@ struct ContentView: View {
     // MARK: - Logic
 
     func fetchModels() {
-        availableModels = [selectedModel]
-
         // First check what's already downloaded
-        if let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-            let modelPath = documents.appendingPathComponent(modelStorage).path
+        availableModels.removeAll()
+        localModels.removeAll()
 
-            // Check if the directory exists
-            if FileManager.default.fileExists(atPath: modelPath) {
-                localModelPath = modelPath
+        if let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let modelPath = documents.appendingPathComponent(modelStorage)
+            let subdirectories = [repoName, mlxRepoName]
+
+            for subdirectory in subdirectories {
+                let localRepoPath = modelPath.appendingPathComponent(subdirectory)
+                let modelType: ModelEngine = subdirectory == repoName ? .coreML : .mlx
+
                 do {
-                    let downloadedModels = try FileManager.default.contentsOfDirectory(atPath: modelPath)
-                    for model in downloadedModels where !localModels.contains(model) {
-                        localModels.append(model)
+                    let downloadedModels = try FileManager.default.contentsOfDirectory(at: localRepoPath, includingPropertiesForKeys: nil)
+                    for modelURL in downloadedModels where modelURL.hasDirectoryPath {
+                        let modelName = modelURL.lastPathComponent
+                        let modelInfo = ModelInfo(name: modelName, engine: modelType, url: modelURL)
+                        localModels.append(modelInfo)
                     }
                 } catch {
-                    print("Error enumerating files at \(modelPath): \(error.localizedDescription)")
+                    print("Error enumerating files at \(localRepoPath): \(error.localizedDescription)")
                 }
             }
         }
 
-        localModels = WhisperKit.formatModelFiles(localModels)
-        for model in localModels {
+        let formattedLocalModels = WhisperKit.formatModelFiles(localModels.map { $0.name })
+        for model in formattedLocalModels {
             if !availableModels.contains(model),
                !disabledModels.contains(model)
             {
@@ -963,22 +976,53 @@ struct ContentView: View {
             }
         }
 
-        print("Found locally: \(localModels)")
+        print("Found locally: \(localModels.map { $0.name })")
         print("Previously selected model: \(selectedModel)")
 
+        // Fetch remote models and add them to availableModels if they're not already local
         Task {
             let remoteModels = try await WhisperKit.fetchAvailableModels(from: repoName)
             for model in remoteModels {
                 if !availableModels.contains(model),
-                   !disabledModels.contains(model)
-                {
+                   !disabledModels.contains(model) {
                     availableModels.append(model)
                 }
             }
+
+            let remoteMLXModels = try await WhisperKit.fetchAvailableModels(from: mlxRepoName)
+            for model in remoteMLXModels {
+                if !availableModels.contains(model),
+                   !disabledModels.contains(model) {
+                    availableModels.append(model)
+                }
+            }
+
+            print("Available models: \(availableModels)")
+            print("Selected model: \(selectedModel)")
         }
     }
 
     func loadModel(_ model: String, redownload: Bool = false) {
+        // Print selected model and compute options for debugging
+        printModelInfo()
+        
+        // Reset the WhisperKit instance
+        resetWhisperKit()
+        
+        Task {
+            do {
+                try await initializeWhisperKit()
+                let (folder, mlxFolder) = try await downloadModelFolders(model: model, redownload: redownload)
+                setupPipelineComponents(folder: folder, mlxFolder: mlxFolder)
+                try await prewarmAndLoadModels()
+                await updateLocalModels(model: model, folder: folder, mlxFolder: mlxFolder)
+            } catch {
+                await handleModelLoadError(error: error, model: model, redownload: redownload)
+            }
+        }
+    }
+
+    private func printModelInfo() {
         print("Selected Model: \(UserDefaults.standard.string(forKey: "selectedModel") ?? "nil")")
         print("""
             Computing Options:
@@ -987,109 +1031,193 @@ struct ContentView: View {
             - Text Decoder:     \(getComputeOptions().textDecoderCompute.description)
             - Prefill Data:     \(getComputeOptions().prefillCompute.description)
         """)
+    }
 
+    private func resetWhisperKit() {
+        // Reset the current WhisperKit instance
         whisperKit = nil
-        Task {
-            whisperKit = try await WhisperKit(
-                computeOptions: getComputeOptions(),
-                verbose: true,
-                logLevel: .debug,
-                prewarm: false,
-                load: false,
-                download: false
-            )
-            guard let whisperKit = whisperKit else {
-                return
+    }
+
+    private func initializeWhisperKit() async throws {
+        // Initialize a new WhisperKit instance with the current compute options
+        whisperKit = try await WhisperKit(
+            computeOptions: getComputeOptions(),
+            verbose: true,
+            logLevel: .debug,
+            prewarm: false,
+            load: false,
+            download: false
+        )
+    }
+
+    private func downloadModelFolders(model: String, redownload: Bool) async throws -> (URL?, URL?) {
+        guard whisperKit != nil else { return (nil, nil) }
+
+        var folder: URL?
+        var mlxFolder: URL?
+
+        // Check if the model is available locally
+        let needsCoreMLModel = encoderComputeUnits != .mlx || decoderComputeUnits != .mlx
+        if needsCoreMLModel {
+            folder = try await downloadCoreMLModelIfNeeded(model: model, redownload: redownload)
+        }
+
+        // Check if MLX model is needed based on compute units
+        let needsMLXModel = encoderComputeUnits == .mlx || decoderComputeUnits == .mlx
+        if needsMLXModel {
+            mlxFolder = try await downloadMLXModelIfNeeded(model: model, redownload: redownload)
+        }
+
+        await MainActor.run {
+            loadingProgressValue = specializationProgressRatio
+            modelState = .downloaded
+        }
+
+        return (folder, mlxFolder)
+    }
+
+    private func downloadCoreMLModelIfNeeded(model: String, redownload: Bool) async throws -> URL? {
+        if localModels.contains(where: { $0.name == model && $0.engine == .coreML }) && !redownload {
+            // Get local model folder URL from localModels
+            // TODO: Make this configurable in the UI
+            return localModels.first(where: { $0.name == model && $0.engine == .coreML })?.url
+        } else {
+            // Download the model
+            return try await WhisperKit.download(variant: model, from: repoName, progressCallback: updateDownloadProgress)
+        }
+    }
+
+    private func downloadMLXModelIfNeeded(model: String, redownload: Bool) async throws -> URL? {
+        if localModels.contains(where: { $0.name == model && $0.engine == .mlx }) && !redownload {
+            return localModels.first(where: { $0.name == model && $0.engine == .mlx })?.url
+        } else {
+            return try await WhisperKit.download(variant: model, from: mlxRepoName, progressCallback: updateDownloadProgress)
+        }
+    }
+
+    private func updateDownloadProgress(_ progress: Progress) {
+        DispatchQueue.main.async {
+            loadingProgressValue = Float(progress.fractionCompleted) * specializationProgressRatio
+            modelState = .downloading
+        }
+    }
+
+    private func setupPipelineComponents(folder: URL?, mlxFolder: URL?) {
+        guard let whisperKit = whisperKit else { return }
+        
+        // Set up CoreML components if needed
+        if let modelFolder = folder {
+            whisperKit.modelFolder = modelFolder
+            if encoderComputeUnits != .mlx || decoderComputeUnits != .mlx {
+                whisperKit.featureExtractor = FeatureExtractor()
             }
-
-            var folder: URL?
-
-            // Check if the model is available locally
-            if localModels.contains(model) && !redownload {
-                // Get local model folder URL from localModels
-                // TODO: Make this configurable in the UI
-                folder = URL(fileURLWithPath: localModelPath).appendingPathComponent(model)
-            } else {
-                // Download the model
-                folder = try await WhisperKit.download(variant: model, from: repoName, progressCallback: { progress in
-                    DispatchQueue.main.async {
-                        loadingProgressValue = Float(progress.fractionCompleted) * specializationProgressRatio
-                        modelState = .downloading
-                    }
-                })
+            if encoderComputeUnits != .mlx {
+                whisperKit.audioEncoder = AudioEncoder()
             }
+            if decoderComputeUnits != .mlx {
+                whisperKit.textDecoder = TextDecoder()
+            }
+        }
 
+        // Set up MLX components if needed
+        if let mlxModelFolder = mlxFolder {
+            whisperKit.mlxModelFolder = mlxModelFolder
+            if encoderComputeUnits == .mlx || decoderComputeUnits == .mlx {
+                whisperKit.featureExtractor = MLXFeatureExtractor()
+            }
+            if encoderComputeUnits == .mlx {
+                whisperKit.audioEncoder = MLXAudioEncoder()
+            }
+            if decoderComputeUnits == .mlx {
+                whisperKit.textDecoder = MLXTextDecoder()
+            }
+        }
+    }
+
+    private func prewarmAndLoadModels() async throws {
+        guard let whisperKit = whisperKit else { return }
+        
+        await MainActor.run {
+            loadingProgressValue = specializationProgressRatio
+            modelState = .prewarming
+        }
+        
+        let progressBarTask = Task {
+            await updateProgressBar(targetProgress: 0.9, maxTime: 240)
+        }
+        
+        // Prewarm models
+        do {
+            try await whisperKit.prewarmModels()
+            progressBarTask.cancel()
+        } catch {
+            print("Error prewarming models, retrying: \(error.localizedDescription)")
+            progressBarTask.cancel()
+            throw error
+        }
+        
+        await MainActor.run {
+            loadingProgressValue = specializationProgressRatio + 0.9 * (1 - specializationProgressRatio)
+            modelState = .loading
+        }
+        
+        try await whisperKit.loadModels()
+    }
+
+    private func updateLocalModels(model: String, folder: URL?, mlxFolder: URL?) async {
+        await MainActor.run {
+            // Add newly downloaded models to localModels if not already present
+            if !localModels.contains(where: { $0.name == model }) {
+                if let folder = folder {
+                    localModels.append(ModelInfo(name: model, engine: .coreML, url: folder))
+                }
+                if let mlxFolder = mlxFolder {
+                    localModels.append(ModelInfo(name: model, engine: .mlx, url: mlxFolder))
+                }
+            }
+            
+            availableLanguages = Constants.languages.map { $0.key }.sorted()
+            loadingProgressValue = 1.0
+            modelState = whisperKit?.modelState ?? .unloaded
+        }
+    }
+
+    private func handleModelLoadError(error: Error, model: String, redownload: Bool) async {
+        print("Error loading model: \(error.localizedDescription)")
+        if !redownload {
+            // Attempt to redownload and load the model if prewarming fails
+            loadModel(model, redownload: true)
+        } else {
             await MainActor.run {
-                loadingProgressValue = specializationProgressRatio
-                modelState = .downloaded
-            }
-
-            if let modelFolder = folder {
-                whisperKit.modelFolder = modelFolder
-
-                await MainActor.run {
-                    // Set the loading progress to 90% of the way after prewarm
-                    loadingProgressValue = specializationProgressRatio
-                    modelState = .prewarming
-                }
-
-                let progressBarTask = Task {
-                    await updateProgressBar(targetProgress: 0.9, maxTime: 240)
-                }
-
-                // Prewarm models
-                do {
-                    try await whisperKit.prewarmModels()
-                    progressBarTask.cancel()
-                } catch {
-                    print("Error prewarming models, retrying: \(error.localizedDescription)")
-                    progressBarTask.cancel()
-                    if !redownload {
-                        loadModel(model, redownload: true)
-                        return
-                    } else {
-                        // Redownloading failed, error out
-                        modelState = .unloaded
-                        return
-                    }
-                }
-
-                await MainActor.run {
-                    // Set the loading progress to 90% of the way after prewarm
-                    loadingProgressValue = specializationProgressRatio + 0.9 * (1 - specializationProgressRatio)
-                    modelState = .loading
-                }
-
-                try await whisperKit.loadModels()
-
-                await MainActor.run {
-                    if !localModels.contains(model) {
-                        localModels.append(model)
-                    }
-
-                    availableLanguages = Constants.languages.map { $0.key }.sorted()
-                    loadingProgressValue = 1.0
-                    modelState = whisperKit.modelState
-                }
+                modelState = .unloaded
             }
         }
     }
 
     func deleteModel() {
-        if localModels.contains(selectedModel) {
-            let modelFolder = URL(fileURLWithPath: localModelPath).appendingPathComponent(selectedModel)
+        let modelsToDelete = localModels.filter { $0.name == selectedModel }
 
+        guard !modelsToDelete.isEmpty else {
+            print("Model not found locally")
+            return
+        }
+
+        for modelToDelete in modelsToDelete {
             do {
-                try FileManager.default.removeItem(at: modelFolder)
-
-                if let index = localModels.firstIndex(of: selectedModel) {
-                    localModels.remove(at: index)
-                }
-
-                modelState = .unloaded
+                try FileManager.default.removeItem(at: modelToDelete.url)
+                print("Deleted model at: \(modelToDelete.url)")
             } catch {
-                print("Error deleting model: \(error)")
+                print("Error deleting model at \(modelToDelete.url): \(error)")
             }
+        }
+
+        localModels.removeAll { $0.name == selectedModel }
+
+        modelState = .unloaded
+
+        // Reset selected model if it was deleted
+        if selectedModel == modelsToDelete.first?.name {
+            selectedModel = availableModels.first ?? ""
         }
     }
 

@@ -146,5 +146,6 @@ test:
 
 
 clean-package-caches:
-	@trash ~/Library/Caches/org.swift.swiftpm/repositories
 	@trash ~/Library/Developer/Xcode/DerivedData
+	@swift package purge-cache
+	@swift package reset

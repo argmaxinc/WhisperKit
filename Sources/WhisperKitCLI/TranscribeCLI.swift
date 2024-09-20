@@ -313,8 +313,8 @@ struct TranscribeCLI: AsyncParsableCommand {
             }
 
         var featureExtractorType = cliArguments.featureExtractorType
-        var audioEncoderType = cliArguments.featureExtractorType
-        var textDecoderType = cliArguments.featureExtractorType
+        var audioEncoderType = cliArguments.audioEncoderType
+        var textDecoderType = cliArguments.textDecoderType
 
         if modelName == nil, mlxModelName != nil {
             // CoreML model not provided, default to MLX
@@ -359,6 +359,7 @@ struct TranscribeCLI: AsyncParsableCommand {
             textDecoder: textDecoder,
             verbose: cliArguments.verbose,
             logLevel: .debug,
+            prewarm: false,
             load: true,
             useBackgroundDownloadSession: false
         )

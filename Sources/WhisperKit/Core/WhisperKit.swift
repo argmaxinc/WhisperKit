@@ -26,11 +26,11 @@ open class WhisperKit {
     public var segmentSeeker: any SegmentSeeking
 
     /// Shapes
-    public static var sampleRate: Int = 16000
-    public static var hopLength: Int = 160
-    public static var chunkLength: Int = 30 // seconds
-    public static var windowSamples: Int = 480_000 // sampleRate * chunkLength
-    public static var secondsPerTimeToken = Float(0.02)
+    public static let sampleRate: Int = 16000
+    public static let hopLength: Int = 160
+    public static let chunkLength: Int = 30 // seconds
+    public static let windowSamples: Int = 480_000 // sampleRate * chunkLength
+    public static let secondsPerTimeToken = Float(0.02)
 
     /// Progress
     public private(set) var currentTimings: TranscriptionTimings
@@ -165,14 +165,16 @@ open class WhisperKit {
         return sortedModels
     }
 
+    @MainActor
     public static func download(
         variant: String,
         downloadBase: URL? = nil,
         useBackgroundSession: Bool = false,
+        hfToken: String? = nil,
         from repo: String = "argmaxinc/whisperkit-coreml",
         progressCallback: ((Progress) -> Void)? = nil
     ) async throws -> URL {
-        let hubApi = HubApi(downloadBase: downloadBase, useBackgroundSession: useBackgroundSession)
+        let hubApi = HubApi(downloadBase: downloadBase, hfToken: hfToken, useBackgroundSession: useBackgroundSession)
         let repo = Hub.Repo(id: repo, type: .models)
         let modelSearchPath = "*\(variant.description)/*"
         do {
@@ -289,58 +291,27 @@ open class WhisperKit {
         modelState = prewarmMode ? .prewarming : .loading
         let modelLoadStart = CFAbsoluteTimeGetCurrent()
 
-        Logging.debug("Loading models with prewarmMode: \(prewarmMode)")
-
-        if let path = modelFolder, let featureExtractor = featureExtractor as? WhisperMLModel {
-            Logging.debug("Loading feature extractor from \(path.path)")
-            try await featureExtractor.loadModel(
-                at: path.appending(path: "MelSpectrogram.mlmodelc"),
-                computeUnits: modelCompute.melCompute, // hardcoded to use GPU
-                prewarmMode: prewarmMode
-            )
-            Logging.debug("Loaded feature extractor")
-        } else if let path = mlxModelFolder, let featureExtractor = featureExtractor as? WhisperMLXModel {
-            Logging.debug("Loading MLX feature extractor from \(path.path)")
-            try await featureExtractor.loadModel(at: path, configPath: path)
-            Logging.debug("Loaded MLX feature extractor")
-        }
-
-        if let path = modelFolder, let audioEncoder = audioEncoder as? WhisperMLModel {
-            Logging.debug("Loading audio encoder from \(path.path)")
-            try await audioEncoder.loadModel(
-                at: path.appending(path: "AudioEncoder.mlmodelc"),
-                computeUnits: modelCompute.audioEncoderCompute,
-                prewarmMode: prewarmMode
-            )
-            Logging.debug("Loaded audio encoder")
-        } else if let path = mlxModelFolder, let audioEncoder = audioEncoder as? WhisperMLXModel {
-            Logging.debug("Loading MLX audio encoder from \(path.path)")
-            try await audioEncoder.loadModel(
-                at: path.appending(path: "encoder.safetensors"),
-                configPath: path.appending(path: "config.json")
-            )
-            Logging.debug("Loaded MLX audio encoder")
-        }
-
-        if let path = modelFolder, let textDecoder = textDecoder as? WhisperMLModel {
-            Logging.debug("Loading text decoder from \(path.path)")
-            try await textDecoder.loadModel(
-                at: path.appending(path: "TextDecoder.mlmodelc"),
-                computeUnits: modelCompute.textDecoderCompute,
-                prewarmMode: prewarmMode
-            )
-            Logging.debug("Loaded text decoder")
-        } else if let path = mlxModelFolder, let textDecoder = textDecoder as? WhisperMLXModel {
-            Logging.debug("Loading MLX text decoder from \(path.path)")
-            try await textDecoder.loadModel(
-                at: path.appending(path: "decoder.safetensors"),
-                configPath: path.appending(path: "config.json")
-            )
-            Logging.debug("Loaded MLX text decoder")
-        }
-
+        // CoreML models
+        var logmelUrl: URL = URL(fileURLWithPath: "")
+        var encoderUrl: URL = URL(fileURLWithPath: "")
+        var decoderUrl: URL = URL(fileURLWithPath: "")
+        var decoderPrefillUrl: URL = URL(fileURLWithPath: "")
         if let path = modelFolder {
-            let decoderPrefillUrl = path.appending(path: "TextDecoderContextPrefill.mlmodelc")
+            Logging.debug("Loading models from \(path.path) with prewarmMode: \(prewarmMode)")
+
+            // Find either mlmodelc or mlpackage models
+            logmelUrl = detectModelURL(inFolder: path, named: "MelSpectrogram")
+            encoderUrl = detectModelURL(inFolder: path, named: "AudioEncoder")
+            decoderUrl = detectModelURL(inFolder: path, named: "TextDecoder")
+            decoderPrefillUrl = detectModelURL(inFolder: path, named: "TextDecoderContextPrefill")
+
+            // Check if all required model files exist
+            for (name, url) in [("MelSpectrogram", logmelUrl), ("AudioEncoder", encoderUrl), ("TextDecoder", decoderUrl)] {
+                if !FileManager.default.fileExists(atPath: url.path) {
+                    throw WhisperError.modelsUnavailable("Model file \(name) not found")
+                }
+            }
+
             if FileManager.default.fileExists(atPath: decoderPrefillUrl.path) {
                 Logging.debug("Loading text decoder prefill data")
                 textDecoder.prefillData = TextDecoderContextPrefill()
@@ -353,9 +324,66 @@ open class WhisperKit {
             }
         }
 
+        if let path = modelFolder, let featureExtractor = featureExtractor as? WhisperMLModel {
+            Logging.debug("Loading feature extractor from \(path.path)")
+            try await featureExtractor.loadModel(
+                at: path.appending(path: "MelSpectrogram.mlmodelc"),
+                computeUnits: modelCompute.melCompute, // hardcoded to use GPU
+                prewarmMode: prewarmMode
+            )
+            Logging.debug("Loaded feature extractor")
+        } else if let path = mlxModelFolder, let featureExtractor = featureExtractor as? (any WhisperMLXModel) {
+            Logging.debug("Loading MLX feature extractor from \(path.path)")
+            try await featureExtractor.loadModel(at: path, configPath: path)
+            Logging.debug("Loaded MLX feature extractor")
+        }
+
+
+        if let textDecoder = textDecoder as? WhisperMLModel {
+            Logging.debug("Loading text decoder")
+            let decoderLoadStart = CFAbsoluteTimeGetCurrent()
+            try await textDecoder.loadModel(
+                at: decoderUrl,
+                computeUnits: modelCompute.textDecoderCompute,
+                prewarmMode: prewarmMode
+            )
+            currentTimings.decoderLoadTime = CFAbsoluteTimeGetCurrent() - decoderLoadStart
+
+            Logging.debug("Loaded text decoder in \(String(format: "%.2f", currentTimings.decoderLoadTime))s")
+        } else if let path = mlxModelFolder, let textDecoder = textDecoder as? (any WhisperMLXModel) {
+            Logging.debug("Loading MLX text decoder from \(path.path)")
+            try await textDecoder.loadModel(
+                at: path.appending(path: "decoder.safetensors"),
+                configPath: path.appending(path: "config.json")
+            )
+            Logging.debug("Loaded MLX text decoder")
+        }
+
+
+        if let audioEncoder = audioEncoder as? WhisperMLModel {
+            Logging.debug("Loading audio encoder")
+            let encoderLoadStart = CFAbsoluteTimeGetCurrent()
+
+            try await audioEncoder.loadModel(
+                at: encoderUrl,
+                computeUnits: modelCompute.audioEncoderCompute,
+                prewarmMode: prewarmMode
+            )
+            currentTimings.encoderLoadTime = CFAbsoluteTimeGetCurrent() - encoderLoadStart
+
+            Logging.debug("Loaded audio encoder in \(String(format: "%.2f", currentTimings.encoderLoadTime))s")
+        } else if let path = mlxModelFolder, let audioEncoder = audioEncoder as? (any WhisperMLXModel) {
+            Logging.debug("Loading MLX audio encoder from \(path.path)")
+            try await audioEncoder.loadModel(
+                at: path.appending(path: "encoder.safetensors"),
+                configPath: path.appending(path: "config.json")
+            )
+            Logging.debug("Loaded MLX audio encoder")
+        }
+
         if prewarmMode {
             modelState = .prewarmed
-            currentTimings.modelLoading = CFAbsoluteTimeGetCurrent() - modelLoadStart
+            currentTimings.prewarmLoadTime = CFAbsoluteTimeGetCurrent() - modelLoadStart
             return
         }
 
@@ -366,20 +394,24 @@ open class WhisperKit {
         textDecoder.isModelMultilingual = isModelMultilingual(logitsDim: logitsDim)
         modelVariant = detectVariant(logitsDim: logitsDim, encoderDim: encoderDim)
         Logging.debug("Loading tokenizer for \(modelVariant)")
+        let tokenizerLoadStart = CFAbsoluteTimeGetCurrent()
+
         let tokenizer = try await loadTokenizer(
             for: modelVariant,
             tokenizerFolder: tokenizerFolder,
             useBackgroundSession: useBackgroundDownloadSession
         )
+        currentTimings.tokenizerLoadTime = CFAbsoluteTimeGetCurrent() - tokenizerLoadStart
+
         self.tokenizer = tokenizer
         textDecoder.tokenizer = tokenizer
-        Logging.debug("Loaded tokenizer")
+        Logging.debug("Loaded tokenizer in \(String(format: "%.2f", currentTimings.tokenizerLoadTime))s")
 
         modelState = .loaded
 
-        currentTimings.modelLoading = CFAbsoluteTimeGetCurrent() - modelLoadStart
+        currentTimings.modelLoading = CFAbsoluteTimeGetCurrent() - modelLoadStart + currentTimings.prewarmLoadTime
 
-        Logging.info("Loaded models for whisper size: \(modelVariant)")
+        Logging.info("Loaded models for whisper size: \(modelVariant) in \(String(format: "%.2f", currentTimings.modelLoading))s")
     }
 
     public func unloadModels() async {
@@ -439,13 +471,13 @@ open class WhisperKit {
         guard textDecoder.isModelMultilingual else {
             throw WhisperError.decodingFailed("Language detection not supported for this model")
         }
-        
+
         // Tokenizer required for decoding
         guard let tokenizer else {
             throw WhisperError.tokenizerUnavailable()
         }
 
-        let options = DecodingOptions()
+        let options = DecodingOptions(verbose: Logging.shared.logLevel != .none)
         let decoderInputs = try textDecoder.prepareDecoderInputs(withPrompt: [tokenizer.specialTokens.startOfTranscriptToken])
         decoderInputs.kvCacheUpdateMask[0] = 1.0
         decoderInputs.decoderKeyPaddingMask[0] = 0.0

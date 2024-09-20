@@ -3,6 +3,8 @@
 
 import Foundation
 import MLX
+import MLXNN
+import WhisperKit
 
 public enum PadMode {
     case constant
@@ -22,14 +24,28 @@ struct MLXModelConfig: Codable {
     let nTextLayer: Int
 }
 
-struct KV {
+public struct KV {
     var k: MLXArray
     var v: MLXArray
+}
+
+public struct MLXDecodingCache {
+    public var kvCache: [KV]
+    public var alignmentWeights: [MLXArray?]
+
+    public init(
+        kvCache: [KV],
+        alignmentWeights: [MLXArray?]
+    ) {
+        self.kvCache = kvCache
+        self.alignmentWeights = alignmentWeights
+    }
 }
 
 struct TextDecoderResult {
     var logits: MLXArray
     var kvCache: [KV]
+    var alignmentWeights: [MLXArray?]
 }
 
 struct ResidualAttentionBlockResult {

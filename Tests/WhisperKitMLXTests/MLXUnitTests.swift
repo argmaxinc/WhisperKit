@@ -1,13 +1,13 @@
 //  For licensing see accompanying LICENSE.md file.
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
-import XCTest
-import MLX
-import WhisperKitTestsUtils
 import CoreML
+import MLX
 import NaturalLanguage
 @testable import WhisperKit
 @testable import WhisperKitMLX
+import WhisperKitTestsUtils
+import XCTest
 
 final class MLXUnitTests: XCTestCase {
     private var tinyModelPath: String!
@@ -71,7 +71,7 @@ final class MLXUnitTests: XCTestCase {
             "Failed to load the tokenizer"
         )
 
-        let tokenSampler = GreedyTokenSampler(
+        let tokenSampler = MLXGreedyTokenSampler(
             temperature: 0,
             eotToken: textDecoder.tokenizer!.specialTokens.endToken,
             decodingOptions: decodingOptions
@@ -106,7 +106,7 @@ final class MLXUnitTests: XCTestCase {
         )
         textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
 
-        let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.specialTokens.endToken, decodingOptions: decodingOptions)
+        let tokenSampler = MLXGreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.specialTokens.endToken, decodingOptions: decodingOptions)
 
         let encoderInput = initMLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16, initialValue: FloatType(0))
         let inputs = try textDecoder.prepareDecoderInputs(withPrompt: [textDecoder.tokenizer!.specialTokens.startOfTranscriptToken])
@@ -133,7 +133,7 @@ final class MLXUnitTests: XCTestCase {
         )
         textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
 
-        let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.specialTokens.endToken, decodingOptions: decodingOptions)
+        let tokenSampler = MLXGreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.specialTokens.endToken, decodingOptions: decodingOptions)
 
         let encoderInput = initMLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16, initialValue: FloatType(0))
         let inputs = try textDecoder.prepareDecoderInputs(withPrompt: [textDecoder.tokenizer!.specialTokens.startOfTranscriptToken])
@@ -153,7 +153,7 @@ final class MLXUnitTests: XCTestCase {
         let options = DecodingOptions(task: .translate, language: targetLanguage, temperatureFallbackCount: 0)
 
         let result = try await XCTUnwrapAsync(
-            try await transcribe(
+            await transcribe(
                 mlxModelPath: tinyModelPath,
                 options: options,
                 audioFile: "es_test_clip.wav",
@@ -172,7 +172,7 @@ final class MLXUnitTests: XCTestCase {
         let options = DecodingOptions(task: .transcribe, language: sourceLanguage, temperatureFallbackCount: 0)
 
         let result = try await XCTUnwrapAsync(
-            try await transcribe(
+            await transcribe(
                 mlxModelPath: tinyModelPath,
                 options: options,
                 audioFile: "es_test_clip.wav",
@@ -214,7 +214,7 @@ final class MLXUnitTests: XCTestCase {
         let options = DecodingOptions(task: .translate, language: targetLanguage, temperatureFallbackCount: 0)
 
         let result = try await XCTUnwrapAsync(
-            try await transcribe(
+            await transcribe(
                 mlxModelPath: tinyModelPath,
                 options: options,
                 audioFile: "ja_test_clip.wav",
@@ -233,7 +233,7 @@ final class MLXUnitTests: XCTestCase {
         let options = DecodingOptions(task: .transcribe, language: sourceLanguage, temperatureFallbackCount: 0)
 
         let result = try await XCTUnwrapAsync(
-            try await transcribe(
+            await transcribe(
                 mlxModelPath: tinyModelPath,
                 options: options,
                 audioFile: "ja_test_clip.wav",
@@ -282,7 +282,7 @@ final class MLXUnitTests: XCTestCase {
 
         for (i, option) in optionsPairs.enumerated() {
             let result = try await XCTUnwrapAsync(
-                try await transcribe(
+                await transcribe(
                     mlxModelPath: tinyModelPath,
                     options: option.options,
                     audioFile: "ja_test_clip.wav",
@@ -312,35 +312,35 @@ final class MLXUnitTests: XCTestCase {
 
     // MARK: - Utils Tests
 
-    func testContiguousStrides() {
+    func testStrides() {
         let count = 24
         let arr1 = MLXArray(0..<count, [count]).asType(Int32.self)
-        XCTAssertEqual(arr1.contiguousStrides, [1])
+        XCTAssertEqual(arr1.asData(access: .noCopy).strides, [1])
 
         let arr2 = MLXArray(0..<count, [2, count / 2]).asType(Int32.self)
-        XCTAssertEqual(arr2.contiguousStrides, [12, 1])
+        XCTAssertEqual(arr2.asData(access: .noCopy).strides, [12, 1])
 
         let arr3 = MLXArray(0..<count, [2, count / 2]).asType(Int32.self).asMLXInput()
-        XCTAssertEqual(arr3.contiguousStrides, [24, 2, 1])
+        XCTAssertEqual(arr3.asData(access: .noCopy).strides, [12, 1, 12])
     }
 
     func testArrayConversion() throws {
         let count = 16
         let arr1 = MLXArray(0..<count, [2, count / 2]).asType(Int32.self)
         let arr2 = try arr1.asMLMultiArray().asMLXArray(Int32.self)
-        XCTAssertEqual(arr2.contiguousStrides, [8, 1])
+        XCTAssertEqual(arr2.asData(access: .noCopy).strides, [8, 1])
         XCTAssertTrue(MLX.allClose(arr1, arr2).item(), "Array conversion failed")
 
         let arr3 = arr1.asMLXOutput().asMLXInput()
-        XCTAssertEqual(arr3.contiguousStrides, [16, 8, 1])
+        XCTAssertEqual(arr3.asData(access: .noCopy).strides, [16, 8, 1])
         XCTAssertTrue(MLX.allClose(arr1, arr3).item(), "Input output conversion failed")
 
         let arr4 = try arr1.asMLXOutput().asMLXInput().asMLMultiArray().asMLXArray(Int32.self)
-        XCTAssertEqual(arr4.contiguousStrides, [16, 8, 1])
+        XCTAssertEqual(arr4.asData(access: .noCopy).strides, [16, 8, 1])
         XCTAssertTrue(MLX.allClose(arr1, arr4).item(), "Complex conversion failed")
 
         let arr5 = try arr1.asMLXOutput().asMLMultiArray().asMLXArray(Int32.self).asMLXInput()
-        XCTAssertEqual(arr5.contiguousStrides, [16, 8, 1])
+        XCTAssertEqual(arr5.asData(access: .noCopy).strides, [16, 8, 1])
         XCTAssertTrue(MLX.allClose(arr1, arr5).item(), "Complex conversion failed")
     }
 
@@ -423,18 +423,18 @@ final class MLXUnitTests: XCTestCase {
 
     func testAdditiveCausalMask() {
         let result1 = additiveCausalMask(0)
-        XCTAssertEqual(result1.shape, [0 ,0], "Array shape should be [0, 0]")
+        XCTAssertEqual(result1.shape, [0, 0], "Array shape should be [0, 0]")
         XCTAssertEqual(result1.dtype, .float32, "Array type should be .float32")
 
         let result2 = additiveCausalMask(3)
-        XCTAssertEqual(result2.shape, [3 ,3], "Array shape should be [3, 3]")
+        XCTAssertEqual(result2.shape, [3, 3], "Array shape should be [3, 3]")
         XCTAssertEqual(result2.dtype, .float32, "Array type should be .float32")
         XCTAssertEqual(result2[0].asArray(Float.self), [0.0, -1e9, -1e9], accuracy: accuracy)
         XCTAssertEqual(result2[1].asArray(Float.self), [0.0, 0.0, -1e9], accuracy: accuracy)
         XCTAssertEqual(result2[2].asArray(Float.self), [0.0, 0.0, 0.0], accuracy: accuracy)
 
         let result3 = additiveCausalMask(4)
-        XCTAssertEqual(result3.shape, [4 ,4], "Array shape should be [4, 4]")
+        XCTAssertEqual(result3.shape, [4, 4], "Array shape should be [4, 4]")
         XCTAssertEqual(result3.dtype, .float32, "Array type should be .float32")
         XCTAssertEqual(result3[0].asArray(Float.self), [0.0, -1e9, -1e9, -1e9], accuracy: accuracy)
         XCTAssertEqual(result3[1].asArray(Float.self), [0.0, 0.0, -1e9, -1e9], accuracy: accuracy)

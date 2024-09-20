@@ -5,6 +5,7 @@ import CoreML
 import Foundation
 import MLX
 import MLXNN
+import WhisperKit
 
 // MARK: - Extensions
 
@@ -35,18 +36,6 @@ extension MLXArray {
     }
 }
 
-extension MLXArray {
-    var contiguousStrides: [Int] {
-        var contiguousStrides = [1]
-        var stride = 1
-        for dimension in shape.dropFirst().reversed() {
-            stride = stride * dimension
-            contiguousStrides.append(stride)
-        }
-        contiguousStrides.reverse()
-        return contiguousStrides
-    }
-}
 
 extension MLXArray {
     func asMLMultiArray() throws -> MLMultiArray {
@@ -54,22 +43,25 @@ extension MLXArray {
         // a buffer to be passed to CoreML
         let buffer = UnsafeMutableRawPointer.allocate(byteCount: nbytes, alignment: 8)
         // copy the data from the MLXArray backing into buffer
-        asData(noCopy: true).withUnsafeBytes { ptr in
+        let dataStartTime = CFAbsoluteTimeGetCurrent()
+        asData(access: .noCopy).data.withUnsafeBytes { ptr in
             let destination = UnsafeMutableRawBufferPointer(start: buffer, count: nbytes)
             ptr.copyBytes(to: destination)
         }
-        // `contiguousStrides` has to used, see the [discussion](https://github.com/ml-explore/mlx-swift/issues/117)
-        return try MLMultiArray(
+        let time = Date()
+        let outputArray = try MLMultiArray(
             dataPointer: buffer,
             shape: shape.map { NSNumber(value: $0) },
             dataType: dataType,
-            strides: contiguousStrides.map { NSNumber(value: $0) },
+            strides: strides.map { NSNumber(value: $0) },
             deallocator: { $0.deallocate() }
         )
+
+        return outputArray
     }
 }
 
-extension MLXArray {
+public extension MLXArray {
     func multiArrayDataType() -> MLMultiArrayDataType {
         switch dtype {
             case .bool, .bfloat16, .complex64,
@@ -113,7 +105,10 @@ func loadParameters(at url: URL) throws -> NestedDictionary<String, MLXArray> {
     return ModuleParameters.unflattened(arrays)
 }
 
-func loadConfig(at url: URL) throws -> MLXModelConfig {
+func loadConfig(at configPath: URL?) throws -> MLXModelConfig {
+    guard let url = configPath else {
+        throw WhisperError.modelsUnavailable("Config path must be specified for MLX models")
+    }
     let configDecoder = JSONDecoder()
     configDecoder.keyDecodingStrategy = .convertFromSnakeCase
     return try configDecoder.decode(MLXModelConfig.self, from: Data(contentsOf: url))

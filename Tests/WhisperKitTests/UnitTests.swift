@@ -1,8 +1,8 @@
 //  For licensing see accompanying LICENSE.md file.
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
-import Combine
 import AVFoundation
+import Combine
 import CoreML
 import Hub
 import NaturalLanguage
@@ -18,6 +18,7 @@ final class UnitTests: XCTestCase {
     override func setUp() async throws {
         try await super.setUp()
         self.tinyModelPath = try tinyModelPath()
+        Logging.shared.logLevel = .debug
     }
 
     // MARK: - Model Loading Test
@@ -47,16 +48,47 @@ final class UnitTests: XCTestCase {
         XCTAssertNotNil(audioBuffer, "Failed to load audio file at path: \(audioFilePath)")
         XCTAssertEqual(audioBuffer.format.sampleRate, 16000)
         XCTAssertEqual(audioBuffer.format.channelCount, 1)
-        XCTAssertEqual(audioBuffer.frameLength, 176000)
+        XCTAssertEqual(audioBuffer.frameLength, 176_000)
         XCTAssertEqual(audioBuffer.frameLength, 11 * 16000)
 
         let audioBufferWithStartTime = try AudioProcessor.loadAudio(fromPath: audioFilePath, startTime: 1.2)
-        XCTAssertEqual(audioBufferWithStartTime.frameLength, AVAudioFrameCount(156800))
+        XCTAssertEqual(audioBufferWithStartTime.frameLength, AVAudioFrameCount(156_800))
         XCTAssertEqual(audioBufferWithStartTime.frameLength, AVAudioFrameCount(16000 * (11 - 1.2)))
 
         let audioBufferWithStartTimeAndEndTime = try AudioProcessor.loadAudio(fromPath: audioFilePath, startTime: 1.2, endTime: 3.4)
         XCTAssertEqual(audioBufferWithStartTimeAndEndTime.frameLength, AVAudioFrameCount(35200))
         XCTAssertEqual(audioBufferWithStartTimeAndEndTime.frameLength, AVAudioFrameCount(16000 * (3.4 - 1.2)))
+    }
+
+    func testAudioFileLoadingWithResampling() throws {
+        let audioFilePath = try XCTUnwrap(
+            TestResource.path(forResource: "jfk_441khz", ofType: "m4a"),
+            "Audio file not found"
+        )
+        let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
+        XCTAssertNotNil(audioBuffer, "Failed to load audio file at path: \(audioFilePath)")
+        XCTAssertEqual(audioBuffer.format.sampleRate, 16000)
+        XCTAssertEqual(audioBuffer.format.channelCount, 1)
+        XCTAssertEqual(audioBuffer.frameLength, 176_000)
+
+        // Test start time and end time with varying max frame sizes
+        let audioBufferWithStartTime1 = try AudioProcessor.loadAudio(fromPath: audioFilePath, startTime: 1.2)
+        XCTAssertEqual(audioBufferWithStartTime1.frameLength, AVAudioFrameCount(156_800))
+        XCTAssertEqual(audioBufferWithStartTime1.frameLength, AVAudioFrameCount(16000 * (11 - 1.2)))
+
+        let audioBufferWithStartTimeAndEndTime1 = try AudioProcessor.loadAudio(fromPath: audioFilePath, startTime: 1.2, endTime: 3.4)
+        XCTAssertEqual(audioBufferWithStartTimeAndEndTime1.frameLength, AVAudioFrameCount(35200))
+        XCTAssertEqual(audioBufferWithStartTimeAndEndTime1.frameLength, AVAudioFrameCount(16000 * (3.4 - 1.2)))
+
+        // NOTE: depending on frameSize, the final frame lengths will match due to integer division between sample rates
+        let frameSize = AVAudioFrameCount(10024)
+        let audioBufferWithStartTime2 = try AudioProcessor.loadAudio(fromPath: audioFilePath, startTime: 1.2, maxReadFrameSize: frameSize)
+        XCTAssertEqual(audioBufferWithStartTime2.frameLength, AVAudioFrameCount(156_800))
+        XCTAssertEqual(audioBufferWithStartTime2.frameLength, AVAudioFrameCount(16000 * (11 - 1.2)))
+
+        let audioBufferWithStartTimeAndEndTime2 = try AudioProcessor.loadAudio(fromPath: audioFilePath, startTime: 1.2, endTime: 3.4, maxReadFrameSize: frameSize)
+        XCTAssertEqual(audioBufferWithStartTimeAndEndTime2.frameLength, AVAudioFrameCount(35200))
+        XCTAssertEqual(audioBufferWithStartTimeAndEndTime2.frameLength, AVAudioFrameCount(16000 * (3.4 - 1.2)))
     }
 
     func testAudioPad() {
@@ -93,8 +125,6 @@ final class UnitTests: XCTestCase {
     }
 
     func testAudioResampleFromFile() throws {
-        Logging.shared.logLevel = .debug
-
         let audioFileURL = try XCTUnwrap(
             TestResource.url(forResource: "jfk", withExtension: "wav"),
             "Audio file not found"
@@ -103,7 +133,7 @@ final class UnitTests: XCTestCase {
 
         let targetSampleRate = 16000.0
         let targetChannelCount: AVAudioChannelCount = 1
-        let smallMaxReadFrameSize: AVAudioFrameCount = 10_000 // Small chunk size to test chunking logic
+        let smallMaxReadFrameSize: AVAudioFrameCount = 10000 // Small chunk size to test chunking logic
 
         let resampledAudio = AudioProcessor.resampleAudio(
             fromFile: audioFile,
@@ -375,7 +405,7 @@ final class UnitTests: XCTestCase {
         }
 
         let result = try await XCTUnwrapAsync(
-            try await transcribe(modelPath: tinyModelPath, options: options, callback: continuationCallback).first!,
+            await transcribe(modelPath: tinyModelPath, options: options, callback: continuationCallback).first!,
             "Failed to transcribe"
         )
 
@@ -390,7 +420,7 @@ final class UnitTests: XCTestCase {
         }
 
         let resultWithWait = try await XCTUnwrapAsync(
-            try await transcribe(modelPath: tinyModelPath, options: options, callback: continuationCallbackWithWait).first!,
+            await transcribe(modelPath: tinyModelPath, options: options, callback: continuationCallbackWithWait).first!,
             "Failed to transcribe"
         )
 
@@ -557,7 +587,7 @@ final class UnitTests: XCTestCase {
 
         for option in options {
             let result = try await XCTUnwrapAsync(
-                try await transcribe(modelPath: tinyModelPath, options: option),
+                await transcribe(modelPath: tinyModelPath, options: option),
                 "Failed to transcribe"
             )
             XCTAssertEqual(result.segments.first?.tokens.count, targetTokenCount)
@@ -571,7 +601,7 @@ final class UnitTests: XCTestCase {
         let options = DecodingOptions(task: .translate, language: targetLanguage, temperatureFallbackCount: 0)
 
         let result = try await XCTUnwrapAsync(
-            try await transcribe(modelPath: tinyModelPath, options: options, audioFile: "es_test_clip.wav"),
+            await transcribe(modelPath: tinyModelPath, options: options, audioFile: "es_test_clip.wav"),
             "Failed to transcribe"
         )
 
@@ -583,7 +613,7 @@ final class UnitTests: XCTestCase {
         let options = DecodingOptions(task: .transcribe, language: sourceLanguage, temperatureFallbackCount: 0)
 
         let result = try await XCTUnwrapAsync(
-            try await transcribe(modelPath: tinyModelPath, options: options, audioFile: "es_test_clip.wav"),
+            await transcribe(modelPath: tinyModelPath, options: options, audioFile: "es_test_clip.wav"),
             "Failed to transcribe"
         )
 
@@ -623,7 +653,7 @@ final class UnitTests: XCTestCase {
 
         for (i, option) in optionsPairs.enumerated() {
             let result = try await XCTUnwrapAsync(
-                try await transcribe(modelPath: tinyModelPath, options: option.options, audioFile: "es_test_clip.wav"),
+                await transcribe(modelPath: tinyModelPath, options: option.options, audioFile: "es_test_clip.wav"),
                 "Failed to transcribe"
             )
 
@@ -649,7 +679,7 @@ final class UnitTests: XCTestCase {
         let options = DecodingOptions(task: .translate, language: targetLanguage, temperatureFallbackCount: 0)
 
         let result = try await XCTUnwrapAsync(
-            try await transcribe(modelPath: tinyModelPath, options: options, audioFile: "ja_test_clip.wav"),
+            await transcribe(modelPath: tinyModelPath, options: options, audioFile: "ja_test_clip.wav"),
             "Failed to transcribe"
         )
 
@@ -661,7 +691,7 @@ final class UnitTests: XCTestCase {
         let options = DecodingOptions(task: .transcribe, language: sourceLanguage, temperatureFallbackCount: 0)
 
         let result = try await XCTUnwrapAsync(
-            try await transcribe(modelPath: tinyModelPath, options: options, audioFile: "ja_test_clip.wav"),
+            await transcribe(modelPath: tinyModelPath, options: options, audioFile: "ja_test_clip.wav"),
             "Failed to transcribe"
         )
 
@@ -700,7 +730,7 @@ final class UnitTests: XCTestCase {
 
         for (i, option) in optionsPairs.enumerated() {
             let result = try await XCTUnwrapAsync(
-                try await transcribe(modelPath: tinyModelPath, options: option.options, audioFile: "ja_test_clip.wav"),
+                await transcribe(modelPath: tinyModelPath, options: option.options, audioFile: "ja_test_clip.wav"),
                 "Failed to transcribe"
             )
 
@@ -746,7 +776,7 @@ final class UnitTests: XCTestCase {
         let options = DecodingOptions(withoutTimestamps: true)
 
         let result = try await XCTUnwrapAsync(
-            try await transcribe(modelPath: tinyModelPath, options: options),
+            await transcribe(modelPath: tinyModelPath, options: options),
             "Failed to transcribe"
         )
 
@@ -757,7 +787,7 @@ final class UnitTests: XCTestCase {
         let options = DecodingOptions(skipSpecialTokens: true, withoutTimestamps: true)
 
         let result = try await XCTUnwrapAsync(
-            try await transcribe(modelPath: tinyModelPath, options: options),
+            await transcribe(modelPath: tinyModelPath, options: options),
             "Failed to transcribe"
         )
 
@@ -768,7 +798,7 @@ final class UnitTests: XCTestCase {
         let options = DecodingOptions(usePrefillPrompt: true)
 
         try await XCTUnwrapAsync(
-            try await transcribe(modelPath: tinyModelPath, options: options),
+            await transcribe(modelPath: tinyModelPath, options: options),
             "Failed to transcribe"
         )
     }
@@ -777,7 +807,7 @@ final class UnitTests: XCTestCase {
         let options = DecodingOptions(usePrefillPrompt: false)
 
         let result = try await XCTUnwrapAsync(
-            try await transcribe(modelPath: tinyModelPath, options: options),
+            await transcribe(modelPath: tinyModelPath, options: options),
             "Failed to transcribe"
         )
 
@@ -824,11 +854,11 @@ final class UnitTests: XCTestCase {
 
     func testTopK() async throws {
         let result10000 = try await XCTUnwrapAsync(
-            try await transcribe(modelPath: tinyModelPath, options: DecodingOptions(temperature: 0.5, topK: 10000)).first,
+            await transcribe(modelPath: tinyModelPath, options: DecodingOptions(temperature: 0.5, topK: 10000)).first,
             "Failed to transcribe"
         )
         let result5 = try await XCTUnwrapAsync(
-            try await transcribe(modelPath: tinyModelPath, options: DecodingOptions(temperature: 0.5)).first,
+            await transcribe(modelPath: tinyModelPath, options: DecodingOptions(temperature: 0.5)).first,
             "Failed to transcribe"
         )
 
@@ -839,7 +869,7 @@ final class UnitTests: XCTestCase {
         var options = DecodingOptions(withoutTimestamps: true, clipTimestamps: [0])
 
         let resultFull = try await XCTUnwrapAsync(
-            try await transcribe(modelPath: tinyModelPath, options: options),
+            await transcribe(modelPath: tinyModelPath, options: options),
             "Failed to transcribe"
         )
 
@@ -847,7 +877,7 @@ final class UnitTests: XCTestCase {
         options = DecodingOptions(withoutTimestamps: true, clipTimestamps: [seekTime])
 
         let resultSeek = try await XCTUnwrapAsync(
-            try await transcribe(modelPath: tinyModelPath, options: options),
+            await transcribe(modelPath: tinyModelPath, options: options),
             "Failed to transcribe"
         )
 
@@ -867,7 +897,7 @@ final class UnitTests: XCTestCase {
         let options = DecodingOptions(skipSpecialTokens: true, promptTokens: promptTokens)
 
         let result = try await XCTUnwrapAsync(
-            try await transcribe(modelPath: tinyModelPath, options: options),
+            await transcribe(modelPath: tinyModelPath, options: options),
             "Failed to transcribe"
         )
 
@@ -884,7 +914,7 @@ final class UnitTests: XCTestCase {
         let options = DecodingOptions(skipSpecialTokens: true, prefixTokens: prefixTokens)
 
         let result = try await XCTUnwrapAsync(
-            try await transcribe(modelPath: tinyModelPath, options: options),
+            await transcribe(modelPath: tinyModelPath, options: options),
             "Failed to transcribe"
         )
 
@@ -991,7 +1021,7 @@ final class UnitTests: XCTestCase {
         let result1 = tokensFilter1.filterLogits(logits1, withTokens: [])
         XCTAssertEqual(result1.data(for: 2), [-.infinity, -.infinity, 0.3, -.infinity, 0.5, -.infinity, 0.7])
 
-        let tokensFilter2 = LanguageLogitsFilter(allLanguageTokens: [2, 4, 6], logitsDim: 7, sampleBegin: 0)
+        let tokensFilter2 = LanguageLogitsFilter(allLanguageTokens: [2, 4, 6], logitsDim: 7, sampleBegin: 2)
         let logits2 = try MLMultiArray.logits([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
         let result2 = tokensFilter2.filterLogits(logits2, withTokens: [1])
         XCTAssertEqual(result2.data(for: 2), [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
@@ -1195,7 +1225,6 @@ final class UnitTests: XCTestCase {
 
     func testVADAudioChunker() async throws {
         let chunker = VADAudioChunker()
-        Logging.shared.logLevel = .debug
 
         let singleChunkPath = try XCTUnwrap(
             TestResource.path(forResource: "jfk", ofType: "wav"),
@@ -1230,14 +1259,14 @@ final class UnitTests: XCTestCase {
 
     func testVADAudioChunkerAccuracy() async throws {
         let testResult = try await XCTUnwrapAsync(
-            try await transcribe(modelPath: tinyModelPath, options: DecodingOptions(), audioFile: "ted_60.m4a"),
+            await transcribe(modelPath: tinyModelPath, options: DecodingOptions(), audioFile: "ted_60.m4a"),
             "Failed to transcribe"
         )
 
         let options = DecodingOptions(chunkingStrategy: .vad)
 
         let chunkedResult = try await XCTUnwrapAsync(
-            try await transcribe(modelPath: tinyModelPath, options: options, audioFile: "ted_60.m4a"),
+            await transcribe(modelPath: tinyModelPath, options: options, audioFile: "ted_60.m4a"),
             "Failed to transcribe"
         )
 

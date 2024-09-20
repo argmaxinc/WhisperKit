@@ -46,10 +46,11 @@ public extension AudioChunking {
 open class VADAudioChunker: AudioChunking {
     /// prevent hallucinations at the end of the clip by stopping up to 1.0s early
     private let windowPadding: Int
-    private let vad = EnergyVAD()
+    private let vad: VoiceActivityDetector
 
-    init(windowPadding: Int = 16000) {
+    init(windowPadding: Int = 16000, vad: VoiceActivityDetector = EnergyVAD()) {
         self.windowPadding = windowPadding
+        self.vad = vad
     }
 
     private func splitOnMiddleOfLongestSilence(audioArray: [Float], startIndex: Int, endIndex: Int) -> Int {

@@ -503,7 +503,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         guard let model, let keyCache, let valueCache else {
             return nil
         }
-        
+
         let modelInputs = TextDecoderInput(
             input_ids: inputIds,
             cache_length: cacheLength,
@@ -800,7 +800,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
                 break
             }
         }
-        
+
         // Cleanup the early stop flag after loop completion
         if shouldEarlyStop.removeValue(forKey: windowUUID) == nil {
             Logging.error("Early stop flag not found for window: \(windowUUID)")

@@ -2,6 +2,7 @@
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
 import Accelerate
+import AVFAudio
 import CoreML
 import Hub
 import NaturalLanguage
@@ -17,41 +18,6 @@ public typealias FloatType = Float
 extension Float16: BNNSScalar {}
 extension Float16: MLShapedArrayScalar {}
 #endif
-
-// MARK: - CoreML
-
-public protocol WhisperModel: AnyObject {
-    func unloadModel()
-}
-
-public protocol WhisperMLModel: WhisperModel {
-    var model: MLModel? { get set }
-    func loadModel(at modelPath: URL, computeUnits: MLComputeUnits, prewarmMode: Bool) async throws
-}
-
-public protocol WhisperMLXModel: WhisperModel {
-    func loadModel(at modelPath: URL, configPath: URL) async throws
-}
-
-public extension WhisperMLModel {
-    func loadModel(at modelPath: URL, computeUnits: MLComputeUnits, prewarmMode: Bool = false) async throws {
-        let loadedModel = try await Task {
-            let modelConfig = MLModelConfiguration()
-            modelConfig.computeUnits = computeUnits
-            return try await MLModel.load(contentsOf: modelPath, configuration: modelConfig)
-        }.value
-
-        model = prewarmMode ? nil : loadedModel
-    }
-
-    func unloadModel() {
-        model = nil
-    }
-
-    var modelState: ModelState {
-        return model == nil ? .unloaded : .loaded
-    }
-}
 
 // MARK: - Whisper Models
 
@@ -168,6 +134,74 @@ public struct ModelComputeOptions {
         } else {
             self.audioEncoderCompute = audioEncoderCompute ?? .cpuAndGPU
         }
+    }
+}
+
+public struct ModelInfo: Identifiable, Hashable {
+    public let id = UUID()
+    public let name: String
+    public let engine: ModelEngine
+    public let url: URL
+
+    public init(name: String, engine: ModelEngine, url: URL) {
+        self.name = name
+        self.engine = engine
+        self.url = url
+    }
+}
+
+public enum ModelEngine: String, Codable {
+    case coreML = "coreml"
+    case mlx
+}
+
+public protocol WhisperModel: AnyObject {
+    func unloadModel()
+    var modelState: ModelState { get }
+}
+
+// MARK: - CoreML
+
+public protocol WhisperMLModel: WhisperModel {
+    var model: MLModel? { get set }
+    func loadModel(at modelPath: URL, computeUnits: MLComputeUnits, prewarmMode: Bool) async throws
+}
+
+public extension WhisperMLModel {
+    func loadModel(at modelPath: URL, computeUnits: MLComputeUnits, prewarmMode: Bool = false) async throws {
+        let loadedModel = try await Task {
+            let modelConfig = MLModelConfiguration()
+            modelConfig.computeUnits = computeUnits
+            return try await MLModel.load(contentsOf: modelPath, configuration: modelConfig)
+        }.value
+
+        model = prewarmMode ? nil : loadedModel
+    }
+
+    func unloadModel() {
+        model = nil
+    }
+
+    var modelState: ModelState {
+        return model == nil ? .unloaded : .loaded
+    }
+}
+
+// MARK: MLX
+
+public protocol WhisperMLXModel: WhisperModel {
+    associatedtype MLXModuleType
+    var model: MLXModuleType? { get set }
+    func loadModel(at modelPath: URL, configPath: URL?) async throws
+}
+
+public extension WhisperMLXModel {
+    func unloadModel() {
+        model = nil
+    }
+
+    var modelState: ModelState {
+        return model == nil ? .unloaded : .loaded
     }
 }
 
@@ -446,9 +480,9 @@ public struct DecodingResult {
 
     public init(
         language: String,
-        languageProbs: [String : Float],
+        languageProbs: [String: Float],
         tokens: [Int],
-        tokenLogProbs: [[Int : Float]],
+        tokenLogProbs: [[Int: Float]],
         text: String,
         avgLogProb: Float,
         noSpeechProb: Float,
@@ -608,6 +642,10 @@ public struct TranscriptionResult: Codable {
         Decoding Full Loop:  \(decodingLoopInfo)
         -------------------------------
         Model Load Time:               \(String(format: "%.2f", timings.modelLoading)) seconds
+        - Prewarm:                     \(String(format: "%.2f", timings.prewarmLoadTime)) seconds
+        - Encoder:                     \(String(format: "%.2f", timings.encoderLoadTime)) seconds
+        - Decoder:                     \(String(format: "%.2f", timings.decoderLoadTime)) seconds
+        - Tokenizer:                   \(String(format: "%.2f", timings.tokenizerLoadTime)) seconds
         Inference Duration (Global):   \(String(format: "%.2f", timings.fullPipeline)) seconds
         - Decoding Loop (Avg/window):  \(String(format: "%.2f", decodeTimePerWindow)) seconds
         - Audio Windows:               \(String(format: "%.2f", timings.totalAudioProcessingRuns))
@@ -673,6 +711,7 @@ public struct TranscriptionProgress {
         self.temperature = temperature
         self.avgLogprob = avgLogprob
         self.compressionRatio = compressionRatio
+        self.windowId = windowId
     }
 }
 
@@ -693,6 +732,10 @@ public struct TranscriptionTimings: Codable {
     public var firstTokenTime: CFAbsoluteTime
     public var inputAudioSeconds: TimeInterval
     public var modelLoading: TimeInterval
+    public var prewarmLoadTime: TimeInterval
+    public var encoderLoadTime: TimeInterval
+    public var decoderLoadTime: TimeInterval
+    public var tokenizerLoadTime: TimeInterval
     public var audioLoading: TimeInterval
     public var audioProcessing: TimeInterval
     public var logmels: TimeInterval
@@ -733,6 +776,10 @@ public struct TranscriptionTimings: Codable {
 
     /// Initialize with all time intervals set to zero.
     public init(modelLoading: TimeInterval = 0,
+                prewarmLoadTime: TimeInterval = 0,
+                encoderLoadTime: TimeInterval = 0,
+                decoderLoadTime: TimeInterval = 0,
+                tokenizerLoadTime: TimeInterval = 0,
                 audioLoading: TimeInterval = 0,
                 audioProcessing: TimeInterval = 0,
                 logmels: TimeInterval = 0,
@@ -762,6 +809,10 @@ public struct TranscriptionTimings: Codable {
         self.firstTokenTime = Double.greatestFiniteMagnitude
         self.inputAudioSeconds = 0.001
         self.modelLoading = modelLoading
+        self.prewarmLoadTime = prewarmLoadTime
+        self.encoderLoadTime = encoderLoadTime
+        self.decoderLoadTime = decoderLoadTime
+        self.tokenizerLoadTime = tokenizerLoadTime
         self.audioLoading = audioLoading
         self.audioProcessing = audioProcessing
         self.logmels = logmels
@@ -1487,4 +1538,6 @@ public enum Constants {
     public static let languageCodes: Set<String> = Set(languages.values)
 
     public static let defaultLanguageCode: String = "en"
+
+    public static let defaultAudioReadFrameSize: AVAudioFrameCount = 1_323_000 // 30s of audio at commonly found 44.1khz sample rate
 }

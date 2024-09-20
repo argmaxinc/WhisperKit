@@ -107,6 +107,19 @@ extension MLModel {
 }
 
 public extension MLComputeUnits {
+    /// Compute unit for MLX-based models.
+    ///
+    /// This compute unit is specifically designed for use with MLX-based models in WhisperKit.
+    ///
+    /// - Important: This is a custom compute unit and will not be recognized by MLModel instances.
+    static let mlx: MLComputeUnits = {
+        guard let unit = MLComputeUnits(rawValue: 99) else { // Prevent overlap with future values
+            Logging.error("Failed to create MLComputeUnits for MLX. Defaulting to .cpuAndGPU.")
+            return .cpuAndGPU
+        }
+        return unit
+    }()
+
     var description: String {
         switch self {
             case .cpuOnly:
@@ -117,6 +130,8 @@ public extension MLComputeUnits {
                 return "all"
             case .cpuAndNeuralEngine:
                 return "cpuAndNeuralEngine"
+            case .mlx:
+                return "mlx"
             @unknown default:
                 return "unknown"
         }
@@ -188,12 +203,12 @@ public extension String {
 }
 
 extension AVAudioPCMBuffer {
-    // Appends the contents of another buffer to the current buffer
+    /// Appends the contents of another buffer to the current buffer
     func appendContents(of buffer: AVAudioPCMBuffer) -> Bool {
         return appendContents(of: buffer, startingFrame: 0, frameCount: buffer.frameLength)
     }
 
-    // Appends a specific range of frames from another buffer to the current buffer
+    /// Appends a specific range of frames from another buffer to the current buffer
     func appendContents(of buffer: AVAudioPCMBuffer, startingFrame: AVAudioFramePosition, frameCount: AVAudioFrameCount) -> Bool {
         guard format == buffer.format else {
             Logging.debug("Format mismatch")
@@ -201,31 +216,32 @@ extension AVAudioPCMBuffer {
         }
 
         guard startingFrame + AVAudioFramePosition(frameCount) <= AVAudioFramePosition(buffer.frameLength) else {
-            Logging.debug("Insufficient audio in buffer")
-            return false
-        }
-
-        guard frameLength + frameCount <= frameCapacity else {
-            Logging.debug("Insufficient space in buffer")
+            Logging.error("Insufficient audio in buffer")
             return false
         }
 
         guard let destination = floatChannelData, let source = buffer.floatChannelData else {
-            Logging.debug("Failed to access float channel data")
+            Logging.error("Failed to access float channel data")
             return false
+        }
+
+        var calculatedFrameCount = frameCount
+        if frameLength + frameCount > frameCapacity {
+            Logging.debug("Insufficient space in buffer, reducing frame count to fit")
+            calculatedFrameCount = frameCapacity - frameLength
         }
 
         let calculatedStride = stride
         let destinationPointer = destination.pointee.advanced(by: calculatedStride * Int(frameLength))
         let sourcePointer = source.pointee.advanced(by: calculatedStride * Int(startingFrame))
 
-        memcpy(destinationPointer, sourcePointer, Int(frameCount) * calculatedStride * MemoryLayout<Float>.size)
+        memcpy(destinationPointer, sourcePointer, Int(calculatedFrameCount) * calculatedStride * MemoryLayout<Float>.size)
 
-        frameLength += frameCount
+        frameLength += calculatedFrameCount
         return true
     }
 
-    // Convenience initializer to concatenate multiple buffers into one
+    /// Convenience initializer to concatenate multiple buffers into one
     convenience init?(concatenating buffers: [AVAudioPCMBuffer]) {
         guard !buffers.isEmpty else {
             Logging.debug("Buffers array should not be empty")
@@ -249,7 +265,7 @@ extension AVAudioPCMBuffer {
         }
     }
 
-    // Computed property to determine the stride for float channel data
+    /// Computed property to determine the stride for float channel data
     private var stride: Int {
         return Int(format.streamDescription.pointee.mBytesPerFrame) / MemoryLayout<Float>.size
     }
@@ -482,6 +498,22 @@ public func modelSupport(for deviceName: String) -> (default: String, disabled: 
     return ("openai_whisper-base", [""])
 }
 
+public func detectModelURL(inFolder path: URL, named modelName: String) -> URL {
+    let compiledUrl = path.appending(path: "\(modelName).mlmodelc")
+    let packageUrl = path.appending(path: "\(modelName).mlpackage/Data/com.apple.CoreML/model.mlmodel")
+
+    let compiledModelExists: Bool = FileManager.default.fileExists(atPath: compiledUrl.path)
+    let packageModelExists: Bool = FileManager.default.fileExists(atPath: packageUrl.path)
+
+    // Swap to mlpackage only if the following is true: we found the mlmodel within the mlpackage, and we did not find a .mlmodelc
+    var modelURL = compiledUrl
+    if (packageModelExists && !compiledModelExists) {
+        modelURL = packageUrl
+    }
+
+    return modelURL
+}
+
 public func resolveAbsolutePath(_ inputPath: String) -> String {
     let fileManager = FileManager.default
 
@@ -621,6 +653,10 @@ public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirm
     // Update the merged timings with non-overlapping time values
     var mergedTimings = TranscriptionTimings(
         modelLoading: validResults.map { $0.timings.modelLoading }.max() ?? 0,
+        prewarmLoadTime: validResults.map { $0.timings.prewarmLoadTime }.max() ?? 0,
+        encoderLoadTime: validResults.map { $0.timings.encoderLoadTime }.max() ?? 0,
+        decoderLoadTime: validResults.map { $0.timings.decoderLoadTime }.max() ?? 0,
+        tokenizerLoadTime: validResults.map { $0.timings.tokenizerLoadTime }.max() ?? 0,
         audioLoading: validResults.map { $0.timings.audioLoading }.reduce(0, +),
         audioProcessing: validResults.map { $0.timings.audioProcessing }.reduce(0, +),
         logmels: validResults.map { $0.timings.logmels }.reduce(0, +),
