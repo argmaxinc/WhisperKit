@@ -2,11 +2,11 @@
 <div align="center">
   
 <a href="https://github.com/argmaxinc/WhisperKit#gh-light-mode-only">
-  <img src="https://github.com/argmaxinc/WhisperKit/assets/1981179/6ac3360b-2f5c-4392-a71a-05c5dda71093" alt="WhisperKit" width="20%" />
+  <img src="https://github.com/user-attachments/assets/f0699c07-c29f-45b6-a9c6-f6d491b8f791" alt="WhisperKit" width="20%" />
 </a>
 
 <a href="https://github.com/argmaxinc/WhisperKit#gh-dark-mode-only">
-  <img src="https://github.com/argmaxinc/WhisperKit/assets/1981179/a682ce21-80e0-4a98-a99f-836663538a4f" alt="WhisperKit" width="20%" />
+  <img src="https://github.com/user-attachments/assets/1be5e31c-de42-40ab-9b85-790cb911ed47" alt="WhisperKit" width="20%" />
 </a>
 
 # WhisperKit
