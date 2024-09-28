@@ -446,6 +446,50 @@ open class WhisperKit {
 
         return (language: languageDecodingResult.language, langProbs: languageDecodingResult.languageProbs)
     }
+    
+    
+    /// Detects silence in the audio samples in the provided array.
+        ///
+        /// - Parameter audioArray: An array of audio samples.
+        /// - Returns: The probability of silence in the audio.
+    public func detectSilence(audioArray: [Float]) async throws -> Float {
+        if modelState != .loaded {
+            try await loadModels()
+        }
+
+        guard let tokenizer else {
+            throw WhisperError.tokenizerUnavailable()
+        }
+
+        let options = DecodingOptions()
+        let decoderInputs = try textDecoder.prepareDecoderInputs(withPrompt: [tokenizer.specialTokens.startOfTranscriptToken])
+        decoderInputs.kvCacheUpdateMask[0] = 1.0
+        decoderInputs.decoderKeyPaddingMask[0] = 0.0
+
+        guard let audioSamples = AudioProcessor.padOrTrimAudio(fromArray: audioArray, startAt: 0, toLength: WhisperKit.windowSamples) else {
+            throw WhisperError.transcriptionFailed("Audio samples are nil")
+        }
+
+        guard let melOutput = try await featureExtractor.logMelSpectrogram(fromAudio: audioSamples) else {
+            throw WhisperError.transcriptionFailed("Mel output is nil")
+        }
+
+        guard let encoderOutput = try await audioEncoder.encodeFeatures(melOutput) else {
+            throw WhisperError.transcriptionFailed("Encoder output is nil")
+        }
+
+        let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: tokenizer.specialTokens.endToken, decodingOptions: options)
+        let noSpeechProb = try await textDecoder.detectSilence(
+            from: encoderOutput,
+            using: decoderInputs,
+            sampler: tokenSampler,
+            options: options,
+            temperature: 0
+        )
+
+        return noSpeechProb
+    }
+
 
     // MARK: - Transcribe multiple audio files
 

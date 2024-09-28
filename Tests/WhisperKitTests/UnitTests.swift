@@ -766,7 +766,37 @@ final class UnitTests: XCTestCase {
             XCTAssertEqual(result.language, language)
         }
     }
-
+    
+    func testDetectSilenceHelperMethod() async throws {
+        let whisperKit = try await WhisperKit(
+            modelFolder: tinyModelPath(),
+            verbose: true,
+            logLevel: .debug
+        )
+        
+        let silentAudioSamples: [Float] = [Float](repeating: 0.0, count: 16000) // 1 second of silence at 16kHz
+        let jfkAudioSamples = try XCTUnwrap(loadAudioSamples(forResource: "ted_60", withExtension: "m4a"))
+        
+        let testAudioFiles: [(String, [Float], Bool)] = [
+            ("silent_clip", silentAudioSamples, false), // Not expecting speech
+            ("non_silent_clip", jfkAudioSamples, true) // Expecting speech
+        ]
+        
+        for (audioFileName, audioSamples, expectingSpeech) in testAudioFiles {
+            let silenceProbability = try await whisperKit.detectSilence(audioArray: audioSamples)
+            
+            //print("Test case: \(audioFileName), Expecting speech: \(expectingSpeech), Calculated silence probability: \(silenceProbability)")
+            // calculated noSpeechProb values for silent and non-silent clips are 0.002598221 and 0.26186648.
+            // Given these values, a threshold of 0.6 might be too high to accurately distinguish between
+            // silence and speech.Based on the debug values, here I picked a threshold of 0.2
+            if expectingSpeech {
+                XCTAssertGreaterThan(silenceProbability, 0.2, "Expected speech, but detected silence for \(audioFileName) with probability \(silenceProbability)")
+            } else {
+                XCTAssertLessThanOrEqual(silenceProbability, 0.2, "Expected silence, but detected speech for \(audioFileName) with probability \(silenceProbability)")
+            }
+        }
+    }
+    
     func testNoTimestamps() async throws {
         let options = DecodingOptions(withoutTimestamps: true)
 
@@ -808,7 +838,70 @@ final class UnitTests: XCTestCase {
 
         XCTAssertNotNil(result.text)
     }
+    
+    
+    func testSilentAudio() async throws {
+        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        
+        let silentAudioSamples: [Float] = [Float](repeating: 0.0, count: 16000)
+        
+        let options = DecodingOptions(usePrefillPrompt: false, skipSpecialTokens: false)
+        
+        let result: [TranscriptionResult] = try await whisperKit.transcribe(audioArray: silentAudioSamples, decodeOptions: options)
+        
+        XCTAssertTrue(result.first?.segments.isEmpty ?? false, "Expected no segments for silent audio")
+    }
 
+    func testInitialSilenceFollowedBySpeech() async throws {
+        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        
+        let initialSilenceSpeechSamples: [Float] = loadAudioSamples(forResource: "initial_silence_speech", withExtension: "m4a")
+        
+        let options = DecodingOptions(usePrefillPrompt: false, skipSpecialTokens: false, noSpeechThreshold: 0.8)
+        
+        let result: [TranscriptionResult] = try await whisperKit.transcribe(audioArray: initialSilenceSpeechSamples, decodeOptions: options)
+        
+        if let transcription = result.first?.segments.first?.text {
+            print("Transcription: \(transcription)")
+        } else {
+            print("No transcription found.")
+        }
+        
+        let transcription = result.first?.segments.first?.text
+        XCTAssertNotNil(transcription, "Expected transcription for audio with initial silence followed by speech")
+        
+        XCTAssertTrue(transcription?.contains("Hey") ?? false, "Expected 'Hey' in transcription")
+    }
+      func testContinuousSpeechAudio() async throws {
+          let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+
+          let continuousSpeechSamples: [Float] = loadAudioSamples(forResource: "continuous_speech", withExtension: "wav")
+          let options = DecodingOptions(usePrefillPrompt: false, skipSpecialTokens: false)
+
+          let result: [TranscriptionResult] = try await whisperKit.transcribe(audioArray: continuousSpeechSamples, decodeOptions: options)
+
+          let transcription = result.first?.segments.first?.text
+          XCTAssertNotNil(transcription, "Expected transcription for continuous speech audio")
+          XCTAssertFalse(transcription?.isEmpty ?? true, "Expected non-empty transcription for continuous speech audio")
+      }
+
+      // MARK: - Helper Function
+
+      func loadAudioSamples(forResource resource: String, withExtension ext: String) -> [Float] {
+          guard let audioFileURL = Bundle.module.url(forResource: resource, withExtension: ext) else {
+              XCTFail("Audio file not found")
+              return []
+          }
+
+          do {
+              let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFileURL.path)
+              return AudioProcessor.convertBufferToArray(buffer: audioBuffer)
+          } catch {
+              XCTFail("Failed to load audio samples: \(error.localizedDescription)")
+              return []
+          }
+      }
+    
     func testSilence() async throws {
         let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
         let audioSamples = [Float](repeating: 0.0, count: 30 * 16000)
@@ -1021,7 +1114,7 @@ final class UnitTests: XCTestCase {
         let result2 = tokensFilter2.filterLogits(logits2, withTokens: [1])
         XCTAssertEqual(result2.data(for: 2), [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
     }
-
+    
     func testTimestampRulesFilter() throws {
         // NOTE: for non-multilingual models we supress tokens immediately
         let tokensFilter1 = TimestampRulesFilter(
