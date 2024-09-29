@@ -36,6 +36,7 @@ final class ResamplingTests: XCTestCase {
 
         for inputFrameCount in AVAudioFrameCount(0)...100_000 {
             autoreleasepool {
+                // TODO: use deterministic/seedable RNG
                 let sampleRate = Bool.random() ? commonSampleRates.randomElement()! : Double.random(in: 5_000..<100_000)
                 //let sampleRate = 44_100.0 // This fails for values of inputFrameCount = 12289 + 1024 * N
                 do {
