@@ -921,7 +921,7 @@ extension AVAudioFile {
             throw WhisperError.audioProcessingFailed("Error reading audio: \(readError)")
         }
 
-        guard status == .haveData || (outputLength <= 1 && status == .endOfStream) else {
+        guard status == .haveData || (status == .endOfStream && outputLength <= 1) else {
             throw WhisperError.audioProcessingFailed("Error converting audio, unexpected status: \(status)")
         }
 
@@ -935,7 +935,7 @@ extension AVAudioFile {
             throw WhisperError.audioProcessingFailed("Error converting audio, unexpected output length")
         }
 
-        // Ensure we read the entire file
+        // Ensure we have read the entire file
         guard framePosition == length else {
             throw WhisperError.audioProcessingFailed("Error converting audio, input file was only partially read")
         }
@@ -952,10 +952,12 @@ extension AVAudioFile {
 }
 
 extension AVAudioPCMBuffer {
+    // This is meant to replace the entire `convertBufferToArray()` function
     var array: [Float] {
         precondition(format == .whisperKitTargetFormat)
         precondition(stride == 1)
-        return Array(UnsafeBufferPointer(start: floatChannelData![0], count: Int(frameLength)))
+        guard let data = floatChannelData?.pointee else { return [] }
+        return Array(UnsafeBufferPointer(start: data, count: Int(frameLength)))
     }
 }
 
