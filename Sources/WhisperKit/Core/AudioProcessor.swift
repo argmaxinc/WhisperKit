@@ -913,7 +913,7 @@ extension AVAudioFile {
             }
         }
 
-        if status == .error {
+        if status == .error || convertError != nil {
             throw WhisperError.audioProcessingFailed("Error converting audio: \(String(describing: convertError))")
         }
 
