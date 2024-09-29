@@ -824,3 +824,18 @@ open class WhisperKit {
         }
     }
 }
+
+
+extension WhisperKit {
+    func transcribe_v2(
+        audioPath: String,
+        decodeOptions: DecodingOptions? = nil,
+        callback: TranscriptionCallback = nil
+    ) async throws -> [TranscriptionResult] {
+        try await transcribe(
+            audioArray: try AVAudioFile(forReading: URL(filePath: audioPath)).resampled().array,
+            decodeOptions: decodeOptions,
+            callback: callback
+        )
+    }
+}
