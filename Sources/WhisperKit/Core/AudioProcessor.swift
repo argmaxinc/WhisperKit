@@ -859,8 +859,8 @@ extension AVAudioFile {
         // Mark our output buffer as empty
         buffer.frameLength = 0
 
-        // Ignore errors when attempting to read past the EOF -- (Foundation._GenericObjCError error 0.) (nilError), could also check for those via (error as NSError).code == 0
-        // Ignore errors when attempting to write past our buffer -- (Code=-1 \"kCFStreamErrorHTTPParseFailure / kCFSocketError / ...)
+        // Prevent errors when attempting to read past the EOF -- (Foundation._GenericObjCError error 0.) (nilError), could also check for those via (error as NSError).code == 0
+        // Prevent errors when attempting to write past our buffer -- (Code=-1 \"kCFStreamErrorHTTPParseFailure / kCFSocketError / ...)
         let frameCount = AVAudioFrameCount(min(Int64(frames), length - framePosition, Int64(buffer.frameCapacity)))
         precondition(frameCount >= 0)
         guard frameCount != 0 else { return false }
