@@ -55,7 +55,7 @@ final class ResamplingTests: XCTestCase {
             let whisperKit = try await XCTUnwrapAsync(await WhisperKit(modelFolder: modelPath))
             let decodeOptions = DecodingOptions(temperature: 0, temperatureFallbackCount: 0)
             let transcriptionResult: [TranscriptionResult] = try! await whisperKit.transcribe(audioPath: audioPath, decodeOptions: decodeOptions)
-            // Switch to `transcribe_v2` to compare memory usage
+            // Switch to `transcribe_v2` to compare memory usage. The transcription result seems to also be somewhat different.
             //let transcriptionResult: [TranscriptionResult] = try! await whisperKit.transcribe_v2(audioPath: audioPath, decodeOptions: decodeOptions)
             precondition(!transcriptionResult.text.isEmpty)
             print(transcriptionResult.text)
