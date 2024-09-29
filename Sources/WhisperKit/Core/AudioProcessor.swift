@@ -953,10 +953,12 @@ extension AVAudioFile {
 
 extension AVAudioPCMBuffer {
     // This is meant to replace the entire `convertBufferToArray()` function
-    var array: [Float] {
+    func array() throws -> [Float] {
         precondition(format == .whisperKitTargetFormat)
         precondition(stride == 1)
-        guard let data = floatChannelData?.pointee else { return [] }
+        guard let data = floatChannelData?.pointee else {
+            throw WhisperError.audioProcessingFailed("Error converting audio, missing floatChannelData")
+        }
         return Array(UnsafeBufferPointer(start: data, count: Int(frameLength)))
     }
 }

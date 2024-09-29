@@ -835,7 +835,7 @@ extension WhisperKit {
         try await transcribe(
             // Replaces the calls to AudioProcessor's .loadAudio & .convertBufferToArray,
             // fixing crashes, reducing memory usage, and producing more correct results.
-            audioArray: try AVAudioFile(forReading: URL(filePath: audioPath)).resampled().array,
+            audioArray: try AVAudioFile(forReading: URL(filePath: audioPath)).resampled().array(),
             decodeOptions: decodeOptions,
             callback: callback
         )
