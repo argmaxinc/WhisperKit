@@ -952,18 +952,6 @@ extension AVAudioFile {
 }
 
 extension AVAudioPCMBuffer {
-
-    var frameBytes: UInt32 { format.channelCount * UInt32(format.streamDescription.pointee.mBitsPerChannel / 8) }
-    var frameCapacityBytes: UInt32 { frameCapacity * frameBytes }
-    var frameLengthBytes: UInt32 { frameLength * frameBytes }
-
-    class func silence(sampleRate: Double, frameCount: AVAudioFrameCount) -> AVAudioPCMBuffer {
-        let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
-        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount)!
-        buffer.frameLength = frameCount
-        return buffer
-    }
-
     var array: [Float] {
         precondition(format == .whisperKitTargetFormat)
         precondition(stride == 1)
