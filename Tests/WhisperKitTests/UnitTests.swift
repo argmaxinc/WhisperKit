@@ -486,12 +486,11 @@ final class UnitTests: XCTestCase {
         let computeOptions = ModelComputeOptions(
             melCompute: .cpuOnly
         )
-        let whisperKit = try await WhisperKit(
-            modelFolder: tinyModelPath(),
-            computeOptions: computeOptions,
-            verbose: true,
-            logLevel: .debug
-        )
+        let config = try WhisperKitConfig(modelFolder: tinyModelPath(),
+                                          computeOptions: computeOptions,
+                                          verbose: true,
+                                          logLevel: .debug)
+        let whisperKit = try await WhisperKit(config)
 
         let audioFilePath = try XCTUnwrap(
             Bundle.module.path(forResource: "jfk", ofType: "wav"),
@@ -617,11 +616,8 @@ final class UnitTests: XCTestCase {
 
     func testDetectSpanish() async throws {
         let targetLanguage = "es"
-        let whisperKit = try await WhisperKit(
-            modelFolder: tinyModelPath(),
-            verbose: true,
-            logLevel: .debug
-        )
+        let config = try WhisperKitConfig(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(config)
 
         let audioFilePath = try XCTUnwrap(
             Bundle.module.path(forResource: "es_test_clip", ofType: "wav"),
@@ -695,11 +691,8 @@ final class UnitTests: XCTestCase {
 
     func testDetectJapanese() async throws {
         let targetLanguage = "ja"
-        let whisperKit = try await WhisperKit(
-            modelFolder: tinyModelPath(),
-            verbose: true,
-            logLevel: .debug
-        )
+        let config = try WhisperKitConfig(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(config)
 
         let audioFilePath = try XCTUnwrap(
             Bundle.module.path(forResource: "ja_test_clip", ofType: "wav"),
@@ -748,11 +741,8 @@ final class UnitTests: XCTestCase {
 
     func testDetectLanguageHelperMethod() async throws {
         let targetLanguages = ["es", "ja"]
-        let whisperKit = try await WhisperKit(
-            modelFolder: tinyModelPath(),
-            verbose: true,
-            logLevel: .debug
-        )
+        let config = try WhisperKitConfig(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(config)
 
         for language in targetLanguages {
             let audioFilePath = try XCTUnwrap(
@@ -810,7 +800,8 @@ final class UnitTests: XCTestCase {
     }
 
     func testSilence() async throws {
-        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let config = try WhisperKitConfig(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(config)
         let audioSamples = [Float](repeating: 0.0, count: 30 * 16000)
         let options = DecodingOptions(usePrefillPrompt: false, skipSpecialTokens: false)
 
@@ -822,7 +813,8 @@ final class UnitTests: XCTestCase {
     }
 
     func testTemperatureIncrement() async throws {
-        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let config = try WhisperKitConfig(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(config)
 
         // Generate random audio samples
         let audioSamples = (0..<(30 * 16000)).map { _ in Float.random(in: -0.7...0.7) }
@@ -885,7 +877,8 @@ final class UnitTests: XCTestCase {
     }
 
     func testPromptTokens() async throws {
-        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let config = try WhisperKitConfig(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(config)
         let promptText = " prompt to encourage output without any punctuation and without capitalizing americans as if it was already normalized"
         let tokenizer = try XCTUnwrap(whisperKit.tokenizer)
         let promptTokens = tokenizer.encode(text: promptText)
@@ -901,7 +894,8 @@ final class UnitTests: XCTestCase {
     }
 
     func testPrefixTokens() async throws {
-        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let config = try WhisperKitConfig(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(config)
         // Prefix to encourage output without any punctuation and without capitalizing americans as if it was already normalized
         let prefixText = " and so my fellow americans"
         let tokenizer = try XCTUnwrap(whisperKit.tokenizer)
@@ -1282,7 +1276,7 @@ final class UnitTests: XCTestCase {
 
     #if !os(watchOS) // FIXME: This test times out on watchOS when run on low compute runners
     func testVADProgress() async throws {
-        let pipe = try await WhisperKit(model: "tiny.en")
+        let pipe = try await WhisperKit(WhisperKitConfig(model: "tiny.en"))
 
         let cancellable: AnyCancellable? = pipe.progress.publisher(for: \.fractionCompleted)
             .removeDuplicates()
@@ -1620,7 +1614,8 @@ final class UnitTests: XCTestCase {
         let audioFile = "jfk.wav"
         let modelPath = try tinyModelPath()
 
-        let whisperKit = try await WhisperKit(modelFolder: modelPath, /* computeOptions: computeOptions,*/ verbose: true, logLevel: .debug)
+        let config = WhisperKitConfig(modelFolder: modelPath, /* computeOptions: computeOptions,*/ verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(config)
 
         let startTime = Date()
         let audioComponents = audioFile.components(separatedBy: ".")

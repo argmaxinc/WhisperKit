@@ -304,18 +304,17 @@ struct TranscribeCLI: AsyncParsableCommand {
                 nil
             }
 
-        return try await WhisperKit(
-            model: modelName,
-            downloadBase: downloadModelFolder,
-            modelFolder: cliArguments.modelPath,
-            tokenizerFolder: downloadTokenizerFolder,
-            computeOptions: computeOptions,
-            verbose: cliArguments.verbose,
-            logLevel: .debug,
-            prewarm: false,
-            load: true,
-            useBackgroundDownloadSession: false
-        )
+        let config = WhisperKitConfig(model: modelName,
+                                      downloadBase: downloadModelFolder,
+                                      modelFolder: cliArguments.modelPath,
+                                      tokenizerFolder: downloadTokenizerFolder,
+                                      computeOptions: computeOptions,
+                                      verbose: cliArguments.verbose,
+                                      logLevel: .debug,
+                                      prewarm: false,
+                                      load: true,
+                                      useBackgroundDownloadSession: false)
+        return try await WhisperKit(config)
     }
 
     private func decodingOptions(task: DecodingTask) -> DecodingOptions {

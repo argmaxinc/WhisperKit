@@ -39,9 +39,42 @@ open class WhisperKit {
     /// Configuration
     public var modelFolder: URL?
     public var tokenizerFolder: URL?
-    public let useBackgroundDownloadSession: Bool
+    public private(set) var useBackgroundDownloadSession: Bool
 
-    public init(
+    public init(_ config: WhisperKitConfig = WhisperKitConfig()) async throws {
+        modelCompute = config.computeOptions ?? ModelComputeOptions()
+        audioProcessor = config.audioProcessor ?? AudioProcessor()
+        featureExtractor = config.featureExtractor ?? FeatureExtractor()
+        audioEncoder = config.audioEncoder ?? AudioEncoder()
+        textDecoder = config.textDecoder ?? TextDecoder()
+        logitsFilters = config.logitsFilters ?? []
+        segmentSeeker = config.segmentSeeker ?? SegmentSeeker()
+        tokenizerFolder = config.tokenizerFolder
+        useBackgroundDownloadSession = config.useBackgroundDownloadSession
+        currentTimings = TranscriptionTimings()
+        Logging.shared.logLevel = config.verbose ? config.logLevel : .none
+
+        try await setupModels(
+            model: config.model,
+            downloadBase: config.downloadBase,
+            modelRepo: config.modelRepo,
+            modelFolder: config.modelFolder,
+            download: config.download
+        )
+
+        if let prewarm = config.prewarm, prewarm {
+            Logging.info("Prewarming models...")
+            try await prewarmModels()
+        }
+
+        // If load is not passed in, load based on whether a modelFolder is passed
+        if config.load ?? (config.modelFolder != nil) {
+            Logging.info("Loading models...")
+            try await loadModels()
+        }
+    }
+
+    public convenience init(
         model: String? = nil,
         downloadBase: URL? = nil,
         modelRepo: String? = nil,
@@ -61,36 +94,27 @@ open class WhisperKit {
         download: Bool = true,
         useBackgroundDownloadSession: Bool = false
     ) async throws {
-        modelCompute = computeOptions ?? ModelComputeOptions()
-        self.audioProcessor = audioProcessor ?? AudioProcessor()
-        self.featureExtractor = featureExtractor ?? FeatureExtractor()
-        self.audioEncoder = audioEncoder ?? AudioEncoder()
-        self.textDecoder = textDecoder ?? TextDecoder()
-        self.logitsFilters = logitsFilters ?? []
-        self.segmentSeeker = segmentSeeker ?? SegmentSeeker()
-        self.tokenizerFolder = tokenizerFolder
-        self.useBackgroundDownloadSession = useBackgroundDownloadSession
-        currentTimings = TranscriptionTimings()
-        Logging.shared.logLevel = verbose ? logLevel : .none
-
-        try await setupModels(
+        let config = WhisperKitConfig(
             model: model,
             downloadBase: downloadBase,
             modelRepo: modelRepo,
             modelFolder: modelFolder,
-            download: download
-        )
-
-        if let prewarm = prewarm, prewarm {
-            Logging.info("Prewarming models...")
-            try await prewarmModels()
-        }
-
-        // If load is not passed in, load based on whether a modelFolder is passed
-        if load ?? (modelFolder != nil) {
-            Logging.info("Loading models...")
-            try await loadModels()
-        }
+            tokenizerFolder: tokenizerFolder,
+            computeOptions: computeOptions,
+            audioProcessor: audioProcessor,
+            featureExtractor: featureExtractor,
+            audioEncoder: audioEncoder,
+            textDecoder: textDecoder,
+            logitsFilters: logitsFilters,
+            segmentSeeker: segmentSeeker,
+            verbose: verbose,
+            logLevel: logLevel,
+            prewarm: prewarm,
+            load: load,
+            download: download,
+            useBackgroundDownloadSession: useBackgroundDownloadSession
+            )
+        try await self.init(config)
     }
 
     // MARK: - Model Loading
