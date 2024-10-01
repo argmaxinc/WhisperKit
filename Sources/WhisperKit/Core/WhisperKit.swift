@@ -236,7 +236,7 @@ open class WhisperKit {
     }
 
     /// Sets up the model folder either from a local path or by downloading from a repository.
-    public func setupModels(
+    open func setupModels(
         model: String?,
         downloadBase: URL? = nil,
         modelRepo: String?,
@@ -268,11 +268,11 @@ open class WhisperKit {
         }
     }
 
-    public func prewarmModels() async throws {
+    open func prewarmModels() async throws {
         try await loadModels(prewarmMode: true)
     }
 
-    public func loadModels(
+    open func loadModels(
         prewarmMode: Bool = false
     ) async throws {
         modelState = prewarmMode ? .prewarming : .loading
@@ -378,7 +378,7 @@ open class WhisperKit {
         Logging.info("Loaded models for whisper size: \(modelVariant) in \(String(format: "%.2f", currentTimings.modelLoading))s")
     }
 
-    public func unloadModels() async {
+    open func unloadModels() async {
         modelState = .unloading
 
         for model in [featureExtractor, audioEncoder, textDecoder] {
@@ -392,7 +392,7 @@ open class WhisperKit {
         Logging.info("Unloaded all models")
     }
 
-    public func clearState() {
+    open func clearState() {
         audioProcessor.stopRecording()
         currentTimings = TranscriptionTimings()
     }
@@ -402,7 +402,7 @@ open class WhisperKit {
     }
 
     /// Pass in your own logging callback here
-    public func loggingCallback(_ callback: Logging.LoggingCallback?) {
+    open func loggingCallback(_ callback: Logging.LoggingCallback?) {
         Logging.shared.loggingCallback = callback
     }
 
@@ -412,7 +412,7 @@ open class WhisperKit {
     ///
     /// - Parameter audioPath: The file path of the audio file.
     /// - Returns: A tuple containing the detected language and the language log probabilities.
-    public func detectLanguage(
+    open func detectLanguage(
         audioPath: String
     ) async throws -> (language: String, langProbs: [String: Float]) {
         let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioPath)
@@ -424,7 +424,7 @@ open class WhisperKit {
     ///
     /// - Parameter audioArray: An array of audio samples.
     /// - Returns: A tuple containing the detected language and the language log probabilities.
-    public func detectLangauge(
+    open func detectLangauge(
         audioArray: [Float]
     ) async throws -> (language: String, langProbs: [String: Float]) {
         if modelState != .loaded {
@@ -475,7 +475,7 @@ open class WhisperKit {
 
     /// Convenience method to transcribe multiple audio files asynchronously and return the results as an array of optional arrays of `TranscriptionResult`.
     /// - Returns: An array of optional arrays containing `TranscriptionResult`.
-    public func transcribe(
+    open func transcribe(
         audioPaths: [String],
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
@@ -500,7 +500,7 @@ open class WhisperKit {
     ///   - callback: Optional callback to receive updates during the transcription process.
     ///
     /// - Returns: An array of `Result` objects with either a successful transcription result or an error.
-    public func transcribeWithResults(
+    open func transcribeWithResults(
         audioPaths: [String],
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
@@ -548,7 +548,7 @@ open class WhisperKit {
 
     /// Convenience method to transcribe multiple audio arrays asynchronously and return the results as an array of optional arrays of `TranscriptionResult`.
     /// - Returns: An array of optional arrays containing `TranscriptionResult`.
-    public func transcribe(
+    open func transcribe(
         audioArrays: [[Float]],
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
@@ -574,7 +574,7 @@ open class WhisperKit {
     ///   - callback: Optional callback to receive updates during the transcription process.
     ///
     /// - Returns: An array of `Result` objects, each containing either a successful transcription result or an error.
-    public func transcribeWithResults(
+    open func transcribeWithResults(
         audioArrays: [[Float]],
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
@@ -595,7 +595,7 @@ open class WhisperKit {
     ///  - callback: Optional callback to receive updates during the transcription process.
     ///
     /// - Returns: An array of `Result` objects, each containing either a successful transcription result or an error.
-    public func transcribeWithOptions(
+    open func transcribeWithOptions(
         audioArrays: [[Float]],
         decodeOptionsArray: [DecodingOptions?] = [nil],
         callback: TranscriptionCallback = nil
@@ -668,7 +668,7 @@ open class WhisperKit {
 
     @available(*, deprecated, message: "Subject to removal in a future version. Use `transcribe(audioPath:decodeOptions:callback:) async throws -> [TranscriptionResult]` instead.")
     @_disfavoredOverload
-    public func transcribe(
+    open func transcribe(
         audioPath: String,
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
@@ -684,7 +684,7 @@ open class WhisperKit {
     ///   - callback: Optional callback to receive updates during the transcription process.
     /// - Returns: An array of `TranscriptionResult`.
     /// - Throws: An error if the transcription fails.
-    public func transcribe(
+    open func transcribe(
         audioPath: String,
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
@@ -714,7 +714,7 @@ open class WhisperKit {
     /// Deprecated
     @available(*, deprecated, message: "Subject to removal in a future version. Use `transcribe(audioArray:decodeOptions:callback:) async throws -> [TranscriptionResult]` instead.")
     @_disfavoredOverload
-    public func transcribe(
+    open func transcribe(
         audioArray: [Float],
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
@@ -730,7 +730,7 @@ open class WhisperKit {
     ///   - callback: Optional callback to receive updates during the transcription process.
     /// - Returns: An array of sorted `TranscriptionResult`.
     /// - Throws: An error if the transcription fails.
-    public func transcribe(
+    open func transcribe(
         audioArray: [Float],
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
@@ -792,7 +792,7 @@ open class WhisperKit {
     /// Runs the transcription task on a single audio sample array asynchronously.
     /// - Returns: An array of `TranscriptionResult`.
     /// - Throws: An error if the transcription fails or if the tokenizer is unavailable.
-    private func runTranscribeTask(
+    open func runTranscribeTask(
         audioArray: [Float],
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
