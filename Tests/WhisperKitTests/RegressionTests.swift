@@ -1,6 +1,6 @@
 import CoreML
 import Hub
-@testable import WhisperKit
+import WhisperKit
 import XCTest
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
@@ -86,7 +86,7 @@ final class RegressionTests: XCTestCase {
             return true
         }
 
-        let whisperKit = try await WhisperKit(model: model)
+        let whisperKit = try await WhisperKit(WhisperKitConfig(model: model))
         memoryStats.preTranscribeMemory = Float(SystemMemoryChecker.getMemoryUsed())
 
         let transcriptionResult = try await XCTUnwrapAsync(
@@ -127,11 +127,8 @@ final class RegressionTests: XCTestCase {
                 "Audio file not found"
             )
 
-            let whisperKit = try await WhisperKit(
-                modelFolder: modelPath,
-                verbose: true,
-                logLevel: .debug
-            )
+            let config = WhisperKitConfig(modelFolder: modelPath, verbose: true, logLevel: .debug)
+            let whisperKit = try await WhisperKit(config)
 
             let transcriptionResult: [TranscriptionResult] = try await whisperKit.transcribe(audioPath: audioFilePath)
             let transcriptionResultText = transcriptionResult.text

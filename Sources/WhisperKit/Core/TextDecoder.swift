@@ -347,6 +347,8 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
     public var shouldEarlyStop = [UUID: Bool]()
     private var languageLogitsFilter: LanguageLogitsFilter?
 
+    public init() {}
+
     public var supportsWordTimestamps: Bool {
         return getModelOutputDimention(model, named: "alignment_heads_weights", position: 0) != nil
     }
