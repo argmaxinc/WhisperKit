@@ -169,7 +169,7 @@ public struct DecodingOptions {
         logProbThreshold: Float? = -1.0,
         firstTokenLogProbThreshold: Float? = -1.5,
         noSpeechThreshold: Float? = 0.6,
-        concurrentWorkerCount: Int = 0,
+        concurrentWorkerCount: Int = 16,
         chunkingStrategy: ChunkingStrategy? = nil,
         voiceActivityDetector: VoiceActivityDetector? = nil
     ) {
