@@ -167,14 +167,14 @@ public struct ModelComputeOptions {
 
 // MARK: - Chunking
 
-public struct AudioChunk {
+public struct AudioChunk: Sendable {
     public var seekOffsetIndex: Int
     public var audioSamples: [Float]
 }
 
 // MARK: - Decoding
 
-public enum DecodingTask: CustomStringConvertible, CaseIterable {
+public enum DecodingTask: CustomStringConvertible, CaseIterable, Sendable {
     case transcribe
     case translate
 
@@ -390,7 +390,7 @@ public enum WhisperError: Error, LocalizedError, Equatable {
 
 // Structs
 
-public struct TranscriptionResult: Codable {
+public struct TranscriptionResult: Codable, Sendable {
     public var text: String
     public var segments: [TranscriptionSegment]
     public var language: String
@@ -478,7 +478,7 @@ public extension TranscriptionResult {
     }
 }
 
-public struct TranscriptionSegment: Hashable, Codable {
+public struct TranscriptionSegment: Hashable, Codable, Sendable {
     public var id: Int = 0
     public var seek: Int = 0
     public var start: Float = 0.0
@@ -493,7 +493,7 @@ public struct TranscriptionSegment: Hashable, Codable {
     public var words: [WordTiming]? = nil
 }
 
-public struct WordTiming: Hashable, Codable {
+public struct WordTiming: Hashable, Codable, Sendable {
     public var word: String
     public var tokens: [Int]
     public var start: Float
@@ -501,7 +501,7 @@ public struct WordTiming: Hashable, Codable {
     public var probability: Float
 }
 
-public struct TranscriptionProgress {
+public struct TranscriptionProgress: Sendable {
     public var timings: TranscriptionTimings
     public var text: String
     public var tokens: [Int]
@@ -533,7 +533,7 @@ public struct TranscriptionProgress {
 /// - Note: This callback should be lightweight and return as quickly as possible to avoid extra decoding loops
 public typealias TranscriptionCallback = ((TranscriptionProgress) -> Bool?)?
 
-public struct TranscriptionTimings: Codable {
+public struct TranscriptionTimings: Codable, Sendable {
     public var pipelineStart: CFAbsoluteTime
     public var firstTokenTime: CFAbsoluteTime
     public var inputAudioSeconds: TimeInterval

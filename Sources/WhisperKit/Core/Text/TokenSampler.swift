@@ -10,7 +10,7 @@ public protocol TokenSampling {
     func finalize(tokens: [Int], logProbs: [Float]) -> SamplingResult
 }
 
-public struct SamplingResult {
+public struct SamplingResult: Sendable {
     public var tokens: [Int]
     public var logProbs: [Float]
     public var completed: Bool
