@@ -767,8 +767,7 @@ public extension AudioProcessor {
         }
 
         let bufferSize = AVAudioFrameCount(minBufferLength) // 100ms - 400ms supported
-        inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: nodeFormat) { [weak self] (buffer: AVAudioPCMBuffer, _: AVAudioTime) in
-            guard let self = self else { return }
+        inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: nodeFormat) { (buffer: AVAudioPCMBuffer, _: AVAudioTime) in
             var buffer = buffer
             if !buffer.format.sampleRate.isEqual(to: Double(WhisperKit.sampleRate)) {
                 do {
@@ -780,7 +779,8 @@ public extension AudioProcessor {
             }
             let targetBuffer = buffer
             let newBufferArray = Self.convertBufferToArray(buffer: targetBuffer)
-            Task {
+            Task { [weak self] in
+                guard let self = self else { return }
                 await self.processBuffer(newBufferArray)
             }
         }
