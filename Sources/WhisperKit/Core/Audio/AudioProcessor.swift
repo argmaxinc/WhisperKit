@@ -770,6 +770,10 @@ public extension AudioProcessor {
         inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: nodeFormat) { [weak self] (buffer: AVAudioPCMBuffer, _: AVAudioTime) in
             var buffer = buffer
             if !buffer.format.sampleRate.isEqual(to: Double(WhisperKit.sampleRate)) {
+                guard let converter = AVAudioConverter(from: nodeFormat, to: desiredFormat) else {
+                    Logging.error("Failed to create audio converter")
+                    return
+                }
                 do {
                     buffer = try Self.resampleBuffer(buffer, with: converter)
                 } catch {
