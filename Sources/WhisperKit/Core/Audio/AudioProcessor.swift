@@ -701,7 +701,6 @@ public extension AudioProcessor {
         let signalEnergy = Self.calculateEnergy(of: buffer)
         let newEnergy = (relativeEnergy, signalEnergy.avg, signalEnergy.max, signalEnergy.min)
         self.audioEnergy.append(newEnergy)
-
         // Call the callback with the new buffer
         audioBufferCallback?(buffer)
 
@@ -804,13 +803,19 @@ public extension AudioProcessor {
 
         audioEngine.prepare()
         try audioEngine.start()
-
+        
         return audioEngine
     }
-
+    
     func purgeAudioSamples(keepingLast keep: Int) {
-        if audioSamples.count > keep {
-            audioSamples.removeFirst(audioSamples.count - keep)
+        let samplesToRemove = audioSamples.count - keep
+        if samplesToRemove > 0 {
+            audioSamples.removeFirst(samplesToRemove)
+        }
+        
+        let energiesToRemove = samplesToRemove / minBufferLength
+        if energiesToRemove > 0 {
+            audioEnergy.removeFirst(min(energiesToRemove, audioEnergy.count))
         }
     }
 
