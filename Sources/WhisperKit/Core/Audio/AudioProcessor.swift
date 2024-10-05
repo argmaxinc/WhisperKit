@@ -511,7 +511,17 @@ public actor AudioProcessor: @preconcurrency AudioProcessing {
         }
         let frameLength = Int(buffer.frameLength)
         let startPointer = channelData[0]
-        let result = Array(UnsafeBufferPointer(start: startPointer, count: frameLength))
+        var result = [Float](unsafeUninitializedCapacity: frameLength) { bufferPointer, initializedCount in
+            vDSP_mmov(
+                startPointer,
+                bufferPointer.baseAddress!,
+                vDSP_Length(frameLength),
+                1,
+                vDSP_Length(frameLength),
+                1
+            )
+            initializedCount = frameLength
+        }
         return result
     }
 
