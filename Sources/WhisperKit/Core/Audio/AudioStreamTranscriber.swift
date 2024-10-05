@@ -106,7 +106,7 @@ public actor AudioStreamTranscriber {
     }
 
     private func onAudioBufferCallback() {
-        state.bufferEnergy = audioProcessor.relativeEnergy
+        state.bufferEnergy = audioProcessor.getRelativeEnergy()
     }
 
     private func onProgressCallback(_ progress: TranscriptionProgress) {
@@ -124,7 +124,7 @@ public actor AudioStreamTranscriber {
 
     private func transcribeCurrentBuffer() async throws {
         // Retrieve the current audio buffer from the audio processor
-        let currentBuffer = audioProcessor.audioSamples
+        let currentBuffer = await audioProcessor.getAudioSamples()
 
         // Calculate the size and duration of the next buffer segment
         let nextBufferSize = currentBuffer.count - state.lastBufferSize
@@ -139,8 +139,9 @@ public actor AudioStreamTranscriber {
         }
 
         if useVAD {
+            let relativeEnergy = await audioProcessor.getRelativeEnergy()
             let voiceDetected = AudioProcessor.isVoiceDetected(
-                in: audioProcessor.relativeEnergy,
+                in: relativeEnergy,
                 nextBufferInSeconds: nextBufferSeconds,
                 silenceThreshold: silenceThreshold
             )

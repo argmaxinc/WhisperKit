@@ -47,13 +47,13 @@ public protocol AudioProcessing {
     ) -> MLMultiArray?
 
     /// Stores the audio samples to be transcribed
-    var audioSamples: ContiguousArray<Float> { get }
+    func getAudioSamples() -> ContiguousArray<Float>
 
     /// Empties the audio samples array, keeping the last `keep` samples
     func purgeAudioSamples(keepingLast keep: Int)
 
     /// A measure of current buffer's energy in dB normalized from 0 - 1 based on the quietest buffer's energy in a specified window
-    var relativeEnergy: [Float] { get }
+    func getRelativeEnergy() ->  [Float]
 
     /// How many past buffers of audio to use to calculate relative energy
     /// The lowest average energy value in the buffer within this amount of previous buffers will used as the silence baseline
@@ -172,12 +172,7 @@ public extension AudioProcessing {
 public actor AudioProcessor: @preconcurrency AudioProcessing {
     private var lastInputDevice: DeviceID?
     public var audioEngine: AVAudioEngine?
-    public var audioSamples: ContiguousArray<Float> = []
-    public var audioEnergy: [(rel: Float, avg: Float, max: Float, min: Float)] = []
     public var relativeEnergyWindow: Int = 20
-    public var relativeEnergy: [Float] {
-        return self.audioEnergy.map { $0.rel }
-    }
 
     public var audioBufferCallback: (([Float]) -> Void)?
     public var maxBufferLength = WhisperKit.sampleRate * WhisperKit.chunkLength // 30 seconds of audio at 16,000 Hz
@@ -185,6 +180,22 @@ public actor AudioProcessor: @preconcurrency AudioProcessing {
     
     public init() {
         
+    }
+    
+    private var audioSamples: ContiguousArray<Float> = []
+    
+    public func getAudioSamples() -> ContiguousArray<Float> {
+        self.audioSamples
+    }
+    
+    private var audioEnergy: [(rel: Float, avg: Float, max: Float, min: Float)] = []
+    
+    public func getAudioEnergy() -> [(rel: Float, avg: Float, max: Float, min: Float)] {
+        self.audioEnergy
+    }
+    
+    public func getRelativeEnergy() -> [Float] {
+        self.audioEnergy.map(\.rel)
     }
 
     // MARK: - Loading and conversion
