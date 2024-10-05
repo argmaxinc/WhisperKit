@@ -99,7 +99,7 @@ public actor AudioStreamTranscriber {
             do {
                 try await transcribeCurrentBuffer()
             } catch {
-                Logging.error("Error: \(error.localizedDescription)")
+                Logging.error("Error: \(#file) \(error.localizedDescription)")
                 break
             }
         }
