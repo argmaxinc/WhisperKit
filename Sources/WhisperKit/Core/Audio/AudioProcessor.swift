@@ -182,6 +182,10 @@ public actor AudioProcessor: @preconcurrency AudioProcessing {
     public var audioBufferCallback: (([Float]) -> Void)?
     public var maxBufferLength = WhisperKit.sampleRate * WhisperKit.chunkLength // 30 seconds of audio at 16,000 Hz
     public var minBufferLength = Int(Double(WhisperKit.sampleRate) * 0.1) // 0.1 second of audio at 16,000 Hz
+    
+    public init() {
+        
+    }
 
     // MARK: - Loading and conversion
 
@@ -792,8 +796,8 @@ public extension AudioProcessor {
                 }
             }
             let targetBuffer = buffer
+            let newBufferArray = Self.convertBufferToArray(buffer: targetBuffer)
             Task {
-                let newBufferArray = Self.convertBufferToArray(buffer: targetBuffer)
                 await self.processBuffer(newBufferArray)
             }
         }
