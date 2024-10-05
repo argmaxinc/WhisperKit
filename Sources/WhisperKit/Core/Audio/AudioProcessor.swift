@@ -490,17 +490,19 @@ public actor AudioProcessor: @preconcurrency AudioProcessing {
         var rmsEnergy: Float = 0.0
         var minEnergy: Float = 0.0
         var maxEnergy: Float = 0.0
-
-        // Calculate the root mean square of the signal
         vDSP_rmsqv(signal, 1, &rmsEnergy, vDSP_Length(signal.count))
-
-        // Calculate the maximum sample value of the signal
-        vDSP_maxmgv(signal, 1, &maxEnergy, vDSP_Length(signal.count))
-
-        // Calculate the minimum sample value of the signal
-        vDSP_minmgv(signal, 1, &minEnergy, vDSP_Length(signal.count))
-
+        vDSP_maxv(signal, 1, &maxEnergy, vDSP_Length(signal.count))
+        vDSP_minv(signal, 1, &minEnergy, vDSP_Length(signal.count))
         return (rmsEnergy, maxEnergy, minEnergy)
+    }
+
+    public static func calculateRelativeEnergy(of signal: [Float], relativeTo reference: Float) -> Float {
+        let signalEnergy = calculateAverageEnergy(of: signal)
+        let referenceEnergy = max(1e-8, reference)
+        let dbEnergy = 20 * log10(signalEnergy)
+        let refEnergy = 20 * log10(referenceEnergy)
+        let normalizedEnergy = rescale(value: dbEnergy, min: refEnergy, max: 0)
+        return max(0, min(normalizedEnergy, 1))
     }
 
     public static func calculateRelativeEnergy(of signal: [Float], relativeTo reference: Float?) -> Float {
@@ -522,41 +524,13 @@ public actor AudioProcessor: @preconcurrency AudioProcessing {
         return max(0, min(normalizedEnergy, 1))
     }
 
-    public static func convertBufferToArray(buffer: AVAudioPCMBuffer, chunkSize: Int = 1024) -> [Float] {
+    public static func convertBufferToArray(buffer: AVAudioPCMBuffer) -> [Float] {
         guard let channelData = buffer.floatChannelData else {
             return []
         }
-
         let frameLength = Int(buffer.frameLength)
         let startPointer = channelData[0]
-
-        var result: [Float] = []
-        result.reserveCapacity(frameLength) // Reserve the capacity to avoid multiple allocations
-
-        var currentFrame = 0
-        while currentFrame < frameLength {
-            let remainingFrames = frameLength - currentFrame
-            let currentChunkSize = min(chunkSize, remainingFrames)
-
-            var chunk = [Float](repeating: 0, count: currentChunkSize)
-
-            chunk.withUnsafeMutableBufferPointer { bufferPointer in
-                vDSP_mmov(
-                    startPointer.advanced(by: currentFrame),
-                    bufferPointer.baseAddress!,
-                    vDSP_Length(currentChunkSize),
-                    1,
-                    vDSP_Length(currentChunkSize),
-                    1
-                )
-            }
-
-            result.append(contentsOf: chunk)
-            currentFrame += currentChunkSize
-
-            memset(startPointer.advanced(by: currentFrame - currentChunkSize), 0, currentChunkSize * MemoryLayout<Float>.size)
-        }
-
+        let result = Array(UnsafeBufferPointer(start: startPointer, count: frameLength))
         return result
     }
 
@@ -691,15 +665,23 @@ public extension AudioProcessor {
     /// We have a new buffer, process and store it.
     /// NOTE: Assumes audio is 16khz mono
     func processBuffer(_ buffer: [Float]) {
+        let bufferCount = buffer.count
+        let previousCount = audioSamples.count
+        audioSamples.reserveCapacity(previousCount + bufferCount)
         audioSamples.append(contentsOf: buffer)
 
-        // Find the lowest average energy of the last 20 buffers ~2 seconds
-        let minAvgEnergy = self.audioEnergy.suffix(20).reduce(Float.infinity) { min($0, $1.avg) }
-        let relativeEnergy = Self.calculateRelativeEnergy(of: buffer, relativeTo: minAvgEnergy)
+        // エネルギー計算
+        let recentAudioEnergy = self.audioEnergy.suffix(relativeEnergyWindow)
+        let minAvgEnergy: Float
+        if recentAudioEnergy.isEmpty {
+            minAvgEnergy = 1e-8 // デフォルトの最小エネルギー値
+        } else {
+            minAvgEnergy = recentAudioEnergy.reduce(Float.infinity) { min($0, $1.avg) }
+        }
 
-        // Update energy for buffers with valid data
+        let relativeEnergy = Self.calculateRelativeEnergy(of: buffer, relativeTo: minAvgEnergy)
         let signalEnergy = Self.calculateEnergy(of: buffer)
-        let newEnergy = (relativeEnergy, signalEnergy.avg, signalEnergy.max, signalEnergy.min)
+        let newEnergy = (rel: relativeEnergy, avg: signalEnergy.avg, max: signalEnergy.max, min: signalEnergy.min)
         self.audioEnergy.append(newEnergy)
         // Call the callback with the new buffer
         audioBufferCallback?(buffer)
