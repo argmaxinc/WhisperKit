@@ -143,7 +143,7 @@ public struct DecodingOptions {
     public var noSpeechThreshold: Float?
     public var concurrentWorkerCount: Int
     public var chunkingStrategy: ChunkingStrategy?
-    public var voiceActivityDetector: VoiceActivityDetector?
+    public var voiceActivityDetector: (any VoiceActivityDetectable)?
 
     public init(
         verbose: Bool = false,
@@ -172,7 +172,7 @@ public struct DecodingOptions {
         noSpeechThreshold: Float? = 0.6,
         concurrentWorkerCount: Int = 16,
         chunkingStrategy: ChunkingStrategy? = nil,
-        voiceActivityDetector: VoiceActivityDetector? = nil
+        voiceActivityDetector: (any VoiceActivityDetectable)? = nil
     ) {
         self.verbose = verbose
         self.task = task

@@ -5,7 +5,7 @@ import Foundation
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public extension AudioStreamTranscriber {
-    struct State {
+    struct State: Sendable {
         public var isRecording: Bool = false
         public var currentFallbacks: Int = 0
         public var lastBufferSize: Int = 0

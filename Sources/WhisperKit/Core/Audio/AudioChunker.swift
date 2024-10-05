@@ -46,9 +46,9 @@ public extension AudioChunking {
 public struct VADAudioChunker: AudioChunking {
     /// prevent hallucinations at the end of the clip by stopping up to 1.0s early
     private let windowPadding: Int
-    private let vad: VoiceActivityDetector
+    private let vad: any VoiceActivityDetectable
 
-    public init(windowPadding: Int = 16000, vad: VoiceActivityDetector? = nil) {
+    public init(windowPadding: Int = 16000, vad: (any VoiceActivityDetectable)? = nil) {
         self.windowPadding = windowPadding
         self.vad = vad ?? EnergyVAD()
     }
