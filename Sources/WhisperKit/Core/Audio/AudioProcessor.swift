@@ -496,31 +496,12 @@ public actor AudioProcessor: @preconcurrency AudioProcessing {
         return (rmsEnergy, maxEnergy, minEnergy)
     }
 
-    public static func calculateRelativeEnergy(of signal: [Float], relativeTo reference: Float) -> Float {
-        let signalEnergy = calculateAverageEnergy(of: signal)
-        let referenceEnergy = max(1e-8, reference)
-        let dbEnergy = 20 * log10(signalEnergy)
-        let refEnergy = 20 * log10(referenceEnergy)
-        let normalizedEnergy = rescale(value: dbEnergy, min: refEnergy, max: 0)
-        return max(0, min(normalizedEnergy, 1))
-    }
-
     public static func calculateRelativeEnergy(of signal: [Float], relativeTo reference: Float?) -> Float {
         let signalEnergy = calculateAverageEnergy(of: signal)
-
-        // Make sure reference is greater than 0
-        // Default 1e-3 measured empirically in a silent room
         let referenceEnergy = max(1e-8, reference ?? 1e-3)
-
-        // Convert to dB
         let dbEnergy = 20 * log10(signalEnergy)
         let refEnergy = 20 * log10(referenceEnergy)
-
-        // Normalize based on reference
-        // NOTE: since signalEnergy elements are floats from 0 to 1, max (full volume) is always 0dB
         let normalizedEnergy = rescale(value: dbEnergy, min: refEnergy, max: 0)
-
-        // Clamp from 0 to 1
         return max(0, min(normalizedEnergy, 1))
     }
 
