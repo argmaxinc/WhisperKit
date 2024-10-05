@@ -1206,9 +1206,10 @@ struct ContentView: View {
                 #endif
 
                 try? audioProcessor.startRecordingLive(inputDeviceID: deviceId) { _ in
-                    DispatchQueue.main.async {
-                        bufferEnergy = whisperKit?.audioProcessor.relativeEnergy ?? []
-                        bufferSeconds = Double(whisperKit?.audioProcessor.audioSamples.count ?? 0) / Double(WhisperKit.sampleRate)
+                    Task { @MainActor in
+                        bufferEnergy = await whisperKit?.audioProcessor.getRelativeEnergy() ?? []
+                        let audioSamples = await whisperKit?.audioProcessor.getAudioSamples() ?? []
+                        bufferSeconds = Double(audioSamples.count) / Double(WhisperKit.sampleRate)
                     }
                 }
 
@@ -1406,7 +1407,7 @@ struct ContentView: View {
         guard let whisperKit = whisperKit else { return }
 
         // Retrieve the current audio buffer from the audio processor
-        let currentBuffer = whisperKit.audioProcessor.audioSamples
+        let currentBuffer = whisperKit.audioProcessor.getAudioSamples()
 
         // Calculate the size and duration of the next buffer segment
         let nextBufferSize = currentBuffer.count - lastBufferSize
@@ -1424,8 +1425,9 @@ struct ContentView: View {
         }
 
         if useVAD {
+            let relativeEnergy = whisperKit.audioProcessor.getRelativeEnergy()
             let voiceDetected = AudioProcessor.isVoiceDetected(
-                in: whisperKit.audioProcessor.relativeEnergy,
+                in: relativeEnergy,
                 nextBufferInSeconds: nextBufferSeconds,
                 silenceThreshold: Float(silenceThreshold)
             )
