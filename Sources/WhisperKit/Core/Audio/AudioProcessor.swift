@@ -169,7 +169,7 @@ public extension AudioProcessing {
 }
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-public class AudioProcessor: NSObject, AudioProcessing {
+public actor AudioProcessor: @preconcurrency AudioProcessing {
     private var lastInputDevice: DeviceID?
     public var audioEngine: AVAudioEngine?
     public var audioSamples: ContiguousArray<Float> = []
@@ -672,9 +672,11 @@ public class AudioProcessor: NSObject, AudioProcessing {
         return devices
     }
     #endif
-
+    
     deinit {
-        stopRecording()
+        Task {
+            await self.stopRecording()
+        }
     }
 }
 
@@ -789,9 +791,11 @@ public extension AudioProcessor {
                     return
                 }
             }
-
-            let newBufferArray = Self.convertBufferToArray(buffer: buffer)
-            self.processBuffer(newBufferArray)
+            let targetBuffer = buffer
+            Task {
+                let newBufferArray = Self.convertBufferToArray(buffer: targetBuffer)
+                await self.processBuffer(newBufferArray)
+            }
         }
 
         audioEngine.prepare()
