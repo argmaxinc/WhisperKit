@@ -247,13 +247,13 @@ public struct DecodingCache {
     }
 }
 
-public enum ChunkingStrategy: String, CaseIterable {
+public enum ChunkingStrategy: String, CaseIterable, Sendable {
     case none
     case vad
 }
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-public struct DecodingFallback {
+public struct DecodingFallback: Sendable {
     public var needsFallback: Bool
     public var fallbackReason: String
 

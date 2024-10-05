@@ -836,7 +836,7 @@ public class Logging {
 }
 
 extension Logging {
-    enum AudioEncoding {
+    enum AudioEncoding: Sendable {
         static let logger = Logger(
             subsystem: Constants.Logging.subsystem,
             category: "AudioEncoding"
@@ -846,7 +846,7 @@ extension Logging {
 }
 
 extension Logging {
-    enum FeatureExtractor {
+    enum FeatureExtractor: Sendable {
         static let logger = Logger(
             subsystem: Constants.Logging.subsystem,
             category: "FeatureExtractor"
@@ -856,7 +856,7 @@ extension Logging {
 }
 
 extension Logging {
-    enum TranscribeTask {
+    enum TranscribeTask: Sendable {
         static let logger = Logger(
             subsystem: Constants.Logging.subsystem,
             category: "TranscribeTask"

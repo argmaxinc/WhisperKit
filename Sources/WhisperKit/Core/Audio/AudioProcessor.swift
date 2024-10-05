@@ -13,7 +13,7 @@ public typealias DeviceID = AudioDeviceID
 public typealias DeviceID = String
 #endif
 
-public struct AudioDevice: Identifiable, Hashable {
+public struct AudioDevice: Identifiable, Hashable, Sendable {
     public let id: DeviceID
     public let name: String
 }
