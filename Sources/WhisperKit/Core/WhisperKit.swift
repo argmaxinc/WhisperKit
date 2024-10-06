@@ -134,32 +134,10 @@ open class WhisperKit {
         return deviceName
     }
 
-    public static func recommendedModels(fromRemote remote: Bool = false, timeout: TimeInterval = 1.0) -> ModelSupport {
+    public static func recommendedModels() -> ModelSupport {
         let deviceName = Self.deviceName()
         Logging.debug("Running on \(deviceName)")
-        if remote {
-            var support: ModelSupport?
-            let group = DispatchGroup()
-            group.enter()
-
-            Task {
-                let modelSupport = await Self.recommendedRemoteModels()
-                support = modelSupport
-                group.leave()
-            }
-
-            // Wait for the task to complete or timeout
-            let timeoutResult = group.wait(timeout: .now() + timeout)
-            if timeoutResult == .timedOut {
-                Logging.debug("Fetching model support timed out after \(timeout) second(s)")
-                return modelSupport(for: deviceName)
-            } else {
-                return support ?? modelSupport(for: deviceName)
-            }
-        } else {
-            // Use fallback model support
-            return modelSupport(for: deviceName)
-        }
+        return modelSupport(for: deviceName)
     }
 
     public static func recommendedRemoteModels(from repo: String = "argmaxinc/whisperkit-coreml") async -> ModelSupport {

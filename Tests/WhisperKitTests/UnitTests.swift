@@ -175,31 +175,15 @@ final class UnitTests: XCTestCase {
 
     func testRecommendedModels() async {
         let asyncRemoteModels = await WhisperKit.recommendedRemoteModels()
-        let syncRemoteModels = WhisperKit.recommendedModels(fromRemote: true)
-        let remoteModelsWithTimeout = WhisperKit.recommendedModels(fromRemote: true, timeout: 0.0001)
         let defaultModels = WhisperKit.recommendedModels()
 
-        // Async and sync remote models should be equal
-        XCTAssertEqual(asyncRemoteModels, syncRemoteModels, "Async and sync remote models should be equal")
-
-        // Models with timeout should fall back to default models
-        XCTAssertNotEqual(syncRemoteModels, remoteModelsWithTimeout, "Models with timeout should fall back to default models")
+        // Remote models should not be nil or empty
+        XCTAssertNotNil(asyncRemoteModels, "Remote models should not be nil")
+        XCTAssertFalse(asyncRemoteModels.default.isEmpty, "Remote model name should not be empty")
 
         // Default models should not be nil or empty
         XCTAssertNotNil(defaultModels, "Default models should not be nil")
         XCTAssertFalse(defaultModels.default.isEmpty, "Default model name should not be empty")
-    }
-
-    func testDeviceName() {
-        let deviceName = WhisperKit.deviceName()
-        XCTAssertFalse(deviceName.isEmpty, "Device name should not be empty")
-        XCTAssertTrue(deviceName.contains(","), "Device name should contain a comma, found \(deviceName)")
-    }
-
-    func testOrderedSet() {
-        let testArray = ["model1", "model2", "model1", "model3", "model2"]
-        let uniqueArray = testArray.orderedSet
-        XCTAssertEqual(uniqueArray, ["model1", "model2", "model3"], "Ordered set should contain unique elements in order")
     }
 
     // MARK: - Audio Tests
@@ -1119,6 +1103,18 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual("<|end<|of|>text|>".trimmingSpecialTokenCharacters(), "end<|of|>text")
         XCTAssertEqual("<|endoftext".trimmingSpecialTokenCharacters(), "endoftext")
         XCTAssertEqual("endoftext|>".trimmingSpecialTokenCharacters(), "endoftext")
+    }
+
+    func testDeviceName() {
+        let deviceName = WhisperKit.deviceName()
+        XCTAssertFalse(deviceName.isEmpty, "Device name should not be empty")
+        XCTAssertTrue(deviceName.contains(","), "Device name should contain a comma, found \(deviceName)")
+    }
+
+    func testOrderedSet() {
+        let testArray = ["model1", "model2", "model1", "model3", "model2"]
+        let uniqueArray = testArray.orderedSet
+        XCTAssertEqual(uniqueArray, ["model1", "model2", "model3"], "Ordered set should contain unique elements in order")
     }
 
     // MARK: - LogitsFilter Tests
