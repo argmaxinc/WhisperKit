@@ -18,7 +18,7 @@ public struct AudioDevice: Identifiable, Hashable, Sendable {
     public let name: String
 }
 
-public protocol AudioProcessing {
+public protocol AudioProcessing: Actor {
     /// Loads audio data from a specified file path.
     /// - Parameters:
     ///   - audioFilePath: The file path of the audio file.

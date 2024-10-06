@@ -393,12 +393,16 @@ open class WhisperKit {
     }
     
     open func clearState() {
-        audioProcessor.stopRecording()
+        Task {
+            await audioProcessor.stopRecording()
+        }
         currentTimings = TranscriptionTimings()
     }
     
     deinit {
-        audioProcessor.stopRecording()
+        Task {
+            await audioProcessor.stopRecording()
+        }
     }
     
     /// Pass in your own logging callback here

@@ -79,7 +79,7 @@ public actor AudioStreamTranscriber {
             return
         }
         state.isRecording = true
-        try audioProcessor.startRecordingLive { [weak self] _ in
+        try await audioProcessor.startRecordingLive { [weak self] _ in
             Task { [weak self] in
                 await self?.onAudioBufferCallback()
             }
@@ -90,7 +90,9 @@ public actor AudioStreamTranscriber {
 
     public func stopStreamTranscription() {
         state.isRecording = false
-        audioProcessor.stopRecording()
+        Task {
+            await audioProcessor.stopRecording()
+        }
         Logging.info("Realtime transcription has ended")
     }
 
@@ -106,7 +108,9 @@ public actor AudioStreamTranscriber {
     }
 
     private func onAudioBufferCallback() {
-        state.bufferEnergy = audioProcessor.getRelativeEnergy()
+        Task {
+            state.bufferEnergy = await audioProcessor.getRelativeEnergy()
+        }    
     }
 
     private func onProgressCallback(_ progress: TranscriptionProgress) {
