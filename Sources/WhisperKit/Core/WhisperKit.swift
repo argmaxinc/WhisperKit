@@ -139,18 +139,17 @@ open class WhisperKit {
         Logging.debug("Running on \(deviceName)")
         if remote {
             var support: ModelSupport?
-            let semaphore = DispatchSemaphore(value: 0)
+            let group = DispatchGroup()
+            group.enter()
 
             Task {
                 let modelSupport = await Self.recommendedRemoteModels()
-                await MainActor.run {
-                    support = modelSupport
-                    semaphore.signal()
-                }
+                support = modelSupport
+                group.leave()
             }
 
             // Wait for the task to complete or timeout
-            let timeoutResult = semaphore.wait(timeout: .now() + timeout)
+            let timeoutResult = group.wait(timeout: .now() + timeout)
             if timeoutResult == .timedOut {
                 Logging.debug("Fetching model support timed out after \(timeout) second(s)")
                 return modelSupport(for: deviceName)
