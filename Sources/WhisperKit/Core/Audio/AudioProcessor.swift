@@ -13,12 +13,12 @@ public typealias DeviceID = AudioDeviceID
 public typealias DeviceID = String
 #endif
 
-public struct AudioDevice: Identifiable, Hashable {
+public struct AudioDevice: Identifiable, Hashable, Sendable {
     public let id: DeviceID
     public let name: String
 }
 
-public protocol AudioProcessing {
+public protocol AudioProcessing: Actor {
     /// Loads audio data from a specified file path.
     /// - Parameters:
     ///   - audioFilePath: The file path of the audio file.
@@ -47,13 +47,13 @@ public protocol AudioProcessing {
     ) -> MLMultiArray?
 
     /// Stores the audio samples to be transcribed
-    var audioSamples: ContiguousArray<Float> { get }
+    func getAudioSamples() -> ContiguousArray<Float>
 
     /// Empties the audio samples array, keeping the last `keep` samples
     func purgeAudioSamples(keepingLast keep: Int)
 
     /// A measure of current buffer's energy in dB normalized from 0 - 1 based on the quietest buffer's energy in a specified window
-    var relativeEnergy: [Float] { get }
+    func getRelativeEnergy() ->  [Float]
 
     /// How many past buffers of audio to use to calculate relative energy
     /// The lowest average energy value in the buffer within this amount of previous buffers will used as the silence baseline
@@ -95,7 +95,7 @@ public extension AudioProcessing {
     static func padOrTrimAudio(fromArray audioArray: [Float], startAt startIndex: Int = 0, toLength frameLength: Int = 480_000, saveSegment: Bool = false) -> MLMultiArray? {
         let currentFrameLength = audioArray.count
 
-        if startIndex >= currentFrameLength, startIndex < 0 {
+        if startIndex >= currentFrameLength || startIndex < 0 {
             Logging.error("startIndex is outside the buffer size")
             return nil
         }
@@ -169,19 +169,34 @@ public extension AudioProcessing {
 }
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-public class AudioProcessor: NSObject, AudioProcessing {
+public actor AudioProcessor: @preconcurrency AudioProcessing {
     private var lastInputDevice: DeviceID?
     public var audioEngine: AVAudioEngine?
-    public var audioSamples: ContiguousArray<Float> = []
-    public var audioEnergy: [(rel: Float, avg: Float, max: Float, min: Float)] = []
     public var relativeEnergyWindow: Int = 20
-    public var relativeEnergy: [Float] {
-        return self.audioEnergy.map { $0.rel }
-    }
 
     public var audioBufferCallback: (([Float]) -> Void)?
     public var maxBufferLength = WhisperKit.sampleRate * WhisperKit.chunkLength // 30 seconds of audio at 16,000 Hz
     public var minBufferLength = Int(Double(WhisperKit.sampleRate) * 0.1) // 0.1 second of audio at 16,000 Hz
+    
+    public init() {
+        
+    }
+    
+    private var audioSamples: ContiguousArray<Float> = []
+    
+    public func getAudioSamples() -> ContiguousArray<Float> {
+        self.audioSamples
+    }
+    
+    private var audioEnergy: [(rel: Float, avg: Float, max: Float, min: Float)] = []
+    
+    public func getAudioEnergy() -> [(rel: Float, avg: Float, max: Float, min: Float)] {
+        self.audioEnergy
+    }
+    
+    public func getRelativeEnergy() -> [Float] {
+        self.audioEnergy.map(\.rel)
+    }
 
     // MARK: - Loading and conversion
 
@@ -437,7 +452,7 @@ public class AudioProcessor: NSObject, AudioProcessing {
     /// - Returns: an array of tuples indicating the start and end indices of non-silent chunks
     public static func calculateNonSilentChunks(
         in signal: [Float]
-    ) -> [(startIndex: Int, endIndex: Int)] {
+    ) -> [SampleRange] {
         EnergyVAD().calculateActiveChunks(in: signal)
     }
 
@@ -486,73 +501,38 @@ public class AudioProcessor: NSObject, AudioProcessing {
         var rmsEnergy: Float = 0.0
         var minEnergy: Float = 0.0
         var maxEnergy: Float = 0.0
-
-        // Calculate the root mean square of the signal
         vDSP_rmsqv(signal, 1, &rmsEnergy, vDSP_Length(signal.count))
-
-        // Calculate the maximum sample value of the signal
-        vDSP_maxmgv(signal, 1, &maxEnergy, vDSP_Length(signal.count))
-
-        // Calculate the minimum sample value of the signal
-        vDSP_minmgv(signal, 1, &minEnergy, vDSP_Length(signal.count))
-
+        vDSP_maxv(signal, 1, &maxEnergy, vDSP_Length(signal.count))
+        vDSP_minv(signal, 1, &minEnergy, vDSP_Length(signal.count))
         return (rmsEnergy, maxEnergy, minEnergy)
     }
 
     public static func calculateRelativeEnergy(of signal: [Float], relativeTo reference: Float?) -> Float {
         let signalEnergy = calculateAverageEnergy(of: signal)
-
-        // Make sure reference is greater than 0
-        // Default 1e-3 measured empirically in a silent room
         let referenceEnergy = max(1e-8, reference ?? 1e-3)
-
-        // Convert to dB
         let dbEnergy = 20 * log10(signalEnergy)
         let refEnergy = 20 * log10(referenceEnergy)
-
-        // Normalize based on reference
-        // NOTE: since signalEnergy elements are floats from 0 to 1, max (full volume) is always 0dB
         let normalizedEnergy = rescale(value: dbEnergy, min: refEnergy, max: 0)
-
-        // Clamp from 0 to 1
         return max(0, min(normalizedEnergy, 1))
     }
 
-    public static func convertBufferToArray(buffer: AVAudioPCMBuffer, chunkSize: Int = 1024) -> [Float] {
+    public static func convertBufferToArray(buffer: AVAudioPCMBuffer) -> [Float] {
         guard let channelData = buffer.floatChannelData else {
             return []
         }
-
         let frameLength = Int(buffer.frameLength)
         let startPointer = channelData[0]
-
-        var result: [Float] = []
-        result.reserveCapacity(frameLength) // Reserve the capacity to avoid multiple allocations
-
-        var currentFrame = 0
-        while currentFrame < frameLength {
-            let remainingFrames = frameLength - currentFrame
-            let currentChunkSize = min(chunkSize, remainingFrames)
-
-            var chunk = [Float](repeating: 0, count: currentChunkSize)
-
-            chunk.withUnsafeMutableBufferPointer { bufferPointer in
-                vDSP_mmov(
-                    startPointer.advanced(by: currentFrame),
-                    bufferPointer.baseAddress!,
-                    vDSP_Length(currentChunkSize),
-                    1,
-                    vDSP_Length(currentChunkSize),
-                    1
-                )
-            }
-
-            result.append(contentsOf: chunk)
-            currentFrame += currentChunkSize
-
-            memset(startPointer.advanced(by: currentFrame - currentChunkSize), 0, currentChunkSize * MemoryLayout<Float>.size)
+        var result = [Float](unsafeUninitializedCapacity: frameLength) { bufferPointer, initializedCount in
+            vDSP_mmov(
+                startPointer,
+                bufferPointer.baseAddress!,
+                vDSP_Length(frameLength),
+                1,
+                vDSP_Length(frameLength),
+                1
+            )
+            initializedCount = frameLength
         }
-
         return result
     }
 
@@ -672,9 +652,11 @@ public class AudioProcessor: NSObject, AudioProcessing {
         return devices
     }
     #endif
-
+    
     deinit {
-        stopRecording()
+        Task {
+            await self.stopRecording()
+        }
     }
 }
 
@@ -685,17 +667,24 @@ public extension AudioProcessor {
     /// We have a new buffer, process and store it.
     /// NOTE: Assumes audio is 16khz mono
     func processBuffer(_ buffer: [Float]) {
+        let bufferCount = buffer.count
+        let previousCount = audioSamples.count
+        audioSamples.reserveCapacity(previousCount + bufferCount)
         audioSamples.append(contentsOf: buffer)
 
-        // Find the lowest average energy of the last 20 buffers ~2 seconds
-        let minAvgEnergy = self.audioEnergy.suffix(20).reduce(Float.infinity) { min($0, $1.avg) }
+        // エネルギー計算
+        let recentAudioEnergy = self.audioEnergy.suffix(relativeEnergyWindow)
+        let minAvgEnergy: Float
+        if recentAudioEnergy.isEmpty {
+            minAvgEnergy = 1e-8 // デフォルトの最小エネルギー値
+        } else {
+            minAvgEnergy = recentAudioEnergy.reduce(Float.infinity) { min($0, $1.avg) }
+        }
+
         let relativeEnergy = Self.calculateRelativeEnergy(of: buffer, relativeTo: minAvgEnergy)
-
-        // Update energy for buffers with valid data
         let signalEnergy = Self.calculateEnergy(of: buffer)
-        let newEnergy = (relativeEnergy, signalEnergy.avg, signalEnergy.max, signalEnergy.min)
+        let newEnergy = (rel: relativeEnergy, avg: signalEnergy.avg, max: signalEnergy.max, min: signalEnergy.min)
         self.audioEnergy.append(newEnergy)
-
         // Call the callback with the new buffer
         audioBufferCallback?(buffer)
 
@@ -779,9 +768,12 @@ public extension AudioProcessor {
 
         let bufferSize = AVAudioFrameCount(minBufferLength) // 100ms - 400ms supported
         inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: nodeFormat) { [weak self] (buffer: AVAudioPCMBuffer, _: AVAudioTime) in
-            guard let self = self else { return }
             var buffer = buffer
             if !buffer.format.sampleRate.isEqual(to: Double(WhisperKit.sampleRate)) {
+                guard let converter = AVAudioConverter(from: nodeFormat, to: desiredFormat) else {
+                    Logging.error("Failed to create audio converter")
+                    return
+                }
                 do {
                     buffer = try Self.resampleBuffer(buffer, with: converter)
                 } catch {
@@ -789,20 +781,29 @@ public extension AudioProcessor {
                     return
                 }
             }
-
-            let newBufferArray = Self.convertBufferToArray(buffer: buffer)
-            self.processBuffer(newBufferArray)
+            let targetBuffer = buffer
+            let newBufferArray = Self.convertBufferToArray(buffer: targetBuffer)
+            Task { [weak self] in
+                guard let self = self else { return }
+                await self.processBuffer(newBufferArray)
+            }
         }
 
         audioEngine.prepare()
         try audioEngine.start()
-
+        
         return audioEngine
     }
-
+    
     func purgeAudioSamples(keepingLast keep: Int) {
-        if audioSamples.count > keep {
-            audioSamples.removeFirst(audioSamples.count - keep)
+        let samplesToRemove = audioSamples.count - keep
+        if samplesToRemove > 0 {
+            audioSamples.removeFirst(samplesToRemove)
+        }
+        
+        let energiesToRemove = samplesToRemove / minBufferLength
+        if energiesToRemove > 0 {
+            audioEnergy.removeFirst(min(energiesToRemove, audioEnergy.count))
         }
     }
 

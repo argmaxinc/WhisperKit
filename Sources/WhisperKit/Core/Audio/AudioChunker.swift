@@ -43,12 +43,12 @@ public extension AudioChunking {
 
 /// A audio chunker that splits audio into smaller pieces based on voice activity detection
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-open class VADAudioChunker: AudioChunking {
+public struct VADAudioChunker: AudioChunking {
     /// prevent hallucinations at the end of the clip by stopping up to 1.0s early
     private let windowPadding: Int
-    private let vad: VoiceActivityDetector
+    private let vad: any VoiceActivityDetectable
 
-    public init(windowPadding: Int = 16000, vad: VoiceActivityDetector? = nil) {
+    public init(windowPadding: Int = 16000, vad: (any VoiceActivityDetectable)? = nil) {
         self.windowPadding = windowPadding
         self.vad = vad ?? EnergyVAD()
     }
@@ -81,12 +81,12 @@ open class VADAudioChunker: AudioChunking {
             // Typically this will be the full audio file, unless seek points are explicitly provided
             var startIndex = seekClipStart
             while startIndex < seekClipEnd - windowPadding {
-                let currentFrameLength = startIndex - seekClipStart
-                if startIndex >= currentFrameLength, startIndex < 0 {
+                // 配列範囲内にあるかチェック
+                if startIndex >= audioArray.count || startIndex < 0 {
                     throw WhisperError.audioProcessingFailed("startIndex is outside the buffer size")
                 }
 
-                // Make sure we still need chunking for this seek clip, otherwise use the original seek clip end
+                // Adjust the end index based on VAD or maxChunkLength
                 var endIndex = seekClipEnd
                 if startIndex + maxChunkLength < endIndex {
                     // Adjust the end index based on VAD
@@ -97,6 +97,8 @@ open class VADAudioChunker: AudioChunking {
                     )
                 }
 
+                // Ensure endIndex is within the array bounds
+                endIndex = min(endIndex, audioArray.count)
                 guard endIndex > startIndex else {
                     break
                 }
@@ -108,4 +110,5 @@ open class VADAudioChunker: AudioChunking {
         }
         return chunkedAudio
     }
+
 }

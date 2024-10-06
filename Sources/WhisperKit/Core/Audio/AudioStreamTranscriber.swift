@@ -5,7 +5,7 @@ import Foundation
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public extension AudioStreamTranscriber {
-    struct State {
+    struct State: Sendable {
         public var isRecording: Bool = false
         public var currentFallbacks: Int = 0
         public var lastBufferSize: Int = 0
@@ -79,7 +79,7 @@ public actor AudioStreamTranscriber {
             return
         }
         state.isRecording = true
-        try audioProcessor.startRecordingLive { [weak self] _ in
+        try await audioProcessor.startRecordingLive { [weak self] _ in
             Task { [weak self] in
                 await self?.onAudioBufferCallback()
             }
@@ -90,7 +90,9 @@ public actor AudioStreamTranscriber {
 
     public func stopStreamTranscription() {
         state.isRecording = false
-        audioProcessor.stopRecording()
+        Task {
+            await audioProcessor.stopRecording()
+        }
         Logging.info("Realtime transcription has ended")
     }
 
@@ -99,14 +101,16 @@ public actor AudioStreamTranscriber {
             do {
                 try await transcribeCurrentBuffer()
             } catch {
-                Logging.error("Error: \(error.localizedDescription)")
+                Logging.error("Error: \(#file) \(error.localizedDescription)")
                 break
             }
         }
     }
 
     private func onAudioBufferCallback() {
-        state.bufferEnergy = audioProcessor.relativeEnergy
+        Task {
+            state.bufferEnergy = await audioProcessor.getRelativeEnergy()
+        }    
     }
 
     private func onProgressCallback(_ progress: TranscriptionProgress) {
@@ -124,7 +128,7 @@ public actor AudioStreamTranscriber {
 
     private func transcribeCurrentBuffer() async throws {
         // Retrieve the current audio buffer from the audio processor
-        let currentBuffer = audioProcessor.audioSamples
+        let currentBuffer = await audioProcessor.getAudioSamples()
 
         // Calculate the size and duration of the next buffer segment
         let nextBufferSize = currentBuffer.count - state.lastBufferSize
@@ -139,8 +143,9 @@ public actor AudioStreamTranscriber {
         }
 
         if useVAD {
+            let relativeEnergy = await audioProcessor.getRelativeEnergy()
             let voiceDetected = AudioProcessor.isVoiceDetected(
-                in: audioProcessor.relativeEnergy,
+                in: relativeEnergy,
                 nextBufferInSeconds: nextBufferSeconds,
                 silenceThreshold: silenceThreshold
             )

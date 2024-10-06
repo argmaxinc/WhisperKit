@@ -167,14 +167,14 @@ public struct ModelComputeOptions {
 
 // MARK: - Chunking
 
-public struct AudioChunk {
+public struct AudioChunk: Sendable {
     public var seekOffsetIndex: Int
     public var audioSamples: [Float]
 }
 
 // MARK: - Decoding
 
-public enum DecodingTask: CustomStringConvertible, CaseIterable {
+public enum DecodingTask: CustomStringConvertible, CaseIterable, Sendable {
     case transcribe
     case translate
 
@@ -247,13 +247,13 @@ public struct DecodingCache {
     }
 }
 
-public enum ChunkingStrategy: String, CaseIterable {
+public enum ChunkingStrategy: String, CaseIterable, Sendable {
     case none
     case vad
 }
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-public struct DecodingFallback {
+public struct DecodingFallback: Sendable {
     public var needsFallback: Bool
     public var fallbackReason: String
 
@@ -390,7 +390,7 @@ public enum WhisperError: Error, LocalizedError, Equatable {
 
 // Structs
 
-public struct TranscriptionResult: Codable {
+public struct TranscriptionResult: Codable, Sendable {
     public var text: String
     public var segments: [TranscriptionSegment]
     public var language: String
@@ -478,7 +478,7 @@ public extension TranscriptionResult {
     }
 }
 
-public struct TranscriptionSegment: Hashable, Codable {
+public struct TranscriptionSegment: Hashable, Codable, Sendable {
     public var id: Int = 0
     public var seek: Int = 0
     public var start: Float = 0.0
@@ -493,7 +493,7 @@ public struct TranscriptionSegment: Hashable, Codable {
     public var words: [WordTiming]? = nil
 }
 
-public struct WordTiming: Hashable, Codable {
+public struct WordTiming: Hashable, Codable, Sendable {
     public var word: String
     public var tokens: [Int]
     public var start: Float
@@ -501,7 +501,7 @@ public struct WordTiming: Hashable, Codable {
     public var probability: Float
 }
 
-public struct TranscriptionProgress {
+public struct TranscriptionProgress: Sendable {
     public var timings: TranscriptionTimings
     public var text: String
     public var tokens: [Int]
@@ -533,7 +533,7 @@ public struct TranscriptionProgress {
 /// - Note: This callback should be lightweight and return as quickly as possible to avoid extra decoding loops
 public typealias TranscriptionCallback = ((TranscriptionProgress) -> Bool?)?
 
-public struct TranscriptionTimings: Codable {
+public struct TranscriptionTimings: Codable, Sendable {
     public var pipelineStart: CFAbsoluteTime
     public var firstTokenTime: CFAbsoluteTime
     public var inputAudioSeconds: TimeInterval
@@ -1155,6 +1155,15 @@ struct WhisperTokenizerWrapper: WhisperTokenizer {
 }
 
 extension WhisperTokenizerWrapper: Tokenizer {
+    
+    func applyChatTemplate(messages: [[String : String]]) throws -> [Int] {
+        try tokenizer.applyChatTemplate(messages: messages)
+    }
+    
+    func applyChatTemplate(messages: [[String : String]], chatTemplate: String?, addGenerationPrompt: Bool, truncation: Bool, maxLength: Int?) throws -> [Int] {
+        try tokenizer.applyChatTemplate(messages: messages, chatTemplate: chatTemplate, addGenerationPrompt: addGenerationPrompt, truncation: truncation, maxLength: maxLength)
+    }
+    
     func tokenize(text: String) -> [String] {
         tokenizer.tokenize(text: text)
     }
@@ -1165,6 +1174,10 @@ extension WhisperTokenizerWrapper: Tokenizer {
 
     func decode(tokens: [Int]) -> String {
         tokenizer.decode(tokens: tokens)
+    }
+    
+    func encode(text: String, addSpecialTokens: Bool) -> [Int] {
+        tokenizer.encode(text: text, addSpecialTokens: addSpecialTokens)
     }
 
     func convertTokenToId(_ token: String) -> Int? {

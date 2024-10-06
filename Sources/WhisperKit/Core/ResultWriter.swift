@@ -3,7 +3,7 @@
 
 import Foundation
 
-public protocol ResultWriting {
+public protocol ResultWriting: Sendable {
     var outputDir: String { get }
     func write(result: TranscriptionResult, to file: String, options: [String: Any]?) -> Result<String, Error>
     func formatTime(seconds: Float, alwaysIncludeHours: Bool, decimalMarker: String) -> String
@@ -37,7 +37,7 @@ public extension ResultWriting {
     }
 }
 
-open class WriteJSON: ResultWriting {
+public struct WriteJSON: ResultWriting {
     public let outputDir: String
 
     public init(outputDir: String) {
@@ -66,7 +66,7 @@ open class WriteJSON: ResultWriting {
     }
 }
 
-open class WriteSRT: ResultWriting {
+public struct WriteSRT: ResultWriting {
     public let outputDir: String
 
     public init(outputDir: String) {
@@ -101,7 +101,7 @@ open class WriteSRT: ResultWriting {
     }
 }
 
-open class WriteVTT: ResultWriting {
+public struct WriteVTT: ResultWriting {
     public let outputDir: String
 
     public init(outputDir: String) {

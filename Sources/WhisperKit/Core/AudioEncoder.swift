@@ -22,16 +22,14 @@ public class AudioEncoder: AudioEncoding, WhisperMLModel {
         guard let inputDescription = model?.modelDescription.outputDescriptionsByName["encoder_output_embeds"] else { return nil }
         guard inputDescription.type == .multiArray else { return nil }
         guard let shapeConstraint = inputDescription.multiArrayConstraint else { return nil }
-        let shape = shapeConstraint.shape.map { $0.intValue }
-        return shape[1]
+        return shapeConstraint.shape[0].intValue
     }
 
     public var sequenceLength: Int? {
         guard let inputDescription = model?.modelDescription.outputDescriptionsByName["encoder_output_embeds"] else { return nil }
         guard inputDescription.type == .multiArray else { return nil }
         guard let shapeConstraint = inputDescription.multiArrayConstraint else { return nil }
-        let shape = shapeConstraint.shape.map { $0.intValue }
-        return shape[3]
+        return shapeConstraint.shape[1].intValue
     }
 
     public init() {}

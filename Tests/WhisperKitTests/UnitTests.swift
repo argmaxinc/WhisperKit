@@ -1132,38 +1132,38 @@ final class UnitTests: XCTestCase {
         // When looking for silence boundaries, a smaller frame length is preferred
         let vadForSilence = EnergyVAD(frameLengthSamples: 320)
         let nonSilentChunks1 = vadForSilence.calculateActiveChunks(in: [])
-        XCTAssertEqual(nonSilentChunks1.map(\.startIndex), [])
-        XCTAssertEqual(nonSilentChunks1.map(\.endIndex), [])
+        XCTAssertEqual(nonSilentChunks1.map(\SampleRange.startIndex), [])
+        XCTAssertEqual(nonSilentChunks1.map(\SampleRange.endIndex), [])
 
         let nonSilentChunks2 = vadForSilence.calculateActiveChunks(in: Array(repeating: 0, count: 1600))
-        XCTAssertEqual(nonSilentChunks2.map(\.startIndex), [])
-        XCTAssertEqual(nonSilentChunks2.map(\.endIndex), [])
+        XCTAssertEqual(nonSilentChunks2.map(\SampleRange.startIndex), [])
+        XCTAssertEqual(nonSilentChunks2.map(\SampleRange.endIndex), [])
 
         let nonSilentChunks3 = vadForSilence.calculateActiveChunks(in: Array(repeating: 1, count: 1600))
-        XCTAssertEqual(nonSilentChunks3.map(\.startIndex), [0])
-        XCTAssertEqual(nonSilentChunks3.map(\.endIndex), [1600])
+        XCTAssertEqual(nonSilentChunks3.map(\SampleRange.startIndex), [0])
+        XCTAssertEqual(nonSilentChunks3.map(\SampleRange.endIndex), [1600])
 
         let nonSilentChunks4 = vadForSilence.calculateActiveChunks(in: Array(repeating: 0, count: 1600) + Array(repeating: 1, count: 1600))
-        XCTAssertEqual(nonSilentChunks4.map(\.startIndex), [1600])
-        XCTAssertEqual(nonSilentChunks4.map(\.endIndex), [3200])
+        XCTAssertEqual(nonSilentChunks4.map(\SampleRange.startIndex), [1600])
+        XCTAssertEqual(nonSilentChunks4.map(\SampleRange.endIndex), [3200])
 
         let nonSilentChunksWithUnevenFrameLength1 = vadForSilence.calculateActiveChunks(in: Array(repeating: 1, count: 1601))
-        XCTAssertEqual(nonSilentChunksWithUnevenFrameLength1.map(\.startIndex), [0])
-        XCTAssertEqual(nonSilentChunksWithUnevenFrameLength1.map(\.endIndex), [1601])
+        XCTAssertEqual(nonSilentChunksWithUnevenFrameLength1.map(\SampleRange.startIndex), [0])
+        XCTAssertEqual(nonSilentChunksWithUnevenFrameLength1.map(\SampleRange.endIndex), [1601])
 
         let nonSilentChunksWithUnevenFrameLength2 = vadForSilence.calculateActiveChunks(in: Array(repeating: 1, count: 1599))
-        XCTAssertEqual(nonSilentChunksWithUnevenFrameLength2.map(\.startIndex), [0])
-        XCTAssertEqual(nonSilentChunksWithUnevenFrameLength2.map(\.endIndex), [1599])
+        XCTAssertEqual(nonSilentChunksWithUnevenFrameLength2.map(\SampleRange.startIndex), [0])
+        XCTAssertEqual(nonSilentChunksWithUnevenFrameLength2.map(\SampleRange.endIndex), [1599])
 
         let nonSilentChunksWithUnevenFrameLength3 = vadForSilence.calculateActiveChunks(in: Array(repeating: 1, count: 1599) + Array(repeating: 0, count: 1600))
-        XCTAssertEqual(nonSilentChunksWithUnevenFrameLength3.map(\.startIndex), [0])
-        XCTAssertEqual(nonSilentChunksWithUnevenFrameLength3.map(\.endIndex), [1600]) // frame length
+        XCTAssertEqual(nonSilentChunksWithUnevenFrameLength3.map(\SampleRange.startIndex), [0])
+        XCTAssertEqual(nonSilentChunksWithUnevenFrameLength3.map(\SampleRange.endIndex), [1600]) // frame length
 
         // Even with a smaller frame lenth, sometimes we need an overlap to detect them when they are very close to the boundary
         let vadWithOverlap = EnergyVAD(frameLengthSamples: 320, frameOverlapSamples: 80)
         let nonSilentChunksWithOverlap = vadWithOverlap.calculateActiveChunks(in: Array(repeating: 0, count: 1600) + Array(repeating: 1, count: 1600))
-        XCTAssertEqual(nonSilentChunksWithOverlap.map(\.startIndex), [1280])
-        XCTAssertEqual(nonSilentChunksWithOverlap.map(\.endIndex), [3200])
+        XCTAssertEqual(nonSilentChunksWithOverlap.map(\SampleRange.startIndex), [1280])
+        XCTAssertEqual(nonSilentChunksWithOverlap.map(\SampleRange.endIndex), [3200])
 
         // When specifically looking for speech instead of silence, a larger window is preferred
         let vadWithLargeWindow = EnergyVAD(frameLength: 0.2, frameOverlap: 0.1)
