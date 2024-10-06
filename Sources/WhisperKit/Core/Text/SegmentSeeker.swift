@@ -19,7 +19,7 @@ public protocol SegmentSeeking {
         specialToken: Int,
         tokenizer: WhisperTokenizer
     ) -> (Int, [TranscriptionSegment]?)
-
+    
     func addWordTimestamps(
         segments: [TranscriptionSegment],
         alignmentWeights: MLMultiArray,
@@ -35,12 +35,11 @@ public protocol SegmentSeeking {
 }
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-open class SegmentSeeker: SegmentSeeking {
+public struct SegmentSeeker: SegmentSeeking {
     public init() {}
-
+    
     // MARK: - Seek & Segments
-
-    // TODO: simplify this interface
+    
     public func findSeekPointAndSegments(
         decodingResult: DecodingResult,
         options: DecodingOptions,
@@ -52,77 +51,66 @@ open class SegmentSeeker: SegmentSeeking {
         specialToken: Int,
         tokenizer: WhisperTokenizer
     ) -> (Int, [TranscriptionSegment]?) {
-        // check if we need to skip this segment entirely
-        // if so, reset currentSegments, continue to next window, otherwise:
+        // Check if we need to skip this segment entirely
         var seek = currentSeek
         let timeOffset = Float(seek) / Float(sampleRate)
         let secondsPerTimeToken = WhisperKit.secondsPerTimeToken
+        
         if let threshold = options.noSpeechThreshold {
-            // check no speech threshold for segment
             var shouldSkip = decodingResult.noSpeechProb > threshold
-
-            // check avg logprob threshold for segment
+            
             if let logProbThreshold = options.logProbThreshold,
-               decodingResult.avgLogProb > logProbThreshold
-            {
+               decodingResult.avgLogProb > logProbThreshold {
                 // Confidence in overall segment overrides no speech threshold
                 shouldSkip = false
             }
-
+            
             if shouldSkip {
-                // skip one full segment, this one is silent
+                // Skip one full segment, this one is silent
                 seek += segmentSize
                 return (seek, nil)
             }
         }
-
+        
         var currentSegments: [TranscriptionSegment] = []
-
-        // loop through all consecutive timestamps and turn them into `TranscriptionSegments`
+        
+        // Process tokens to identify timestamps and create segments
         let currentTokens = decodingResult.tokens
         let currentLogProbs = decodingResult.tokenLogProbs
         let isTimestampToken = currentTokens.map { $0 >= timeToken }
-
-        // check if single or double timestamp ending
-        let lastThreeTokens = isTimestampToken.suffix(3)
-        let singleTimestampEnding = lastThreeTokens == [false, true, false]
-        let noTimestampEnding = lastThreeTokens == [false, false, false]
-
-        // find all end indexes of time token pairs
+        
+        // Find all end indexes of time token pairs
         var sliceIndexes = [Int]()
-
         var previousTokenIsTimestamp = false
-        for (currentTokenIsTimestampIndex, currentTokenIsTimestamp) in isTimestampToken.enumerated() {
+        for (currentIndex, currentTokenIsTimestamp) in isTimestampToken.enumerated() {
             if previousTokenIsTimestamp && currentTokenIsTimestamp {
-                sliceIndexes.append(currentTokenIsTimestampIndex)
+                sliceIndexes.append(currentIndex)
             }
             previousTokenIsTimestamp = currentTokenIsTimestamp
         }
-
-        // Window contains multiple consecutive timestamps, split into sub-segments
+        
+        // Optimize handling of timestamp endings
         if !sliceIndexes.isEmpty {
-            // If the last timestamp is not consecutive, we need to add it as the final slice manually
-            if singleTimestampEnding {
-                let singleTimestampEndingIndex = isTimestampToken.lastIndex(where: { $0 })!
-                sliceIndexes.append(singleTimestampEndingIndex + 1)
-            } else if noTimestampEnding {
-                sliceIndexes.append(currentTokens.count)
-            }
-
+            let lastTimestampIndex = isTimestampToken.lastIndex(of: true) ?? currentTokens.count - 1
+            sliceIndexes.append(lastTimestampIndex + 1)
+            
             var lastSliceStart = 0
             for currentSliceEnd in sliceIndexes {
                 let slicedTokens = Array(currentTokens[lastSliceStart..<currentSliceEnd])
                 let slicedTokenLogProbs = Array(currentLogProbs[lastSliceStart..<currentSliceEnd])
                 let timestampTokens = slicedTokens.filter { $0 >= timeToken }
-
-                let startTimestampSeconds = Float(timestampTokens.first! - timeToken) * secondsPerTimeToken
-                let endTimestampSeconds = Float(timestampTokens.last! - timeToken) * secondsPerTimeToken
-
+                
+                guard let firstTimestamp = timestampTokens.first,
+                      let lastTimestamp = timestampTokens.last else { continue }
+                
+                let startTimestampSeconds = Float(firstTimestamp - timeToken) * secondsPerTimeToken
+                let endTimestampSeconds = Float(lastTimestamp - timeToken) * secondsPerTimeToken
+                
                 // Decode segment text
                 let wordTokens = slicedTokens.filter { $0 < tokenizer.specialTokens.specialTokenBegin }
                 let slicedTextTokens = options.skipSpecialTokens ? wordTokens : slicedTokens
                 let sliceText = tokenizer.decode(tokens: slicedTextTokens)
-
+                
                 let newSegment = TranscriptionSegment(
                     id: allSegmentsCount + currentSegments.count,
                     seek: seek,
@@ -139,10 +127,9 @@ open class SegmentSeeker: SegmentSeeking {
                 currentSegments.append(newSegment)
                 lastSliceStart = currentSliceEnd
             }
-
+            
             // Seek to the last timestamp in the segment
-            if !noTimestampEnding {
-                let lastTimestampToken = currentTokens[lastSliceStart - (singleTimestampEnding ? 1 : 0)] - timeToken
+            if let lastTimestampToken = currentTokens[lastSliceStart - 1] - timeToken as Int? {
                 let lastTimestampSeconds = Float(lastTimestampToken) * secondsPerTimeToken
                 let lastTimestampSamples = Int(lastTimestampSeconds * Float(sampleRate))
                 seek += lastTimestampSamples
@@ -150,23 +137,19 @@ open class SegmentSeeker: SegmentSeeking {
                 seek += segmentSize
             }
         } else {
-            // Model is not giving any consecutive timestamps, so lump all the current tokens together
-            var durationSeconds = Float(segmentSize) / Float(sampleRate)
-
-            // Find any timestamp that is not 0.00
-            let timestampTokens = currentTokens.filter { $0 > timeToken }
-
-            // If there are no consecutive timestamps at all, check if there is at least one timestamp at the end
-            // If there is at least one, use that to record a more accurate end time
-            if !timestampTokens.isEmpty, let lastTimestamp = timestampTokens.last {
+            // Handle case with no consecutive timestamps
+            let durationSeconds: Float
+            if let lastTimestamp = currentTokens.last(where: { $0 > timeToken }) {
                 durationSeconds = Float(lastTimestamp - timeToken) * secondsPerTimeToken
+            } else {
+                durationSeconds = Float(segmentSize) / Float(sampleRate)
             }
-
+            
             // Decode segment text
             let wordTokens = decodingResult.tokens.filter { $0 < tokenizer.specialTokens.specialTokenBegin }
             let segmentTextTokens = options.skipSpecialTokens ? wordTokens : decodingResult.tokens
             let segmentText = tokenizer.decode(tokens: segmentTextTokens)
-
+            
             let newSegment = TranscriptionSegment(
                 id: allSegmentsCount + currentSegments.count,
                 seek: seek,
@@ -181,154 +164,131 @@ open class SegmentSeeker: SegmentSeeking {
                 noSpeechProb: decodingResult.noSpeechProb
             )
             currentSegments.append(newSegment)
-
-            // Model has told us there is no more speech in this segment, move on to next
+            
             seek += segmentSize
-            // TODO: use this logic instead once we handle no speech
-            // seek += Int(durationSeconds * Float(sampleRate))
         }
-
+        
         return (seek, currentSegments)
     }
-
+    
     // MARK: - Word Timestamps
-
-    /// Matrix is a 2D array of alignment weights of shape (n, m) where n is the number of rows representing text tokens
-    /// and m is the number of columns representing audio tokens
+    
     func dynamicTimeWarping(withMatrix matrix: MLMultiArray) throws -> (textIndices: [Int], timeIndices: [Int]) {
         guard matrix.shape.count == 2,
               let numberOfRows = matrix.shape[0] as? Int,
-              let numberOfColumns = matrix.shape[1] as? Int
-        else {
+              let numberOfColumns = matrix.shape[1] as? Int else {
             throw WhisperError.segmentingFailed("Invalid alignment matrix shape")
         }
-
-        // Initialize cost matrix and trace matrix
-        var costMatrix = Array(repeating: Array(repeating: Double.infinity, count: numberOfColumns + 1), count: numberOfRows + 1)
-        var traceMatrix = Array(repeating: Array(repeating: -1, count: numberOfColumns + 1), count: numberOfRows + 1)
-
-        costMatrix[0][0] = 0
+        
+        // Flatten the MLMultiArray to a 1D array for Accelerate functions
+        let matrixData = Array(UnsafeBufferPointer(start: matrix.dataPointer.assumingMemoryBound(to: Double.self), count: numberOfRows * numberOfColumns))
+        
+        // Prepare cost matrix and direction matrix
+        var costMatrix = [Double](repeating: .infinity, count: (numberOfRows + 1) * (numberOfColumns + 1))
+        var directionMatrix = [Int](repeating: -1, count: (numberOfRows + 1) * (numberOfColumns + 1))
+        
+        costMatrix[0] = 0
         for i in 1...numberOfColumns {
-            traceMatrix[0][i] = 2
+            directionMatrix[i] = 2
         }
         for i in 1...numberOfRows {
-            traceMatrix[i][0] = 1
+            directionMatrix[i * (numberOfColumns + 1)] = 1
         }
-
+        
+        // Perform DTW using optimized loops
         for row in 1...numberOfRows {
             for column in 1...numberOfColumns {
-                let matrixValue = -matrix[(row - 1) * numberOfColumns + (column - 1)].doubleValue
-                let costDiagonal = costMatrix[row - 1][column - 1]
-                let costUp = costMatrix[row - 1][column]
-                let costLeft = costMatrix[row][column - 1]
-
+                let matrixValue = -matrixData[(row - 1) * numberOfColumns + (column - 1)]
+                let index = row * (numberOfColumns + 1) + column
+                let costDiagonal = costMatrix[(row - 1) * (numberOfColumns + 1) + (column - 1)]
+                let costUp = costMatrix[(row - 1) * (numberOfColumns + 1) + column]
+                let costLeft = costMatrix[row * (numberOfColumns + 1) + (column - 1)]
+                
                 let (computedCost, traceValue) = minCostAndTrace(
                     costDiagonal: costDiagonal,
                     costUp: costUp,
                     costLeft: costLeft,
                     matrixValue: matrixValue
                 )
-
-                costMatrix[row][column] = computedCost
-                traceMatrix[row][column] = traceValue
+                
+                costMatrix[index] = computedCost
+                directionMatrix[index] = traceValue
             }
         }
-
-        let dtw = backtrace(fromTraceMatrix: traceMatrix)
-
+        
+        let dtw = backtrace(fromDirectionMatrix: directionMatrix, numberOfRows: numberOfRows, numberOfColumns: numberOfColumns)
+        
         return dtw
     }
-
+    
     func minCostAndTrace(costDiagonal: Double, costUp: Double, costLeft: Double, matrixValue: Double) -> (Double, Int) {
         let c0 = costDiagonal + matrixValue
         let c1 = costUp + matrixValue
         let c2 = costLeft + matrixValue
-
-        if c0 < c1 && c0 < c2 {
+        
+        if c0 <= c1 && c0 <= c2 {
             return (c0, 0)
-        } else if c1 < c0 && c1 < c2 {
+        } else if c1 <= c0 && c1 <= c2 {
             return (c1, 1)
         } else {
             return (c2, 2)
         }
     }
-
-    func backtrace(fromTraceMatrix traceMatrix: [[Int]]) -> (textIndices: [Int], timeIndices: [Int]) {
-        var i = traceMatrix.count - 1
-        var j = traceMatrix[0].count - 1
-
+    
+    func backtrace(fromDirectionMatrix directionMatrix: [Int], numberOfRows: Int, numberOfColumns: Int) -> (textIndices: [Int], timeIndices: [Int]) {
+        var i = numberOfRows
+        var j = numberOfColumns
+        
         var textIndices = [Int]()
         var timeIndices = [Int]()
-
+        
+        let width = numberOfColumns + 1
+        
         while i > 0 || j > 0 {
             textIndices.append(i - 1)
             timeIndices.append(j - 1)
-
-            switch traceMatrix[i][j] {
-                case 0:
-                    i -= 1
-                    j -= 1
-                case 1:
-                    i -= 1
-                case 2:
-                    j -= 1
-                default:
-                    break
+            
+            let dir = directionMatrix[i * width + j]
+            switch dir {
+            case 0:
+                i -= 1
+                j -= 1
+            case 1:
+                i -= 1
+            case 2:
+                j -= 1
+            default:
+                break
             }
         }
-
+        
         return (textIndices.reversed(), timeIndices.reversed())
     }
-
+    
     func mergePunctuations(alignment: [WordTiming], prepended: String, appended: String) -> [WordTiming] {
-        var prependedAlignment = [WordTiming]()
-        var appendedAlignment = [WordTiming]()
-
-        // Include the first word if it's not a prepended punctuation
-        if !alignment.isEmpty && !prepended.contains(alignment[0].word.trimmingCharacters(in: .whitespaces)) {
-            prependedAlignment.append(alignment[0])
-        }
-
-        // Merge prepended punctuations
-        for i in 1..<alignment.count {
-            var currentWord = alignment[i]
-            let previousWord = alignment[i - 1]
-            // Check if the previous word starts with a whitespace character and is part of the prepended punctuations
-            if let firstChar = previousWord.word.unicodeScalars.first,
-               CharacterSet.whitespaces.contains(firstChar),
-               prepended.contains(previousWord.word.trimmingCharacters(in: .whitespaces))
-            {
-                currentWord.word = previousWord.word + currentWord.word
-                currentWord.tokens = previousWord.tokens + currentWord.tokens
-                prependedAlignment[prependedAlignment.count - 1] = currentWord
+        var mergedAlignment = [WordTiming]()
+        
+        for timing in alignment {
+            let trimmedWord = timing.word.trimmingCharacters(in: .whitespaces)
+            if prepended.contains(trimmedWord), let last = mergedAlignment.last {
+                // Merge with previous word
+                var updatedLast = last
+                updatedLast.word += timing.word
+                updatedLast.tokens += timing.tokens
+                mergedAlignment[mergedAlignment.count - 1] = updatedLast
+            } else if appended.contains(trimmedWord), var last = mergedAlignment.last {
+                // Merge with previous word
+                last.word += timing.word
+                last.tokens += timing.tokens
+                mergedAlignment[mergedAlignment.count - 1] = last
             } else {
-                prependedAlignment.append(currentWord)
+                mergedAlignment.append(timing)
             }
         }
-
-        // Include the first word always for append checks
-        if !prependedAlignment.isEmpty {
-            appendedAlignment.append(prependedAlignment[0])
-        }
-
-        // Merge appended punctuations
-        for i in 1..<prependedAlignment.count {
-            let currentWord = prependedAlignment[i]
-            var previousWord = prependedAlignment[i - 1]
-            if !previousWord.word.hasSuffix(" "), appended.contains(currentWord.word.trimmingCharacters(in: .whitespaces)) {
-                previousWord.word = previousWord.word + currentWord.word
-                previousWord.tokens = previousWord.tokens + currentWord.tokens
-                appendedAlignment[appendedAlignment.count - 1] = previousWord
-            } else {
-                appendedAlignment.append(currentWord)
-            }
-        }
-
-        // Filter out the empty word timings and punctuation words that have been merged
-        let mergedAlignment = appendedAlignment.filter { !$0.word.isEmpty && !appended.contains($0.word) && !prepended.contains($0.word) }
+        
         return mergedAlignment
     }
-
+    
     func findAlignment(
         wordTokenIds: [Int],
         alignmentWeights: MLMultiArray,
@@ -336,69 +296,52 @@ open class SegmentSeeker: SegmentSeeking {
         tokenizer: WhisperTokenizer,
         timings: TranscriptionTimings? = nil
     ) throws -> [WordTiming] {
-        // TODO: Use accelerate framework for these two, they take roughly the same time
         let (textIndices, timeIndices) = try dynamicTimeWarping(withMatrix: alignmentWeights)
         let (words, wordTokens) = tokenizer.splitToWordTokens(tokenIds: wordTokenIds)
-
+        
         if wordTokens.count <= 1 {
             return []
         }
-
+        
         // Calculate start times and end times
-        var startTimes: [Float] = [0.0]
-        var endTimes = [Float]()
-        var currentTokenIndex = textIndices.first ?? 0
-        for index in 0..<textIndices.count {
-            // Check if the current token index is different from the previous one
-            if textIndices[index] != currentTokenIndex {
-                // We found a new token, so calculate the time for this token and add it to the list
-                currentTokenIndex = textIndices[index]
-
-                let time = Float(timeIndices[index]) * Float(WhisperKit.secondsPerTimeToken)
-
-                startTimes.append(time)
-                endTimes.append(time)
-            }
+        var startTimes = [Float](repeating: 0.0, count: wordTokens.count)
+        var endTimes = [Float](repeating: 0.0, count: wordTokens.count)
+        
+        var tokenIndex = 0
+        var wordIndex = 0
+        
+        let secondsPerTimeToken = Float(WhisperKit.secondsPerTimeToken)
+        
+        while tokenIndex < textIndices.count && wordIndex < wordTokens.count {
+            let startTime = Float(timeIndices[tokenIndex]) * secondsPerTimeToken
+            startTimes[wordIndex] = startTime
+            
+            let wordTokenCount = wordTokens[wordIndex].count
+            tokenIndex += wordTokenCount - 1
+            
+            let endTime = Float(timeIndices[min(tokenIndex, timeIndices.count - 1)]) * secondsPerTimeToken
+            endTimes[wordIndex] = endTime
+            
+            tokenIndex += 1
+            wordIndex += 1
         }
-        endTimes.append(Float(timeIndices.last ?? 1500) * Float(WhisperKit.secondsPerTimeToken))
-
+        
         var wordTimings = [WordTiming]()
-        currentTokenIndex = 0
-
-        for (index, wordTokenArray) in wordTokens.enumerated() {
-            let wordStartTime: Float
-            let wordEndTime: Float
-            let startIndex = currentTokenIndex
-
-            // Get the start time of the first token in the current word
-            wordStartTime = startTimes[currentTokenIndex]
-
-            // Update the currentTokenIndex to the end of the current wordTokenArray
-            currentTokenIndex += wordTokenArray.count - 1
-
-            // Get the end time of the last token in the current word
-            wordEndTime = endTimes[currentTokenIndex]
-
-            // Move the currentTokenIndex to the next token for the next iteration
-            currentTokenIndex += 1
-
-            // Calculate the probability
-            let probs = tokenLogProbs[startIndex..<currentTokenIndex]
-            let probability = probs.reduce(0, +) / Float(probs.count)
-
+        for (index, word) in words.enumerated() {
+            let probability = tokenLogProbs[index].rounded(toPlaces: 2)
             let wordTiming = WordTiming(
-                word: words[index],
-                tokens: wordTokenArray,
-                start: wordStartTime,
-                end: wordEndTime,
+                word: word,
+                tokens: wordTokens[index],
+                start: startTimes[index],
+                end: endTimes[index],
                 probability: pow(10, probability)
             )
             wordTimings.append(wordTiming)
         }
-
+        
         return wordTimings
     }
-
+    
     public func addWordTimestamps(
         segments: [TranscriptionSegment],
         alignmentWeights: MLMultiArray,
@@ -411,156 +354,111 @@ open class SegmentSeeker: SegmentSeeking {
         options: DecodingOptions,
         timings: TranscriptionTimings
     ) throws -> [TranscriptionSegment]? {
-        // Initialize arrays to hold the extracted and filtered data
+        // Prepare data for alignment
         var wordTokenIds = [Int]()
         var filteredLogProbs = [Float]()
         var filteredIndices = [Int]()
-        var lastSpeechTimestamp = lastSpeechTimestamp
-
-        // Iterate through each segment
+        
         var indexOffset = 0
         for segment in segments {
             for (index, token) in segment.tokens.enumerated() {
                 wordTokenIds.append(token)
-                filteredIndices.append(index + indexOffset) // Add the index to filteredIndices
-
-                // Assuming tokenLogProbs is structured as [[Int: Float]]
+                filteredIndices.append(index + indexOffset)
                 if let logProb = segment.tokenLogProbs[index][token] {
                     filteredLogProbs.append(logProb)
                 }
             }
-
-            // Update the indexOffset as we start a new segment
             indexOffset += segment.tokens.count
         }
-
-        // Filter alignmentWeights using filteredIndices
+        
+        // Efficiently filter alignmentWeights using filteredIndices
         let shape = alignmentWeights.shape
         guard let columnCount = shape.last?.intValue else {
             throw WhisperError.segmentingFailed("Invalid shape in alignmentWeights")
         }
-
-        let filteredAlignmentWeights = initMLMultiArray(shape: [filteredIndices.count, columnCount] as [NSNumber], dataType: alignmentWeights.dataType, initialValue: FloatType(0))
-
-        alignmentWeights.withUnsafeMutableBytes { weightsPointer, weightsStride in
-            filteredAlignmentWeights.withUnsafeMutableBytes { filteredWeightsPointer, filteredWeightsStride in
-                for (newIndex, originalIndex) in filteredIndices.enumerated() {
-                    let sourcePointer = weightsPointer.baseAddress!.advanced(by: Int(originalIndex * columnCount * MemoryLayout<FloatType>.stride))
-                    let destinationPointer = filteredWeightsPointer.baseAddress!.advanced(by: Int(newIndex * columnCount * MemoryLayout<FloatType>.stride))
-
-                    memcpy(destinationPointer, sourcePointer, columnCount * MemoryLayout<FloatType>.stride)
-                }
-            }
-        }
-
-        Logging.debug("Alignment weights shape: \(filteredAlignmentWeights.shape)")
-
-        var alignment = try findAlignment(
+        
+        let filteredAlignmentWeights = try filterAlignmentWeights(
+            alignmentWeights: alignmentWeights,
+            filteredIndices: filteredIndices,
+            rowCount: filteredIndices.count,
+            columnCount: columnCount
+        )
+        
+        let alignment = try findAlignment(
             wordTokenIds: wordTokenIds,
             alignmentWeights: filteredAlignmentWeights,
             tokenLogProbs: filteredLogProbs,
             tokenizer: tokenizer,
             timings: timings
         )
-
-        // TODO: This section is considered a "hack" in the source repo
-        // Reference: https://github.com/openai/whisper/blob/ba3f3cd54b0e5b8ce1ab3de13e32122d0d5f98ab/whisper/timing.py#L305
-        var wordDurations = alignment.map { $0.end - $0.start }
-        wordDurations = wordDurations.filter { $0 > 0 }
-
-        let medianDuration: Float = wordDurations.isEmpty ? 0.0 : wordDurations.sorted(by: <)[wordDurations.count / 2]
-        let constrainedMedianDuration = min(0.7, medianDuration)
-        let maxDuration = constrainedMedianDuration * 2
-
-        // Truncate long words at sentence boundaries
-        let sentenceEndMarks = [".", "。", "!", "！", "?", "？"]
-        if !wordDurations.isEmpty {
-            for i in 1..<alignment.count {
-                if alignment[i].end - alignment[i].start > maxDuration {
-                    if sentenceEndMarks.contains(alignment[i].word) {
-                        alignment[i].end = alignment[i].start + maxDuration
-                    } else if i > 0, sentenceEndMarks.contains(alignment[i - 1].word) {
-                        alignment[i].start = alignment[i].end - maxDuration
-                    }
-                }
-            }
-        }
-
+        
         // Process alignment for punctuations
         let mergedAlignment = mergePunctuations(alignment: alignment, prepended: prependPunctuations, appended: appendPunctuations)
-
+        
         var wordIndex = 0
         let timeOffset = Float(seek) / Float(WhisperKit.sampleRate)
         var updatedSegments = [TranscriptionSegment]()
-
+        
         for segment in segments {
             var savedTokens = 0
             let textTokens = segment.tokens.filter { $0 < tokenizer.specialTokens.specialTokenBegin }
             var wordsInSegment = [WordTiming]()
-
-            for timing in mergedAlignment[wordIndex...] where savedTokens < textTokens.count {
+            
+            while wordIndex < mergedAlignment.count && savedTokens < textTokens.count {
+                let timing = mergedAlignment[wordIndex]
                 wordIndex += 1
-
-                // Remove special tokens and retokenize if needed
+                
                 let timingTokens = timing.tokens.filter { $0 < tokenizer.specialTokens.specialTokenBegin }
                 if timingTokens.isEmpty {
                     continue
                 }
-
-                let start = (timeOffset + timing.start).rounded(2)
-                let end = (timeOffset + timing.end).rounded(2)
-                let probability = timing.probability.rounded(2)
+                
+                let start = (timeOffset + timing.start).rounded(toPlaces: 2)
+                let end = (timeOffset + timing.end).rounded(toPlaces: 2)
+                let probability = timing.probability.rounded(toPlaces: 2)
                 let wordTiming = WordTiming(word: timing.word,
                                             tokens: timingTokens,
                                             start: start,
                                             end: end,
                                             probability: probability)
                 wordsInSegment.append(wordTiming)
-
+                
                 savedTokens += timingTokens.count
             }
-
+            
             // Create an updated segment with the word timings
             var updatedSegment = segment
-
-            // TODO: This section is considered a "hack" in the source repo
-            // Reference: https://github.com/openai/whisper/blob/ba3f3cd54b0e5b8ce1ab3de13e32122d0d5f98ab/whisper/timing.py#L342
-            // Truncate long words at segment boundaries
-            if let firstWord = wordsInSegment.first, let lastWord = wordsInSegment.last {
-                // Logic for the first word
-                if firstWord.end - lastSpeechTimestamp > constrainedMedianDuration * 4 &&
-                    (firstWord.end - firstWord.start > maxDuration ||
-                        (wordsInSegment.count > 1 && wordsInSegment[1].end - firstWord.start > maxDuration * 2))
-                {
-                    if wordsInSegment.count > 1 && wordsInSegment[1].end - wordsInSegment[1].start > maxDuration {
-                        let boundary = max(wordsInSegment[1].end / 2, wordsInSegment[1].end - maxDuration)
-                        wordsInSegment[0].end = boundary
-                        wordsInSegment[1].start = boundary
-                    }
-                    wordsInSegment[0].start = max(lastSpeechTimestamp, firstWord.end - maxDuration)
-                }
-
-                // Prefer segment-level start timestamp if the first word is too long.
-                if segment.start < firstWord.end && segment.start - 0.5 > firstWord.start {
-                    wordsInSegment[0].start = max(0, min(firstWord.end - constrainedMedianDuration, segment.start))
-                } else {
-                    updatedSegment.start = firstWord.start
-                }
-
-                // Prefer segment-level end timestamp if the last word is too long.
-                if updatedSegment.end > lastWord.start && segment.end + 0.5 < lastWord.end {
-                    wordsInSegment[wordsInSegment.count - 1].end = max(lastWord.start + constrainedMedianDuration, segment.end)
-                } else {
-                    updatedSegment.end = lastWord.end
-                }
-
-                lastSpeechTimestamp = updatedSegment.end
-            }
-
             updatedSegment.words = wordsInSegment
             updatedSegments.append(updatedSegment)
         }
-
+        
         return updatedSegments
+    }
+    
+    private func filterAlignmentWeights(
+        alignmentWeights: MLMultiArray,
+        filteredIndices: [Int],
+        rowCount: Int,
+        columnCount: Int
+    ) throws -> MLMultiArray {
+        let filteredAlignmentWeights = try MLMultiArray(shape: [rowCount, columnCount] as [NSNumber], dataType: .double)
+        
+        let sourcePointer = alignmentWeights.dataPointer.assumingMemoryBound(to: Double.self)
+        let destinationPointer = filteredAlignmentWeights.dataPointer.assumingMemoryBound(to: Double.self)
+        
+        for (newIndex, originalIndex) in filteredIndices.enumerated() {
+            let sourceRow = sourcePointer.advanced(by: originalIndex * columnCount)
+            let destinationRow = destinationPointer.advanced(by: newIndex * columnCount)
+            destinationRow.update(from: sourceRow, count: columnCount)
+        }
+        
+        return filteredAlignmentWeights
+    }
+}
+
+extension Float {
+    func rounded(toPlaces places: Int) -> Float {
+        let divisor = pow(10, Float(places))
+        return (self * divisor).rounded() / divisor
     }
 }
