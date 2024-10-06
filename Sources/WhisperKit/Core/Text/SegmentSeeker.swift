@@ -174,19 +174,11 @@ public struct SegmentSeeker: SegmentSeeking {
         let elementCount = numberOfRows * numberOfColumns
         var matrixData = [Double](repeating: 0.0, count: elementCount)
         
-        switch matrix.dataType {
-        case .double:
-            let pointer = matrix.dataPointer.assumingMemoryBound(to: Double.self)
-            for i in 0..<elementCount {
-                matrixData[i] = pointer[i]
-            }
-        case .float32:
-            let pointer = matrix.dataPointer.assumingMemoryBound(to: Float.self)
-            for i in 0..<elementCount {
-                matrixData[i] = Double(pointer[i])
-            }
-        default:
-            throw WhisperError.segmentingFailed("Unsupported MLMultiArray data type: \(matrix.dataType)")
+        let pointer = matrix.dataPointer.assumingMemoryBound(to: UInt16.self)
+        for i in 0..<elementCount {
+            let uint16Value = pointer[i]
+            let float16Value = Float16(bitPattern: uint16Value)
+            matrixData[i] = Double(float16Value)
         }
         
         let totalSize = (numberOfRows + 1) * (numberOfColumns + 1)
