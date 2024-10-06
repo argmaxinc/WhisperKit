@@ -363,9 +363,8 @@ public struct SegmentSeeker: SegmentSeeking {
         var wordTokenIds = [Int]()
         var filteredLogProbs = [Float]()
         var filteredIndices = [Int]()
-        var lastSpeechTimestamp = lastSpeechTimestamp
-        
         var indexOffset = 0
+        
         for segment in segments {
             for (index, token) in segment.tokens.enumerated() {
                 wordTokenIds.append(token)
@@ -390,7 +389,7 @@ public struct SegmentSeeker: SegmentSeeking {
             columnCount: columnCount
         )
         
-        var alignment = try findAlignment(
+        let alignment = try findAlignment(
             wordTokenIds: wordTokenIds,
             alignmentWeights: filteredAlignmentWeights,
             tokenLogProbs: filteredLogProbs,
@@ -449,27 +448,13 @@ public struct SegmentSeeker: SegmentSeeking {
     ) throws -> MLMultiArray {
         let filteredAlignmentWeights = try MLMultiArray(shape: [rowCount, columnCount] as [NSNumber], dataType: alignmentWeights.dataType)
         
-        switch alignmentWeights.dataType {
-        case .double:
-            let sourcePointer = alignmentWeights.dataPointer.assumingMemoryBound(to: Double.self)
-            let destinationPointer = filteredAlignmentWeights.dataPointer.assumingMemoryBound(to: Double.self)
-            
-            for (newIndex, originalIndex) in filteredIndices.enumerated() {
-                let sourceRow = sourcePointer.advanced(by: originalIndex * columnCount)
-                let destinationRow = destinationPointer.advanced(by: newIndex * columnCount)
-                destinationRow.update(from: sourceRow, count: columnCount)
-            }
-        case .float32:
-            let sourcePointer = alignmentWeights.dataPointer.assumingMemoryBound(to: Float.self)
-            let destinationPointer = filteredAlignmentWeights.dataPointer.assumingMemoryBound(to: Float.self)
-            
-            for (newIndex, originalIndex) in filteredIndices.enumerated() {
-                let sourceRow = sourcePointer.advanced(by: originalIndex * columnCount)
-                let destinationRow = destinationPointer.advanced(by: newIndex * columnCount)
-                destinationRow.update(from: sourceRow, count: columnCount)
-            }            
-        default:
-            throw WhisperError.segmentingFailed("Unsupported MLMultiArray data type: \(alignmentWeights.dataType)")
+        let sourcePointer = alignmentWeights.dataPointer.assumingMemoryBound(to: UInt16.self)
+        let destinationPointer = filteredAlignmentWeights.dataPointer.assumingMemoryBound(to: UInt16.self)
+        
+        for (newIndex, originalIndex) in filteredIndices.enumerated() {
+            let sourceRow = sourcePointer.advanced(by: originalIndex * columnCount)
+            let destinationRow = destinationPointer.advanced(by: newIndex * columnCount)
+            destinationRow.update(from: sourceRow, count: columnCount)
         }
         
         return filteredAlignmentWeights
