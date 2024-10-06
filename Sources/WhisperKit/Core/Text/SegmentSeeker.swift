@@ -51,7 +51,6 @@ public struct SegmentSeeker: SegmentSeeking {
         specialToken: Int,
         tokenizer: WhisperTokenizer
     ) -> (Int, [TranscriptionSegment]?) {
-        // Check if we need to skip this segment entirely
         var seek = currentSeek
         let timeOffset = Float(seek) / Float(sampleRate)
         let secondsPerTimeToken = WhisperKit.secondsPerTimeToken
@@ -61,12 +60,10 @@ public struct SegmentSeeker: SegmentSeeking {
             
             if let logProbThreshold = options.logProbThreshold,
                decodingResult.avgLogProb > logProbThreshold {
-                // Confidence in overall segment overrides no speech threshold
                 shouldSkip = false
             }
             
             if shouldSkip {
-                // Skip one full segment, this one is silent
                 seek += segmentSize
                 return (seek, nil)
             }
@@ -74,12 +71,11 @@ public struct SegmentSeeker: SegmentSeeking {
         
         var currentSegments: [TranscriptionSegment] = []
         
-        // Process tokens to identify timestamps and create segments
+        // トークンを処理してタイムスタンプを特定し、セグメントを作成
         let currentTokens = decodingResult.tokens
         let currentLogProbs = decodingResult.tokenLogProbs
         let isTimestampToken = currentTokens.map { $0 >= timeToken }
         
-        // Find all end indexes of time token pairs
         var sliceIndexes = [Int]()
         var previousTokenIsTimestamp = false
         for (currentIndex, currentTokenIsTimestamp) in isTimestampToken.enumerated() {
@@ -89,7 +85,6 @@ public struct SegmentSeeker: SegmentSeeking {
             previousTokenIsTimestamp = currentTokenIsTimestamp
         }
         
-        // Optimize handling of timestamp endings
         if !sliceIndexes.isEmpty {
             let lastTimestampIndex = isTimestampToken.lastIndex(of: true) ?? currentTokens.count - 1
             sliceIndexes.append(lastTimestampIndex + 1)
@@ -106,7 +101,6 @@ public struct SegmentSeeker: SegmentSeeking {
                 let startTimestampSeconds = Float(firstTimestamp - timeToken) * secondsPerTimeToken
                 let endTimestampSeconds = Float(lastTimestamp - timeToken) * secondsPerTimeToken
                 
-                // Decode segment text
                 let wordTokens = slicedTokens.filter { $0 < tokenizer.specialTokens.specialTokenBegin }
                 let slicedTextTokens = options.skipSpecialTokens ? wordTokens : slicedTokens
                 let sliceText = tokenizer.decode(tokens: slicedTextTokens)
@@ -128,16 +122,14 @@ public struct SegmentSeeker: SegmentSeeking {
                 lastSliceStart = currentSliceEnd
             }
             
-            // Seek to the last timestamp in the segment
-            if let lastTimestampToken = currentTokens[lastSliceStart - 1] - timeToken as Int? {
-                let lastTimestampSeconds = Float(lastTimestampToken) * secondsPerTimeToken
+            if let lastTimestampToken = currentTokens[lastSliceStart - 1] as Int? {
+                let lastTimestampSeconds = Float(lastTimestampToken - timeToken) * secondsPerTimeToken
                 let lastTimestampSamples = Int(lastTimestampSeconds * Float(sampleRate))
                 seek += lastTimestampSamples
             } else {
                 seek += segmentSize
             }
         } else {
-            // Handle case with no consecutive timestamps
             let durationSeconds: Float
             if let lastTimestamp = currentTokens.last(where: { $0 > timeToken }) {
                 durationSeconds = Float(lastTimestamp - timeToken) * secondsPerTimeToken
@@ -145,7 +137,6 @@ public struct SegmentSeeker: SegmentSeeking {
                 durationSeconds = Float(segmentSize) / Float(sampleRate)
             }
             
-            // Decode segment text
             let wordTokens = decodingResult.tokens.filter { $0 < tokenizer.specialTokens.specialTokenBegin }
             let segmentTextTokens = options.skipSpecialTokens ? wordTokens : decodingResult.tokens
             let segmentText = tokenizer.decode(tokens: segmentTextTokens)
@@ -180,12 +171,27 @@ public struct SegmentSeeker: SegmentSeeking {
             throw WhisperError.segmentingFailed("Invalid alignment matrix shape")
         }
         
-        // Flatten the MLMultiArray to a 1D array for Accelerate functions
-        let matrixData = Array(UnsafeBufferPointer(start: matrix.dataPointer.assumingMemoryBound(to: Double.self), count: numberOfRows * numberOfColumns))
+        let elementCount = numberOfRows * numberOfColumns
+        var matrixData = [Double](repeating: 0.0, count: elementCount)
         
-        // Prepare cost matrix and direction matrix
-        var costMatrix = [Double](repeating: .infinity, count: (numberOfRows + 1) * (numberOfColumns + 1))
-        var directionMatrix = [Int](repeating: -1, count: (numberOfRows + 1) * (numberOfColumns + 1))
+        switch matrix.dataType {
+        case .double:
+            let pointer = matrix.dataPointer.assumingMemoryBound(to: Double.self)
+            for i in 0..<elementCount {
+                matrixData[i] = pointer[i]
+            }
+        case .float32:
+            let pointer = matrix.dataPointer.assumingMemoryBound(to: Float.self)
+            for i in 0..<elementCount {
+                matrixData[i] = Double(pointer[i])
+            }
+        default:
+            throw WhisperError.segmentingFailed("Unsupported MLMultiArray data type: \(matrix.dataType)")
+        }
+        
+        let totalSize = (numberOfRows + 1) * (numberOfColumns + 1)
+        var costMatrix = [Double](repeating: .infinity, count: totalSize)
+        var directionMatrix = [Int](repeating: -1, count: totalSize)
         
         costMatrix[0] = 0
         for i in 1...numberOfColumns {
@@ -195,7 +201,6 @@ public struct SegmentSeeker: SegmentSeeking {
             directionMatrix[i * (numberOfColumns + 1)] = 1
         }
         
-        // Perform DTW using optimized loops
         for row in 1...numberOfRows {
             for column in 1...numberOfColumns {
                 let matrixValue = -matrixData[(row - 1) * numberOfColumns + (column - 1)]
@@ -271,13 +276,13 @@ public struct SegmentSeeker: SegmentSeeking {
         for timing in alignment {
             let trimmedWord = timing.word.trimmingCharacters(in: .whitespaces)
             if prepended.contains(trimmedWord), let last = mergedAlignment.last {
-                // Merge with previous word
+                // 前の単語と結合
                 var updatedLast = last
                 updatedLast.word += timing.word
                 updatedLast.tokens += timing.tokens
                 mergedAlignment[mergedAlignment.count - 1] = updatedLast
             } else if appended.contains(trimmedWord), var last = mergedAlignment.last {
-                // Merge with previous word
+                // 前の単語と結合
                 last.word += timing.word
                 last.tokens += timing.tokens
                 mergedAlignment[mergedAlignment.count - 1] = last
@@ -303,7 +308,7 @@ public struct SegmentSeeker: SegmentSeeking {
             return []
         }
         
-        // Calculate start times and end times
+        // 開始時間と終了時間を計算
         var startTimes = [Float](repeating: 0.0, count: wordTokens.count)
         var endTimes = [Float](repeating: 0.0, count: wordTokens.count)
         
@@ -354,10 +359,11 @@ public struct SegmentSeeker: SegmentSeeking {
         options: DecodingOptions,
         timings: TranscriptionTimings
     ) throws -> [TranscriptionSegment]? {
-        // Prepare data for alignment
+        // アライメントのためのデータを準備
         var wordTokenIds = [Int]()
         var filteredLogProbs = [Float]()
         var filteredIndices = [Int]()
+        var lastSpeechTimestamp = lastSpeechTimestamp
         
         var indexOffset = 0
         for segment in segments {
@@ -371,7 +377,7 @@ public struct SegmentSeeker: SegmentSeeking {
             indexOffset += segment.tokens.count
         }
         
-        // Efficiently filter alignmentWeights using filteredIndices
+        // alignmentWeights を効率的にフィルタリング
         let shape = alignmentWeights.shape
         guard let columnCount = shape.last?.intValue else {
             throw WhisperError.segmentingFailed("Invalid shape in alignmentWeights")
@@ -384,7 +390,7 @@ public struct SegmentSeeker: SegmentSeeking {
             columnCount: columnCount
         )
         
-        let alignment = try findAlignment(
+        var alignment = try findAlignment(
             wordTokenIds: wordTokenIds,
             alignmentWeights: filteredAlignmentWeights,
             tokenLogProbs: filteredLogProbs,
@@ -392,7 +398,7 @@ public struct SegmentSeeker: SegmentSeeking {
             timings: timings
         )
         
-        // Process alignment for punctuations
+        // 句読点の処理
         let mergedAlignment = mergePunctuations(alignment: alignment, prepended: prependPunctuations, appended: appendPunctuations)
         
         var wordIndex = 0
@@ -426,7 +432,7 @@ public struct SegmentSeeker: SegmentSeeking {
                 savedTokens += timingTokens.count
             }
             
-            // Create an updated segment with the word timings
+            // word timings を持つ更新されたセグメントを作成
             var updatedSegment = segment
             updatedSegment.words = wordsInSegment
             updatedSegments.append(updatedSegment)
@@ -441,15 +447,29 @@ public struct SegmentSeeker: SegmentSeeking {
         rowCount: Int,
         columnCount: Int
     ) throws -> MLMultiArray {
-        let filteredAlignmentWeights = try MLMultiArray(shape: [rowCount, columnCount] as [NSNumber], dataType: .double)
+        let filteredAlignmentWeights = try MLMultiArray(shape: [rowCount, columnCount] as [NSNumber], dataType: alignmentWeights.dataType)
         
-        let sourcePointer = alignmentWeights.dataPointer.assumingMemoryBound(to: Double.self)
-        let destinationPointer = filteredAlignmentWeights.dataPointer.assumingMemoryBound(to: Double.self)
-        
-        for (newIndex, originalIndex) in filteredIndices.enumerated() {
-            let sourceRow = sourcePointer.advanced(by: originalIndex * columnCount)
-            let destinationRow = destinationPointer.advanced(by: newIndex * columnCount)
-            destinationRow.update(from: sourceRow, count: columnCount)
+        switch alignmentWeights.dataType {
+        case .double:
+            let sourcePointer = alignmentWeights.dataPointer.assumingMemoryBound(to: Double.self)
+            let destinationPointer = filteredAlignmentWeights.dataPointer.assumingMemoryBound(to: Double.self)
+            
+            for (newIndex, originalIndex) in filteredIndices.enumerated() {
+                let sourceRow = sourcePointer.advanced(by: originalIndex * columnCount)
+                let destinationRow = destinationPointer.advanced(by: newIndex * columnCount)
+                destinationRow.update(from: sourceRow, count: columnCount)
+            }
+        case .float32:
+            let sourcePointer = alignmentWeights.dataPointer.assumingMemoryBound(to: Float.self)
+            let destinationPointer = filteredAlignmentWeights.dataPointer.assumingMemoryBound(to: Float.self)
+            
+            for (newIndex, originalIndex) in filteredIndices.enumerated() {
+                let sourceRow = sourcePointer.advanced(by: originalIndex * columnCount)
+                let destinationRow = destinationPointer.advanced(by: newIndex * columnCount)
+                destinationRow.update(from: sourceRow, count: columnCount)
+            }            
+        default:
+            throw WhisperError.segmentingFailed("Unsupported MLMultiArray data type: \(alignmentWeights.dataType)")
         }
         
         return filteredAlignmentWeights
