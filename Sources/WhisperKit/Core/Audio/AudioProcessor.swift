@@ -95,7 +95,7 @@ public extension AudioProcessing {
     static func padOrTrimAudio(fromArray audioArray: [Float], startAt startIndex: Int = 0, toLength frameLength: Int = 480_000, saveSegment: Bool = false) -> MLMultiArray? {
         let currentFrameLength = audioArray.count
 
-        if startIndex >= currentFrameLength, startIndex < 0 {
+        if startIndex < 0 || startIndex >= currentFrameLength {
             Logging.error("startIndex is outside the buffer size")
             return nil
         }
