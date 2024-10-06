@@ -119,16 +119,9 @@ open class WhisperKit {
 
     // MARK: - Model Loading
 
-    public static func recommendedModels() -> (default: String, disabled: [String]) {
-        let deviceName = Self.deviceName()
-        Logging.debug("Running on \(deviceName)")
-
-        let defaultModel = modelSupport(for: deviceName).default
-        let disabledModels = modelSupport(for: deviceName).disabled
-        return (defaultModel, disabledModels)
-    }
 
     public static func deviceName() -> String {
+        #if !os(macOS) && !targetEnvironment(simulator)
         var utsname = utsname()
         uname(&utsname)
         let deviceName = withUnsafePointer(to: &utsname.machine) {
@@ -136,14 +129,74 @@ open class WhisperKit {
                 String(cString: $0)
             }
         }
+        #else
+        let deviceName = ProcessInfo.hwModel
+        #endif
         return deviceName
     }
 
-    public static func fetchAvailableModels(from repo: String = "argmaxinc/whisperkit-coreml", matching: [String] = ["openai_*", "distil-whisper_*"]) async throws -> [String] {
-        let hubApi = HubApi()
-        let modelFiles = try await hubApi.getFilenames(from: repo, matching: matching)
+    public static func recommendedModels(fromRemote remote: Bool = false, timeout: TimeInterval = 1.0) -> ModelSupport {
+        let deviceName = Self.deviceName()
+        Logging.debug("Running on \(deviceName)")
+        if remote {
+            var support: ModelSupport?
+            let semaphore = DispatchSemaphore(value: 0)
 
-        return formatModelFiles(modelFiles)
+            // Start the asynchronous task
+            Task {
+                let modelSupport = await Self.recommendedRemoteModels()
+                support = modelSupport
+                semaphore.signal()
+            }
+
+            // Wait for the task to complete or timeout
+            let timeoutResult = semaphore.wait(timeout: .now() + timeout)
+            if timeoutResult == .timedOut {
+                Logging.error("Fetching model support timed out after \(timeout) second(s)")
+                return modelSupport(for: deviceName)
+            } else {
+                return support ?? modelSupport(for: deviceName)
+            }
+        } else {
+            // Use fallback model support
+            return modelSupport(for: deviceName)
+        }
+    }
+
+    public static func recommendedRemoteModels(from repo: String = "argmaxinc/whisperkit-coreml") async -> ModelSupport {
+        let deviceName = Self.deviceName()
+        let config = await Self.fetchModelSupportConfig(from: repo)
+        return modelSupport(for: deviceName, from: config)
+    }
+
+    public static func fetchModelSupportConfig(from repo: String = "argmaxinc/whisperkit-coreml") async -> ModelSupportConfig {
+        let hubApi = HubApi()
+        var modelSupportConfig = Constants.fallbackModelSupportConfig
+
+        do {
+            // Try to decode config.json into ModelSupportConfig
+            let configUrl = try await hubApi.snapshot(from: repo, matching: "config*")
+            let decoder = JSONDecoder()
+            let jsonData = try Data(contentsOf: configUrl.appendingPathComponent("config.json"))
+            modelSupportConfig = try decoder.decode(ModelSupportConfig.self, from: jsonData)
+        } catch {
+            // Allow this to fail gracefully as it uses fallback config by default
+            Logging.debug(error)
+        }
+
+        return modelSupportConfig
+    }
+
+    public static func fetchAvailableModels(from repo: String = "argmaxinc/whisperkit-coreml", matching: [String] = ["*"]) async throws -> [String] {
+        let modelSupportConfig = await fetchModelSupportConfig(from: repo)
+        let supportedModels = modelSupportConfig.modelSupport().supported
+        var filteredSupportSet: Set<String> = []
+        for glob in matching {
+            filteredSupportSet = filteredSupportSet.union(supportedModels.matching(glob: glob))
+        }
+        let filteredSupport = Array(filteredSupportSet)
+
+        return formatModelFiles(filteredSupport)
     }
 
     public static func formatModelFiles(_ modelFiles: [String]) -> [String] {
@@ -243,13 +296,14 @@ open class WhisperKit {
         modelFolder: String?,
         download: Bool
     ) async throws {
-        // Determine the model variant to use
-        let modelVariant = model ?? WhisperKit.recommendedModels().default
-
         // If a local model folder is provided, use it; otherwise, download the model
         if let folder = modelFolder {
             self.modelFolder = URL(fileURLWithPath: folder)
         } else if download {
+            // Determine the model variant to use
+            let modelSupport = await WhisperKit.recommendedRemoteModels()
+            let modelVariant = model ?? modelSupport.default
+
             let repo = modelRepo ?? "argmaxinc/whisperkit-coreml"
             do {
                 self.modelFolder = try await Self.download(

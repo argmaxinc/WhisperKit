@@ -32,6 +32,176 @@ final class UnitTests: XCTestCase {
         )
     }
 
+    // MARK: - Config Tests
+
+    func testModelSupportConfigFallback() {
+        let fallbackRepoConfig = Constants.fallbackModelSupportConfig
+        XCTAssertEqual(fallbackRepoConfig.repoName, "whisperkit-coreml")
+        XCTAssertEqual(fallbackRepoConfig.repoVersion, "0.2")
+        XCTAssertGreaterThanOrEqual(fallbackRepoConfig.deviceSupport.count, 5)
+
+        // Test that all device supports have their disabled models set except devices that should support all known models
+        for deviceSupport in fallbackRepoConfig.deviceSupport where !Constants.knownModels.allSatisfy(deviceSupport.models.supported.contains) {
+            let modelSupport = deviceSupport.models.supported
+            let knownModels = Constants.knownModels
+
+            // Ensure that the disabled models list is not empty
+            XCTAssertFalse(deviceSupport.models.disabled.isEmpty,
+                           "Disabled models should be set for \(deviceSupport.identifiers), found missing model(s): \(modelSupport.filter { knownModels.contains($0) })")
+        }
+
+        // Test that default device support has all known models as supported and none disabled
+        let defaultSupport = fallbackRepoConfig.defaultSupport
+        XCTAssertEqual(defaultSupport.identifiers, [])
+        XCTAssertEqual(defaultSupport.models.supported.sorted(), Constants.knownModels.sorted())
+    }
+
+    func testModelSupportConfigFromJson() throws {
+        let configFilePath = try XCTUnwrap(
+            Bundle.module.path(forResource: "config", ofType: "json"),
+            "Config file not found"
+        )
+
+        let jsonData = try Data(contentsOf: URL(fileURLWithPath: configFilePath))
+        let decoder = JSONDecoder()
+        let loadedConfig = try decoder.decode(ModelSupportConfig.self, from: jsonData)
+
+        // Compare loaded config with fallback config
+        XCTAssertEqual(loadedConfig.repoName, Constants.fallbackModelSupportConfig.repoName)
+        XCTAssertEqual(loadedConfig.repoVersion, Constants.fallbackModelSupportConfig.repoVersion)
+        XCTAssertEqual(loadedConfig.deviceSupport.count, Constants.fallbackModelSupportConfig.deviceSupport.count)
+
+        // Compare device supports
+        for (loadedDeviceSupport, fallbackDeviceSupport) in zip(loadedConfig.deviceSupport, Constants.fallbackModelSupportConfig.deviceSupport) {
+            XCTAssertEqual(loadedDeviceSupport.identifiers, fallbackDeviceSupport.identifiers)
+            XCTAssertEqual(loadedDeviceSupport.models.default, fallbackDeviceSupport.models.default)
+            XCTAssertEqual(Set(loadedDeviceSupport.models.supported), Set(fallbackDeviceSupport.models.supported))
+            XCTAssertEqual(Set(loadedDeviceSupport.models.disabled), Set(fallbackDeviceSupport.models.disabled))
+        }
+    }
+
+    func testModelSupportConfigCorrectness() throws {
+        let config = Constants.fallbackModelSupportConfig
+
+        // Test if a model exists in config for one device but not others, it is disabled
+        let iPhone13Models = config.modelSupport(for: "iPhone13,1")
+        let iPhone14Models = config.modelSupport(for: "iPhone14,3")
+
+        XCTAssertFalse(iPhone13Models.supported.contains("openai_whisper-large-v3_947MB"))
+        XCTAssertTrue(iPhone13Models.disabled.contains("openai_whisper-large-v3_947MB"))
+        XCTAssertTrue(iPhone14Models.supported.contains("openai_whisper-large-v3_947MB"))
+
+        // Test when a device with the same prefix if matched to the appropriate support if different
+        let iPad14A15Model = config.modelSupport(for: "iPad14,1")
+        let iPad14M2Model = config.modelSupport(for: "iPad14,4")
+
+        XCTAssertFalse(iPad14A15Model.supported.contains("openai_whisper-large-v3-v20240930_turbo"))
+        XCTAssertTrue(iPad14A15Model.disabled.contains("openai_whisper-large-v3-v20240930_turbo"))
+        XCTAssertTrue(iPad14M2Model.supported.contains("openai_whisper-large-v3-v20240930_turbo"))
+
+        // Test if a model exists in a remote repo but not in the fallback config, it is disabled for all devices except default
+        let newModel = "some_new_model"
+        let newDevice = "some_new_device"
+        let newDeviceSupport = config.deviceSupport + [DeviceSupport(
+            identifiers: [newDevice],
+            models: ModelSupport(
+                default: "openai_whisper-base",
+                supported: [
+                    "some_new_model",
+                ]
+            )
+        )]
+
+        let newConfig = ModelSupportConfig(
+            repoName: config.repoName,
+            repoVersion: config.repoVersion,
+            deviceSupport: newDeviceSupport
+        )
+
+        XCTAssertEqual(Set(newConfig.knownModels), Set(newDeviceSupport.flatMap { $0.models.supported }))
+        for deviceSupport in newConfig.deviceSupport where !deviceSupport.identifiers.allSatisfy([newDevice].contains) {
+            XCTAssertFalse(deviceSupport.models.supported.contains(newModel))
+            XCTAssertTrue(deviceSupport.models.disabled.contains(newModel))
+        }
+
+        // Test if a model does not exist in a remote repo but does in the fallback config, it is disabled
+        // This will not prevent use of the model if already downloaded, but will enable the remote config to disable specific models
+        let knownLocalModel = Constants.fallbackModelSupportConfig.modelSupport(for: "iPhone13,1").supported.first!
+        let remoteModel = "remote_model"
+        let remoteConfig = ModelSupportConfig(
+            repoName: "test",
+            repoVersion: "test",
+            deviceSupport: [DeviceSupport(
+                identifiers: ["test_device"],
+                models: ModelSupport(
+                    default: remoteModel,
+                    supported: [remoteModel]
+                )
+            )]
+        )
+
+        // Helper method returns supported model
+        let modelSupport = remoteConfig.modelSupport(for: "test_device").supported
+        let disabledModels = remoteConfig.modelSupport(for: "test_device").disabled
+        XCTAssertTrue(modelSupport.contains(remoteModel))
+        XCTAssertTrue(disabledModels.contains(knownLocalModel))
+        // Direct access has it disabled
+        for deviceSupport in remoteConfig.deviceSupport where deviceSupport.identifiers.contains("test_device") {
+            XCTAssertTrue(deviceSupport.models.supported.contains(remoteModel))
+            XCTAssertFalse(deviceSupport.models.disabled.contains(remoteModel))
+            XCTAssertFalse(deviceSupport.models.supported.contains(knownLocalModel))
+            XCTAssertTrue(deviceSupport.models.disabled.contains(knownLocalModel))
+        }
+    }
+
+    func testModelSupportConfigFetch () async throws {
+        // Make sure remote repo config loads successfully from HF
+        let modelRepoConfig = await WhisperKit.fetchModelSupportConfig()
+
+        XCTAssertFalse(modelRepoConfig.deviceSupport.isEmpty, "Should have device support")
+        XCTAssertFalse(modelRepoConfig.knownModels.isEmpty, "Should have known models")
+
+        XCTAssertGreaterThanOrEqual(modelRepoConfig.deviceSupport.count, Constants.fallbackModelSupportConfig.deviceSupport.count, "Remote config should have at least as many devices as fallback")
+
+        // Verify that known models in the remote config include all known models from fallback
+        let remoteKnownModels = Set(modelRepoConfig.knownModels)
+        let fallbackKnownModels = Set(Constants.fallbackModelSupportConfig.knownModels)
+        XCTAssertTrue(remoteKnownModels.isSuperset(of: fallbackKnownModels), "Remote known models should include all fallback known models")
+
+        // Test an unknown device to ensure it falls back to default support
+        let unknownDeviceSupport = modelRepoConfig.modelSupport(for: "unknown_device")
+        XCTAssertEqual(unknownDeviceSupport.supported, modelRepoConfig.defaultSupport.models.supported, "Unknown device should use default support")
+    }
+
+    func testRecommendedModels() async {
+        let asyncRemoteModels = await WhisperKit.recommendedRemoteModels()
+        let syncRemoteModels = WhisperKit.recommendedModels(fromRemote: true)
+        let remoteModelsWithTimeout = WhisperKit.recommendedModels(fromRemote: true, timeout: 0.0001)
+        let defaultModels = WhisperKit.recommendedModels()
+
+        // Async and sync remote models should be equal
+        XCTAssertEqual(asyncRemoteModels, syncRemoteModels, "Async and sync remote models should be equal")
+
+        // Models with timeout should fall back to default models
+        XCTAssertNotEqual(syncRemoteModels, remoteModelsWithTimeout, "Models with timeout should fall back to default models")
+
+        // Default models should not be nil or empty
+        XCTAssertNotNil(defaultModels, "Default models should not be nil")
+        XCTAssertFalse(defaultModels.default.isEmpty, "Default model name should not be empty")
+    }
+
+    func testDeviceName() {
+        let deviceName = WhisperKit.deviceName()
+        XCTAssertFalse(deviceName.isEmpty, "Device name should not be empty")
+        XCTAssertTrue(deviceName.contains(","), "Device name should contain a comma, found \(deviceName)")
+    }
+
+    func testOrderedSet() {
+        let testArray = ["model1", "model2", "model1", "model3", "model2"]
+        let uniqueArray = testArray.orderedSet
+        XCTAssertEqual(uniqueArray, ["model1", "model2", "model3"], "Ordered set should contain unique elements in order")
+    }
+
     // MARK: - Audio Tests
 
     func testAudioFileLoading() throws {

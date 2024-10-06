@@ -12,6 +12,9 @@ import UIKit
 #elseif canImport(AppKit)
 import AppKit
 #endif
+#if canImport(Darwin)
+import Darwin
+#endif
 
 // MARK: - Extensions
 
@@ -34,6 +37,21 @@ extension Array where Element == Result<[TranscriptionResult], Swift.Error> {
 public extension Array where Element == TranscriptionSegment {
     func contains(segment: TranscriptionSegment) -> Bool {
         return self.contains { $0.start == segment.start }
+    }
+}
+
+extension Array where Element: Hashable {
+    /// Returns an array with duplicates removed, preserving the original order.
+    var orderedSet: [Element] {
+        var seen = Set<Element>()
+        return self.filter { element in
+            if seen.contains(element) {
+                return false
+            } else {
+                seen.insert(element)
+                return true
+            }
+        }
     }
 }
 
@@ -123,24 +141,23 @@ public extension MLComputeUnits {
     }
 }
 
-#if os(macOS)
+#if os(macOS) || targetEnvironment(simulator)
 // From: https://stackoverflow.com/a/71726663
-public extension Process {
-    static func stringFromTerminal(command: String) -> String {
-        let task = Process()
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.launchPath = "/bin/bash"
-        task.arguments = ["-c", "sysctl -n " + command]
-        task.launch()
-        return String(bytes: pipe.fileHandleForReading.availableData, encoding: .utf8) ?? ""
+public extension ProcessInfo {
+    static func stringFromSysctl(named name: String) -> String {
+        var size: size_t = 0
+        sysctlbyname(name, nil, &size, nil, 0)
+        var machineModel = [CChar](repeating: 0, count: Int(size))
+        sysctlbyname(name, &machineModel, &size, nil, 0)
+        return String(cString: machineModel)
     }
 
-    static let processor = stringFromTerminal(command: "machdep.cpu.brand_string")
-    static let cores = stringFromTerminal(command: "machdep.cpu.core_count")
-    static let threads = stringFromTerminal(command: "machdep.cpu.thread_count")
-    static let vendor = stringFromTerminal(command: "machdep.cpu.vendor")
-    static let family = stringFromTerminal(command: "machdep.cpu.family")
+    static let processor = stringFromSysctl(named: "machdep.cpu.brand_string")
+    static let cores = stringFromSysctl(named: "machdep.cpu.core_count")
+    static let threads = stringFromSysctl(named: "machdep.cpu.thread_count")
+    static let vendor = stringFromSysctl(named: "machdep.cpu.vendor")
+    static let family = stringFromSysctl(named: "machdep.cpu.family")
+    static let hwModel = stringFromSysctl(named: "hw.model")
 }
 #endif
 
@@ -419,68 +436,19 @@ func detectVariant(logitsDim: Int, encoderDim: Int) -> ModelVariant {
     return modelVariant
 }
 
-public func modelSupport(for deviceName: String) -> (default: String, disabled: [String]) {
-    switch deviceName {
-        case let model where model.hasPrefix("iPhone11"), // A12
-             let model where model.hasPrefix("iPhone12"), // A13
-             let model where model.hasPrefix("Watch7"): // Series 9 and Ultra 2
-            return ("openai_whisper-base", ["openai_whisper-small",
-                                            "openai_whisper-small.en",
-                                            "openai_whisper-large-v2",
-                                            "openai_whisper-large-v2_949MB",
-                                            "openai_whisper-large-v2_turbo",
-                                            "openai_whisper-large-v2_turbo_955MB",
-                                            "openai_whisper-large-v3",
-                                            "openai_whisper-large-v3_947MB",
-                                            "openai_whisper-large-v3_turbo",
-                                            "openai_whisper-large-v3_turbo_954MB",
-                                            "distil-whisper_distil-large-v3",
-                                            "distil-whisper_distil-large-v3_594MB",
-                                            "distil-whisper_distil-large-v3_turbo_600MB",
-                                            "distil-whisper_distil-large-v3_turbo"])
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
+public func modelSupport(for deviceName: String, from config: ModelSupportConfig? = nil) -> ModelSupport {
+    let config = config ?? Constants.fallbackModelSupportConfig
+    let modelSupport = config.modelSupport(for: deviceName)
+    return modelSupport
+}
 
-        case let model where model.hasPrefix("iPhone13"): // A14
-            return ("openai_whisper-base", ["openai_whisper-large-v2",
-                                            "openai_whisper-large-v2_turbo",
-                                            "openai_whisper-large-v2_turbo_955MB",
-                                            "openai_whisper-large-v3",
-                                            "openai_whisper-large-v3_turbo",
-                                            "openai_whisper-large-v3_turbo_954MB",
-                                            "distil-whisper_distil-large-v3_turbo_600MB",
-                                            "distil-whisper_distil-large-v3_turbo"])
-
-        case let model where model.hasPrefix("iPhone14"), // A15
-             let model where model.hasPrefix("iPhone15"), // A16
-             let model where model.hasPrefix("iPhone16"): // A17
-            return ("openai_whisper-base", ["openai_whisper-large-v2",
-                                            "openai_whisper-large-v2_turbo",
-                                            "openai_whisper-large-v3",
-                                            "openai_whisper-large-v3_turbo"])
-
-        // Fall through to macOS checks
-        default:
-            break
-    }
-
-    #if os(macOS)
-    if deviceName.hasPrefix("arm64") {
-        if Process.processor.contains("Apple M1") {
-            // Disable turbo variants for M1
-            return ("openai_whisper-base", ["openai_whisper-large-v2_turbo",
-                                            "openai_whisper-large-v2_turbo_955MB",
-                                            "openai_whisper-large-v3_turbo",
-                                            "openai_whisper-large-v3_turbo_954MB",
-                                            "distil-whisper_distil-large-v3_turbo_600MB",
-                                            "distil-whisper_distil-large-v3_turbo"])
-        } else {
-            // Enable all variants for M2 or M3, none disabled
-            return ("openai_whisper-base", [])
-        }
-    }
-    #endif
-
-    // Unhandled device, default to base variant
-    return ("openai_whisper-base", [""])
+/// Deprecated
+@available(*, deprecated, message: "Subject to removal in a future version. Use modelSupport(for:from:) -> ModelSupport instead.")
+@_disfavoredOverload
+public func modelSupport(for deviceName: String, from config: ModelSupportConfig? = nil) -> (default: String, disabled: [String]) {
+    let modelSupport = modelSupport(for: deviceName, from: config)
+    return (modelSupport.default, modelSupport.disabled)
 }
 
 public func detectModelURL(inFolder path: URL, named modelName: String) -> URL {

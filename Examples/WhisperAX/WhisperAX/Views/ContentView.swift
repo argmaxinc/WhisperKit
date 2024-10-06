@@ -956,8 +956,7 @@ struct ContentView: View {
 
         localModels = WhisperKit.formatModelFiles(localModels)
         for model in localModels {
-            if !availableModels.contains(model),
-               !disabledModels.contains(model)
+            if !availableModels.contains(model)
             {
                 availableModels.append(model)
             }
@@ -967,12 +966,19 @@ struct ContentView: View {
         print("Previously selected model: \(selectedModel)")
 
         Task {
-            let remoteModels = try await WhisperKit.fetchAvailableModels(from: repoName)
-            for model in remoteModels {
-                if !availableModels.contains(model),
-                   !disabledModels.contains(model)
-                {
-                    availableModels.append(model)
+            let remoteModelSupport = await WhisperKit.recommendedRemoteModels()
+            await MainActor.run {
+                for model in remoteModelSupport.supported {
+                    if !availableModels.contains(model)
+                    {
+                        availableModels.append(model)
+                    }
+                }
+                for model in remoteModelSupport.disabled {
+                    if !disabledModels.contains(model)
+                    {
+                        disabledModels.append(model)
+                    }
                 }
             }
         }
