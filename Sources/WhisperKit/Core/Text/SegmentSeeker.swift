@@ -69,9 +69,7 @@ public struct SegmentSeeker: SegmentSeeking {
             }
         }
         
-        var currentSegments: [TranscriptionSegment] = []
-        
-        // トークンを処理してタイムスタンプを特定し、セグメントを作成
+        var currentSegments: [TranscriptionSegment] = []        
         let currentTokens = decodingResult.tokens
         let currentLogProbs = decodingResult.tokenLogProbs
         let isTimestampToken = currentTokens.map { $0 >= timeToken }
