@@ -141,17 +141,18 @@ open class WhisperKit {
             var support: ModelSupport?
             let semaphore = DispatchSemaphore(value: 0)
 
-            // Start the asynchronous task
             Task {
                 let modelSupport = await Self.recommendedRemoteModels()
-                support = modelSupport
-                semaphore.signal()
+                await MainActor.run {
+                    support = modelSupport
+                    semaphore.signal()
+                }
             }
 
             // Wait for the task to complete or timeout
             let timeoutResult = semaphore.wait(timeout: .now() + timeout)
             if timeoutResult == .timedOut {
-                Logging.error("Fetching model support timed out after \(timeout) second(s)")
+                Logging.debug("Fetching model support timed out after \(timeout) second(s)")
                 return modelSupport(for: deviceName)
             } else {
                 return support ?? modelSupport(for: deviceName)

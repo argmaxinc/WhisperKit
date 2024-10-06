@@ -60,7 +60,7 @@ jobs:
         run: make download-model MODEL=tiny
       - name: Install and discover destinations
         run: |
-          xcodebuild -downloadAllPlatforms
+          xcodebuild -downloadPlatorm ${{ matrix.run-config['name'] }}
           echo "Destinations for testing:"
           xcodebuild test-without-building -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -showdestinations
       - name: Boot Simulator and Wait
