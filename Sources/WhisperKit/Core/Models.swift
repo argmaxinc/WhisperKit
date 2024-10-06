@@ -168,7 +168,7 @@ public struct ModelComputeOptions {
 public struct ModelSupport: Codable, Equatable {
     public let `default`: String
     public let supported: [String]
-    // Computed on init of ModelRepoConfig
+    /// Computed on init of ModelRepoConfig
     public var disabled: [String] = []
 
     private enum CodingKeys: String, CodingKey {
@@ -185,7 +185,7 @@ public struct ModelSupportConfig: Codable {
     public let repoName: String
     public let repoVersion: String
     public var deviceSupport: [DeviceSupport]
-    // Computed on init
+    /// Computed on init
     public private(set) var knownModels: [String]
     public private(set) var defaultSupport: DeviceSupport
 
@@ -1468,7 +1468,7 @@ public enum Constants {
                             "openai_whisper-base",
                             "openai_whisper-base.en",
                             "openai_whisper-tiny",
-                            "openai_whisper-tiny.en"
+                            "openai_whisper-tiny.en",
                         ]
                     )
                 ),
@@ -1482,7 +1482,7 @@ public enum Constants {
                             "openai_whisper-base",
                             "openai_whisper-base.en",
                             "openai_whisper-small",
-                            "openai_whisper-small.en"
+                            "openai_whisper-small.en",
                         ]
                     )
                 ),
@@ -1518,7 +1518,7 @@ public enum Constants {
                         "Macmini9",
                         "iPad13,16",
                         "iPad13,4",
-                        "iPad13,8"
+                        "iPad13,8",
                     ],
                     models: ModelSupport(
                         default: "openai_whisper-large-v3-v20240930",
@@ -1553,7 +1553,7 @@ public enum Constants {
                         "iPad14,9",
                         "iPad14,10",
                         "iPad14,11",
-                        "iPad16"
+                        "iPad16",
                     ],
                     models: ModelSupport(
                         default: "openai_whisper-large-v3-v20240930",
@@ -1582,7 +1582,7 @@ public enum Constants {
                             "openai_whisper-large-v3-v20240930_turbo_632MB",
                         ]
                     )
-                )
+                ),
             ],
             includeFallback: false
         )
@@ -1590,7 +1590,5 @@ public enum Constants {
         return config
     }()
 
-    public static let knownModels: [String] = {
-        fallbackModelSupportConfig.deviceSupport.flatMap { $0.models.supported }.orderedSet
-    }()
+    public static let knownModels: [String] = fallbackModelSupportConfig.deviceSupport.flatMap { $0.models.supported }.orderedSet
 }

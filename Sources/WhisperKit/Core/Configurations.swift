@@ -60,8 +60,8 @@ open class WhisperKitConfig {
                 prewarm: Bool? = nil,
                 load: Bool? = nil,
                 download: Bool = true,
-                useBackgroundDownloadSession: Bool = false
-    ) {
+                useBackgroundDownloadSession: Bool = false)
+    {
         self.model = model
         self.downloadBase = downloadBase
         self.modelRepo = modelRepo
@@ -82,7 +82,6 @@ open class WhisperKitConfig {
         self.useBackgroundDownloadSession = useBackgroundDownloadSession
     }
 }
-
 
 /// Options for how to transcribe an audio file using WhisperKit.
 ///

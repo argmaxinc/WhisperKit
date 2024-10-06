@@ -154,7 +154,7 @@ final class UnitTests: XCTestCase {
         }
     }
 
-    func testModelSupportConfigFetch () async throws {
+    func testModelSupportConfigFetch() async throws {
         // Make sure remote repo config loads successfully from HF
         let modelRepoConfig = await WhisperKit.fetchModelSupportConfig()
 

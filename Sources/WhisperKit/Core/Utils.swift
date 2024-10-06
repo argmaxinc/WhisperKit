@@ -460,7 +460,7 @@ public func detectModelURL(inFolder path: URL, named modelName: String) -> URL {
 
     // Swap to mlpackage only if the following is true: we found the mlmodel within the mlpackage, and we did not find a .mlmodelc
     var modelURL = compiledUrl
-    if (packageModelExists && !compiledModelExists) {
+    if packageModelExists && !compiledModelExists {
         modelURL = packageUrl
     }
 
