@@ -259,7 +259,7 @@ extension AVAudioPCMBuffer {
 // MARK: - Helpers
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-func prepareSeekClips(contentFrames: Int, decodeOptions: DecodingOptions?) -> [(start: Int, end: Int)] {
+func prepareSeekClips(contentFrames: Int, decodeOptions: DecodingOptions?) -> [FrameRange] {
     let options = decodeOptions ?? DecodingOptions()
     var seekPoints: [Int] = options.clipTimestamps.map { Int(round($0 * Float(WhisperKit.sampleRate))) }
     if seekPoints.count == 0 {
@@ -270,7 +270,7 @@ func prepareSeekClips(contentFrames: Int, decodeOptions: DecodingOptions?) -> [(
         seekPoints.append(contentFrames)
     }
 
-    var seekClips: [(start: Int, end: Int)] = []
+    var seekClips: [FrameRange] = []
     for i in stride(from: 0, to: seekPoints.count, by: 2) {
         let start = seekPoints[i]
         let end = i + 1 < seekPoints.count ? seekPoints[i + 1] : contentFrames

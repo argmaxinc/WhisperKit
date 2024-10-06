@@ -452,7 +452,7 @@ public actor AudioProcessor: @preconcurrency AudioProcessing {
     /// - Returns: an array of tuples indicating the start and end indices of non-silent chunks
     public static func calculateNonSilentChunks(
         in signal: [Float]
-    ) -> [(startIndex: Int, endIndex: Int)] {
+    ) -> [SampleRange] {
         EnergyVAD().calculateActiveChunks(in: signal)
     }
 

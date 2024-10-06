@@ -10,7 +10,7 @@ public struct EnergyVAD: VoiceActivityDetectable {
     public let frameLengthSamples: Int
     public let frameOverlapSamples: Int
     public var energyThreshold: Float
-
+    
     public init(
         sampleRate: Int = WhisperKit.sampleRate,
         frameLength: Float = 0.1,
@@ -20,6 +20,18 @@ public struct EnergyVAD: VoiceActivityDetectable {
         self.sampleRate = sampleRate
         self.frameLengthSamples = Int(frameLength * Float(sampleRate))
         self.frameOverlapSamples = Int(frameOverlap * Float(sampleRate))
+        self.energyThreshold = energyThreshold
+    }
+
+    init(
+        sampleRate: Int = 16000,
+        frameLengthSamples: Int,
+        frameOverlapSamples: Int = 0,
+        energyThreshold: Float = 0.02
+    ) {
+        self.sampleRate = sampleRate
+        self.frameLengthSamples = frameLengthSamples
+        self.frameOverlapSamples = frameOverlapSamples
         self.energyThreshold = energyThreshold
     }
     

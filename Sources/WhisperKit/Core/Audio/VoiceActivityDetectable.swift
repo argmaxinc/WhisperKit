@@ -13,20 +13,20 @@ public protocol VoiceActivityDetectable: Sendable {
     var frameOverlapSamples: Int { get }
     
     func voiceActivity(in waveform: [Float]) -> [Bool]
-    func calculateActiveChunks(in waveform: [Float]) -> [(startIndex: Int, endIndex: Int)]
+    func calculateActiveChunks(in waveform: [Float]) -> [SampleRange]
     func voiceActivityIndexToAudioSampleIndex(_ index: Int) -> Int
     func voiceActivityIndexToSeconds(_ index: Int) -> Float
-    func findLongestSilence(in vadResult: [Bool]) -> (startIndex: Int, endIndex: Int)?
+    func findLongestSilence(in vadResult: [Bool]) -> SampleRange?
     func voiceActivityClipTimestamps(in waveform: [Float]) -> [Float]
-    func calculateNonSilentSeekClips(in waveform: [Float]) -> [(start: Int, end: Int)]
-    func calculateSeekTimestamps(in waveform: [Float]) -> [(startTime: Float, endTime: Float)]
+    func calculateNonSilentSeekClips(in waveform: [Float]) -> [FrameRange]
+    func calculateSeekTimestamps(in waveform: [Float]) -> [TimestampRange]
 }
 
 extension VoiceActivityDetectable {
     
-    public func calculateActiveChunks(in waveform: [Float]) -> [(startIndex: Int, endIndex: Int)] {
+    public func calculateActiveChunks(in waveform: [Float]) -> [SampleRange] {
         let vad = voiceActivity(in: waveform)
-        var result = [(startIndex: Int, endIndex: Int)]()
+        var result = [SampleRange]()
         var currentStartIndex: Int?
 
         for (index, vadChunk) in vad.enumerated() {
@@ -56,7 +56,7 @@ extension VoiceActivityDetectable {
         return Float(voiceActivityIndexToAudioSampleIndex(index)) / Float(sampleRate)
     }
 
-    public func findLongestSilence(in vadResult: [Bool]) -> (startIndex: Int, endIndex: Int)? {
+    public func findLongestSilence(in vadResult: [Bool]) -> SampleRange? {
         var longestStartIndex: Int?
         var longestEndIndex: Int?
         var longestCount = 0
@@ -101,16 +101,16 @@ extension VoiceActivityDetectable {
         return clipTimestamps
     }
 
-    public func calculateNonSilentSeekClips(in waveform: [Float]) -> [(start: Int, end: Int)] {
+    public func calculateNonSilentSeekClips(in waveform: [Float]) -> [FrameRange] {
         let clipTimestamps = voiceActivityClipTimestamps(in: waveform)
         let options = DecodingOptions(clipTimestamps: clipTimestamps)
         let seekClips = prepareSeekClips(contentFrames: waveform.count, decodeOptions: options)
         return seekClips
     }
 
-    public func calculateSeekTimestamps(in waveform: [Float]) -> [(startTime: Float, endTime: Float)] {
+    public func calculateSeekTimestamps(in waveform: [Float]) -> [TimestampRange] {
         let nonSilentChunks = calculateActiveChunks(in: waveform)
-        var seekTimestamps = [(startTime: Float, endTime: Float)]()
+        var seekTimestamps = [TimestampRange]()
 
         for chunk in nonSilentChunks {
             let startTimestamp = Float(chunk.startIndex) / Float(sampleRate)
