@@ -51,7 +51,8 @@ struct ContentView: View {
     @AppStorage("silenceThreshold") private var silenceThreshold: Double = 0.3
     @AppStorage("useVAD") private var useVAD: Bool = true
     @AppStorage("tokenConfirmationsNeeded") private var tokenConfirmationsNeeded: Double = 2
-    @AppStorage("chunkingStrategy") private var chunkingStrategy: ChunkingStrategy = .none
+    @AppStorage("concurrentWorkerCount") private var concurrentWorkerCount: Int = 4
+    @AppStorage("chunkingStrategy") private var chunkingStrategy: ChunkingStrategy = .vad
     @AppStorage("encoderComputeUnits") private var encoderComputeUnits: MLComputeUnits = .cpuAndNeuralEngine
     @AppStorage("decoderComputeUnits") private var decoderComputeUnits: MLComputeUnits = .cpuAndNeuralEngine
 
@@ -1317,6 +1318,7 @@ struct ContentView: View {
             withoutTimestamps: !enableTimestamps,
             wordTimestamps: true,
             clipTimestamps: seekClip,
+            concurrentWorkerCount: concurrentWorkerCount,
             chunkingStrategy: chunkingStrategy
         )
 
