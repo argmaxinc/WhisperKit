@@ -188,6 +188,14 @@ public extension String {
 }
 
 extension AVAudioPCMBuffer {
+    /// Converts the buffer to a float array
+    func asFloatArray() throws -> [Float] {
+        guard let data = floatChannelData?.pointee else {
+            throw WhisperError.audioProcessingFailed("Error converting audio, missing floatChannelData")
+        }
+        return Array(UnsafeBufferPointer(start: data, count: Int(frameLength)))
+    }
+
     /// Appends the contents of another buffer to the current buffer
     func appendContents(of buffer: AVAudioPCMBuffer) -> Bool {
         return appendContents(of: buffer, startingFrame: 0, frameCount: buffer.frameLength)

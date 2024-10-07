@@ -690,15 +690,20 @@ open class WhisperKit {
         callback: TranscriptionCallback = nil
     ) async throws -> [TranscriptionResult] {
         // Process input audio file into audio samples
-        let loadAudioStart = Date()
-        let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioPath)
-        let loadTime = Date().timeIntervalSince(loadAudioStart)
+        let audioArray = try await withThrowingTaskGroup(of: [Float].self) { group -> [Float] in
+            let loadAudioStart = Date()
+            let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioPath)
+            let loadTime = Date().timeIntervalSince(loadAudioStart)
 
-        let convertAudioStart = Date()
-        let audioArray = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
-        let convertTime = Date().timeIntervalSince(convertAudioStart)
-        currentTimings.audioLoading = loadTime + convertTime
-        Logging.debug("Audio loading time: \(loadTime), Audio convert time: \(convertTime)")
+            let convertAudioStart = Date()
+            defer {
+                let convertTime = Date().timeIntervalSince(convertAudioStart)
+                currentTimings.audioLoading = loadTime + convertTime
+                Logging.debug("Audio loading time: \(loadTime), Audio convert time: \(convertTime)")
+            }
+
+            return AudioProcessor.convertBufferToArray(buffer: audioBuffer)
+        }
 
         let transcribeResults: [TranscriptionResult] = try await transcribe(
             audioArray: audioArray,
