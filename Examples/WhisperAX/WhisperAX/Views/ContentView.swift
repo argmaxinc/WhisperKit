@@ -1267,12 +1267,15 @@ struct ContentView: View {
 
     func transcribeCurrentFile(path: String) async throws {
         // Load and convert buffer in a limited scope
+        Logging.debug("Loading audio file: \(path)")
+        let loadingStart = Date()
         let audioFileSamples = try await Task {
             try autoreleasepool {
-                let audioFileBuffer = try AudioProcessor.loadAudio(fromPath: path)
-                return AudioProcessor.convertBufferToArray(buffer: audioFileBuffer)
+                return try AudioProcessor.loadAudioAsFloatArray(fromPath: path)
             }
         }.value
+        Logging.debug("Loaded audio file in \(Date().timeIntervalSince(loadingStart)) seconds")
+
 
         let transcription = try await transcribeAudioSamples(audioFileSamples)
 

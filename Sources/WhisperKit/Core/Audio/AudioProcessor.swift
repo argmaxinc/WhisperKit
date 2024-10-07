@@ -197,7 +197,15 @@ public class AudioProcessor: NSObject, AudioProcessing {
 
         let audioFileURL = URL(fileURLWithPath: audioFilePath)
         let audioFile = try AVAudioFile(forReading: audioFileURL, commonFormat: .pcmFormatFloat32, interleaved: false)
+        return try loadAudio(fromFile: audioFile, startTime: startTime, endTime: endTime, maxReadFrameSize: maxReadFrameSize)
+    }
 
+    public static func loadAudio(
+        fromFile audioFile: AVAudioFile,
+        startTime: Double? = 0,
+        endTime: Double? = nil,
+        maxReadFrameSize: AVAudioFrameCount? = nil
+    ) throws -> AVAudioPCMBuffer {
         let sampleRate = audioFile.fileFormat.sampleRate
         let channelCount = audioFile.fileFormat.channelCount
         let frameLength = AVAudioFrameCount(audioFile.length)
@@ -243,13 +251,56 @@ public class AudioProcessor: NSObject, AudioProcessing {
         }
     }
 
+    public static func loadAudioAsFloatArray(
+        fromPath audioFilePath: String,
+        startTime: Double? = 0,
+        endTime: Double? = nil
+    ) throws -> [Float] {
+        guard FileManager.default.fileExists(atPath: audioFilePath) else {
+            throw WhisperError.loadAudioFailed("Resource path does not exist \(audioFilePath)")
+        }
+
+        let audioFileURL = URL(fileURLWithPath: audioFilePath)
+        let audioFile = try AVAudioFile(forReading: audioFileURL, commonFormat: .pcmFormatFloat32, interleaved: false)
+        let inputFormat = audioFile.fileFormat
+        let inputFrameCount = AVAudioFrameCount(audioFile.length)
+        let inputDuration = Double(inputFrameCount) / inputFormat.sampleRate
+
+        let start = startTime ?? 0
+        let end = min(endTime ?? inputDuration, inputDuration)
+
+        // Load 10m of audio at a time to reduce peak memory while converting
+        // Particularly impactful for large audio files
+        let chunkDuration: Double = 60 * 10
+        var currentTime = start
+        var result: [Float] = []
+
+        while currentTime < end {
+            let chunkEnd = min(currentTime + chunkDuration, end)
+
+            try autoreleasepool {
+                let buffer = try loadAudio(
+                    fromFile: audioFile,
+                    startTime: currentTime,
+                    endTime: chunkEnd
+                )
+
+                let floatArray = Self.convertBufferToArray(buffer: buffer)
+                result.append(contentsOf: floatArray)
+            }
+
+            currentTime = chunkEnd
+        }
+
+        return result
+    }
+
     public static func loadAudio(at audioPaths: [String]) async -> [Result<[Float], Swift.Error>] {
         await withTaskGroup(of: [(index: Int, result: Result<[Float], Swift.Error>)].self) { taskGroup -> [Result<[Float], Swift.Error>] in
             for (index, audioPath) in audioPaths.enumerated() {
                 taskGroup.addTask {
                     do {
-                        let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioPath)
-                        let audio = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
+                        let audio = try AudioProcessor.loadAudioAsFloatArray(fromPath: audioPath)
                         return [(index: index, result: .success(audio))]
                     } catch {
                         return [(index: index, result: .failure(error))]

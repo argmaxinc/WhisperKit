@@ -415,7 +415,8 @@ open class WhisperKit {
     open func detectLanguage(
         audioPath: String
     ) async throws -> (language: String, langProbs: [String: Float]) {
-        let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioPath)
+        // Only need the first 30s for language detection
+        let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioPath, endTime: 30.0)
         let audioArray = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
         return try await detectLangauge(audioArray: audioArray)
     }
@@ -691,18 +692,15 @@ open class WhisperKit {
     ) async throws -> [TranscriptionResult] {
         // Process input audio file into audio samples
         let audioArray = try await withThrowingTaskGroup(of: [Float].self) { group -> [Float] in
-            let loadAudioStart = Date()
-            let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioPath)
-            let loadTime = Date().timeIntervalSince(loadAudioStart)
-
             let convertAudioStart = Date()
             defer {
                 let convertTime = Date().timeIntervalSince(convertAudioStart)
-                currentTimings.audioLoading = loadTime + convertTime
-                Logging.debug("Audio loading time: \(loadTime), Audio convert time: \(convertTime)")
+                currentTimings.audioLoading = convertTime
+                Logging.debug("Audio loading and convert time: \(convertTime)")
+                logCurrentMemoryUsage("Audio Loading and Convert")
             }
 
-            return AudioProcessor.convertBufferToArray(buffer: audioBuffer)
+            return try AudioProcessor.loadAudioAsFloatArray(fromPath: audioPath)
         }
 
         let transcribeResults: [TranscriptionResult] = try await transcribe(
