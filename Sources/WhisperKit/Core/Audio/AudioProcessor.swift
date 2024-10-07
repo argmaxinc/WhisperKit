@@ -695,7 +695,7 @@ public class AudioProcessor: NSObject, AudioProcessing {
                 &propertySize,
                 &name
             )
-            if status == noErr, let deviceNameCF = name?.takeUnretainedValue() as String? {
+            if status == noErr, let deviceNameCF = name?.takeRetainedValue() as String? {
                 deviceName = deviceNameCF
             }
 
