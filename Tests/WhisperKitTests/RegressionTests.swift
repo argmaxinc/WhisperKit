@@ -149,7 +149,7 @@ final class RegressionTests: XCTestCase {
         let iso8601DateTimeString = ISO8601DateFormatter().string(from: Date())
 
         #if os(macOS) && arch(arm64)
-        currentDevice = Process.processor
+        currentDevice = ProcessInfo.processor
         #endif
 
         do {
