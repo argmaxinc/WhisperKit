@@ -110,7 +110,6 @@ struct ContentView: View {
         MenuItem(name: "Stream", image: "waveform.badge.mic"),
     ]
 
-
     private var isStreamMode: Bool {
         self.selectedCategoryId == menu.first(where: { $0.name == "Stream" })?.id
     }
@@ -202,7 +201,7 @@ struct ContentView: View {
             .toolbar(content: {
                 ToolbarItem {
                     Button {
-                        if (!enableEagerDecoding) {
+                        if !enableEagerDecoding {
                             let fullTranscript = formatSegments(confirmedSegments + unconfirmedSegments, withTimestamps: enableTimestamps).joined(separator: "\n")
                             #if os(iOS)
                             UIPasteboard.general.string = fullTranscript
@@ -956,9 +955,7 @@ struct ContentView: View {
 
         localModels = WhisperKit.formatModelFiles(localModels)
         for model in localModels {
-            if !availableModels.contains(model),
-               !disabledModels.contains(model)
-            {
+            if !availableModels.contains(model) {
                 availableModels.append(model)
             }
         }
@@ -967,12 +964,17 @@ struct ContentView: View {
         print("Previously selected model: \(selectedModel)")
 
         Task {
-            let remoteModels = try await WhisperKit.fetchAvailableModels(from: repoName)
-            for model in remoteModels {
-                if !availableModels.contains(model),
-                   !disabledModels.contains(model)
-                {
-                    availableModels.append(model)
+            let remoteModelSupport = await WhisperKit.recommendedRemoteModels()
+            await MainActor.run {
+                for model in remoteModelSupport.supported {
+                    if !availableModels.contains(model) {
+                        availableModels.append(model)
+                    }
+                }
+                for model in remoteModelSupport.disabled {
+                    if !disabledModels.contains(model) {
+                        disabledModels.append(model)
+                    }
                 }
             }
         }
@@ -1643,7 +1645,6 @@ struct ContentView: View {
             Logging.error("[EagerMode] Error: \(error)")
             finalizeText()
         }
-
 
         let mergedResult = mergeTranscriptionResults(eagerResults, confirmedWords: confirmedWords)
 

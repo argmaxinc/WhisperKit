@@ -113,22 +113,14 @@ open class WhisperKit {
             load: load,
             download: download,
             useBackgroundDownloadSession: useBackgroundDownloadSession
-            )
+        )
         try await self.init(config)
     }
 
     // MARK: - Model Loading
 
-    public static func recommendedModels() -> (default: String, disabled: [String]) {
-        let deviceName = Self.deviceName()
-        Logging.debug("Running on \(deviceName)")
-
-        let defaultModel = modelSupport(for: deviceName).default
-        let disabledModels = modelSupport(for: deviceName).disabled
-        return (defaultModel, disabledModels)
-    }
-
     public static func deviceName() -> String {
+        #if !os(macOS) && !targetEnvironment(simulator)
         var utsname = utsname()
         uname(&utsname)
         let deviceName = withUnsafePointer(to: &utsname.machine) {
@@ -136,14 +128,52 @@ open class WhisperKit {
                 String(cString: $0)
             }
         }
+        #else
+        let deviceName = ProcessInfo.hwModel
+        #endif
         return deviceName
     }
 
-    public static func fetchAvailableModels(from repo: String = "argmaxinc/whisperkit-coreml", matching: [String] = ["openai_*", "distil-whisper_*"]) async throws -> [String] {
-        let hubApi = HubApi()
-        let modelFiles = try await hubApi.getFilenames(from: repo, matching: matching)
+    public static func recommendedModels() -> ModelSupport {
+        let deviceName = Self.deviceName()
+        Logging.debug("Running on \(deviceName)")
+        return modelSupport(for: deviceName)
+    }
 
-        return formatModelFiles(modelFiles)
+    public static func recommendedRemoteModels(from repo: String = "argmaxinc/whisperkit-coreml") async -> ModelSupport {
+        let deviceName = Self.deviceName()
+        let config = await Self.fetchModelSupportConfig(from: repo)
+        return modelSupport(for: deviceName, from: config)
+    }
+
+    public static func fetchModelSupportConfig(from repo: String = "argmaxinc/whisperkit-coreml") async -> ModelSupportConfig {
+        let hubApi = HubApi()
+        var modelSupportConfig = Constants.fallbackModelSupportConfig
+
+        do {
+            // Try to decode config.json into ModelSupportConfig
+            let configUrl = try await hubApi.snapshot(from: repo, matching: "config*")
+            let decoder = JSONDecoder()
+            let jsonData = try Data(contentsOf: configUrl.appendingPathComponent("config.json"))
+            modelSupportConfig = try decoder.decode(ModelSupportConfig.self, from: jsonData)
+        } catch {
+            // Allow this to fail gracefully as it uses fallback config by default
+            Logging.error(error)
+        }
+
+        return modelSupportConfig
+    }
+
+    public static func fetchAvailableModels(from repo: String = "argmaxinc/whisperkit-coreml", matching: [String] = ["*"]) async throws -> [String] {
+        let modelSupportConfig = await fetchModelSupportConfig(from: repo)
+        let supportedModels = modelSupportConfig.modelSupport().supported
+        var filteredSupportSet: Set<String> = []
+        for glob in matching {
+            filteredSupportSet = filteredSupportSet.union(supportedModels.matching(glob: glob))
+        }
+        let filteredSupport = Array(filteredSupportSet)
+
+        return formatModelFiles(filteredSupport)
     }
 
     public static func formatModelFiles(_ modelFiles: [String]) -> [String] {
@@ -243,13 +273,14 @@ open class WhisperKit {
         modelFolder: String?,
         download: Bool
     ) async throws {
-        // Determine the model variant to use
-        let modelVariant = model ?? WhisperKit.recommendedModels().default
-
         // If a local model folder is provided, use it; otherwise, download the model
         if let folder = modelFolder {
             self.modelFolder = URL(fileURLWithPath: folder)
         } else if download {
+            // Determine the model variant to use
+            let modelSupport = await WhisperKit.recommendedRemoteModels()
+            let modelVariant = model ?? modelSupport.default
+
             let repo = modelRepo ?? "argmaxinc/whisperkit-coreml"
             do {
                 self.modelFolder = try await Self.download(
@@ -741,14 +772,14 @@ open class WhisperKit {
         let isChunkable = audioArray.count > WhisperKit.windowSamples
         switch (isChunkable, decodeOptions?.chunkingStrategy) {
             case (true, .vad):
-            // We have some audio that will require multiple windows and a strategy to chunk them
-            let vad = decodeOptions?.voiceActivityDetector ?? EnergyVAD()
-            let chunker = VADAudioChunker(vad: vad)
-            let audioChunks: [AudioChunk] = try await chunker.chunkAll(
-                audioArray: audioArray,
-                maxChunkLength: WhisperKit.windowSamples,
-                decodeOptions: decodeOptions
-            )
+                // We have some audio that will require multiple windows and a strategy to chunk them
+                let vad = decodeOptions?.voiceActivityDetector ?? EnergyVAD()
+                let chunker = VADAudioChunker(vad: vad)
+                let audioChunks: [AudioChunk] = try await chunker.chunkAll(
+                    audioArray: audioArray,
+                    maxChunkLength: WhisperKit.windowSamples,
+                    decodeOptions: decodeOptions
+                )
 
                 // Reset the seek times since we've already chunked the audio
                 var chunkedOptions = decodeOptions
