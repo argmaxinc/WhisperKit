@@ -260,9 +260,9 @@ public class AudioProcessor: NSObject, AudioProcessing {
 
         let audioFileURL = URL(fileURLWithPath: audioFilePath)
         let audioFile = try AVAudioFile(forReading: audioFileURL, commonFormat: .pcmFormatFloat32, interleaved: false)
-        let inputFormat = audioFile.fileFormat
+        let inputSampleRate = audioFile.fileFormat.sampleRate
         let inputFrameCount = AVAudioFrameCount(audioFile.length)
-        let inputDuration = Double(inputFrameCount) / inputFormat.sampleRate
+        let inputDuration = Double(inputFrameCount) / inputSampleRate
 
         let start = startTime ?? 0
         let end = min(endTime ?? inputDuration, inputDuration)
@@ -329,10 +329,10 @@ public class AudioProcessor: NSObject, AudioProcessing {
         frameCount: AVAudioFrameCount? = nil,
         maxReadFrameSize: AVAudioFrameCount = Constants.defaultAudioReadFrameSize
     ) -> AVAudioPCMBuffer? {
-        let inputFormat = audioFile.fileFormat
+        let inputSampleRate = audioFile.fileFormat.sampleRate
         let inputStartFrame = audioFile.framePosition
         let inputFrameCount = frameCount ?? AVAudioFrameCount(audioFile.length)
-        let inputDuration = Double(inputFrameCount) / inputFormat.sampleRate
+        let inputDuration = Double(inputFrameCount) / inputSampleRate
         let endFramePosition = min(inputStartFrame + AVAudioFramePosition(inputFrameCount), audioFile.length + 1)
 
         guard let outputFormat = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: channelCount) else {
@@ -354,8 +354,8 @@ public class AudioProcessor: NSObject, AudioProcessing {
             let remainingFrames = AVAudioFrameCount(endFramePosition - audioFile.framePosition)
             let framesToRead = min(remainingFrames, maxReadFrameSize)
 
-            let currentPositionInSeconds = Double(audioFile.framePosition) / inputFormat.sampleRate
-            let nextPositionInSeconds = (Double(audioFile.framePosition) + Double(framesToRead)) / inputFormat.sampleRate
+            let currentPositionInSeconds = Double(audioFile.framePosition) / inputSampleRate
+            let nextPositionInSeconds = (Double(audioFile.framePosition) + Double(framesToRead)) / inputSampleRate
             Logging.debug("Resampling \(String(format: "%.2f", currentPositionInSeconds))s - \(String(format: "%.2f", nextPositionInSeconds))s")
 
             do {
