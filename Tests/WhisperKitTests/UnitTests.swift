@@ -552,7 +552,7 @@ final class UnitTests: XCTestCase {
         let options = DecodingOptions()
         let continuationCallback: TranscriptionCallback = { (progress: TranscriptionProgress) -> Bool? in
             // Stop after only 10 tokens (full test audio contains 16)
-            return progress.tokens.count <= earlyStopTokenCount ? true : false
+            return progress.tokens.count <= earlyStopTokenCount
         }
 
         let result = try await XCTUnwrapAsync(
