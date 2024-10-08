@@ -51,7 +51,8 @@ struct ContentView: View {
     @AppStorage("silenceThreshold") private var silenceThreshold: Double = 0.3
     @AppStorage("useVAD") private var useVAD: Bool = true
     @AppStorage("tokenConfirmationsNeeded") private var tokenConfirmationsNeeded: Double = 2
-    @AppStorage("chunkingStrategy") private var chunkingStrategy: ChunkingStrategy = .none
+    @AppStorage("concurrentWorkerCount") private var concurrentWorkerCount: Int = 4
+    @AppStorage("chunkingStrategy") private var chunkingStrategy: ChunkingStrategy = .vad
     @AppStorage("encoderComputeUnits") private var encoderComputeUnits: MLComputeUnits = .cpuAndNeuralEngine
     @AppStorage("decoderComputeUnits") private var decoderComputeUnits: MLComputeUnits = .cpuAndNeuralEngine
 
@@ -1269,12 +1270,15 @@ struct ContentView: View {
 
     func transcribeCurrentFile(path: String) async throws {
         // Load and convert buffer in a limited scope
+        Logging.debug("Loading audio file: \(path)")
+        let loadingStart = Date()
         let audioFileSamples = try await Task {
             try autoreleasepool {
-                let audioFileBuffer = try AudioProcessor.loadAudio(fromPath: path)
-                return AudioProcessor.convertBufferToArray(buffer: audioFileBuffer)
+                return try AudioProcessor.loadAudioAsFloatArray(fromPath: path)
             }
         }.value
+        Logging.debug("Loaded audio file in \(Date().timeIntervalSince(loadingStart)) seconds")
+
 
         let transcription = try await transcribeAudioSamples(audioFileSamples)
 
@@ -1316,6 +1320,7 @@ struct ContentView: View {
             withoutTimestamps: !enableTimestamps,
             wordTimestamps: true,
             clipTimestamps: seekClip,
+            concurrentWorkerCount: concurrentWorkerCount,
             chunkingStrategy: chunkingStrategy
         )
 

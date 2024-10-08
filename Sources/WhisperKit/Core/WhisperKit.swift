@@ -446,7 +446,8 @@ open class WhisperKit {
     open func detectLanguage(
         audioPath: String
     ) async throws -> (language: String, langProbs: [String: Float]) {
-        let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioPath)
+        // Only need the first 30s for language detection
+        let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioPath, endTime: 30.0)
         let audioArray = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
         return try await detectLangauge(audioArray: audioArray)
     }
@@ -721,15 +722,17 @@ open class WhisperKit {
         callback: TranscriptionCallback = nil
     ) async throws -> [TranscriptionResult] {
         // Process input audio file into audio samples
-        let loadAudioStart = Date()
-        let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioPath)
-        let loadTime = Date().timeIntervalSince(loadAudioStart)
+        let audioArray = try await withThrowingTaskGroup(of: [Float].self) { group -> [Float] in
+            let convertAudioStart = Date()
+            defer {
+                let convertTime = Date().timeIntervalSince(convertAudioStart)
+                currentTimings.audioLoading = convertTime
+                Logging.debug("Audio loading and convert time: \(convertTime)")
+                logCurrentMemoryUsage("Audio Loading and Convert")
+            }
 
-        let convertAudioStart = Date()
-        let audioArray = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
-        let convertTime = Date().timeIntervalSince(convertAudioStart)
-        currentTimings.audioLoading = loadTime + convertTime
-        Logging.debug("Audio loading time: \(loadTime), Audio convert time: \(convertTime)")
+            return try AudioProcessor.loadAudioAsFloatArray(fromPath: audioPath)
+        }
 
         let transcribeResults: [TranscriptionResult] = try await transcribe(
             audioArray: audioArray,
@@ -837,22 +840,22 @@ open class WhisperKit {
             throw WhisperError.tokenizerUnavailable()
         }
 
-        let childProgress = Progress()
-        progress.totalUnitCount += 1
-        progress.addChild(childProgress, withPendingUnitCount: 1)
-
-        let transcribeTask = TranscribeTask(
-            currentTimings: currentTimings,
-            progress: childProgress,
-            audioEncoder: audioEncoder,
-            featureExtractor: featureExtractor,
-            segmentSeeker: segmentSeeker,
-            textDecoder: textDecoder,
-            tokenizer: tokenizer
-        )
-
         do {
             try Task.checkCancellation()
+
+            let childProgress = Progress()
+            progress.totalUnitCount += 1
+            progress.addChild(childProgress, withPendingUnitCount: 1)
+
+            let transcribeTask = TranscribeTask(
+                currentTimings: currentTimings,
+                progress: childProgress,
+                audioEncoder: audioEncoder,
+                featureExtractor: featureExtractor,
+                segmentSeeker: segmentSeeker,
+                textDecoder: textDecoder,
+                tokenizer: tokenizer
+            )
 
             let transcribeTaskResult = try await transcribeTask.run(
                 audioArray: audioArray,

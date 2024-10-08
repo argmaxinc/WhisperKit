@@ -103,9 +103,9 @@ struct CLIArguments: ParsableArguments {
     @Flag(help: "Simulate streaming transcription using the input audio file")
     var streamSimulated: Bool = false
 
-    @Option(help: "Maximum concurrent inference, might be helpful when processing more than 1 audio file at the same time. 0 means unlimited")
-    var concurrentWorkerCount: Int = 0
+    @Option(help: "Maximum concurrent inference, might be helpful when processing more than 1 audio file at the same time. 0 means unlimited. Default: 4")
+    var concurrentWorkerCount: Int = 4
 
-    @Option(help: "Chunking strategy for audio processing, `nil` means no chunking, `vad` means using voice activity detection")
-    var chunkingStrategy: String? = nil
+    @Option(help: "Chunking strategy for audio processing, `none` means no chunking, `vad` means using voice activity detection. Default: `vad`")
+    var chunkingStrategy: String = "vad"
 }

@@ -548,9 +548,11 @@ final class UnitTests: XCTestCase {
     }
 
     func testDecodingEarlyStopping() async throws {
+        let earlyStopTokenCount = 10
         let options = DecodingOptions()
         let continuationCallback: TranscriptionCallback = { (progress: TranscriptionProgress) -> Bool? in
-            false
+            // Stop after only 10 tokens (full test audio contains 16)
+            return progress.tokens.count <= earlyStopTokenCount
         }
 
         let result = try await XCTUnwrapAsync(
@@ -576,6 +578,7 @@ final class UnitTests: XCTestCase {
         XCTAssertNotNil(resultWithWait)
         let tokenCountWithWait = resultWithWait.segments.flatMap { $0.tokens }.count
         let decodingTimePerTokenWithWait = resultWithWait.timings.decodingLoop / Double(tokenCountWithWait)
+        Logging.debug("Decoding loop without wait: \(result.timings.decodingLoop), with wait: \(resultWithWait.timings.decodingLoop)")
 
         // Assert that the decoding predictions per token are not slower with the waiting
         XCTAssertEqual(decodingTimePerTokenWithWait, decodingTimePerToken, accuracy: decodingTimePerToken, "Decoding predictions per token should not be significantly slower with waiting")

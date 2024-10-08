@@ -93,8 +93,6 @@ public extension AudioProcessing {
     }
 
     static func padOrTrimAudio(fromArray audioArray: [Float], startAt startIndex: Int = 0, toLength frameLength: Int = 480_000, saveSegment: Bool = false) -> MLMultiArray? {
-        let currentFrameLength = audioArray.count
-
         guard startIndex >= 0 && startIndex < audioArray.count else {
             Logging.error("startIndex is outside the buffer size")
             return nil
@@ -197,7 +195,15 @@ public class AudioProcessor: NSObject, AudioProcessing {
 
         let audioFileURL = URL(fileURLWithPath: audioFilePath)
         let audioFile = try AVAudioFile(forReading: audioFileURL, commonFormat: .pcmFormatFloat32, interleaved: false)
+        return try loadAudio(fromFile: audioFile, startTime: startTime, endTime: endTime, maxReadFrameSize: maxReadFrameSize)
+    }
 
+    public static func loadAudio(
+        fromFile audioFile: AVAudioFile,
+        startTime: Double? = 0,
+        endTime: Double? = nil,
+        maxReadFrameSize: AVAudioFrameCount? = nil
+    ) throws -> AVAudioPCMBuffer {
         let sampleRate = audioFile.fileFormat.sampleRate
         let channelCount = audioFile.fileFormat.channelCount
         let frameLength = AVAudioFrameCount(audioFile.length)
@@ -243,13 +249,56 @@ public class AudioProcessor: NSObject, AudioProcessing {
         }
     }
 
+    public static func loadAudioAsFloatArray(
+        fromPath audioFilePath: String,
+        startTime: Double? = 0,
+        endTime: Double? = nil
+    ) throws -> [Float] {
+        guard FileManager.default.fileExists(atPath: audioFilePath) else {
+            throw WhisperError.loadAudioFailed("Resource path does not exist \(audioFilePath)")
+        }
+
+        let audioFileURL = URL(fileURLWithPath: audioFilePath)
+        let audioFile = try AVAudioFile(forReading: audioFileURL, commonFormat: .pcmFormatFloat32, interleaved: false)
+        let inputSampleRate = audioFile.fileFormat.sampleRate
+        let inputFrameCount = AVAudioFrameCount(audioFile.length)
+        let inputDuration = Double(inputFrameCount) / inputSampleRate
+
+        let start = startTime ?? 0
+        let end = min(endTime ?? inputDuration, inputDuration)
+
+        // Load 10m of audio at a time to reduce peak memory while converting
+        // Particularly impactful for large audio files
+        let chunkDuration: Double = 60 * 10
+        var currentTime = start
+        var result: [Float] = []
+
+        while currentTime < end {
+            let chunkEnd = min(currentTime + chunkDuration, end)
+
+            try autoreleasepool {
+                let buffer = try loadAudio(
+                    fromFile: audioFile,
+                    startTime: currentTime,
+                    endTime: chunkEnd
+                )
+
+                let floatArray = Self.convertBufferToArray(buffer: buffer)
+                result.append(contentsOf: floatArray)
+            }
+
+            currentTime = chunkEnd
+        }
+
+        return result
+    }
+
     public static func loadAudio(at audioPaths: [String]) async -> [Result<[Float], Swift.Error>] {
         await withTaskGroup(of: [(index: Int, result: Result<[Float], Swift.Error>)].self) { taskGroup -> [Result<[Float], Swift.Error>] in
             for (index, audioPath) in audioPaths.enumerated() {
                 taskGroup.addTask {
                     do {
-                        let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioPath)
-                        let audio = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
+                        let audio = try AudioProcessor.loadAudioAsFloatArray(fromPath: audioPath)
                         return [(index: index, result: .success(audio))]
                     } catch {
                         return [(index: index, result: .failure(error))]
@@ -280,10 +329,10 @@ public class AudioProcessor: NSObject, AudioProcessing {
         frameCount: AVAudioFrameCount? = nil,
         maxReadFrameSize: AVAudioFrameCount = Constants.defaultAudioReadFrameSize
     ) -> AVAudioPCMBuffer? {
-        let inputFormat = audioFile.fileFormat
+        let inputSampleRate = audioFile.fileFormat.sampleRate
         let inputStartFrame = audioFile.framePosition
         let inputFrameCount = frameCount ?? AVAudioFrameCount(audioFile.length)
-        let inputDuration = Double(inputFrameCount) / inputFormat.sampleRate
+        let inputDuration = Double(inputFrameCount) / inputSampleRate
         let endFramePosition = min(inputStartFrame + AVAudioFramePosition(inputFrameCount), audioFile.length + 1)
 
         guard let outputFormat = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: channelCount) else {
@@ -305,8 +354,8 @@ public class AudioProcessor: NSObject, AudioProcessing {
             let remainingFrames = AVAudioFrameCount(endFramePosition - audioFile.framePosition)
             let framesToRead = min(remainingFrames, maxReadFrameSize)
 
-            let currentPositionInSeconds = Double(audioFile.framePosition) / inputFormat.sampleRate
-            let nextPositionInSeconds = (Double(audioFile.framePosition) + Double(framesToRead)) / inputFormat.sampleRate
+            let currentPositionInSeconds = Double(audioFile.framePosition) / inputSampleRate
+            let nextPositionInSeconds = (Double(audioFile.framePosition) + Double(framesToRead)) / inputSampleRate
             Logging.debug("Resampling \(String(format: "%.2f", currentPositionInSeconds))s - \(String(format: "%.2f", nextPositionInSeconds))s")
 
             do {
@@ -644,7 +693,7 @@ public class AudioProcessor: NSObject, AudioProcessing {
                 &propertySize,
                 &name
             )
-            if status == noErr, let deviceNameCF = name?.takeUnretainedValue() as String? {
+            if status == noErr, let deviceNameCF = name?.takeRetainedValue() as String? {
                 deviceName = deviceNameCF
             }
 
