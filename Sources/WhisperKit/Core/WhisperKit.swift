@@ -158,7 +158,7 @@ open class WhisperKit {
             modelSupportConfig = try decoder.decode(ModelSupportConfig.self, from: jsonData)
         } catch {
             // Allow this to fail gracefully as it uses fallback config by default
-            Logging.debug(error)
+            Logging.error(error)
         }
 
         return modelSupportConfig

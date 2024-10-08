@@ -82,7 +82,7 @@ open class VADAudioChunker: AudioChunking {
             var startIndex = seekClipStart
             while startIndex < seekClipEnd - windowPadding {
                 let currentFrameLength = audioArray.count
-                if startIndex < 0 || startIndex >= currentFrameLength {
+                guard startIndex >= 0 && startIndex < audioArray.count else {
                     throw WhisperError.audioProcessingFailed("startIndex is outside the buffer size")
                 }
 

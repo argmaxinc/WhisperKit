@@ -36,12 +36,12 @@ final class UnitTests: XCTestCase {
 
     func testModelSupportConfigFallback() {
         let fallbackRepoConfig = Constants.fallbackModelSupportConfig
-        XCTAssertEqual(fallbackRepoConfig.repoName, "whisperkit-coreml")
+        XCTAssertEqual(fallbackRepoConfig.repoName, "whisperkit-coreml-fallback")
         XCTAssertEqual(fallbackRepoConfig.repoVersion, "0.2")
-        XCTAssertGreaterThanOrEqual(fallbackRepoConfig.deviceSupport.count, 5)
+        XCTAssertGreaterThanOrEqual(fallbackRepoConfig.deviceSupports.count, 5)
 
         // Test that all device supports have their disabled models set except devices that should support all known models
-        for deviceSupport in fallbackRepoConfig.deviceSupport where !Constants.knownModels.allSatisfy(deviceSupport.models.supported.contains) {
+        for deviceSupport in fallbackRepoConfig.deviceSupports where !Constants.knownModels.allSatisfy(deviceSupport.models.supported.contains) {
             let modelSupport = deviceSupport.models.supported
             let knownModels = Constants.knownModels
 
@@ -67,12 +67,12 @@ final class UnitTests: XCTestCase {
         let loadedConfig = try decoder.decode(ModelSupportConfig.self, from: jsonData)
 
         // Compare loaded config with fallback config
-        XCTAssertEqual(loadedConfig.repoName, Constants.fallbackModelSupportConfig.repoName)
+        XCTAssertEqual(loadedConfig.repoName, "whisperkit-coreml")
         XCTAssertEqual(loadedConfig.repoVersion, Constants.fallbackModelSupportConfig.repoVersion)
-        XCTAssertEqual(loadedConfig.deviceSupport.count, Constants.fallbackModelSupportConfig.deviceSupport.count)
+        XCTAssertEqual(loadedConfig.deviceSupports.count, Constants.fallbackModelSupportConfig.deviceSupports.count)
 
         // Compare device supports
-        for (loadedDeviceSupport, fallbackDeviceSupport) in zip(loadedConfig.deviceSupport, Constants.fallbackModelSupportConfig.deviceSupport) {
+        for (loadedDeviceSupport, fallbackDeviceSupport) in zip(loadedConfig.deviceSupports, Constants.fallbackModelSupportConfig.deviceSupports) {
             XCTAssertEqual(loadedDeviceSupport.identifiers, fallbackDeviceSupport.identifiers)
             XCTAssertEqual(loadedDeviceSupport.models.default, fallbackDeviceSupport.models.default)
             XCTAssertEqual(Set(loadedDeviceSupport.models.supported), Set(fallbackDeviceSupport.models.supported))
@@ -102,7 +102,7 @@ final class UnitTests: XCTestCase {
         // Test if a model exists in a remote repo but not in the fallback config, it is disabled for all devices except default
         let newModel = "some_new_model"
         let newDevice = "some_new_device"
-        let newDeviceSupport = config.deviceSupport + [DeviceSupport(
+        let newDeviceSupport = config.deviceSupports + [DeviceSupport(
             identifiers: [newDevice],
             models: ModelSupport(
                 default: "openai_whisper-base",
@@ -115,11 +115,11 @@ final class UnitTests: XCTestCase {
         let newConfig = ModelSupportConfig(
             repoName: config.repoName,
             repoVersion: config.repoVersion,
-            deviceSupport: newDeviceSupport
+            deviceSupports: newDeviceSupport
         )
 
         XCTAssertEqual(Set(newConfig.knownModels), Set(newDeviceSupport.flatMap { $0.models.supported }))
-        for deviceSupport in newConfig.deviceSupport where !deviceSupport.identifiers.allSatisfy([newDevice].contains) {
+        for deviceSupport in newConfig.deviceSupports where !deviceSupport.identifiers.allSatisfy([newDevice].contains) {
             XCTAssertFalse(deviceSupport.models.supported.contains(newModel))
             XCTAssertTrue(deviceSupport.models.disabled.contains(newModel))
         }
@@ -131,7 +131,7 @@ final class UnitTests: XCTestCase {
         let remoteConfig = ModelSupportConfig(
             repoName: "test",
             repoVersion: "test",
-            deviceSupport: [DeviceSupport(
+            deviceSupports: [DeviceSupport(
                 identifiers: ["test_device"],
                 models: ModelSupport(
                     default: remoteModel,
@@ -146,7 +146,7 @@ final class UnitTests: XCTestCase {
         XCTAssertTrue(modelSupport.contains(remoteModel))
         XCTAssertTrue(disabledModels.contains(knownLocalModel))
         // Direct access has it disabled
-        for deviceSupport in remoteConfig.deviceSupport where deviceSupport.identifiers.contains("test_device") {
+        for deviceSupport in remoteConfig.deviceSupports where deviceSupport.identifiers.contains("test_device") {
             XCTAssertTrue(deviceSupport.models.supported.contains(remoteModel))
             XCTAssertFalse(deviceSupport.models.disabled.contains(remoteModel))
             XCTAssertFalse(deviceSupport.models.supported.contains(knownLocalModel))
@@ -158,10 +158,10 @@ final class UnitTests: XCTestCase {
         // Make sure remote repo config loads successfully from HF
         let modelRepoConfig = await WhisperKit.fetchModelSupportConfig()
 
-        XCTAssertFalse(modelRepoConfig.deviceSupport.isEmpty, "Should have device support")
+        XCTAssertFalse(modelRepoConfig.deviceSupports.isEmpty, "Should have device supports")
         XCTAssertFalse(modelRepoConfig.knownModels.isEmpty, "Should have known models")
 
-        XCTAssertGreaterThanOrEqual(modelRepoConfig.deviceSupport.count, Constants.fallbackModelSupportConfig.deviceSupport.count, "Remote config should have at least as many devices as fallback")
+        XCTAssertGreaterThanOrEqual(modelRepoConfig.deviceSupports.count, Constants.fallbackModelSupportConfig.deviceSupports.count, "Remote config should have at least as many devices as fallback")
 
         // Verify that known models in the remote config include all known models from fallback
         let remoteKnownModels = Set(modelRepoConfig.knownModels)

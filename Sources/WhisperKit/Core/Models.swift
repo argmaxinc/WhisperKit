@@ -184,7 +184,7 @@ public struct DeviceSupport: Codable {
 public struct ModelSupportConfig: Codable {
     public let repoName: String
     public let repoVersion: String
-    public var deviceSupport: [DeviceSupport]
+    public var deviceSupports: [DeviceSupport]
     /// Computed on init
     public private(set) var knownModels: [String]
     public private(set) var defaultSupport: DeviceSupport
@@ -192,28 +192,28 @@ public struct ModelSupportConfig: Codable {
     enum CodingKeys: String, CodingKey {
         case repoName = "name"
         case repoVersion = "version"
-        case deviceSupport = "device_support"
+        case deviceSupports = "device_support"
     }
 
     public init(from decoder: Swift.Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let repoName = try container.decode(String.self, forKey: .repoName)
         let repoVersion = try container.decode(String.self, forKey: .repoVersion)
-        let deviceSupport = try container.decode([DeviceSupport].self, forKey: .deviceSupport)
+        let deviceSupports = try container.decode([DeviceSupport].self, forKey: .deviceSupports)
 
-        self.init(repoName: repoName, repoVersion: repoVersion, deviceSupport: deviceSupport)
+        self.init(repoName: repoName, repoVersion: repoVersion, deviceSupports: deviceSupports)
     }
 
-    public init(repoName: String, repoVersion: String, deviceSupport: [DeviceSupport], includeFallback: Bool = true) {
+    public init(repoName: String, repoVersion: String, deviceSupports: [DeviceSupport], includeFallback: Bool = true) {
         self.repoName = repoName
         self.repoVersion = repoVersion
 
         if includeFallback {
-            self.deviceSupport = Self.mergeDeviceSupport(remote: deviceSupport, fallback: Constants.fallbackModelSupportConfig.deviceSupport)
-            self.knownModels = self.deviceSupport.flatMap { $0.models.supported }.orderedSet
+            self.deviceSupports = Self.mergeDeviceSupport(remote: deviceSupports, fallback: Constants.fallbackModelSupportConfig.deviceSupports)
+            self.knownModels = self.deviceSupports.flatMap { $0.models.supported }.orderedSet
         } else {
-            self.deviceSupport = deviceSupport
-            self.knownModels = deviceSupport.flatMap { $0.models.supported }.orderedSet
+            self.deviceSupports = deviceSupports
+            self.knownModels = deviceSupports.flatMap { $0.models.supported }.orderedSet
         }
 
         // Add default device support with all models supported for unknown devices
@@ -230,18 +230,20 @@ public struct ModelSupportConfig: Codable {
 
     @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
     public func modelSupport(for deviceIdentifier: String = WhisperKit.deviceName()) -> ModelSupport {
-        for support in deviceSupport {
+        for support in deviceSupports {
             if support.identifiers.contains(where: { deviceIdentifier.hasPrefix($0) }) {
                 return support.models
             }
         }
+
+        Logging.info("No device support found for \(deviceIdentifier), using default")
         return defaultSupport.models
     }
 
     private mutating func computeDisabledModels() {
-        for i in 0..<deviceSupport.count {
-            let disabledModels = Set(knownModels).subtracting(deviceSupport[i].models.supported)
-            self.deviceSupport[i].models.disabled = Array(disabledModels)
+        for i in 0..<deviceSupports.count {
+            let disabledModels = Set(knownModels).subtracting(deviceSupports[i].models.supported)
+            self.deviceSupports[i].models.disabled = Array(disabledModels)
         }
     }
 
@@ -249,7 +251,7 @@ public struct ModelSupportConfig: Codable {
         var mergedSupports: [DeviceSupport] = []
         let remoteIdentifiers = Set(remote.flatMap { $0.identifiers })
 
-        // Add remote device support, merging with fallback if identifiers overlap
+        // Add remote device supports, merging with fallback if identifiers overlap
         for remoteSupport in remote {
             if let fallbackSupport = fallback.first(where: { $0.identifiers.contains(where: remoteSupport.identifiers.contains) }) {
                 let mergedModels = ModelSupport(
@@ -262,11 +264,9 @@ public struct ModelSupportConfig: Codable {
             }
         }
 
-        // Add fallback device support that don't overlap with remote
-        for fallbackSupport in fallback {
-            if !fallbackSupport.identifiers.contains(where: remoteIdentifiers.contains) {
-                mergedSupports.append(fallbackSupport)
-            }
+        // Add fallback device supports that don't overlap with remote
+        for fallbackSupport in fallback where !fallbackSupport.identifiers.contains(where: remoteIdentifiers.contains) {
+            mergedSupports.append(fallbackSupport)
         }
 
         return mergedSupports
@@ -1457,9 +1457,9 @@ public enum Constants {
 
     public static let fallbackModelSupportConfig: ModelSupportConfig = {
         var config = ModelSupportConfig(
-            repoName: "whisperkit-coreml",
+            repoName: "whisperkit-coreml-fallback",
             repoVersion: "0.2",
-            deviceSupport: [
+            deviceSupports: [
                 DeviceSupport(
                     identifiers: ["iPhone11", "iPhone12", "Watch7", "Watch8"],
                     models: ModelSupport(
@@ -1590,5 +1590,5 @@ public enum Constants {
         return config
     }()
 
-    public static let knownModels: [String] = fallbackModelSupportConfig.deviceSupport.flatMap { $0.models.supported }.orderedSet
+    public static let knownModels: [String] = fallbackModelSupportConfig.deviceSupports.flatMap { $0.models.supported }.orderedSet
 }
