@@ -591,9 +591,11 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         var hasAlignment = false
         var isFirstTokenLogProbTooLow = false
         let windowUUID = UUID()
-        DispatchQueue.global().async { [weak self] in
+        Task { [weak self] in
             guard let self = self else { return }
-            self.shouldEarlyStop[windowUUID] = false
+            await MainActor.run {
+                self.shouldEarlyStop[windowUUID] = false
+            }
         }
         for tokenIndex in prefilledIndex..<loopCount {
             let loopStart = Date()
@@ -735,13 +737,15 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
 
                 // Call the callback if it is provided on a background thread to avoid blocking the decoding loop
                 if let callback = callback {
-                    DispatchQueue.global().async { [weak self] in
+                    Task { [weak self] in
                         guard let self = self else { return }
                         let shouldContinue = callback(result)
                         if let shouldContinue = shouldContinue, !shouldContinue, !isPrefill {
-                            Logging.debug("Early stopping")
-                            if self.shouldEarlyStop.keys.contains(windowUUID) {
-                                self.shouldEarlyStop[windowUUID] = true
+                            await MainActor.run {
+                                Logging.debug("Early stopping")
+                                if self.shouldEarlyStop.keys.contains(windowUUID) {
+                                    self.shouldEarlyStop[windowUUID] = true
+                                }
                             }
                         }
                     }
