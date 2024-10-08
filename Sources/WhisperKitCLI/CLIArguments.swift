@@ -107,5 +107,5 @@ struct CLIArguments: ParsableArguments {
     var concurrentWorkerCount: Int = 4
 
     @Option(help: "Chunking strategy for audio processing, `none` means no chunking, `vad` means using voice activity detection. Default: `vad`")
-    var chunkingStrategy: String? = "vad"
+    var chunkingStrategy: String = "vad"
 }

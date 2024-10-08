@@ -454,8 +454,9 @@ public func modelSupport(for deviceName: String, from config: ModelSupportConfig
 /// Deprecated
 @available(*, deprecated, message: "Subject to removal in a future version. Use modelSupport(for:from:) -> ModelSupport instead.")
 @_disfavoredOverload
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public func modelSupport(for deviceName: String, from config: ModelSupportConfig? = nil) -> (default: String, disabled: [String]) {
-    let modelSupport = modelSupport(for: deviceName, from: config)
+    let modelSupport: ModelSupport = modelSupport(for: deviceName, from: config)
     return (modelSupport.default, modelSupport.disabled)
 }
 
