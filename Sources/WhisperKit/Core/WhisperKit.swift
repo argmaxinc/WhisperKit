@@ -784,6 +784,8 @@ open class WhisperKit {
                     decodeOptions: decodeOptions
                 )
 
+                progress.totalUnitCount = max(progress.totalUnitCount, Int64(audioChunks.count))
+
                 // Reset the seek times since we've already chunked the audio
                 var chunkedOptions = decodeOptions
                 chunkedOptions?.clipTimestamps = []
@@ -844,7 +846,8 @@ open class WhisperKit {
             try Task.checkCancellation()
 
             let childProgress = Progress()
-            progress.totalUnitCount += 1
+            // Total can be set elsewhere, here ensures it is at least 1
+            progress.totalUnitCount = max(1, progress.totalUnitCount)
             progress.addChild(childProgress, withPendingUnitCount: 1)
 
             let transcribeTask = TranscribeTask(
