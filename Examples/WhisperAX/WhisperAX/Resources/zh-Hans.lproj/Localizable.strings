@@ -1,0 +1,181 @@
+// 通用
+"whisperax" = "WhisperAX";
+"no_audio_input" = "无音频输入";
+
+// 标签页
+"tab_transcribe" = "转录";
+"tab_stream" = "录音流";
+
+// 模型管理
+"load_model" = "加载模型";
+"compute_units" = "计算单元";
+"audio_encoder" = "音频编码器";
+"text_decoder" = "文本解码器";
+"cpu" = "CPU";
+"gpu" = "GPU";
+"neural_engine" = "神经引擎";
+"specializing_text" = "正在为您的设备加载 %@ ...\n首次加载可能需要几分钟时间";
+
+// 控制
+"reset" = "重置";
+"settings" = "设置";
+"from_file" = "文件";
+"record" = "录音";
+"waiting_for_speech" = "等待语音输入...";
+"encoder_runs" = "编码器运行: %d";
+"decoder_runs" = "解码器运行: %d";
+
+
+// 设置
+"source_language" = "源语言";
+"show_timestamps" = "显示时间戳";
+"special_characters" = "特殊字符";
+"show_decoder_preview" = "显示解码器预览";
+"prompt_prefill" = "提示预填充";
+"cache_prefill" = "缓存预填充";
+"chunking_strategy" = "分块策略";
+"none" = "无";
+"vad" = "语音活动检测";
+"starting_temperature" = "起始温度:";
+"max_fallback_count" = "最大回退次数:";
+"compression_check_tokens" = "压缩检查令牌";
+"max_tokens_per_loop" = "每循环最大令牌数";
+"silence_threshold" = "静音阈值";
+"experimental" = "实验性";
+"eager_streaming_mode" = "急切流式模式";
+"token_confirmations" = "令牌确认";
+"decoding_options" = "解码选项";
+"done" = "完成";
+
+// 工具栏
+"copy_text" = "复制文本";
+
+
+// model 说明
+"unloading" = "卸载";
+"unloaded" = "未加载";
+"loading" = "加载";
+"loaded" = "已加载";
+"specializing" = "特殊化";
+"specialized" = "已特殊化";
+"downloading" = "下载";
+"downloaded" = "下载";
+
+// 解码类型
+"decode_type_transcribe" = "转录";
+"decode_type_translate" = "翻译";
+
+// 语言
+"language_english" = "英文";
+"language_chinese" = "中文";
+"language_german" = "德语";
+"language_spanish" = "西班牙语";
+"language_russian" = "俄语";
+"language_korean" = "韩语";
+"language_french" = "法语";
+"language_japanese" = "日语";
+"language_portuguese" = "葡萄牙语";
+"language_turkish" = "土耳其语";
+"language_polish" = "波兰语";
+"language_catalan" = "加泰罗尼亚语";
+"language_dutch" = "荷兰语";
+"language_arabic" = "阿拉伯语";
+"language_swedish" = "瑞典语";
+"language_italian" = "意大利语";
+"language_indonesian" = "印尼语";
+"language_hindi" = "印度语";
+"language_finnish" = "芬兰语";
+"language_vietnamese" = "越南语";
+"language_hebrew" = "希伯来语";
+"language_ukrainian" = "乌克兰语";
+"language_greek" = "希腊语";
+"language_malay" = "马来语";
+"language_czech" = "捷克语";
+"language_romanian" = "罗马尼亚语";
+"language_danish" = "丹麦语";
+"language_hungarian" = "匈牙利语";
+"language_tamil" = "泰米尔语";
+"language_norwegian" = "挪威语";
+"language_thai" = "泰语";
+"language_urdu" = "乌尔都语";
+"language_croatian" = "克罗地亚语";
+"language_bulgarian" = "保加利亚语";
+"language_lithuanian" = "立陶宛语";
+"language_latin" = "拉丁语";
+"language_maori" = "毛利语";
+"language_malayalam" = "马拉雅拉姆语";
+"language_welsh" = "威尔士语";
+"language_slovak" = "斯洛伐克语";
+"language_telugu" = "泰卢固语";
+"language_persian" = "波斯语";
+"language_latvian" = "拉脱维亚语";
+"language_bengali" = "孟加拉语";
+"language_serbian" = "塞尔维亚语";
+"language_azerbaijani" = "阿塞拜疆语";
+"language_slovenian" = "斯洛文尼亚语";
+"language_kannada" = "卡纳达语";
+"language_estonian" = "爱沙尼亚语";
+"language_macedonian" = "马其顿语";
+"language_breton" = "布列塔尼语";
+"language_basque" = "巴斯克语";
+"language_icelandic" = "冰岛语";
+"language_armenian" = "亚美尼亚语";
+"language_nepali" = "尼泊尔语";
+"language_mongolian" = "蒙古语";
+"language_bosnian" = "波斯尼亚语";
+"language_kazakh" = "哈萨克语";
+"language_albanian" = "阿尔巴尼亚语";
+"language_swahili" = "斯瓦希里语";
+"language_galician" = "加利西亚语";
+"language_marathi" = "马拉地语";
+"language_punjabi" = "旁遮普语";
+"language_sinhala" = "僧伽罗语";
+"language_khmer" = "高棉语";
+"language_shona" = "绍纳语";
+"language_yoruba" = "约鲁巴语";
+"language_somali" = "索马里语";
+"language_afrikaans" = "南非荷兰语";
+"language_occitan" = "奥克西坦语";
+"language_georgian" = "格鲁吉亚语";
+"language_belarusian" = "白俄罗斯语";
+"language_tajik" = "塔吉克语";
+"language_sindhi" = "信德语";
+"language_gujarati" = "古吉拉特语";
+"language_amharic" = "阿姆哈拉语";
+"language_yiddish" = "意第绪语";
+"language_lao" = "老挝语";
+"language_uzbek" = "乌兹别克语";
+"language_faroese" = "法罗语";
+"language_haitian" = "海地克里奥尔语";
+"language_pashto" = "普什图语";
+"language_turkmen" = "土库曼语";
+"language_nynorsk" = "尼诺斯克语";
+"language_maltese" = "马耳他语";
+"language_sanskrit" = "梵语";
+"language_luxembourgish" = "卢森堡语";
+"language_myanmar" = "缅甸语";
+"language_tibetan" = "藏语";
+"language_tagalog" = "塔加洛语";
+"language_malagasy" = "马达加斯加语";
+"language_assamese" = "阿萨姆语";
+"language_tatar" = "鞑靼语";
+"language_hawaiian" = "夏威夷语";
+"language_lingala" = "林加拉语";
+"language_hausa" = "豪萨语";
+"language_bashkir" = "巴什基尔语";
+"language_javanese" = "爪哇语";
+"language_sundanese" = "巽他语";
+"language_cantonese" = "粤语";
+"language_burmese" = "缅甸语";
+"language_valencian" = "瓦伦西亚语";
+"language_flemish" = "弗拉芒语";
+"language_haitian_creole" = "海地克里奥尔语";
+"language_letzeburgesch" = "卢森堡语";
+"language_pushto" = "普什图语";
+"language_panjabi" = "旁遮普语";
+"language_moldavian" = "摩尔多瓦语";
+"language_moldovan" = "摩尔多瓦语";
+"language_sinhalese" = "僧伽罗语";
+"language_castilian" = "卡斯蒂利亚语";
+"language_mandarin" = "普通话";
+

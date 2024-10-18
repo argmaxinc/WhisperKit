@@ -1,0 +1,185 @@
+// General
+"whisperax" = "WhisperAX";
+"no_audio_input" = "No Audio Input";
+
+// Tabs
+"tab_transcribe" = "Transcribe";
+"tab_stream" = "Stream";
+
+"transcribe" = "Transcribe";
+"stream" = "Stream";
+
+// Model Management
+"load_model" = "Load Model";
+"compute_units" = "Compute Units";
+"audio_encoder" = "Audio Encoder";
+"text_decoder" = "Text Decoder";
+"cpu" = "CPU";
+"gpu" = "GPU";
+"neural_engine" = "Neural Engine";
+"specializing_text" = "Specializing %@ for your device...\nThis can take several minutes on first load";
+
+
+// Controls
+"reset" = "Reset";
+"settings" = "Settings";
+"from_file" = "FROM FILE";
+"record" = "RECORD";
+"waiting_for_speech" = "Waiting for speech...";
+"encoder_runs" = "Encoder runs: %d";
+"decoder_runs" = "Decoder runs: %d";
+
+
+
+// Settings
+"source_language" = "Source Language";
+"show_timestamps" = "Show Timestamps";
+"special_characters" = "Special Characters";
+"show_decoder_preview" = "Show Decoder Preview";
+"prompt_prefill" = "Prompt Prefill";
+"cache_prefill" = "Cache Prefill";
+"chunking_strategy" = "Chunking Strategy";
+"none" = "None";
+"vad" = "VAD";
+"starting_temperature" = "Starting Temperature:";
+"max_fallback_count" = "Max Fallback Count:";
+"compression_check_tokens" = "Compression Check Tokens";
+"max_tokens_per_loop" = "Max Tokens Per Loop";
+"silence_threshold" = "Silence Threshold";
+"experimental" = "Experimental";
+"eager_streaming_mode" = "Eager Streaming Mode";
+"token_confirmations" = "Token Confirmations";
+"decoding_options" = "Decoding Options";
+"done" = "Done";
+
+// Toolbar
+"copy_text" = "Copy Text";
+
+// model 说明
+"unloading" = "Unloading";
+"unloaded" = "Unloaded";
+"loading" = "Loading";
+"loaded" = "Loaded";
+"specializing" = "Specializing";
+"specialized" = "Specialized";
+"downloading" = "Downloading";
+"downloaded" = "Downloading";
+
+// 解码类型
+"decode_type_transcribe" = "Transcribe";
+"decode_type_translate" = "Translate";
+
+
+// 语言
+"language_english" = "english";
+"language_chinese" = "chinese";
+"language_german" = "german";
+"language_spanish" = "spanish";
+"language_russian" = "russian";
+"language_korean" = "korean";
+"language_french" = "french";
+"language_japanese" = "japanese";
+"language_portuguese" = "portuguese";
+"language_turkish" = "turkish";
+"language_polish" = "polish";
+"language_catalan" = "catalan";
+"language_dutch" = "dutch";
+"language_arabic" = "arabic";
+"language_swedish" = "swedish";
+"language_italian" = "italian";
+"language_indonesian" = "indonesian";
+"language_hindi" = "hindi";
+"language_finnish" = "finnish";
+"language_vietnamese" = "vietnamese";
+"language_hebrew" = "hebrew";
+"language_ukrainian" = "ukrainian";
+"language_greek" = "greek";
+"language_malay" = "malay";
+"language_czech" = "czech";
+"language_romanian" = "romanian";
+"language_danish" = "danish";
+"language_hungarian" = "hungarian";
+"language_tamil" = "tamil";
+"language_norwegian" = "norwegian";
+"language_thai" = "thai";
+"language_urdu" = "urdu";
+"language_croatian" = "croatian";
+"language_bulgarian" = "bulgarian";
+"language_lithuanian" = "lithuanian";
+"language_latin" = "latin";
+"language_maori" = "maori";
+"language_malayalam" = "malayalam";
+"language_welsh" = "welsh";
+"language_slovak" = "slovak";
+"language_telugu" = "telugu";
+"language_persian" = "persian";
+"language_latvian" = "latvian";
+"language_bengali" = "bengali";
+"language_serbian" = "serbian";
+"language_azerbaijani" = "azerbaijani";
+"language_slovenian" = "slovenian";
+"language_kannada" = "kannada";
+"language_estonian" = "estonian";
+"language_macedonian" = "macedonian";
+"language_breton" = "breton";
+"language_basque" = "basque";
+"language_icelandic" = "icelandic";
+"language_armenian" = "armenian";
+"language_nepali" = "nepali";
+"language_mongolian" = "mongolian";
+"language_bosnian" = "bosnian";
+"language_kazakh" = "kazakh";
+"language_albanian" = "albanian";
+"language_swahili" = "swahili";
+"language_galician" = "galician";
+"language_marathi" = "marathi";
+"language_punjabi" = "punjabi";
+"language_sinhala" = "sinhala";
+"language_khmer" = "khmer";
+"language_shona" = "shona";
+"language_yoruba" = "yoruba";
+"language_somali" = "somali";
+"language_afrikaans" = "afrikaans";
+"language_occitan" = "occitan";
+"language_georgian" = "georgian";
+"language_belarusian" = "belarusian";
+"language_tajik" = "tajik";
+"language_sindhi" = "sindhi";
+"language_gujarati" = "gujarati";
+"language_amharic" = "amharic";
+"language_yiddish" = "yiddish";
+"language_lao" = "lao";
+"language_uzbek" = "uzbek";
+"language_faroese" = "faroese";
+"language_haitian_creole" = "haitian";
+"language_pashto" = "pashto";
+"language_turkmen" = "turkmen";
+"language_nynorsk" = "nynorsk";
+"language_maltese" = "maltese";
+"language_sanskrit" = "sanskrit";
+"language_luxembourgish" = "luxembourgish";
+"language_myanmar" = "myanmar";
+"language_tibetan" = "tibetan";
+"language_tagalog" = "tagalog";
+"language_malagasy" = "malagasy";
+"language_assamese" = "assamese";
+"language_tatar" = "tatar";
+"language_hawaiian" = "hawaiian";
+"language_lingala" = "lingala";
+"language_hausa" = "hausa";
+"language_bashkir" = "bashkir";
+"language_javanese" = "javanese";
+"language_sundanese" = "sundanese";
+"language_cantonese" = "cantonese";
+"language_burmese" = "burmese";
+"language_valencian" = "valencian";
+"language_flemish" = "flemish";
+"language_haitian" = "haitian";
+"language_letzeburgesch" = "letzeburgesch";
+"language_pushto" = "pushto";
+"language_panjabi" = "panjabi";
+"language_moldavian" = "moldavian";
+"language_moldovan" = "moldovan";
+"language_sinhalese" = "sinhalese";
+"language_castilian" = "castilian";
+"language_mandarin" = "mandarin";

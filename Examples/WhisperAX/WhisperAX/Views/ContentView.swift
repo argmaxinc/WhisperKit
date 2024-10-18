@@ -104,11 +104,12 @@ struct ContentView: View {
         var id = UUID()
         var name: String
         var image: String
+        var nameId: String
     }
 
     private var menu = [
-        MenuItem(name: "Transcribe", image: "book.pages"),
-        MenuItem(name: "Stream", image: "waveform.badge.mic"),
+        MenuItem(name: "Transcribe", image: "book.pages", nameId: "tab_transcribe"),
+        MenuItem(name: "Stream", image: "waveform.badge.mic", nameId: "tab_stream"),
     ]
 
     private var isStreamMode: Bool {
@@ -158,6 +159,11 @@ struct ContentView: View {
         hypothesisText = ""
     }
 
+    // 添加这个函数到 ContentView 结构体中
+    func localizedString(_ key: String) -> String {
+        return NSLocalizedString(key, comment: "")
+    }
+
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             VStack(alignment: .leading) {
@@ -170,7 +176,7 @@ struct ContentView: View {
                 List(menu, selection: $selectedCategoryId) { item in
                     HStack {
                         Image(systemName: item.image)
-                        Text(item.name)
+                        Text(localizedString(item.nameId))
                             .font(.system(.title3))
                             .bold()
                     }
@@ -181,7 +187,7 @@ struct ContentView: View {
                 .disabled(modelState != .loaded)
                 .foregroundColor(modelState != .loaded ? .secondary : .primary)
             }
-            .navigationTitle("WhisperAX")
+            .navigationTitle(localizedString("whisperax"))
             .navigationSplitViewColumnWidth(min: 300, ideal: 350)
             .padding(.horizontal)
             Spacer()
@@ -219,7 +225,7 @@ struct ContentView: View {
                             #endif
                         }
                     } label: {
-                        Label("Copy Text", systemImage: "doc.on.doc")
+                        Label(localizedString("copy_text"), systemImage: "doc.on.doc")
                     }
                     .keyboardShortcut("c", modifiers: .command)
                     .foregroundColor(.primary)
@@ -345,7 +351,7 @@ struct ContentView: View {
                     Image(systemName: "circle.fill")
                         .foregroundStyle(modelState == .loaded ? .green : (modelState == .unloaded ? .red : .yellow))
                         .symbolEffect(.variableColor, isActive: modelState != .loaded && modelState != .unloaded)
-                    Text(modelState.description)
+                    Text(localizedString(modelState.description.lowercased()))
 
                     Spacer()
 
@@ -410,7 +416,7 @@ struct ContentView: View {
                         loadModel(selectedModel)
                         modelState = .loading
                     } label: {
-                        Text("Load Model")
+                        Text(localizedString("load_model"))
                             .frame(maxWidth: .infinity)
                             .frame(height: 40)
                     }
@@ -427,7 +433,7 @@ struct ContentView: View {
                                 .foregroundColor(.gray)
                         }
                         if modelState == .prewarming {
-                            Text("Specializing \(selectedModel) for your device...\nThis can take several minutes on first load")
+                            Text(String(format: NSLocalizedString("specializing_text", comment: ""), selectedModel))
                                 .font(.caption)
                                 .foregroundColor(.gray)
                         }
@@ -444,12 +450,12 @@ struct ContentView: View {
                     Image(systemName: "circle.fill")
                         .foregroundStyle((whisperKit?.audioEncoder as? WhisperMLModel)?.modelState == .loaded ? .green : (modelState == .unloaded ? .red : .yellow))
                         .symbolEffect(.variableColor, isActive: modelState != .loaded && modelState != .unloaded)
-                    Text("Audio Encoder")
+                    Text(localizedString("audio_encoder"))
                     Spacer()
                     Picker("", selection: $encoderComputeUnits) {
-                        Text("CPU").tag(MLComputeUnits.cpuOnly)
-                        Text("GPU").tag(MLComputeUnits.cpuAndGPU)
-                        Text("Neural Engine").tag(MLComputeUnits.cpuAndNeuralEngine)
+                        Text(localizedString("cpu")).tag(MLComputeUnits.cpuOnly)
+                        Text(localizedString("gpu")).tag(MLComputeUnits.cpuAndGPU)
+                        Text(localizedString("neural_engine")).tag(MLComputeUnits.cpuAndNeuralEngine)
                     }
                     .onChange(of: encoderComputeUnits, initial: false) { _, _ in
                         loadModel(selectedModel)
@@ -461,12 +467,12 @@ struct ContentView: View {
                     Image(systemName: "circle.fill")
                         .foregroundStyle((whisperKit?.textDecoder as? WhisperMLModel)?.modelState == .loaded ? .green : (modelState == .unloaded ? .red : .yellow))
                         .symbolEffect(.variableColor, isActive: modelState != .loaded && modelState != .unloaded)
-                    Text("Text Decoder")
+                    Text(localizedString("text_decoder"))
                     Spacer()
                     Picker("", selection: $decoderComputeUnits) {
-                        Text("CPU").tag(MLComputeUnits.cpuOnly)
-                        Text("GPU").tag(MLComputeUnits.cpuAndGPU)
-                        Text("Neural Engine").tag(MLComputeUnits.cpuAndNeuralEngine)
+                        Text(localizedString("cpu")).tag(MLComputeUnits.cpuOnly)
+                        Text(localizedString("gpu")).tag(MLComputeUnits.cpuAndGPU)
+                        Text(localizedString("neural_engine")).tag(MLComputeUnits.cpuAndNeuralEngine)
                     }
                     .onChange(of: decoderComputeUnits, initial: false) { _, _ in
                         loadModel(selectedModel)
@@ -480,7 +486,7 @@ struct ContentView: View {
             Button {
                 showComputeUnits.toggle()
             } label: {
-                Text("Compute Units")
+                Text(localizedString("compute_units"))
                     .font(.headline)
             }
             .buttonStyle(.plain)
@@ -529,7 +535,7 @@ struct ContentView: View {
                                 Button {
                                     resetState()
                                 } label: {
-                                    Label("Reset", systemImage: "arrow.clockwise")
+                                    Label(localizedString("reset"), systemImage: "arrow.clockwise")
                                 }
                                 .buttonStyle(.borderless)
 
@@ -542,7 +548,7 @@ struct ContentView: View {
                                 Button {
                                     showAdvancedOptions.toggle()
                                 } label: {
-                                    Label("Settings", systemImage: "slider.horizontal.3")
+                                    Label(localizedString("settings"), systemImage: "slider.horizontal.3")
                                 }
                                 .buttonStyle(.borderless)
                             }
@@ -554,7 +560,7 @@ struct ContentView: View {
                                         selectFile()
                                     }
                                 }) {
-                                    Text("FROM FILE")
+                                    Text(localizedString("from_file"))
                                         .font(.headline)
                                         .foregroundColor(color)
                                         .padding()
@@ -585,7 +591,7 @@ struct ContentView: View {
                                         }
                                     }) {
                                         if !isRecording {
-                                            Text("RECORD")
+                                            Text(localizedString("record"))
                                                 .font(.headline)
                                                 .foregroundColor(color)
                                                 .padding()
@@ -626,7 +632,7 @@ struct ContentView: View {
                                 Button {
                                     resetState()
                                 } label: {
-                                    Label("Reset", systemImage: "arrow.clockwise")
+                                    Label(localizedString("reset"), systemImage: "arrow.clockwise")
                                 }
                                 .frame(minWidth: 0, maxWidth: .infinity)
                                 .buttonStyle(.borderless)
@@ -641,7 +647,7 @@ struct ContentView: View {
                                     Button {
                                         showAdvancedOptions.toggle()
                                     } label: {
-                                        Label("Settings", systemImage: "slider.horizontal.3")
+                                        Label(localizedString("settings"), systemImage: "slider.horizontal.3")
                                     }
                                     .frame(minWidth: 0, maxWidth: .infinity)
                                     .buttonStyle(.borderless)
@@ -667,10 +673,12 @@ struct ContentView: View {
                                 .frame(minWidth: 0, maxWidth: .infinity)
 
                                 VStack {
-                                    Text("Encoder runs: \(currentEncodingLoops)")
-                                        .font(.caption)
-                                    Text("Decoder runs: \(currentDecodingLoops)")
-                                        .font(.caption)
+                                    Text(String(format: NSLocalizedString("encoder_runs", comment: ""), currentEncodingLoops))
+    .font(.caption)
+
+Text(String(format: NSLocalizedString("decoder_runs", comment: ""), currentDecodingLoops))
+    .font(.caption)
+
                                 }
                                 .offset(x: -120, y: 0)
 
@@ -702,7 +710,7 @@ struct ContentView: View {
             HStack {
                 Picker("", selection: $selectedTask) {
                     ForEach(DecodingTask.allCases, id: \.self) { task in
-                        Text(task.description.capitalized).tag(task.description)
+                        Text(localizedString("decode_type_\(task.description)")).tag(task.description)
                     }
                 }
                 .pickerStyle(SegmentedPickerStyle())
@@ -713,12 +721,13 @@ struct ContentView: View {
             LabeledContent {
                 Picker("", selection: $selectedLanguage) {
                     ForEach(availableLanguages, id: \.self) { language in
-                        Text(language.description).tag(language.description)
+//                        Text(language.description).tag(language.description)
+                        Text(localizedString("language_\(language.description.replacingOccurrences(of: " ", with: "_"))")).tag(language.description)
                     }
                 }
                 .disabled(!(whisperKit?.modelVariant.isMultilingual ?? false))
             } label: {
-                Label("Source Language", systemImage: "globe")
+                Label(localizedString("source_language"), systemImage: "globe")
             }
             .padding(.horizontal)
             .padding(.top)
@@ -755,7 +764,7 @@ struct ContentView: View {
         }
         #else
         VStack {
-            Text("Decoding Options")
+            Text(localizedString("decoding_options"))
                 .font(.title2)
                 .padding()
             settingsForm
@@ -767,52 +776,52 @@ struct ContentView: View {
     var settingsForm: some View {
         List {
             HStack {
-                Text("Show Timestamps")
-                InfoButton("Toggling this will include/exclude timestamps in both the UI and the prefill tokens.\nEither <|notimestamps|> or <|0.00|> will be forced based on this setting unless \"Prompt Prefill\" is de-selected.")
+                Text(localizedString("show_timestamps"))
+                InfoButton(localizedString("Toggling this will include/exclude timestamps in both the UI and the prefill tokens.\nEither <|notimestamps|> or <|0.00|> will be forced based on this setting unless \"Prompt Prefill\" is de-selected."))
                 Spacer()
                 Toggle("", isOn: $enableTimestamps)
             }
             .padding(.horizontal)
 
             HStack {
-                Text("Special Characters")
-                InfoButton("Toggling this will include/exclude special characters in the transcription text.")
+                Text(localizedString("special_characters"))
+                InfoButton(localizedString("Toggling this will include/exclude special characters in the transcription text."))
                 Spacer()
                 Toggle("", isOn: $enableSpecialCharacters)
             }
             .padding(.horizontal)
 
             HStack {
-                Text("Show Decoder Preview")
-                InfoButton("Toggling this will show a small preview of the decoder output in the UI under the transcribe. This can be useful for debugging.")
+                Text(localizedString("show_decoder_preview"))
+                InfoButton(localizedString("Toggling this will show a small preview of the decoder output in the UI under the transcribe. This can be useful for debugging."))
                 Spacer()
                 Toggle("", isOn: $enableDecoderPreview)
             }
             .padding(.horizontal)
 
             HStack {
-                Text("Prompt Prefill")
-                InfoButton("When Prompt Prefill is on, it will force the task, language, and timestamp tokens in the decoding loop. \nToggle it off if you'd like the model to generate those tokens itself instead.")
+                Text(localizedString("prompt_prefill"))
+                InfoButton(localizedString("When Prompt Prefill is on, it will force the task, language, and timestamp tokens in the decoding loop. \nToggle it off if you'd like the model to generate those tokens itself instead."))
                 Spacer()
                 Toggle("", isOn: $enablePromptPrefill)
             }
             .padding(.horizontal)
 
             HStack {
-                Text("Cache Prefill")
-                InfoButton("When Cache Prefill is on, the decoder will try to use a lookup table of pre-computed KV caches instead of computing them during the decoding loop. \nThis allows the model to skip the compute required to force the initial prefill tokens, and can speed up inference")
+                Text(localizedString("cache_prefill"))
+                InfoButton(localizedString("When Cache Prefill is on, the decoder will try to use a lookup table of pre-computed KV caches instead of computing them during the decoding loop. \nThis allows the model to skip the compute required to force the initial prefill tokens, and can speed up inference"))
                 Spacer()
                 Toggle("", isOn: $enableCachePrefill)
             }
             .padding(.horizontal)
 
             HStack {
-                Text("Chunking Strategy")
-                InfoButton("Select the strategy to use for chunking audio data. If VAD is selected, the audio will be chunked based on voice activity (split on silent portions).")
+                Text(localizedString("chunking_strategy"))
+                InfoButton(localizedString("Select the strategy to use for chunking audio data. If VAD is selected, the audio will be chunked based on voice activity (split on silent portions)."))
                 Spacer()
                 Picker("", selection: $chunkingStrategy) {
-                    Text("None").tag(ChunkingStrategy.none)
-                    Text("VAD").tag(ChunkingStrategy.vad)
+                    Text(localizedString("none")).tag(ChunkingStrategy.none)
+                    Text(localizedString("vad")).tag(ChunkingStrategy.vad)
                 }
                 .pickerStyle(SegmentedPickerStyle())
             }
@@ -820,63 +829,63 @@ struct ContentView: View {
             .padding(.bottom)
 
             VStack {
-                Text("Starting Temperature:")
+                Text(localizedString("starting_temperature"))
                 HStack {
                     Slider(value: $temperatureStart, in: 0...1, step: 0.1)
                     Text(temperatureStart.formatted(.number))
-                    InfoButton("Controls the initial randomness of the decoding loop token selection.\nA higher temperature will result in more random choices for tokens, and can improve accuracy.")
+                    InfoButton(localizedString("Controls the initial randomness of the decoding loop token selection.\nA higher temperature will result in more random choices for tokens, and can improve accuracy."))
                 }
             }
             .padding(.horizontal)
 
             VStack {
-                Text("Max Fallback Count:")
+                Text(localizedString("max_fallback_count"))
                 HStack {
                     Slider(value: $fallbackCount, in: 0...5, step: 1)
                     Text(fallbackCount.formatted(.number))
                         .frame(width: 30)
-                    InfoButton("Controls how many times the decoder will fallback to a higher temperature if any of the decoding thresholds are exceeded.\n Higher values will cause the decoder to run multiple times on the same audio, which can improve accuracy at the cost of speed.")
+                    InfoButton(localizedString("Controls how many times the decoder will fallback to a higher temperature if any of the decoding thresholds are exceeded.\n Higher values will cause the decoder to run multiple times on the same audio, which can improve accuracy at the cost of speed."))
                 }
             }
             .padding(.horizontal)
 
             VStack {
-                Text("Compression Check Tokens")
+                Text(localizedString("compression_check_tokens"))
                 HStack {
                     Slider(value: $compressionCheckWindow, in: 0...100, step: 5)
                     Text(compressionCheckWindow.formatted(.number))
                         .frame(width: 30)
-                    InfoButton("Amount of tokens to use when checking for whether the model is stuck in a repetition loop.\nRepetition is checked by using zlib compressed size of the text compared to non-compressed value.\n Lower values will catch repetitions sooner, but too low will miss repetition loops of phrases longer than the window.")
+                    InfoButton(localizedString("Amount of tokens to use when checking for whether the model is stuck in a repetition loop.\nRepetition is checked by using zlib compressed size of the text compared to non-compressed value.\n Lower values will catch repetitions sooner, but too low will miss repetition loops of phrases longer than the window."))
                 }
             }
             .padding(.horizontal)
 
             VStack {
-                Text("Max Tokens Per Loop")
+                Text(localizedString("max_tokens_per_loop"))
                 HStack {
                     Slider(value: $sampleLength, in: 0...Double(min(whisperKit?.textDecoder.kvCacheMaxSequenceLength ?? Constants.maxTokenContext, Constants.maxTokenContext)), step: 10)
                     Text(sampleLength.formatted(.number))
                         .frame(width: 30)
-                    InfoButton("Maximum number of tokens to generate per loop.\nCan be lowered based on the type of speech in order to further prevent repetition loops from going too long.")
+                    InfoButton(localizedString("Maximum number of tokens to generate per loop.\nCan be lowered based on the type of speech in order to further prevent repetition loops from going too long."))
                 }
             }
             .padding(.horizontal)
 
             VStack {
-                Text("Silence Threshold")
+                Text(localizedString("silence_threshold"))
                 HStack {
                     Slider(value: $silenceThreshold, in: 0...1, step: 0.05)
                     Text(silenceThreshold.formatted(.number))
                         .frame(width: 30)
-                    InfoButton("Relative silence threshold for the audio. \n Baseline is set by the quietest 100ms in the previous 2 seconds.")
+                    InfoButton(localizedString("Relative silence threshold for the audio. \n Baseline is set by the quietest 100ms in the previous 2 seconds."))
                 }
             }
             .padding(.horizontal)
 
-            Section(header: Text("Experimental")) {
+            Section(header: Text(localizedString("experimental"))) {
                 HStack {
-                    Text("Eager Streaming Mode")
-                    InfoButton("When Eager Streaming Mode is on, the transcription will be updated more frequently, but with potentially less accurate results.")
+                    Text(localizedString("eager_streaming_mode"))
+                    InfoButton(localizedString("When Eager Streaming Mode is on, the transcription will be updated more frequently, but with potentially less accurate results."))
                     Spacer()
                     Toggle("", isOn: $enableEagerDecoding)
                 }
@@ -884,24 +893,24 @@ struct ContentView: View {
                 .padding(.top)
 
                 VStack {
-                    Text("Token Confirmations")
+                    Text(localizedString("token_confirmations"))
                     HStack {
                         Slider(value: $tokenConfirmationsNeeded, in: 1...10, step: 1)
                         Text(tokenConfirmationsNeeded.formatted(.number))
                             .frame(width: 30)
-                        InfoButton("Controls the number of consecutive tokens required to agree between decoder loops before considering them as confirmed in the streaming process.")
+                        InfoButton(localizedString("Controls the number of consecutive tokens required to agree between decoder loops before considering them as confirmed in the streaming process."))
                     }
                 }
                 .padding(.horizontal)
             }
         }
-        .navigationTitle("Decoding Options")
+        .navigationTitle(localizedString("decoding_options"))
         .toolbar(content: {
             ToolbarItem {
                 Button {
                     showAdvancedOptions = false
                 } label: {
-                    Label("Done", systemImage: "xmark.circle.fill")
+                    Label(localizedString("done"), systemImage: "xmark.circle.fill")
                         .foregroundColor(.primary)
                 }
             }
@@ -1423,7 +1432,7 @@ struct ContentView: View {
         guard nextBufferSeconds > 1 else {
             await MainActor.run {
                 if currentText == "" {
-                    currentText = "Waiting for speech..."
+                    currentText = localizedString("waiting_for_speech")
                 }
             }
             try await Task.sleep(nanoseconds: 100_000_000) // sleep for 100ms for next buffer
@@ -1440,7 +1449,7 @@ struct ContentView: View {
             guard voiceDetected else {
                 await MainActor.run {
                     if currentText == "" {
-                        currentText = "Waiting for speech..."
+                        currentText = localizedString("waiting_for_speech")
                     }
                 }
 
