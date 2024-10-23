@@ -400,9 +400,17 @@ open class WhisperKit {
     }
     
     deinit {
-        Task {
-            await audioProcessor.stopRecording()
+        modelState = .unloading
+        if let featureExtractor = featureExtractor as? WhisperMLModel {
+            featureExtractor.unloadModel()
         }
+        if let audioEncoder = audioEncoder as? WhisperMLModel {
+            audioEncoder.unloadModel()
+        }
+        if let textDecoder = textDecoder as? WhisperMLModel {
+            textDecoder.unloadModel()
+        }        
+        modelState = .unloaded
     }
     
     /// Pass in your own logging callback here

@@ -522,7 +522,9 @@ public actor AudioProcessor: @preconcurrency AudioProcessing {
         }
         let frameLength = Int(buffer.frameLength)
         let startPointer = channelData[0]
-        var result = [Float](unsafeUninitializedCapacity: frameLength) { bufferPointer, initializedCount in
+        let result = [Float](
+            unsafeUninitializedCapacity: frameLength
+        ) { bufferPointer, initializedCount in
             vDSP_mmov(
                 startPointer,
                 bufferPointer.baseAddress!,
@@ -654,9 +656,11 @@ public actor AudioProcessor: @preconcurrency AudioProcessing {
     #endif
     
     deinit {
-        Task {
-            await self.stopRecording()
-        }
+        audioEngine?.stop()
+        audioEngine = nil
+        
+        audioSamples.removeAll()
+        audioEnergy.removeAll()
     }
 }
 
@@ -770,10 +774,6 @@ public extension AudioProcessor {
         inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: nodeFormat) { [weak self] (buffer: AVAudioPCMBuffer, _: AVAudioTime) in
             var buffer = buffer
             if !buffer.format.sampleRate.isEqual(to: Double(WhisperKit.sampleRate)) {
-                guard let converter = AVAudioConverter(from: nodeFormat, to: desiredFormat) else {
-                    Logging.error("Failed to create audio converter")
-                    return
-                }
                 do {
                     buffer = try Self.resampleBuffer(buffer, with: converter)
                 } catch {
