@@ -51,7 +51,8 @@ struct ContentView: View {
     @AppStorage("silenceThreshold") private var silenceThreshold: Double = 0.3
     @AppStorage("useVAD") private var useVAD: Bool = true
     @AppStorage("tokenConfirmationsNeeded") private var tokenConfirmationsNeeded: Double = 2
-    @AppStorage("chunkingStrategy") private var chunkingStrategy: ChunkingStrategy = .none
+    @AppStorage("concurrentWorkerCount") private var concurrentWorkerCount: Int = 4
+    @AppStorage("chunkingStrategy") private var chunkingStrategy: ChunkingStrategy = .vad
     @AppStorage("encoderComputeUnits") private var encoderComputeUnits: MLComputeUnits = .cpuAndNeuralEngine
     @AppStorage("decoderComputeUnits") private var decoderComputeUnits: MLComputeUnits = .cpuAndNeuralEngine
 
@@ -109,7 +110,6 @@ struct ContentView: View {
         MenuItem(name: "Transcribe", image: "book.pages"),
         MenuItem(name: "Stream", image: "waveform.badge.mic"),
     ]
-
 
     private var isStreamMode: Bool {
         self.selectedCategoryId == menu.first(where: { $0.name == "Stream" })?.id
@@ -202,7 +202,7 @@ struct ContentView: View {
             .toolbar(content: {
                 ToolbarItem {
                     Button {
-                        if (!enableEagerDecoding) {
+                        if !enableEagerDecoding {
                             let fullTranscript = formatSegments(confirmedSegments + unconfirmedSegments, withTimestamps: enableTimestamps).joined(separator: "\n")
                             #if os(iOS)
                             UIPasteboard.general.string = fullTranscript
@@ -956,9 +956,7 @@ struct ContentView: View {
 
         localModels = WhisperKit.formatModelFiles(localModels)
         for model in localModels {
-            if !availableModels.contains(model),
-               !disabledModels.contains(model)
-            {
+            if !availableModels.contains(model) {
                 availableModels.append(model)
             }
         }
@@ -967,12 +965,17 @@ struct ContentView: View {
         print("Previously selected model: \(selectedModel)")
 
         Task {
-            let remoteModels = try await WhisperKit.fetchAvailableModels(from: repoName)
-            for model in remoteModels {
-                if !availableModels.contains(model),
-                   !disabledModels.contains(model)
-                {
-                    availableModels.append(model)
+            let remoteModelSupport = await WhisperKit.recommendedRemoteModels()
+            await MainActor.run {
+                for model in remoteModelSupport.supported {
+                    if !availableModels.contains(model) {
+                        availableModels.append(model)
+                    }
+                }
+                for model in remoteModelSupport.disabled {
+                    if !disabledModels.contains(model) {
+                        disabledModels.append(model)
+                    }
                 }
             }
         }
@@ -990,14 +993,13 @@ struct ContentView: View {
 
         whisperKit = nil
         Task {
-            whisperKit = try await WhisperKit(
-                computeOptions: getComputeOptions(),
-                verbose: true,
-                logLevel: .debug,
-                prewarm: false,
-                load: false,
-                download: false
-            )
+            let config = WhisperKitConfig(computeOptions: getComputeOptions(),
+                                          verbose: true,
+                                          logLevel: .debug,
+                                          prewarm: false,
+                                          load: false,
+                                          download: false)
+            whisperKit = try await WhisperKit(config)
             guard let whisperKit = whisperKit else {
                 return
             }
@@ -1268,12 +1270,15 @@ struct ContentView: View {
 
     func transcribeCurrentFile(path: String) async throws {
         // Load and convert buffer in a limited scope
+        Logging.debug("Loading audio file: \(path)")
+        let loadingStart = Date()
         let audioFileSamples = try await Task {
             try autoreleasepool {
-                let audioFileBuffer = try AudioProcessor.loadAudio(fromPath: path)
-                return AudioProcessor.convertBufferToArray(buffer: audioFileBuffer)
+                return try AudioProcessor.loadAudioAsFloatArray(fromPath: path)
             }
         }.value
+        Logging.debug("Loaded audio file in \(Date().timeIntervalSince(loadingStart)) seconds")
+
 
         let transcription = try await transcribeAudioSamples(audioFileSamples)
 
@@ -1315,6 +1320,7 @@ struct ContentView: View {
             withoutTimestamps: !enableTimestamps,
             wordTimestamps: true,
             clipTimestamps: seekClip,
+            concurrentWorkerCount: concurrentWorkerCount,
             chunkingStrategy: chunkingStrategy
         )
 
@@ -1644,7 +1650,6 @@ struct ContentView: View {
             Logging.error("[EagerMode] Error: \(error)")
             finalizeText()
         }
-
 
         let mergedResult = mergeTranscriptionResults(eagerResults, confirmedWords: confirmedWords)
 

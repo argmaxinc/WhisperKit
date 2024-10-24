@@ -1,6 +1,6 @@
 import CoreML
 import Hub
-@testable import WhisperKit
+import WhisperKit
 import XCTest
 import Foundation
 import UniformTypeIdentifiers
@@ -243,11 +243,8 @@ final class RegressionTests: XCTestCase {
                 "Audio file not found"
             )
 
-            let whisperKit = try await WhisperKit(
-                modelFolder: modelPath,
-                verbose: true,
-                logLevel: .debug
-            )
+            let config = WhisperKitConfig(modelFolder: modelPath, verbose: true, logLevel: .debug)
+            let whisperKit = try await WhisperKit(config)
 
             let transcriptionResult: [TranscriptionResult] = try await whisperKit.transcribe(audioPath: audioFilePath)
             let transcriptionResultText = transcriptionResult.text
@@ -268,7 +265,7 @@ final class RegressionTests: XCTestCase {
         let iso8601DateTimeString = ISO8601DateFormatter().string(from: Date())
 
         #if os(macOS) && arch(arm64)
-        currentDevice = Process.processor
+        currentDevice = ProcessInfo.processor
         #endif
         
         //Remove trailing whitespace characters

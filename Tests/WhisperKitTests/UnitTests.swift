@@ -32,6 +32,160 @@ final class UnitTests: XCTestCase {
         )
     }
 
+    // MARK: - Config Tests
+
+    func testModelSupportConfigFallback() {
+        let fallbackRepoConfig = Constants.fallbackModelSupportConfig
+        XCTAssertEqual(fallbackRepoConfig.repoName, "whisperkit-coreml-fallback")
+        XCTAssertEqual(fallbackRepoConfig.repoVersion, "0.2")
+        XCTAssertGreaterThanOrEqual(fallbackRepoConfig.deviceSupports.count, 5)
+
+        // Test that all device supports have their disabled models set except devices that should support all known models
+        for deviceSupport in fallbackRepoConfig.deviceSupports where !Constants.knownModels.allSatisfy(deviceSupport.models.supported.contains) {
+            let modelSupport = deviceSupport.models.supported
+            let knownModels = Constants.knownModels
+
+            // Ensure that the disabled models list is not empty
+            XCTAssertFalse(deviceSupport.models.disabled.isEmpty,
+                           "Disabled models should be set for \(deviceSupport.identifiers), found missing model(s): \(modelSupport.filter { knownModels.contains($0) })")
+        }
+
+        // Test that default device support has all known models as supported and none disabled
+        let defaultSupport = fallbackRepoConfig.defaultSupport
+        XCTAssertEqual(defaultSupport.identifiers, [])
+        XCTAssertEqual(defaultSupport.models.supported.sorted(), Constants.knownModels.sorted())
+    }
+
+    func testModelSupportConfigFromJson() throws {
+        let configFilePath = try XCTUnwrap(
+            Bundle.module.path(forResource: "config", ofType: "json"),
+            "Config file not found"
+        )
+
+        let jsonData = try Data(contentsOf: URL(fileURLWithPath: configFilePath))
+        let decoder = JSONDecoder()
+        let loadedConfig = try decoder.decode(ModelSupportConfig.self, from: jsonData)
+
+        // Compare loaded config with fallback config
+        XCTAssertEqual(loadedConfig.repoName, "whisperkit-coreml")
+        XCTAssertEqual(loadedConfig.repoVersion, Constants.fallbackModelSupportConfig.repoVersion)
+        XCTAssertEqual(loadedConfig.deviceSupports.count, Constants.fallbackModelSupportConfig.deviceSupports.count)
+
+        // Compare device supports
+        for (loadedDeviceSupport, fallbackDeviceSupport) in zip(loadedConfig.deviceSupports, Constants.fallbackModelSupportConfig.deviceSupports) {
+            XCTAssertEqual(loadedDeviceSupport.identifiers, fallbackDeviceSupport.identifiers)
+            XCTAssertEqual(loadedDeviceSupport.models.default, fallbackDeviceSupport.models.default)
+            XCTAssertEqual(Set(loadedDeviceSupport.models.supported), Set(fallbackDeviceSupport.models.supported))
+            XCTAssertEqual(Set(loadedDeviceSupport.models.disabled), Set(fallbackDeviceSupport.models.disabled))
+        }
+    }
+
+    func testModelSupportConfigCorrectness() throws {
+        let config = Constants.fallbackModelSupportConfig
+
+        // Test if a model exists in config for one device but not others, it is disabled
+        let iPhone13Models = config.modelSupport(for: "iPhone13,1")
+        let iPhone14Models = config.modelSupport(for: "iPhone14,3")
+
+        XCTAssertFalse(iPhone13Models.supported.contains("openai_whisper-large-v3_947MB"))
+        XCTAssertTrue(iPhone13Models.disabled.contains("openai_whisper-large-v3_947MB"))
+        XCTAssertTrue(iPhone14Models.supported.contains("openai_whisper-large-v3_947MB"))
+
+        // Test when a device with the same prefix if matched to the appropriate support if different
+        let iPad14A15Model = config.modelSupport(for: "iPad14,1")
+        let iPad14M2Model = config.modelSupport(for: "iPad14,4")
+
+        XCTAssertFalse(iPad14A15Model.supported.contains("openai_whisper-large-v3-v20240930_turbo"))
+        XCTAssertTrue(iPad14A15Model.disabled.contains("openai_whisper-large-v3-v20240930_turbo"))
+        XCTAssertTrue(iPad14M2Model.supported.contains("openai_whisper-large-v3-v20240930_turbo"))
+
+        // Test if a model exists in a remote repo but not in the fallback config, it is disabled for all devices except default
+        let newModel = "some_new_model"
+        let newDevice = "some_new_device"
+        let newDeviceSupport = config.deviceSupports + [DeviceSupport(
+            identifiers: [newDevice],
+            models: ModelSupport(
+                default: "openai_whisper-base",
+                supported: [
+                    "some_new_model",
+                ]
+            )
+        )]
+
+        let newConfig = ModelSupportConfig(
+            repoName: config.repoName,
+            repoVersion: config.repoVersion,
+            deviceSupports: newDeviceSupport
+        )
+
+        XCTAssertEqual(Set(newConfig.knownModels), Set(newDeviceSupport.flatMap { $0.models.supported }))
+        for deviceSupport in newConfig.deviceSupports where !deviceSupport.identifiers.allSatisfy([newDevice].contains) {
+            XCTAssertFalse(deviceSupport.models.supported.contains(newModel))
+            XCTAssertTrue(deviceSupport.models.disabled.contains(newModel))
+        }
+
+        // Test if a model does not exist in a remote repo but does in the fallback config, it is disabled
+        // This will not prevent use of the model if already downloaded, but will enable the remote config to disable specific models
+        let knownLocalModel = Constants.fallbackModelSupportConfig.modelSupport(for: "iPhone13,1").supported.first!
+        let remoteModel = "remote_model"
+        let remoteConfig = ModelSupportConfig(
+            repoName: "test",
+            repoVersion: "test",
+            deviceSupports: [DeviceSupport(
+                identifiers: ["test_device"],
+                models: ModelSupport(
+                    default: remoteModel,
+                    supported: [remoteModel]
+                )
+            )]
+        )
+
+        // Helper method returns supported model
+        let modelSupport = remoteConfig.modelSupport(for: "test_device").supported
+        let disabledModels = remoteConfig.modelSupport(for: "test_device").disabled
+        XCTAssertTrue(modelSupport.contains(remoteModel))
+        XCTAssertTrue(disabledModels.contains(knownLocalModel))
+        // Direct access has it disabled
+        for deviceSupport in remoteConfig.deviceSupports where deviceSupport.identifiers.contains("test_device") {
+            XCTAssertTrue(deviceSupport.models.supported.contains(remoteModel))
+            XCTAssertFalse(deviceSupport.models.disabled.contains(remoteModel))
+            XCTAssertFalse(deviceSupport.models.supported.contains(knownLocalModel))
+            XCTAssertTrue(deviceSupport.models.disabled.contains(knownLocalModel))
+        }
+    }
+
+    func testModelSupportConfigFetch() async throws {
+        // Make sure remote repo config loads successfully from HF
+        let modelRepoConfig = await WhisperKit.fetchModelSupportConfig()
+
+        XCTAssertFalse(modelRepoConfig.deviceSupports.isEmpty, "Should have device supports")
+        XCTAssertFalse(modelRepoConfig.knownModels.isEmpty, "Should have known models")
+
+        XCTAssertGreaterThanOrEqual(modelRepoConfig.deviceSupports.count, Constants.fallbackModelSupportConfig.deviceSupports.count, "Remote config should have at least as many devices as fallback")
+
+        // Verify that known models in the remote config include all known models from fallback
+        let remoteKnownModels = Set(modelRepoConfig.knownModels)
+        let fallbackKnownModels = Set(Constants.fallbackModelSupportConfig.knownModels)
+        XCTAssertTrue(remoteKnownModels.isSuperset(of: fallbackKnownModels), "Remote known models should include all fallback known models")
+
+        // Test an unknown device to ensure it falls back to default support
+        let unknownDeviceSupport = modelRepoConfig.modelSupport(for: "unknown_device")
+        XCTAssertEqual(unknownDeviceSupport.supported, modelRepoConfig.defaultSupport.models.supported, "Unknown device should use default support")
+    }
+
+    func testRecommendedModels() async {
+        let asyncRemoteModels = await WhisperKit.recommendedRemoteModels()
+        let defaultModels = WhisperKit.recommendedModels()
+
+        // Remote models should not be nil or empty
+        XCTAssertNotNil(asyncRemoteModels, "Remote models should not be nil")
+        XCTAssertFalse(asyncRemoteModels.default.isEmpty, "Remote model name should not be empty")
+
+        // Default models should not be nil or empty
+        XCTAssertNotNil(defaultModels, "Default models should not be nil")
+        XCTAssertFalse(defaultModels.default.isEmpty, "Default model name should not be empty")
+    }
+
     // MARK: - Audio Tests
 
     func testAudioFileLoading() throws {
@@ -394,9 +548,11 @@ final class UnitTests: XCTestCase {
     }
 
     func testDecodingEarlyStopping() async throws {
+        let earlyStopTokenCount = 10
         let options = DecodingOptions()
         let continuationCallback: TranscriptionCallback = { (progress: TranscriptionProgress) -> Bool? in
-            false
+            // Stop after only 10 tokens (full test audio contains 16)
+            return progress.tokens.count <= earlyStopTokenCount
         }
 
         let result = try await XCTUnwrapAsync(
@@ -422,6 +578,7 @@ final class UnitTests: XCTestCase {
         XCTAssertNotNil(resultWithWait)
         let tokenCountWithWait = resultWithWait.segments.flatMap { $0.tokens }.count
         let decodingTimePerTokenWithWait = resultWithWait.timings.decodingLoop / Double(tokenCountWithWait)
+        Logging.debug("Decoding loop without wait: \(result.timings.decodingLoop), with wait: \(resultWithWait.timings.decodingLoop)")
 
         // Assert that the decoding predictions per token are not slower with the waiting
         XCTAssertEqual(decodingTimePerTokenWithWait, decodingTimePerToken, accuracy: decodingTimePerToken, "Decoding predictions per token should not be significantly slower with waiting")
@@ -486,12 +643,11 @@ final class UnitTests: XCTestCase {
         let computeOptions = ModelComputeOptions(
             melCompute: .cpuOnly
         )
-        let whisperKit = try await WhisperKit(
-            modelFolder: tinyModelPath(),
-            computeOptions: computeOptions,
-            verbose: true,
-            logLevel: .debug
-        )
+        let config = try WhisperKitConfig(modelFolder: tinyModelPath(),
+                                          computeOptions: computeOptions,
+                                          verbose: true,
+                                          logLevel: .debug)
+        let whisperKit = try await WhisperKit(config)
 
         let audioFilePath = try XCTUnwrap(
             Bundle.module.path(forResource: "jfk", ofType: "wav"),
@@ -617,11 +773,8 @@ final class UnitTests: XCTestCase {
 
     func testDetectSpanish() async throws {
         let targetLanguage = "es"
-        let whisperKit = try await WhisperKit(
-            modelFolder: tinyModelPath(),
-            verbose: true,
-            logLevel: .debug
-        )
+        let config = try WhisperKitConfig(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(config)
 
         let audioFilePath = try XCTUnwrap(
             Bundle.module.path(forResource: "es_test_clip", ofType: "wav"),
@@ -695,11 +848,8 @@ final class UnitTests: XCTestCase {
 
     func testDetectJapanese() async throws {
         let targetLanguage = "ja"
-        let whisperKit = try await WhisperKit(
-            modelFolder: tinyModelPath(),
-            verbose: true,
-            logLevel: .debug
-        )
+        let config = try WhisperKitConfig(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(config)
 
         let audioFilePath = try XCTUnwrap(
             Bundle.module.path(forResource: "ja_test_clip", ofType: "wav"),
@@ -748,11 +898,8 @@ final class UnitTests: XCTestCase {
 
     func testDetectLanguageHelperMethod() async throws {
         let targetLanguages = ["es", "ja"]
-        let whisperKit = try await WhisperKit(
-            modelFolder: tinyModelPath(),
-            verbose: true,
-            logLevel: .debug
-        )
+        let config = try WhisperKitConfig(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(config)
 
         for language in targetLanguages {
             let audioFilePath = try XCTUnwrap(
@@ -810,7 +957,8 @@ final class UnitTests: XCTestCase {
     }
 
     func testSilence() async throws {
-        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let config = try WhisperKitConfig(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(config)
         let audioSamples = [Float](repeating: 0.0, count: 30 * 16000)
         let options = DecodingOptions(usePrefillPrompt: false, skipSpecialTokens: false)
 
@@ -822,7 +970,8 @@ final class UnitTests: XCTestCase {
     }
 
     func testTemperatureIncrement() async throws {
-        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let config = try WhisperKitConfig(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(config)
 
         // Generate random audio samples
         let audioSamples = (0..<(30 * 16000)).map { _ in Float.random(in: -0.7...0.7) }
@@ -885,7 +1034,8 @@ final class UnitTests: XCTestCase {
     }
 
     func testPromptTokens() async throws {
-        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let config = try WhisperKitConfig(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(config)
         let promptText = " prompt to encourage output without any punctuation and without capitalizing americans as if it was already normalized"
         let tokenizer = try XCTUnwrap(whisperKit.tokenizer)
         let promptTokens = tokenizer.encode(text: promptText)
@@ -901,7 +1051,8 @@ final class UnitTests: XCTestCase {
     }
 
     func testPrefixTokens() async throws {
-        let whisperKit = try await WhisperKit(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let config = try WhisperKitConfig(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(config)
         // Prefix to encourage output without any punctuation and without capitalizing americans as if it was already normalized
         let prefixText = " and so my fellow americans"
         let tokenizer = try XCTUnwrap(whisperKit.tokenizer)
@@ -955,6 +1106,18 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual("<|end<|of|>text|>".trimmingSpecialTokenCharacters(), "end<|of|>text")
         XCTAssertEqual("<|endoftext".trimmingSpecialTokenCharacters(), "endoftext")
         XCTAssertEqual("endoftext|>".trimmingSpecialTokenCharacters(), "endoftext")
+    }
+
+    func testDeviceName() {
+        let deviceName = WhisperKit.deviceName()
+        XCTAssertFalse(deviceName.isEmpty, "Device name should not be empty")
+        XCTAssertTrue(deviceName.contains(","), "Device name should contain a comma, found \(deviceName)")
+    }
+
+    func testOrderedSet() {
+        let testArray = ["model1", "model2", "model1", "model3", "model2"]
+        let uniqueArray = testArray.orderedSet
+        XCTAssertEqual(uniqueArray, ["model1", "model2", "model3"], "Ordered set should contain unique elements in order")
     }
 
     // MARK: - LogitsFilter Tests
@@ -1282,7 +1445,7 @@ final class UnitTests: XCTestCase {
 
     #if !os(watchOS) // FIXME: This test times out on watchOS when run on low compute runners
     func testVADProgress() async throws {
-        let pipe = try await WhisperKit(model: "tiny.en")
+        let pipe = try await WhisperKit(WhisperKitConfig(model: "tiny.en"))
 
         let cancellable: AnyCancellable? = pipe.progress.publisher(for: \.fractionCompleted)
             .removeDuplicates()
@@ -1620,7 +1783,8 @@ final class UnitTests: XCTestCase {
         let audioFile = "jfk.wav"
         let modelPath = try tinyModelPath()
 
-        let whisperKit = try await WhisperKit(modelFolder: modelPath, /* computeOptions: computeOptions,*/ verbose: true, logLevel: .debug)
+        let config = WhisperKitConfig(modelFolder: modelPath, /* computeOptions: computeOptions,*/ verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(config)
 
         let startTime = Date()
         let audioComponents = audioFile.components(separatedBy: ".")

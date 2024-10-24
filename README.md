@@ -2,11 +2,11 @@
 <div align="center">
   
 <a href="https://github.com/argmaxinc/WhisperKit#gh-light-mode-only">
-  <img src="https://github.com/argmaxinc/WhisperKit/assets/1981179/6ac3360b-2f5c-4392-a71a-05c5dda71093" alt="WhisperKit" width="20%" />
+  <img src="https://github.com/user-attachments/assets/f0699c07-c29f-45b6-a9c6-f6d491b8f791" alt="WhisperKit" width="20%" />
 </a>
 
 <a href="https://github.com/argmaxinc/WhisperKit#gh-dark-mode-only">
-  <img src="https://github.com/argmaxinc/WhisperKit/assets/1981179/a682ce21-80e0-4a98-a99f-836663538a4f" alt="WhisperKit" width="20%" />
+  <img src="https://github.com/user-attachments/assets/1be5e31c-de42-40ab-9b85-790cb911ed47" alt="WhisperKit" width="20%" />
 </a>
 
 # WhisperKit
@@ -92,13 +92,13 @@ Task {
 WhisperKit automatically downloads the recommended model for the device if not specified. You can also select a specific model by passing in the model name:
 
 ```swift
-let pipe = try? await WhisperKit(model: "large-v3")
+let pipe = try? await WhisperKit(WhisperKitConfig(model: "large-v3"))
 ```
 
 This method also supports glob search, so you can use wildcards to select a model:
 
 ```swift
-let pipe = try? await WhisperKit(model: "distil*large-v3")
+let pipe = try? await WhisperKit(WhisperKitConfig(model: "distil*large-v3"))
 ```
 
 Note that the model search must return a single model from the source repo, otherwise an error will be thrown.
@@ -110,7 +110,8 @@ For a list of available models, see our [HuggingFace repo](https://huggingface.c
 WhisperKit also comes with the supporting repo [`whisperkittools`](https://github.com/argmaxinc/whisperkittools) which lets you create and deploy your own fine tuned versions of Whisper in CoreML format to HuggingFace. Once generated, they can be loaded by simply changing the repo name to the one used to upload the model:
 
 ```swift
-let pipe = try? await WhisperKit(model: "large-v3", modelRepo: "username/your-model-repo")
+let config = WhisperKitConfig(model: "large-v3", modelRepo: "username/your-model-repo")
+let pipe = try? await WhisperKit(config)
 ```
 
 ### Swift CLI

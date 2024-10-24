@@ -123,7 +123,8 @@ extension XCTestCase {
             textDecoderCompute: .cpuOnly,
             prefillCompute: .cpuOnly
         )
-        let whisperKit = try await WhisperKit(modelFolder: modelPath, computeOptions: computeOptions, verbose: true, logLevel: .debug)
+        let config = WhisperKitConfig(modelFolder: modelPath, computeOptions: computeOptions, verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(config)
         trackForMemoryLeaks(on: whisperKit, file: file, line: line)
 
         let audioComponents = audioFile.components(separatedBy: ".")

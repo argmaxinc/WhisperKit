@@ -347,6 +347,8 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
     public var shouldEarlyStop = [UUID: Bool]()
     private var languageLogitsFilter: LanguageLogitsFilter?
 
+    public init() {}
+
     public var supportsWordTimestamps: Bool {
         return getModelOutputDimention(model, named: "alignment_heads_weights", position: 0) != nil
     }
@@ -589,9 +591,11 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         var hasAlignment = false
         var isFirstTokenLogProbTooLow = false
         let windowUUID = UUID()
-        DispatchQueue.global().async { [weak self] in
+        Task { [weak self] in
             guard let self = self else { return }
-            self.shouldEarlyStop[windowUUID] = false
+            await MainActor.run {
+                self.shouldEarlyStop[windowUUID] = false
+            }
         }
         for tokenIndex in prefilledIndex..<loopCount {
             let loopStart = Date()
