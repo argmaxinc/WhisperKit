@@ -1,0 +1,434 @@
+# This file contains the fastlane.tools configuration
+# You can find the documentation at https://docs.fastlane.tools
+#
+# For a list of all available actions, check out
+#     https://docs.fastlane.tools/actions
+#
+# For a list of all available plugins, check out
+#     https://docs.fastlane.tools/plugins/available-plugins
+
+require 'date'
+require 'fileutils'
+require 'json'
+require 'pathname'
+
+COMMIT_HASH = `git rev-parse --short HEAD`.strip
+COMMIT_TIMESTAMP = `git log -1 --format=%ct`.strip
+COMMIT_TIMESTAMP = Time.at(COMMIT_TIMESTAMP.to_i).utc.strftime('%Y-%m-%dT%H%M%S')
+WORKING_DIR = Dir.pwd
+BASE_BENCHMARK_PATH = "#{WORKING_DIR}/benchmark_data".freeze
+BASE_UPLOAD_PATH = "#{WORKING_DIR}/upload_folder".freeze
+XCRESULT_PATH = File.expand_path("#{BASE_BENCHMARK_PATH}/#{COMMIT_TIMESTAMP}_#{COMMIT_HASH}/")
+BENCHMARK_REPO = 'argmaxinc/whisperkit-evals-dataset'.freeze
+BENCHMARK_CONFIGS = {
+  full: {
+    test_identifier: 'WhisperAXTests/RegressionTests/testModelPerformance',
+    name: 'full',
+    models: [
+      'openai_whisper-tiny',
+      'openai_whisper-tiny.en',
+      'openai_whisper-base',
+      'openai_whisper-base.en',
+      'openai_whisper-small',
+      'openai_whisper-small.en',
+      'openai_whisper-large-v2',
+      'openai_whisper-large-v2_949MB',
+      'openai_whisper-large-v2_turbo',
+      'openai_whisper-large-v2_turbo_955MB',
+      'openai_whisper-large-v3',
+      'openai_whisper-large-v3_947MB',
+      'openai_whisper-large-v3_turbo',
+      'openai_whisper-large-v3_turbo_954MB',
+      'distil-whisper_distil-large-v3',
+      'distil-whisper_distil-large-v3_594MB',
+      'distil-whisper_distil-large-v3_turbo',
+      'distil-whisper_distil-large-v3_turbo_600MB',
+      'openai_whisper-large-v3-v20240930',
+      'openai_whisper-large-v3-v20240930_turbo',
+      'openai_whisper-large-v3-v20240930_626MB',
+      'openai_whisper-large-v3-v20240930_turbo_632MB'
+    ]
+  },
+  debug: {
+    test_identifier: 'WhisperAXTests/RegressionTests/testModelPerformanceWithDebugConfig',
+    name: 'debug',
+    models: ['small.en'] # , 'crash_test', 'unknown_model', 'tiny']
+  }
+}.freeze
+
+default_platform(:ios)
+
+platform :ios do
+  desc 'List all connected devices'
+  lane :list_devices do
+    devices = available_devices
+    UI.message 'Connected devices:'
+    devices.each do |device|
+      UI.message device
+    end
+  end
+
+  desc 'Benchmark devices with options'
+  lane :benchmark do |options|
+    devices = options[:devices]
+    config = options[:debug] ? :debug : :full
+
+    if devices
+      devices = devices.split(',').map(&:strip) if devices.is_a?(String)
+      benchmark_specific_devices(devices: devices, config: config)
+    else
+      benchmark_connected_devices(config: config)
+    end
+  end
+
+  # Update the extract_results lane to match
+  desc 'Extract benchmark results'
+  lane :extract_results do |options|
+    # CLI Comment: To use a specific result bundle path, pass it as an option like this: `fastlane extract_results result_bundle_path:/path/to/your/xcresult`
+    # CLI Comment: If no path is provided, the default path will be used based on the commit hash and configuration.
+    devices = options[:devices]
+    config = options[:debug] ? :debug : :full
+
+    # Use the provided result bundle path if available, otherwise use the default
+    xcresult_bundle = options[:result_bundle_path] || "WhisperAX_#{COMMIT_HASH}_#{BENCHMARK_CONFIGS[config][:name]}.xcresult"
+    # Ensure the path is expanded to an absolute path
+    xcresult_bundle = File.expand_path(xcresult_bundle)
+
+    devices = devices.split(',').map(&:strip) if devices && devices.is_a?(String)
+
+    extract_xcresult_attachments(xcresult_bundle, devices: devices, config: config)
+  end
+
+  desc 'Upload benchmark results'
+  lane :upload_results do |_options|
+    UI.message 'Uploading benchmark results to Hugging Face dataset...'
+    upload_results
+  end
+end
+
+def available_devices
+  # Run the devicectl command, capturing only stdout (JSON output)
+  devices_json = sh('xcrun devicectl list devices --json-output - 2>/dev/null', log: false)
+
+  # Read and parse the JSON file
+  devices_data = JSON.parse(devices_json)
+
+  # Extract device information
+  devices = devices_data['result']['devices'].map do |device|
+    device_name = device['deviceProperties']['name']
+    device_type = device['hardwareProperties']['marketingName']
+    platform = device['hardwareProperties']['platform']
+    os_version = device['deviceProperties']['osVersionNumber']
+    device_product = device['hardwareProperties']['productType']
+    udid = device['hardwareProperties']['udid']
+    state = device['connectionProperties']['tunnelState']
+
+    unless device_type && (device_type.include?('iPhone') || device_type.include?('iPad')) && !state.include?('unavailable')
+      next
+    end
+
+    {
+      name: device_name,
+      type: device_type,
+      platform: platform,
+      os_version: os_version,
+      product: device_product,
+      id: udid,
+      state: state
+    }
+  end.compact
+
+  # Add the current Mac
+  mac_system_info = JSON.parse(sh('system_profiler SPHardwareDataType -json', log: false))
+  mac_type = mac_system_info['SPHardwareDataType'][0]['chip_type']
+  mac_name = mac_system_info['SPHardwareDataType'][0]['machine_model']
+  mac_udid = mac_system_info['SPHardwareDataType'][0]['platform_UUID']
+  mac_info = `sw_vers`
+  mac_version = mac_info.match(/ProductVersion:\s+(.+)/)[1]
+  mac_platform = mac_info.match(/ProductName:\s+(.+)/)[1]
+
+  devices << {
+    name: 'My Mac',
+    type: mac_type,
+    platform: mac_platform,
+    os_version: mac_version,
+    product: mac_name,
+    id: mac_udid,
+    state: 'connected'
+  }
+
+  devices
+end
+
+def benchmark_connected_devices(config:)
+  run_benchmarks(devices: available_devices, config: config)
+end
+
+desc 'Benchmark specific devices'
+def benchmark_specific_devices(devices:, config:)
+  all_devices = available_devices
+  selected_devices = all_devices.select { |device| devices.include?(device[:name]) }
+
+  UI.user_error!("No matching devices found for the names provided: #{devices}") if selected_devices.empty?
+
+  run_benchmarks(devices: selected_devices, config: config)
+end
+
+def run_benchmarks(devices:, config:)
+  UI.user_error!('No matching devices found.') if devices.empty?
+
+  UI.message "Devices to benchmark (#{BENCHMARK_CONFIGS[config][:name]} mode):"
+  devices.each { |device| UI.message device }
+
+  # Remove existing xcresults that start with device[:product]
+  devices.each do |device|
+    product_pattern = File.join(XCRESULT_PATH, "#{device[:product]}*")
+    UI.message "Removing existing xcresults for device: #{device[:product]}"
+    # Check if the file exists
+    if Dir.glob(product_pattern).any?
+      sh("trash #{product_pattern}")
+    else
+      UI.message "No xcresults found for device: #{device[:product]}"
+    end
+  end
+
+  run_benchmark(devices, config)
+end
+
+def run_benchmark(devices, config)
+  summaries = []
+  BENCHMARK_CONFIGS[config][:models].each do |model|
+    begin
+      # Sanitize device name for use in file path
+      devices_to_test = devices.map { |device_info| device_info[:name] }.compact
+      destinations = devices.map do |device_info|
+        "platform=#{device_info[:platform]},name=#{device_info[:name]}"
+      end.compact
+
+      UI.message "Output path: #{XCRESULT_PATH}"
+
+      # Ensure the directory exists
+      FileUtils.mkdir_p(XCRESULT_PATH)
+
+      # Generate a unique name for the xcresult bundle
+      result_bundle_name = "WhisperAX_#{COMMIT_HASH}_#{BENCHMARK_CONFIGS[config][:name]}.xcresult"
+
+      # Safely remove any existing xcresult bundle
+      xcresult_bundle = File.join(XCRESULT_PATH, result_bundle_name)
+
+      if File.exist?(xcresult_bundle)
+        UI.message "Removing existing xcresult bundle: #{xcresult_bundle}"
+        sh("trash #{xcresult_bundle}")
+      end
+
+      UI.message "Running scan with result bundle path: #{xcresult_bundle}"
+      UI.message "Running in #{BENCHMARK_CONFIGS[config][:name]} mode"
+
+      UI.message "Running benchmark for model: #{model}"
+      xcargs = [
+        "MODEL_NAME=#{model}",
+        '-allowProvisioningUpdates'
+      ].join(' ')
+
+      scan_result = scan(
+        project: 'Examples/WhisperAX/WhisperAX.xcodeproj',
+        scheme: 'WhisperAX',
+        clean: false,
+        devices: devices_to_test,
+        skip_detect_devices: true,
+        only_testing: [BENCHMARK_CONFIGS[config][:test_identifier]],
+        xcargs: xcargs,
+        destination: destinations,
+        result_bundle_path: xcresult_bundle,
+        output_directory: XCRESULT_PATH,
+        suppress_xcode_output: false,
+        result_bundle: true,
+        # show_xcode_test_logs: true
+        buildlog_path: XCRESULT_PATH,
+        # include_simulator_logs: true,
+        output_style: 'raw',
+        fail_build: false
+      )
+      extract_xcresult_attachments(xcresult_bundle, devices: devices, config: config)
+      summaries << { model: model, success: scan_result }
+    rescue StandardError => e
+      UI.error('Model failed. Continuing with next model')
+      UI.message(e.message)
+      summaries << { model: model, success: false, error: e.message }
+    end
+  end
+
+  merge_all_summaries(summaries, devices, config)
+end
+
+def extract_xcresult_attachments(xcresult_bundle, devices:, config:)
+  UI.message "Starting extraction of attachments from #{xcresult_bundle}..."
+
+  # Check if the file exists
+  if File.exist?(xcresult_bundle)
+    UI.success "xcresult file found at: #{xcresult_bundle}"
+  else
+    UI.error "xcresult file does not exist at: #{xcresult_bundle}"
+    UI.message "Current directory contents of #{xcresult_bundle}:"
+    Dir.glob(File.join(File.dirname(xcresult_bundle), '*')).each do |file|
+      UI.message "  #{file}"
+    end
+    return
+  end
+
+  # Get all ActionTestSummary IDs
+  UI.message 'Fetching ActionTestSummary IDs...'
+  xcode_version = `xcodebuild -version | grep Xcode`.gsub('Xcode ', '')
+  legacy_flag = xcode_version.to_f >= 16 ? '--legacy' : ''
+  UI.message "Legacy flag: Xcode version - #{xcode_version.to_i}, flag - #{legacy_flag}"
+
+  graph_output = sh("xcrun xcresulttool graph #{legacy_flag} --path '#{xcresult_bundle}' | grep ActionTestSummary -A1 | grep Id",
+                    log: true)
+  action_test_summary_ids = graph_output.split("\n").map { |line| line.split.last }
+  UI.message "Found #{action_test_summary_ids.count} ActionTestSummary IDs"
+
+  action_test_summary_ids.each_with_index do |xcid, index|
+    UI.message "Processing ActionTestSummary ID #{index + 1} of #{action_test_summary_ids.count}: #{xcid}"
+
+    json_output = sh("xcrun xcresulttool get #{legacy_flag} --format json --path '#{xcresult_bundle}' --id '#{xcid}'",
+                     log: false)
+    parsed_json = JSON.parse(json_output)
+
+    attachments = parsed_json.dig('activitySummaries', '_values')&.flat_map do |summary|
+      summary.dig('attachments', '_values')
+    end&.compact || []
+
+    UI.message "Found #{attachments.count} attachments for this summary"
+
+    attachments.each_with_index do |attachment, att_index|
+      ref = attachment.dig('payloadRef', 'id', '_value')
+      filename = attachment['filename']['_value']
+
+      if ref && filename
+        UI.message "Extracting attachment #{att_index + 1} of #{attachments.count}: #{filename}"
+
+        output_path = File.join(File.dirname(xcresult_bundle), filename)
+        sh("xcrun xcresulttool get #{legacy_flag} --path '#{xcresult_bundle}' --id '#{ref}' > '#{output_path}'")
+
+        if File.exist?(output_path)
+          UI.success "Successfully extracted: #{output_path}"
+        else
+          UI.error "Failed to extract: #{output_path}"
+        end
+      else
+        UI.error "Invalid attachment data for attachment #{att_index + 1}"
+      end
+    end
+  end
+
+  UI.success "Extraction complete. Total ActionTestSummaries processed: #{action_test_summary_ids.count}"
+end
+
+def merge_all_summaries(summaries, devices, _config)
+  files_to_upload = []
+  devices.each do |device|
+    merged_data = {
+      osType: device[:platform],
+      failureInfo: {},
+      osVersion: device[:os_version],
+      modelsTested: [],
+      deviceModel: device[:type],
+      deviceIdentifier: device[:product],
+      testResults: {},
+      commitHash: COMMIT_HASH,
+      commitTimestamp: COMMIT_TIMESTAMP
+    }
+
+    summaries.each do |result|
+      UI.message "Test result from fastlane: #{result}"
+      model = result[:model]
+
+      unless result[:success]
+        merged_data[:modelsTested] << model
+        merged_data[:failureInfo][model] = result[:error] || 'Test failed'
+      end
+    end
+
+    # Merge data from extracted xcresult attachments
+    summary_pattern = File.join(XCRESULT_PATH, "#{device[:product]}_summary_*.json".gsub(/\s+/, '_'))
+    Dir.glob(summary_pattern).each do |file|
+      attachment_data = JSON.parse(File.read(file))
+      merged_data[:failureInfo].merge!(attachment_data['failureInfo']) if attachment_data['failureInfo']
+      merged_data[:modelsTested] |= attachment_data['modelsTested'] if attachment_data['modelsTested']
+      UI.message "Merging data from: #{file} #{attachment_data}"
+    end
+
+    merged_data[:modelsTested].each do |model|
+      # Store the test result file path
+      result_pattern = File.join(XCRESULT_PATH, "#{device[:product]}_#{model.gsub('.', '_')}_20*.json".gsub(/\s+/, '_'))
+      merged_data[:testResults][model] = []
+      Dir.glob(result_pattern).each do |file|
+        merged_data[:testResults][model] << File.basename(file)
+        files_to_upload << file
+      end
+    end
+    timestamp = Time.now.strftime('%Y-%m-%dT%H%M%S')
+    filename = "#{device[:product]}_summary_#{timestamp}.json".gsub(/\s+/, '_')
+    file_path = File.join(XCRESULT_PATH, filename)
+
+    FileUtils.mkdir_p(File.dirname(file_path))
+    File.write(file_path, JSON.pretty_generate(merged_data))
+    UI.message "Created merged summary: #{file_path}"
+    files_to_upload << file_path
+
+    prepare_upload(files_to_upload)
+  end
+end
+
+def prepare_upload(files)
+  UI.message 'Preparing upload folder...'
+  upload_folder = File.expand_path(BASE_UPLOAD_PATH)
+
+  # Clear out the existing upload folder
+  if Dir.exist?(upload_folder) && !Dir.glob("#{upload_folder}").empty?
+    UI.message "Clearing existing upload folder: #{upload_folder}"
+    sh("trash #{upload_folder}/*")
+  else
+    FileUtils.mkdir_p(upload_folder)
+  end
+
+  # Copy the new data to the upload folder
+  files.each do |file|
+    relative_path = Pathname.new(file).relative_path_from(Pathname.new(WORKING_DIR)).to_s
+    destination = File.join(upload_folder, relative_path)
+
+    UI.message "Copying #{file} to #{upload_folder}/#{relative_path}"
+
+    # Ensure the destination directory exists
+    FileUtils.mkdir_p(File.dirname(destination))
+    FileUtils.cp(file, destination)
+  end
+end
+
+def upload_results
+  upload_folder = File.expand_path(BASE_UPLOAD_PATH)
+
+  # Ensure the upload folder exists
+  unless Dir.exist?(upload_folder)
+    UI.user_error!("Upload folder does not exist: #{upload_folder}")
+    return
+  end
+
+  # Get the git hash and timestamp for the PR branch name
+  timestamp = Time.now.strftime('%Y%m%d_%H%M%S')
+  branch_name = "benchmark_results_#{timestamp}"
+
+  # Construct the huggingface-cli command
+  cmd = "huggingface-cli upload #{BENCHMARK_REPO} '#{upload_folder}' --repo-type dataset --create-pr"
+
+  UI.message "Executing command: #{cmd}"
+
+  # Execute the command
+  begin
+    result = sh(cmd)
+    UI.success 'Successfully uploaded benchmark results and created a pull request.'
+    UI.message "Command output: #{result}"
+  rescue StandardError => e
+    UI.error "Failed to upload benchmark results: #{e.message}"
+  end
+end

@@ -1,4 +1,7 @@
-// https://github.com/argmaxinc/whisperkittools/blob/main/whisperkit/evaluate/abbreviations_en.py See abbr
+//  For licensing see accompanying LICENSE.md file.
+//  Copyright © 2024 Argmax, Inc. All rights reserved.
+
+/// https://github.com/argmaxinc/whisperkittools/blob/main/whisperkit/evaluate/abbreviations_en.py See abbr
 let englishSpellingMappingAbbr = [
     "accessorise": "accessorize",
     "accessorised": "accessorized",
@@ -1739,5 +1742,5 @@ let englishSpellingMappingAbbr = [
     "yoghourt": "yogurt",
     "yoghourts": "yogurts",
     "yoghurt": "yogurt",
-    "yoghurts": "yogurts"
+    "yoghurts": "yogurts",
 ]

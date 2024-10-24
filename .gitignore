@@ -1,6 +1,7 @@
 .DS_Store
 /.build
 /Packages
+.vscode/
 xcuserdata/
 DerivedData/
 .swiftpm/configuration/registries.json
@@ -56,6 +57,8 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots
 fastlane/test_output
+fastlane/benchmark_data
+fastlane/upload_folder
 
 ### Xcode Patch ###
 *.xcodeproj/*

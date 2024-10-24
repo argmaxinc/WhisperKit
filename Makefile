@@ -1,4 +1,4 @@
-.PHONY: setup setup-huggingface-cli setup-model-repo download-models download-model build build-cli test clean-package-caches
+.PHONY: setup setup-huggingface-cli setup-model-repo download-models download-model build build-cli test clean-package-caches list-devices benchmark-connected-devices benchmark-device benchmark-devices extract-xcresult
 
 PIP_COMMAND := pip3
 PYTHON_COMMAND := python3
@@ -8,13 +8,14 @@ MODEL_REPO := argmaxinc/whisperkit-coreml
 MODEL_REPO_DIR := ./Models/whisperkit-coreml
 BASE_COMPILED_DIR := ./Models
 
+GIT_HASH := $(shell git rev-parse --short HEAD)
 
 setup:
 	@echo "Setting up environment..."
 	@which $(PIP_COMMAND)
 	@which $(PYTHON_COMMAND)
 	@echo "Checking for Homebrew..."
-	@which brew > /dev/null || (echo "Error: Homebrew is not installed. Install it form here https://brew.sh and try again" && exit 1)
+	@which brew > /dev/null || (echo "Error: Homebrew is not installed. Install it from https://brew.sh and try again" && exit 1)
 	@echo "Homebrew is installed."
 	@echo "Checking for huggingface-cli..."
 	@which huggingface-cli > /dev/null || (echo "Installing huggingface-cli..." && brew install huggingface-cli)
@@ -25,6 +26,9 @@ setup:
 	@echo "Checking for trash..."
 	@which trash > /dev/null || (echo "Installing trash..." && brew install trash)
 	@echo "trash is installed."
+	@echo "Checking for fastlane"
+	@which fastlane > /dev/null || (echo "Installing fastlane..." && brew install fastlane)
+	@echo "fastlane is installed."
 	@echo "Done 🚀"
 
 
@@ -56,11 +60,13 @@ setup-model-repo:
 		git clone https://huggingface.co/$(MODEL_REPO) $(MODEL_REPO_DIR); \
 	fi
 
+
 # Download all models
 download-models: setup-model-repo
 	@echo "Downloading all models..."
 	@cd $(MODEL_REPO_DIR) && \
 	git lfs pull
+
 
 # Download a specific model
 download-model:
@@ -88,6 +94,31 @@ test:
 	@echo "Running tests..."
 	@swift test -v
 
+
+list-devices:
+	fastlane ios list_devices
+
+
+# Usage:
+#	make benchmark-devices										# Benchmark all connected devices
+#	make benchmark-devices DEBUG=true							# Benchmark all connected devices with small test matrix
+#	make benchmark-devices DEVICES="iPhone 15 Pro Max,My Mac"	# Benchmark specific device names from `make list-devices`
+DEVICES ?=
+DEBUG ?= false
+benchmark-devices:
+	@if [ -n "$(DEVICES)" ]; then \
+		echo "Benchmarking specific devices: $(DEVICES)"; \
+		fastlane benchmark devices:"$(DEVICES)" debug:$(DEBUG); \
+	else \
+		echo "Benchmarking all connected devices"; \
+		fastlane benchmark debug:$(DEBUG); \
+	fi
+
+upload-benchmark-results:
+	@echo "Uploading benchmark results..."
+	@fastlane upload_results
+
 clean-package-caches:
-	@trash ~/Library/Caches/org.swift.swiftpm/repositories
-	@trash ~/Library/Developer/Xcode/DerivedData
+	@trash ~/Library/Developer/Xcode/DerivedData/WhisperKit*
+	@swift package purge-cache
+	@swift package reset
