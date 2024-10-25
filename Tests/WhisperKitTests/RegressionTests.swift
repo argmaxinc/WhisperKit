@@ -287,12 +287,15 @@ final class RegressionTests: XCTestCase {
             generatedTranscript: transcriptionResult.text
         )
 
+        let modelSizeMB = try? getFolderSize(atUrl: whisperKit.modelFolder)
+
         let testInfo = TestInfo(
             device: device,
             audioFile: URL(fileURLWithPath: audioFilePath).lastPathComponent,
             datasetDir: config.dataset,
             datasetRepo: datasetRepo,
             model: config.model,
+            modelSizeMB: modelSizeMB ?? -1,
             date: startTime.formatted(Date.ISO8601FormatStyle().dateSeparator(.dash)),
             timeElapsedInSeconds: Date().timeIntervalSince(startTime),
             timings: transcriptionResult.timings,
@@ -596,6 +599,15 @@ final class RegressionTests: XCTestCase {
         let cacheURL = fileManager.urls(for: .cachesDirectory, in: .userDomainMask)
         let cacheSize = try fileManager.allocatedSizeOfDirectory(at: cacheURL.first!)
         return cacheSize / (1024 * 1024) // Convert to MB
+    }
+
+    private func getFolderSize(atUrl folder: URL?) throws -> Double {
+        guard let folder = folder else {
+            return -1
+        }
+        let fileManager = FileManager.default
+        let modelSize = try fileManager.allocatedSizeOfDirectory(at: folder)
+        return Double(modelSize / (1024 * 1024)) // Convert to MB
     }
 
     func createWithMemoryCheck(

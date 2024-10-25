@@ -52,7 +52,7 @@ BENCHMARK_CONFIGS = {
   debug: {
     test_identifier: 'WhisperAXTests/RegressionTests/testModelPerformanceWithDebugConfig',
     name: 'debug',
-    models: ['small.en'] # , 'crash_test', 'unknown_model', 'tiny']
+    models: ['tiny', 'crash_test', 'unknown_model', 'small.en']
   }
 }.freeze
 
@@ -385,7 +385,7 @@ def prepare_upload(files)
   upload_folder = File.expand_path(BASE_UPLOAD_PATH)
 
   # Clear out the existing upload folder
-  if Dir.exist?(upload_folder) && !Dir.glob("#{upload_folder}").empty?
+  if Dir.exist?(upload_folder) && !Dir.glob(upload_folder.to_s).empty?
     UI.message "Clearing existing upload folder: #{upload_folder}"
     sh("trash #{upload_folder}/*")
   else
