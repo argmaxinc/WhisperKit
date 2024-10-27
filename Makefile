@@ -29,8 +29,8 @@ setup:
 	@echo "Checking for fastlane"
 	@which fastlane > /dev/null || (echo "Installing fastlane..." && brew install fastlane)
 	@echo "fastlane is installed."
-	@echo "Done 🚀"
 	@$(MAKE) generate-whisperax-xcconfig
+	@echo "Done 🚀"
 
 
 generate-whisperax-xcconfig:

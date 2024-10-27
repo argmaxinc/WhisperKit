@@ -10,7 +10,18 @@ To download the code to run the test suite, run:
 git clone git@github.com:argmaxinc/WhisperKit.git
 ```
 
-## Xcode Environment Variables
+## Local Environment
+
+Before running the benchmarks, you'll need to set up your local environment with the necessary dependencies. To do this, run:
+
+```sh
+make setup
+```
+
+See [Contributing](CONTRIBUTING.md) for more information.
+
+
+## Xcode Environment
 
 When running the tests, the model to test needs is provided to the Xcode from Fastlane as an environment variable:
 
