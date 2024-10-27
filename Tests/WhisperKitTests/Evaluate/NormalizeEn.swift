@@ -253,14 +253,17 @@ class EnglishNumberNormalizer {
     }
 
     func processWords(_ words: [String]) -> [String] {
-        var prefix: String?
-        var value: String?
-        var skip = false
+        var prefix: String? // Stores currency/sign prefixes (e.g., "$", "+", "-")
+        var value: String? // Accumulates the current number being processed
+        var skip = false // Controls skipping next word in special cases
         var results: [String] = []
 
         func output(_ result: String) -> String {
             var result = result
             if let prefix = prefix {
+                // Handles currency symbols and signs
+                // prefix="$", result="100" -> "$100"
+                // prefix="-", result="123" -> "-123"
                 result = prefix + result
             }
             value = nil
@@ -278,15 +281,17 @@ class EnglishNumberNormalizer {
                 continue
             }
 
-            // should be checking for regex match here. But if just checking for number, Int(next) should be good
             let nextIsNumeric = next != nil && Int(next!) != nil
             let hasPrefix = current.first.map { self.prefixes.contains(String($0)) } ?? false
             let currentWithoutPrefix = hasPrefix ? String(current.dropFirst()) : current
 
             if currentWithoutPrefix.range(of: #"^\d+(\.\d+)?$"#, options: .regularExpression) != nil {
-                // arabic numbers (potentially with signs and fractions)
+                // Handles direct numeric input (Arabic numerals)
+                // "123", "45.67", "-123.45"
                 if let f = Decimal(string: currentWithoutPrefix) {
                     if var v = value, v.hasSuffix(".") {
+                        // Handles decimal numbers after "point"
+                        // "one point five" -> value="1." -> "1.5"
                         v = v + current
                         value = v
                         continue
@@ -299,48 +304,64 @@ class EnglishNumberNormalizer {
                     fatalError("Converting the fraction failed")
                 }
             } else if !self.words.contains(current) {
-                // non-numeric words
+                // Non-numeric words that aren't in our dictionary
+                // "hello", "world", "apple"
                 if let v = value {
                     value = v
                     results.append(output(v))
                 }
                 results.append(output(current))
             } else if self.zeros.contains(current) {
+                // Handles zero words: "zero", "oh", "o"
+                // Especially important for sequences like "one oh one" -> "101"
                 value = (value ?? "") + "0"
             } else if let ones = self.ones[current] {
+                // Handles single digits (1-9) and teens (11-19)
+                // "one" -> "1", "fifteen" -> "15"
                 if value == nil {
                     value = String(ones)
                 } else if let v = value, let prev = prev, self.ones[prev] != nil {
                     if ones < 10 {
+                        // Handles consecutive digits
+                        // "twenty one" -> "21"
                         value = String(v.dropLast()) + String(ones)
                     } else {
+                        // Handles teen numbers after another number
+                        // "one fifteen" -> "115"
                         value = v + String(ones)
                     }
                 } else if ones < 10 {
                     if let v = value, let f = Decimal(string: v), f.remainder(dividingBy: 10) == 0 {
+                        // Handles single digit after tens
+                        // "twenty one" -> "21"
                         value = (f + Decimal(ones)).integerPart()
                     } else {
                         value = value! + String(ones)
                     }
                 } else {
-                    // if var v = value, Int(v)! % 100 == 0
                     if let v = value, let f = Decimal(string: v), f.remainder(dividingBy: 100) == 0 {
+                        // Handles teens after hundreds
+                        // "one hundred fifteen" -> "115"
                         value = (f + Decimal(ones)).integerPart()
                     } else {
                         value = value! + String(ones)
                     }
                 }
             } else if let (ones, suffix) = self.onesSuffixed[current] {
+                // Handles ordinal numbers and plurals
+                // "first" -> "1st", "second" -> "2nd", "thirds" -> "3rds"
                 if value == nil {
                     results.append(output("\(ones)\(suffix)"))
                 } else if let v = value, let prev = prev, self.ones[prev] != nil {
                     if ones < 10 {
+                        // "twenty first" -> "21st"
                         results.append(output("\(v.dropLast())\(ones)\(suffix)"))
                     } else {
                         results.append(output("\(v)\(ones)\(suffix)"))
                     }
                 } else if ones < 10 {
                     if let v = value, let f = Decimal(string: v), f.remainder(dividingBy: 10) == 0 {
+                        // "twenty first" -> "21st"
                         results.append(output("\((f + Decimal(ones)).integerPart())\(suffix)"))
                     } else {
                         results.append(output("\(value!)\(ones)\(suffix)"))
@@ -354,18 +375,24 @@ class EnglishNumberNormalizer {
                 }
                 value = nil
             } else if let tens = self.tens[current] {
+                // Handles multiples of ten (20-90)
+                // "twenty" -> "20", "fifty" -> "50"
                 if value == nil {
                     value = String(tens)
                 } else if let v = value, !v.isEmpty {
                     value = v + String(tens)
                 } else {
                     if let v = value, let f = Decimal(string: v), f.remainder(dividingBy: 100) == 0 {
+                        // Handles tens after hundreds
+                        // "one hundred twenty" -> "120"
                         value = (f + Decimal(tens)).integerPart()
                     } else {
                         value = value! + String(tens)
                     }
                 }
             } else if let (tens, suffix) = self.tensSuffixed[current] {
+                // Handles ordinal and plural forms of tens
+                // "twentieth" -> "20th", "sixties" -> "60s"
                 if value == nil {
                     results.append(output("\(tens)\(suffix)"))
                 } else if let v = value, !v.isEmpty, let f = Decimal(string: v) {
@@ -378,22 +405,29 @@ class EnglishNumberNormalizer {
                     value = nil
                 }
             } else if let multiplier = self.multipliers[current] {
+                // Handles number multipliers (hundred, thousand, million, etc.)
+                // "hundred" -> "100", "million" -> "1000000"
                 if value == nil {
                     value = String(multiplier)
                 } else if let v = value, let f = Decimal(string: v) {
                     let p = f * Decimal(multiplier)
                     if p.isInteger {
+                        // "one hundred" -> "100"
                         value = p.integerPart()
                     } else {
                         value = v
                         results.append(output(v))
                     }
                 } else if let v = value {
+                    // Handles complex cases with multiple multipliers
+                    // "one thousand two hundred" -> "1200"
                     let before = Decimal(string: v)! / 1000 * 1000
                     let residual = Decimal(string: v)!.remainder(dividingBy: 1000)
                     value = "\(before + residual * Decimal(multiplier))"
                 }
             } else if let (multiplier, suffix) = self.multipliersSuffixed[current] {
+                // Handles ordinal and plural forms of multipliers
+                // "hundredth" -> "100th", "thousands" -> "1000s"
                 if value == nil {
                     results.append(output("\(multiplier)\(suffix)"))
                 } else if let v = value, let f = Decimal(string: v), (f * Decimal(multiplier)).isInteger {
@@ -407,6 +441,8 @@ class EnglishNumberNormalizer {
                 }
                 value = nil
             } else if let prefixValue = self.precedingPrefixers[current] {
+                // Handles prefixes that come before numbers
+                // "minus 5" -> "-5", "plus 10" -> "+10"
                 if value != nil {
                     results.append(output(value!))
                 }
@@ -416,6 +452,8 @@ class EnglishNumberNormalizer {
                     results.append(output(current))
                 }
             } else if let prefixValue = self.followingPrefixers[current] {
+                // Handles currency words that come after numbers
+                // "5 dollars" -> "$5", "10 euros" -> "€10"
                 if value != nil {
                     prefix = prefixValue
                     results.append(output(value!))
@@ -423,9 +461,13 @@ class EnglishNumberNormalizer {
                     results.append(output(current))
                 }
             } else if let suffixValue = self.suffixers[current] {
+                // Handles various number suffixes
+                // "per cent" -> "%", "percent" -> "%"
                 if value != nil {
                     if let dictSuffixValue = suffixValue as? [String: String] {
                         if let n = next, let nextSuffix = dictSuffixValue[n] {
+                            // Handles multi-word suffixes
+                            // "5 per cent" -> "5%"
                             results.append(output("\(value!)\(nextSuffix)"))
                             skip = true
                         } else {
@@ -439,12 +481,15 @@ class EnglishNumberNormalizer {
                     results.append(output(current))
                 }
             } else if self.specials.contains(current) {
+                // Handles special cases: "and", "point", "double", "triple"
                 if let next, !self.words.contains(next) && !nextIsNumeric {
                     if let v = value {
                         results.append(output(v))
                     }
                     results.append(output(current))
                 } else if current == "and" {
+                    // Handles "and" in number phrases
+                    // "one hundred and twenty" -> "120"
                     if let prev, !self.multipliers.keys.contains(prev) {
                         if let v = value {
                             results.append(output(v))
@@ -452,6 +497,8 @@ class EnglishNumberNormalizer {
                         results.append(output(current))
                     }
                 } else if current == "double" || current == "triple" {
+                    // Handles repeated digits
+                    // "double zero" -> "00", "triple five" -> "555"
                     if let next, let ones = self.ones[next] {
                         let repeats = current == "double" ? 2 : 3
                         value = "\(value ?? "")\(ones)\(repeats)"
@@ -463,6 +510,8 @@ class EnglishNumberNormalizer {
                         results.append(output(current))
                     }
                 } else if current == "point" {
+                    // Handles decimal points in numbers
+                    // "one point five" -> "1.5"
                     if let next, self.decimals.contains(next) || nextIsNumeric {
                         value = "\(value ?? "")."
                     }

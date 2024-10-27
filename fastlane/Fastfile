@@ -1,3 +1,6 @@
+#  For licensing see accompanying LICENSE.md file.
+#  Copyright © 2024 Argmax, Inc. All rights reserved.
+
 # This file contains the fastlane.tools configuration
 # You can find the documentation at https://docs.fastlane.tools
 #
@@ -15,6 +18,7 @@ require 'pathname'
 COMMIT_HASH = `git rev-parse --short HEAD`.strip
 COMMIT_TIMESTAMP = `git log -1 --format=%ct`.strip
 COMMIT_TIMESTAMP = Time.at(COMMIT_TIMESTAMP.to_i).utc.strftime('%Y-%m-%dT%H%M%S')
+XCODE_TEAM_ID = `defaults read com.apple.dt.Xcode IDEProvisioningTeamManagerLastSelectedTeamID`.strip
 WORKING_DIR = Dir.pwd
 BASE_BENCHMARK_PATH = "#{WORKING_DIR}/benchmark_data".freeze
 BASE_UPLOAD_PATH = "#{WORKING_DIR}/upload_folder".freeze
@@ -192,6 +196,13 @@ def run_benchmarks(devices:, config:)
     end
   end
 
+  team_id = XCODE_TEAM_ID
+  if team_id.empty?
+    UI.user_error!('Development Team ID not found. Please log into Xcode with your Apple ID.')
+  else
+    UI.message("Using Development Team ID: #{team_id}")
+  end
+
   run_benchmark(devices, config)
 end
 
@@ -227,7 +238,8 @@ def run_benchmark(devices, config)
       UI.message "Running benchmark for model: #{model}"
       xcargs = [
         "MODEL_NAME=#{model}",
-        '-allowProvisioningUpdates'
+        '-allowProvisioningUpdates',
+        "DEVELOPMENT_TEAM=#{XCODE_TEAM_ID}"
       ].join(' ')
 
       scan_result = scan(
@@ -385,10 +397,11 @@ def prepare_upload(files)
   upload_folder = File.expand_path(BASE_UPLOAD_PATH)
 
   # Clear out the existing upload folder
-  if Dir.exist?(upload_folder) && !Dir.glob(upload_folder.to_s).empty?
+  if Dir.exist?(upload_folder) && !Dir.glob("#{upload_folder}/*").empty?
     UI.message "Clearing existing upload folder: #{upload_folder}"
     sh("trash #{upload_folder}/*")
   else
+    UI.message "Upload folder does not exist or is empty, creating: #{upload_folder}"
     FileUtils.mkdir_p(upload_folder)
   end
 

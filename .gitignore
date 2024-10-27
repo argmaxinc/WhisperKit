@@ -61,6 +61,7 @@ fastlane/benchmark_data
 fastlane/upload_folder
 
 ### Xcode Patch ###
+**/*.xcconfig
 *.xcodeproj/*
 !*.xcodeproj/project.pbxproj
 !*.xcodeproj/xcshareddata/

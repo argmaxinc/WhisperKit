@@ -1,0 +1,8 @@
+//  For licensing see accompanying LICENSE.md file.
+//  Copyright © 2024 Argmax, Inc. All rights reserved.
+
+// Configuration settings file format documentation can be found at:
+// https://help.apple.com/xcode/#/dev745c5c974
+
+CODE_SIGN_STYLE=Automatic
+DEVELOPMENT_TEAM=

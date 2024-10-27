@@ -101,9 +101,8 @@ enum WERUtils {
             numRfWords += referenceSentence.count
             numHypWords += hypothesisSentence.count
         }
-        let (S, D, I, H) = (numSubstitutions, numDeletions, numInsertions, numHits)
 
-        let wer = Double(S + D + I) / Double(H + S + D)
+        let wer = Double(numSubstitutions + numDeletions + numInsertions) / Double(numHits + numSubstitutions + numDeletions)
 
         return (wer, diffResult)
     }
