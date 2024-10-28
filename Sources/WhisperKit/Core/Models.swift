@@ -282,7 +282,7 @@ public struct AudioChunk {
 
 // MARK: - Decoding
 
-public enum DecodingTask: CustomStringConvertible, CaseIterable {
+public enum DecodingTask: Codable, CustomStringConvertible, CaseIterable {
     case transcribe
     case translate
 
@@ -355,7 +355,7 @@ public struct DecodingCache {
     }
 }
 
-public enum ChunkingStrategy: String, CaseIterable {
+public enum ChunkingStrategy: String, Codable, CaseIterable {
     case none
     case vad
 }
@@ -649,6 +649,8 @@ public struct TranscriptionTimings: Codable {
     public var prewarmLoadTime: TimeInterval
     public var encoderLoadTime: TimeInterval
     public var decoderLoadTime: TimeInterval
+    public var encoderSpecializationTime: TimeInterval
+    public var decoderSpecializationTime: TimeInterval
     public var tokenizerLoadTime: TimeInterval
     public var audioLoading: TimeInterval
     public var audioProcessing: TimeInterval
@@ -693,6 +695,8 @@ public struct TranscriptionTimings: Codable {
                 prewarmLoadTime: TimeInterval = 0,
                 encoderLoadTime: TimeInterval = 0,
                 decoderLoadTime: TimeInterval = 0,
+                encoderSpecializationTime: TimeInterval = 0,
+                decoderSpecializationTime: TimeInterval = 0,
                 tokenizerLoadTime: TimeInterval = 0,
                 audioLoading: TimeInterval = 0,
                 audioProcessing: TimeInterval = 0,
@@ -726,6 +730,8 @@ public struct TranscriptionTimings: Codable {
         self.prewarmLoadTime = prewarmLoadTime
         self.encoderLoadTime = encoderLoadTime
         self.decoderLoadTime = decoderLoadTime
+        self.encoderSpecializationTime = encoderSpecializationTime
+        self.decoderSpecializationTime = decoderSpecializationTime
         self.tokenizerLoadTime = tokenizerLoadTime
         self.audioLoading = audioLoading
         self.audioProcessing = audioProcessing

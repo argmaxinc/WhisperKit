@@ -58,7 +58,7 @@ final class UnitTests: XCTestCase {
 
     func testModelSupportConfigFromJson() throws {
         let configFilePath = try XCTUnwrap(
-            Bundle.module.path(forResource: "config", ofType: "json"),
+            Bundle.current.path(forResource: "config", ofType: "json"),
             "Config file not found"
         )
 
@@ -190,7 +190,7 @@ final class UnitTests: XCTestCase {
 
     func testAudioFileLoading() throws {
         let audioFilePath = try XCTUnwrap(
-            Bundle.module.path(forResource: "jfk", ofType: "wav"),
+            Bundle.current.path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
         let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
@@ -211,7 +211,7 @@ final class UnitTests: XCTestCase {
 
     func testAudioFileLoadingWithResampling() throws {
         let audioFilePath = try XCTUnwrap(
-            Bundle.module.path(forResource: "jfk_441khz", ofType: "m4a"),
+            Bundle.current.path(forResource: "jfk_441khz", ofType: "m4a"),
             "Audio file not found"
         )
         let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
@@ -256,7 +256,7 @@ final class UnitTests: XCTestCase {
 
     func testAudioResample() throws {
         let audioFileURL = try XCTUnwrap(
-            Bundle.module.url(forResource: "jfk", withExtension: "wav"),
+            Bundle.current.url(forResource: "jfk", withExtension: "wav"),
             "Audio file not found"
         )
         let audioFile = try AVAudioFile(forReading: audioFileURL)
@@ -275,7 +275,7 @@ final class UnitTests: XCTestCase {
 
     func testAudioResampleFromFile() throws {
         let audioFileURL = try XCTUnwrap(
-            Bundle.module.url(forResource: "jfk", withExtension: "wav"),
+            Bundle.current.url(forResource: "jfk", withExtension: "wav"),
             "Audio file not found"
         )
         let audioFile = try AVAudioFile(forReading: audioFileURL)
@@ -552,7 +552,7 @@ final class UnitTests: XCTestCase {
         let options = DecodingOptions()
         let continuationCallback: TranscriptionCallback = { (progress: TranscriptionProgress) -> Bool? in
             // Stop after only 10 tokens (full test audio contains 16)
-            return progress.tokens.count <= earlyStopTokenCount
+            progress.tokens.count <= earlyStopTokenCount
         }
 
         let result = try await XCTUnwrapAsync(
@@ -650,7 +650,7 @@ final class UnitTests: XCTestCase {
         let whisperKit = try await WhisperKit(config)
 
         let audioFilePath = try XCTUnwrap(
-            Bundle.module.path(forResource: "jfk", ofType: "wav"),
+            Bundle.current.path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
         let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
@@ -777,7 +777,7 @@ final class UnitTests: XCTestCase {
         let whisperKit = try await WhisperKit(config)
 
         let audioFilePath = try XCTUnwrap(
-            Bundle.module.path(forResource: "es_test_clip", ofType: "wav"),
+            Bundle.current.path(forResource: "es_test_clip", ofType: "wav"),
             "Audio file not found"
         )
 
@@ -852,7 +852,7 @@ final class UnitTests: XCTestCase {
         let whisperKit = try await WhisperKit(config)
 
         let audioFilePath = try XCTUnwrap(
-            Bundle.module.path(forResource: "ja_test_clip", ofType: "wav"),
+            Bundle.current.path(forResource: "ja_test_clip", ofType: "wav"),
             "Audio file not found"
         )
 
@@ -903,7 +903,7 @@ final class UnitTests: XCTestCase {
 
         for language in targetLanguages {
             let audioFilePath = try XCTUnwrap(
-                Bundle.module.path(forResource: "\(language)_test_clip", ofType: "wav"),
+                Bundle.current.path(forResource: "\(language)_test_clip", ofType: "wav"),
                 "Audio file not found"
             )
 
@@ -1281,7 +1281,7 @@ final class UnitTests: XCTestCase {
         XCTAssertTrue(vad.voiceActivity(in: []).isEmpty)
 
         let audioFilePath = try XCTUnwrap(
-            Bundle.module.path(forResource: "jfk", ofType: "wav"),
+            Bundle.current.path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
         let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
@@ -1385,7 +1385,7 @@ final class UnitTests: XCTestCase {
         let chunker = VADAudioChunker()
 
         let singleChunkPath = try XCTUnwrap(
-            Bundle.module.path(forResource: "jfk", ofType: "wav"),
+            Bundle.current.path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
         var audioBuffer = try AudioProcessor.loadAudio(fromPath: singleChunkPath)
@@ -1400,7 +1400,7 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(audioChunks.count, 1)
 
         let multiChunkPath = try XCTUnwrap(
-            Bundle.module.path(forResource: "ted_60", ofType: "m4a"),
+            Bundle.current.path(forResource: "ted_60", ofType: "m4a"),
             "Audio file not found"
         )
         audioBuffer = try AudioProcessor.loadAudio(fromPath: multiChunkPath)
@@ -1456,7 +1456,7 @@ final class UnitTests: XCTestCase {
                 }
             }
         _ = try await pipe.transcribe(
-            audioPath: Bundle.module.path(forResource: "ted_60", ofType: "m4a")!,
+            audioPath: Bundle.current.path(forResource: "ted_60", ofType: "m4a")!,
             decodeOptions: .init(chunkingStrategy: .vad)
         )
         cancellable?.cancel()
@@ -1788,7 +1788,7 @@ final class UnitTests: XCTestCase {
 
         let startTime = Date()
         let audioComponents = audioFile.components(separatedBy: ".")
-        guard let audioFileURL = Bundle.module.path(forResource: audioComponents.first, ofType: audioComponents.last) else {
+        guard let audioFileURL = Bundle.current.path(forResource: audioComponents.first, ofType: audioComponents.last) else {
             XCTFail("Audio file not found")
             return
         }

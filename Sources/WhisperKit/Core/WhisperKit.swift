@@ -24,6 +24,7 @@ open class WhisperKit {
     public var textDecoder: any TextDecoding
     public var logitsFilters: [any LogitsFiltering]
     public var segmentSeeker: any SegmentSeeking
+    public var voiceActivityDetector: VoiceActivityDetector?
 
     /// Shapes
     public static let sampleRate: Int = 16000
@@ -49,6 +50,7 @@ open class WhisperKit {
         textDecoder = config.textDecoder ?? TextDecoder()
         logitsFilters = config.logitsFilters ?? []
         segmentSeeker = config.segmentSeeker ?? SegmentSeeker()
+        voiceActivityDetector = config.voiceActivityDetector
         tokenizerFolder = config.tokenizerFolder
         useBackgroundDownloadSession = config.useBackgroundDownloadSession
         currentTimings = TranscriptionTimings()
@@ -357,8 +359,13 @@ open class WhisperKit {
                 computeUnits: modelCompute.textDecoderCompute,
                 prewarmMode: prewarmMode
             )
-            currentTimings.decoderLoadTime = CFAbsoluteTimeGetCurrent() - decoderLoadStart
 
+            if prewarmMode {
+                currentTimings.decoderSpecializationTime = CFAbsoluteTimeGetCurrent() - decoderLoadStart
+            } else {
+                currentTimings.decoderLoadTime = CFAbsoluteTimeGetCurrent() - decoderLoadStart
+            }
+            
             Logging.debug("Loaded text decoder in \(String(format: "%.2f", currentTimings.decoderLoadTime))s")
         }
 
@@ -371,8 +378,13 @@ open class WhisperKit {
                 computeUnits: modelCompute.audioEncoderCompute,
                 prewarmMode: prewarmMode
             )
-            currentTimings.encoderLoadTime = CFAbsoluteTimeGetCurrent() - encoderLoadStart
-
+            
+            if prewarmMode {
+                currentTimings.encoderSpecializationTime = CFAbsoluteTimeGetCurrent() - encoderLoadStart
+            } else {
+                currentTimings.encoderLoadTime = CFAbsoluteTimeGetCurrent() - encoderLoadStart
+            }
+            
             Logging.debug("Loaded audio encoder in \(String(format: "%.2f", currentTimings.encoderLoadTime))s")
         }
 
@@ -776,7 +788,7 @@ open class WhisperKit {
         switch (isChunkable, decodeOptions?.chunkingStrategy) {
             case (true, .vad):
                 // We have some audio that will require multiple windows and a strategy to chunk them
-                let vad = decodeOptions?.voiceActivityDetector ?? EnergyVAD()
+                let vad = voiceActivityDetector ?? EnergyVAD()
                 let chunker = VADAudioChunker(vad: vad)
                 let audioChunks: [AudioChunk] = try await chunker.chunkAll(
                     audioArray: audioArray,

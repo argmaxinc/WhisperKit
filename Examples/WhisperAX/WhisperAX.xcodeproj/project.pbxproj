@@ -8,6 +8,18 @@
 
 /* Begin PBXBuildFile section */
 		161136102B3F6C68003C20F6 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1611360F2B3F6C68003C20F6 /* WhisperKit */; };
+		164F15AF2C91A51D00C715CB /* DistanceCalculation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 164F15AE2C91A51D00C715CB /* DistanceCalculation.swift */; };
+		16548D3A2C7BB90B002BAE86 /* NormalizeEn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16548D292C7BB90B002BAE86 /* NormalizeEn.swift */; };
+		16548D3B2C7BB90B002BAE86 /* SpellingMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16548D2A2C7BB90B002BAE86 /* SpellingMapping.swift */; };
+		16548D3C2C7BB90B002BAE86 /* WERUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16548D2B2C7BB90B002BAE86 /* WERUtils.swift */; };
+		16548D3D2C7BB90B002BAE86 /* es_test_clip.wav in Resources */ = {isa = PBXBuildFile; fileRef = 16548D2D2C7BB90B002BAE86 /* es_test_clip.wav */; };
+		16548D3E2C7BB90B002BAE86 /* ja_test_clip.wav in Resources */ = {isa = PBXBuildFile; fileRef = 16548D2E2C7BB90B002BAE86 /* ja_test_clip.wav */; };
+		16548D3F2C7BB90B002BAE86 /* jfk_441khz.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 16548D2F2C7BB90B002BAE86 /* jfk_441khz.m4a */; };
+		16548D402C7BB90B002BAE86 /* jfk.wav in Resources */ = {isa = PBXBuildFile; fileRef = 16548D302C7BB90B002BAE86 /* jfk.wav */; };
+		16548D412C7BB90B002BAE86 /* ted_60.m4a in Resources */ = {isa = PBXBuildFile; fileRef = 16548D312C7BB90B002BAE86 /* ted_60.m4a */; };
+		16548D432C7BB90B002BAE86 /* RegressionTestUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16548D342C7BB90B002BAE86 /* RegressionTestUtils.swift */; };
+		16548D442C7BB90B002BAE86 /* RegressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16548D352C7BB90B002BAE86 /* RegressionTests.swift */; };
+		16548D452C7BB90B002BAE86 /* TestUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16548D362C7BB90B002BAE86 /* TestUtils.swift */; };
 		1677AFC22B57618A008C61C0 /* WhisperAXApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1677AFAB2B57618A008C61C0 /* WhisperAXApp.swift */; };
 		1677AFC42B57618A008C61C0 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1677AFAE2B57618A008C61C0 /* Preview Assets.xcassets */; };
 		1677AFC92B57618A008C61C0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1677AFB42B57618A008C61C0 /* Assets.xcassets */; };
@@ -85,6 +97,18 @@
 		161135F02B3F66DC003C20F6 /* WhisperAX Watch AppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "WhisperAX Watch AppTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		161135FA2B3F66DC003C20F6 /* WhisperAX Watch AppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "WhisperAX Watch AppUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		1626683A2BB90CC9008F950A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		164F15AE2C91A51D00C715CB /* DistanceCalculation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DistanceCalculation.swift; sourceTree = "<group>"; };
+		16548D292C7BB90B002BAE86 /* NormalizeEn.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NormalizeEn.swift; sourceTree = "<group>"; };
+		16548D2A2C7BB90B002BAE86 /* SpellingMapping.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SpellingMapping.swift; sourceTree = "<group>"; };
+		16548D2B2C7BB90B002BAE86 /* WERUtils.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WERUtils.swift; sourceTree = "<group>"; };
+		16548D2D2C7BB90B002BAE86 /* es_test_clip.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = es_test_clip.wav; sourceTree = "<group>"; };
+		16548D2E2C7BB90B002BAE86 /* ja_test_clip.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = ja_test_clip.wav; sourceTree = "<group>"; };
+		16548D2F2C7BB90B002BAE86 /* jfk_441khz.m4a */ = {isa = PBXFileReference; lastKnownFileType = file; path = jfk_441khz.m4a; sourceTree = "<group>"; };
+		16548D302C7BB90B002BAE86 /* jfk.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = jfk.wav; sourceTree = "<group>"; };
+		16548D312C7BB90B002BAE86 /* ted_60.m4a */ = {isa = PBXFileReference; lastKnownFileType = file; path = ted_60.m4a; sourceTree = "<group>"; };
+		16548D342C7BB90B002BAE86 /* RegressionTestUtils.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RegressionTestUtils.swift; sourceTree = "<group>"; };
+		16548D352C7BB90B002BAE86 /* RegressionTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RegressionTests.swift; sourceTree = "<group>"; };
+		16548D362C7BB90B002BAE86 /* TestUtils.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TestUtils.swift; sourceTree = "<group>"; };
 		1677AFA62B57618A008C61C0 /* WhisperAX_Watch_AppUITests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WhisperAX_Watch_AppUITests.swift; sourceTree = "<group>"; };
 		1677AFA72B57618A008C61C0 /* WhisperAX_Watch_AppUITestsLaunchTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WhisperAX_Watch_AppUITestsLaunchTests.swift; sourceTree = "<group>"; };
 		1677AFA92B57618A008C61C0 /* WhisperAX.entitlements */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; path = WhisperAX.entitlements; sourceTree = "<group>"; };
@@ -103,6 +127,7 @@
 		167B345E2B05431E0076F261 /* WhisperAX.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WhisperAX.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		167B34712B05431F0076F261 /* WhisperAXTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WhisperAXTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		167B347B2B05431F0076F261 /* WhisperAXUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WhisperAXUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		169144182CCEEE87009903CA /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -153,6 +178,41 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		16548D2C2C7BB90B002BAE86 /* Evaluate */ = {
+			isa = PBXGroup;
+			children = (
+				164F15AE2C91A51D00C715CB /* DistanceCalculation.swift */,
+				16548D292C7BB90B002BAE86 /* NormalizeEn.swift */,
+				16548D2A2C7BB90B002BAE86 /* SpellingMapping.swift */,
+				16548D2B2C7BB90B002BAE86 /* WERUtils.swift */,
+			);
+			path = Evaluate;
+			sourceTree = "<group>";
+		};
+		16548D322C7BB90B002BAE86 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				16548D2D2C7BB90B002BAE86 /* es_test_clip.wav */,
+				16548D2E2C7BB90B002BAE86 /* ja_test_clip.wav */,
+				16548D2F2C7BB90B002BAE86 /* jfk_441khz.m4a */,
+				16548D302C7BB90B002BAE86 /* jfk.wav */,
+				16548D312C7BB90B002BAE86 /* ted_60.m4a */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		16548D382C7BB90B002BAE86 /* WhisperKitTests */ = {
+			isa = PBXGroup;
+			children = (
+				16548D2C2C7BB90B002BAE86 /* Evaluate */,
+				16548D322C7BB90B002BAE86 /* Resources */,
+				16548D352C7BB90B002BAE86 /* RegressionTests.swift */,
+				16548D342C7BB90B002BAE86 /* RegressionTestUtils.swift */,
+				16548D362C7BB90B002BAE86 /* TestUtils.swift */,
+			);
+			path = WhisperKitTests;
+			sourceTree = "<group>";
+		};
 		1677AFA52B57618A008C61C0 /* WhisperAXWatchAppUITests */ = {
 			isa = PBXGroup;
 			children = (
@@ -214,6 +274,7 @@
 			isa = PBXGroup;
 			children = (
 				1677AFBC2B57618A008C61C0 /* WhisperAXTests.swift */,
+				16548D382C7BB90B002BAE86 /* WhisperKitTests */,
 			);
 			path = WhisperAXTests;
 			sourceTree = "<group>";
@@ -246,6 +307,7 @@
 		167B34552B05431E0076F261 = {
 			isa = PBXGroup;
 			children = (
+				169144182CCEEE87009903CA /* Debug.xcconfig */,
 				1677AFA82B57618A008C61C0 /* WhisperAX */,
 				1677AFBB2B57618A008C61C0 /* WhisperAXTests */,
 				1677AFB82B57618A008C61C0 /* WhisperAXUITests */,
@@ -402,7 +464,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1520;
-				LastUpgradeCheck = 1520;
+				LastUpgradeCheck = 1600;
 				TargetAttributes = {
 					161135DD2B3F66DA003C20F6 = {
 						CreatedOnToolsVersion = 15.1;
@@ -439,7 +501,6 @@
 			mainGroup = 167B34552B05431E0076F261;
 			packageReferences = (
 				161135D62B3F66A6003C20F6 /* XCLocalSwiftPackageReference "../.." */,
-				16D581062B4F7DCE000C0AB0 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
 			);
 			productRefGroup = 167B345F2B05431E0076F261 /* Products */;
 			projectDirPath = "";
@@ -494,6 +555,11 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				16548D3D2C7BB90B002BAE86 /* es_test_clip.wav in Resources */,
+				16548D3E2C7BB90B002BAE86 /* ja_test_clip.wav in Resources */,
+				16548D402C7BB90B002BAE86 /* jfk.wav in Resources */,
+				16548D3F2C7BB90B002BAE86 /* jfk_441khz.m4a in Resources */,
+				16548D412C7BB90B002BAE86 /* ted_60.m4a in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -546,8 +612,15 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				16548D3A2C7BB90B002BAE86 /* NormalizeEn.swift in Sources */,
+				16548D3B2C7BB90B002BAE86 /* SpellingMapping.swift in Sources */,
+				16548D432C7BB90B002BAE86 /* RegressionTestUtils.swift in Sources */,
+				16548D452C7BB90B002BAE86 /* TestUtils.swift in Sources */,
 				1677AFDA2B5763BA008C61C0 /* WhisperAXUITestsLaunchTests.swift in Sources */,
 				1677AFDC2B5763C0008C61C0 /* WhisperAXTests.swift in Sources */,
+				164F15AF2C91A51D00C715CB /* DistanceCalculation.swift in Sources */,
+				16548D3C2C7BB90B002BAE86 /* WERUtils.swift in Sources */,
+				16548D442C7BB90B002BAE86 /* RegressionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -593,6 +666,7 @@
 /* Begin XCBuildConfiguration section */
 		161136032B3F66DC003C20F6 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 169144182CCEEE87009903CA /* Debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -600,7 +674,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"WhisperAXWatchApp/Preview Content\"";
-				DEVELOPMENT_TEAM = PP83DTRKSA;
+				DEVELOPMENT_TEAM = "${DEVELOPMENT_TEAM}";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Required to record audio from the microphone for transcription.";
@@ -626,6 +700,7 @@
 		};
 		161136042B3F66DC003C20F6 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 169144182CCEEE87009903CA /* Debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -633,19 +708,19 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"WhisperAXWatchApp/Preview Content\"";
-				DEVELOPMENT_TEAM = PP83DTRKSA;
+				DEVELOPMENT_TEAM = "${DEVELOPMENT_TEAM}";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Required to record audio from the microphone for transcription.";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.argmax.whisperkit.WhisperAX;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "com.argmax.whisperkit.WhisperAX${DEVELOPMENT_TEAM}";
 				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 0.1.2;
-				PRODUCT_BUNDLE_IDENTIFIER = com.argmax.whisperkit.WhisperAX.watchapp;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.argmax.whisperkit.WhisperAX${DEVELOPMENT_TEAM}.watchapp";
 				PRODUCT_NAME = "WhisperAX Watch App";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = watchos;
@@ -660,15 +735,15 @@
 		};
 		1611360A2B3F66DC003C20F6 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 169144182CCEEE87009903CA /* Debug.xcconfig */;
 			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = JSGZDY54HP;
+				DEVELOPMENT_TEAM = "${DEVELOPMENT_TEAM}";
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.argmax.whisperkit.WhisperAX.watchkitapp.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.argmax.whisperkit.WhisperAX${DEVELOPMENT_TEAM}.watchkitapp.tests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -681,15 +756,15 @@
 		};
 		1611360B2B3F66DC003C20F6 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 169144182CCEEE87009903CA /* Debug.xcconfig */;
 			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = JSGZDY54HP;
+				DEVELOPMENT_TEAM = "${DEVELOPMENT_TEAM}";
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.argmax.whisperkit.WhisperAX.watchkitapp.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.argmax.whisperkit.WhisperAX${DEVELOPMENT_TEAM}.watchkitapp.tests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -703,14 +778,14 @@
 		};
 		1611360D2B3F66DC003C20F6 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 169144182CCEEE87009903CA /* Debug.xcconfig */;
 			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = JSGZDY54HP;
+				DEVELOPMENT_TEAM = "${DEVELOPMENT_TEAM}";
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.argmax.whisperkit.WhisperAX.watchkitappUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.argmax.whisperkit.WhisperAX${DEVELOPMENT_TEAM}.watchkitappUITests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -723,14 +798,14 @@
 		};
 		1611360E2B3F66DC003C20F6 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 169144182CCEEE87009903CA /* Debug.xcconfig */;
 			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = JSGZDY54HP;
+				DEVELOPMENT_TEAM = "${DEVELOPMENT_TEAM}";
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.argmax.whisperkit.WhisperAX.watchkitappUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.argmax.whisperkit.WhisperAX${DEVELOPMENT_TEAM}.watchkitappUITests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -744,6 +819,7 @@
 		};
 		167B34832B05431F0076F261 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 169144182CCEEE87009903CA /* Debug.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -806,6 +882,7 @@
 		};
 		167B34842B05431F0076F261 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 169144182CCEEE87009903CA /* Debug.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -860,16 +937,17 @@
 		};
 		167B34862B05431F0076F261 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 169144182CCEEE87009903CA /* Debug.xcconfig */;
 			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = WhisperAX/Resources/WhisperAX.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"WhisperAX/Preview Content\"";
-				DEVELOPMENT_TEAM = PP83DTRKSA;
+				DEVELOPMENT_TEAM = "${DEVELOPMENT_TEAM}";
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -890,9 +968,10 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.3.2;
+				MARKETING_VERSION = 0.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.argmax.whisperkit.WhisperAX${DEVELOPMENT_TEAM}";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
@@ -906,8 +985,8 @@
 		};
 		167B34872B05431F0076F261 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 169144182CCEEE87009903CA /* Debug.xcconfig */;
 			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = WhisperAX/Resources/WhisperAX.entitlements;
@@ -915,7 +994,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"WhisperAX/Preview Content\"";
-				DEVELOPMENT_TEAM = PP83DTRKSA;
+				DEVELOPMENT_TEAM = "${DEVELOPMENT_TEAM}";
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -936,8 +1015,8 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.3.2;
-				PRODUCT_BUNDLE_IDENTIFIER = com.argmax.whisperkit.WhisperAX;
+				MARKETING_VERSION = 0.4.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.argmax.whisperkit.WhisperAX${DEVELOPMENT_TEAM}";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
@@ -951,18 +1030,18 @@
 		};
 		167B34892B05431F0076F261 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 169144182CCEEE87009903CA /* Debug.xcconfig */;
 			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = JSGZDY54HP;
+				DEVELOPMENT_TEAM = "${DEVELOPMENT_TEAM}";
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.argmax.whisperkit.WhisperAXTests;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.argmax.whisperkit.WhisperAXTests${DEVELOPMENT_TEAM}";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
@@ -975,18 +1054,18 @@
 		};
 		167B348A2B05431F0076F261 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 169144182CCEEE87009903CA /* Debug.xcconfig */;
 			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = JSGZDY54HP;
+				DEVELOPMENT_TEAM = "${DEVELOPMENT_TEAM}";
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.argmax.whisperkit.WhisperAXTests;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.argmax.whisperkit.WhisperAXTests${DEVELOPMENT_TEAM}";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
@@ -999,17 +1078,17 @@
 		};
 		167B348C2B05431F0076F261 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 169144182CCEEE87009903CA /* Debug.xcconfig */;
 			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = JSGZDY54HP;
+				DEVELOPMENT_TEAM = "${DEVELOPMENT_TEAM}";
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.argmax.whisperkit.WhisperAXUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.argmax.whisperkit.WhisperAXUITests${DEVELOPMENT_TEAM}";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
@@ -1022,17 +1101,17 @@
 		};
 		167B348D2B05431F0076F261 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 169144182CCEEE87009903CA /* Debug.xcconfig */;
 			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = JSGZDY54HP;
+				DEVELOPMENT_TEAM = "${DEVELOPMENT_TEAM}";
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.argmax.whisperkit.WhisperAXUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.argmax.whisperkit.WhisperAXUITests${DEVELOPMENT_TEAM}";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
@@ -1117,17 +1196,6 @@
 			relativePath = ../..;
 		};
 /* End XCLocalSwiftPackageReference section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		16D581062B4F7DCE000C0AB0 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.3.0;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		1611360F2B3F6C68003C20F6 /* WhisperKit */ = {

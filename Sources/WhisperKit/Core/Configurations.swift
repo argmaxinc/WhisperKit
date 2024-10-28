@@ -28,6 +28,7 @@ open class WhisperKitConfig {
     public var textDecoder: (any TextDecoding)?
     public var logitsFilters: [any LogitsFiltering]?
     public var segmentSeeker: (any SegmentSeeking)?
+    public var voiceActivityDetector: VoiceActivityDetector?
 
     /// Enable extra verbosity for logging
     public var verbose: Bool
@@ -55,6 +56,7 @@ open class WhisperKitConfig {
                 textDecoder: (any TextDecoding)? = nil,
                 logitsFilters: [any LogitsFiltering]? = nil,
                 segmentSeeker: (any SegmentSeeking)? = nil,
+                voiceActivityDetector: VoiceActivityDetector? = nil,
                 verbose: Bool = true,
                 logLevel: Logging.LogLevel = .info,
                 prewarm: Bool? = nil,
@@ -74,6 +76,7 @@ open class WhisperKitConfig {
         self.textDecoder = textDecoder
         self.logitsFilters = logitsFilters
         self.segmentSeeker = segmentSeeker
+        self.voiceActivityDetector = voiceActivityDetector
         self.verbose = verbose
         self.logLevel = logLevel
         self.prewarm = prewarm
@@ -115,7 +118,7 @@ open class WhisperKitConfig {
 ///   - noSpeechThreshold: If the no speech probability is higher than this value AND the average log
 ///                        probability over sampled tokens is below `logProbThreshold`, consider the segment as silent.
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-public struct DecodingOptions {
+public struct DecodingOptions: Codable {
     public var verbose: Bool
     public var task: DecodingTask
     public var language: String?
@@ -142,7 +145,6 @@ public struct DecodingOptions {
     public var noSpeechThreshold: Float?
     public var concurrentWorkerCount: Int
     public var chunkingStrategy: ChunkingStrategy?
-    public var voiceActivityDetector: VoiceActivityDetector?
 
     public init(
         verbose: Bool = false,
@@ -170,8 +172,7 @@ public struct DecodingOptions {
         firstTokenLogProbThreshold: Float? = -1.5,
         noSpeechThreshold: Float? = 0.6,
         concurrentWorkerCount: Int = 16,
-        chunkingStrategy: ChunkingStrategy? = nil,
-        voiceActivityDetector: VoiceActivityDetector? = nil
+        chunkingStrategy: ChunkingStrategy? = nil
     ) {
         self.verbose = verbose
         self.task = task
@@ -199,6 +200,5 @@ public struct DecodingOptions {
         self.noSpeechThreshold = noSpeechThreshold
         self.concurrentWorkerCount = concurrentWorkerCount
         self.chunkingStrategy = chunkingStrategy
-        self.voiceActivityDetector = voiceActivityDetector
     }
 }
