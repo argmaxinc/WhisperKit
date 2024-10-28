@@ -18,7 +18,6 @@ require 'pathname'
 COMMIT_HASH = `git rev-parse --short HEAD`.strip
 COMMIT_TIMESTAMP = `git log -1 --format=%ct`.strip
 COMMIT_TIMESTAMP = Time.at(COMMIT_TIMESTAMP.to_i).utc.strftime('%Y-%m-%dT%H%M%S')
-XCODE_TEAM_ID = `defaults read com.apple.dt.Xcode IDEProvisioningTeams | plutil -convert json -r -o - -- - | jq -r  'to_entries[0].value | sort_by(.teamType == "Individual") | .[0].teamID'`.strip
 WORKING_DIR = Dir.pwd
 BASE_BENCHMARK_PATH = "#{WORKING_DIR}/benchmark_data".freeze
 BASE_UPLOAD_PATH = "#{WORKING_DIR}/upload_folder".freeze
@@ -196,13 +195,6 @@ def run_benchmarks(devices:, config:)
     end
   end
 
-  team_id = XCODE_TEAM_ID
-  if team_id.empty?
-    UI.user_error!('Development Team ID not found. Please log into Xcode with your Apple ID.')
-  else
-    UI.message("Using Development Team ID: #{team_id}")
-  end
-
   run_benchmark(devices, config)
 end
 
@@ -239,8 +231,7 @@ def run_benchmark(devices, config)
       xcargs = [
         "MODEL_NAME=#{model}",
         '-allowProvisioningUpdates',
-        '-allowProvisioningDeviceRegistration',
-        "DEVELOPMENT_TEAM=#{XCODE_TEAM_ID}"
+        '-allowProvisioningDeviceRegistration'
       ].join(' ')
 
       scan_result = scan(
@@ -256,9 +247,7 @@ def run_benchmark(devices, config)
         output_directory: XCRESULT_PATH,
         suppress_xcode_output: false,
         result_bundle: true,
-        # show_xcode_test_logs: true
         buildlog_path: XCRESULT_PATH,
-        # include_simulator_logs: true,
         output_style: 'raw',
         fail_build: false
       )
