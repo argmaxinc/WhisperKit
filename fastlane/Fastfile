@@ -358,7 +358,7 @@ def merge_all_summaries(summaries, devices, _config)
 
       unless result[:success]
         merged_data[:modelsTested] << model
-        merged_data[:failureInfo][model] = result[:error] || 'Test failed'
+        merged_data[:failureInfo][model] = result[:error] || "Test failed without error message, full output: #{result}"
       end
     end
 
