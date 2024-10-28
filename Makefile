@@ -117,7 +117,7 @@ list-devices:
 #	make benchmark-devices DEVICES="iPhone 15 Pro Max,My Mac"	# Benchmark specific device names from `make list-devices`
 DEVICES ?=
 DEBUG ?= false
-benchmark-devices:
+benchmark-devices: generate-whisperax-xcconfig
 	@if [ -n "$(DEVICES)" ]; then \
 		echo "Benchmarking specific devices: $(DEVICES)"; \
 		fastlane benchmark devices:"$(DEVICES)" debug:$(DEBUG); \
