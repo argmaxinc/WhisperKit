@@ -35,7 +35,7 @@ setup:
 
 generate-whisperax-xcconfig:
 	@echo "Updating DEVELOPMENT_TEAM in Examples/WhisperAX/Debug.xcconfig..."
-	@TEAM_ID=$$(defaults read com.apple.dt.Xcode IDEProvisioningTeamManagerLastSelectedTeamID 2>/dev/null); \
+	@TEAM_ID=$$(defaults read com.apple.dt.Xcode IDEProvisioningTeams | plutil -convert json -r -o - -- - | jq -r  'to_entries[0].value | sort_by(.teamType == "Individual") | .[0].teamID' 2>/dev/null); \
 	if [ -z "$$TEAM_ID" ]; then \
 		echo "Error: No Development Team ID found. Please log into Xcode with your Apple ID and select a team."; \
 	else \
