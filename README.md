@@ -30,7 +30,8 @@ Check out the demo app on [TestFlight](https://testflight.apple.com/join/LPVOyJZ
 - [Installation](#installation)
   - [Swift Package Manager](#swift-package-manager)
   - [Prerequisites](#prerequisites)
-  - [Steps](#steps)
+  - [Xcode Steps](#xcode-steps)
+  - [Package.swift](#packageswift)
   - [Homebrew](#homebrew)
 - [Getting Started](#getting-started)
   - [Quick Example](#quick-example)
@@ -52,13 +53,32 @@ WhisperKit can be integrated into your Swift project using the Swift Package Man
 - macOS 14.0 or later.
 - Xcode 15.0 or later.
 
-### Steps
+### Xcode Steps
 
 1. Open your Swift project in Xcode.
 2. Navigate to `File` > `Add Package Dependencies...`.
 3. Enter the package repository URL: `https://github.com/argmaxinc/whisperkit`.
 4. Choose the version range or specific version.
 5. Click `Finish` to add WhisperKit to your project.
+
+### Package.swift
+
+If you're using WhisperKit as part of a swift package, you can include it in your Package.swift dependencies as follows:
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/argmaxinc/WhisperKit.git", from: "0.9.0"),
+],
+```
+
+Then add `WhisperKit` as a dependency for your target:
+
+```swift
+.target(
+    name: "YourApp",
+    dependencies: ["WhisperKit"]
+),
+```
 
 ### Homebrew
 
