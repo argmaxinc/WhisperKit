@@ -35,11 +35,11 @@ setup:
 
 generate-whisperax-xcconfig:
 	@echo "Updating DEVELOPMENT_TEAM in Examples/WhisperAX/Debug.xcconfig..."
-	@TEAM_ID=$$(defaults read com.apple.dt.Xcode IDEProvisioningTeamManagerLastSelectedTeamID 2>/dev/null); \
+	@TEAM_ID=$$(defaults read com.apple.dt.Xcode IDEProvisioningTeams | plutil -convert json -r -o - -- - | jq -r  'to_entries[0].value | sort_by(.teamType == "Individual") | .[0].teamID' 2>/dev/null); \
 	if [ -z "$$TEAM_ID" ]; then \
 		echo "Error: No Development Team ID found. Please log into Xcode with your Apple ID and select a team."; \
 	else \
-		echo "DEVELOPMENT_TEAM=$$TEAM_ID" >> Examples/WhisperAX/Debug.xcconfig; \
+		echo "DEVELOPMENT_TEAM=$$TEAM_ID" > Examples/WhisperAX/Debug.xcconfig; \
 		echo "DEVELOPMENT_TEAM has been updated in Examples/WhisperAX/Debug.xcconfig with your Development Team ID: $$TEAM_ID"; \
 	fi
 
@@ -117,7 +117,7 @@ list-devices:
 #	make benchmark-devices DEVICES="iPhone 15 Pro Max,My Mac"	# Benchmark specific device names from `make list-devices`
 DEVICES ?=
 DEBUG ?= false
-benchmark-devices:
+benchmark-devices: generate-whisperax-xcconfig
 	@if [ -n "$(DEVICES)" ]; then \
 		echo "Benchmarking specific devices: $(DEVICES)"; \
 		fastlane benchmark devices:"$(DEVICES)" debug:$(DEBUG); \
