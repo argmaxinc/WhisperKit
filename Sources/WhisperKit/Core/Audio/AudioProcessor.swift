@@ -349,13 +349,14 @@ public class AudioProcessor: NSObject, AudioProcessing {
         }
 
         let inputBuffer = AVAudioPCMBuffer(pcmFormat: audioFile.processingFormat, frameCapacity: maxReadFrameSize)!
-
-        while audioFile.framePosition < endFramePosition {
+        var nextPosition = inputStartFrame
+        while nextPosition < endFramePosition {
             let remainingFrames = AVAudioFrameCount(endFramePosition - audioFile.framePosition)
             let framesToRead = min(remainingFrames, maxReadFrameSize)
+            nextPosition = audioFile.framePosition + Int64(framesToRead)
 
             let currentPositionInSeconds = Double(audioFile.framePosition) / inputSampleRate
-            let nextPositionInSeconds = (Double(audioFile.framePosition) + Double(framesToRead)) / inputSampleRate
+            let nextPositionInSeconds = Double(nextPosition) / inputSampleRate
             Logging.debug("Resampling \(String(format: "%.2f", currentPositionInSeconds))s - \(String(format: "%.2f", nextPositionInSeconds))s")
 
             do {
