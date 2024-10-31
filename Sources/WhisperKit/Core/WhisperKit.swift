@@ -266,6 +266,79 @@ open class WhisperKit {
             throw error
         }
     }
+    public static func modelLocation(
+        variant: String,
+        downloadBase: URL? = nil,
+        from repo: String = "argmaxinc/whisperkit-coreml",
+        specificOnly: Bool = false
+    ) throws -> URL {
+        let saveRoot: URL
+        if let downloadBase {
+            saveRoot = downloadBase
+        } else {
+            let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+            saveRoot = documents.appending(component: "huggingface")
+        }
+        let modelSearchPath = "*\(variant.description)"
+        let repoDestination = saveRoot.appending(component: "models").appending(component: repo)
+
+        do {
+            Logging.debug(repoDestination.absoluteString)
+            let isInstalled = try? repoDestination.resourceValues(forKeys: [.isDirectoryKey]).isDirectory
+            guard let isInstalled, isInstalled else {
+                throw WhisperError.modelsUnavailable("Repo destination does not exist \(repoDestination.absoluteString)")
+            }
+            let dirFiles = try FileManager.default.contentsOfDirectory(atPath: repoDestination.path(percentEncoded: false))
+            let modelFiles = dirFiles.matching(glob: modelSearchPath)
+            var uniquePaths = Set(modelFiles.map { $0.components(separatedBy: "/").first! })
+            
+            var variantPath: String? = nil
+            
+            if uniquePaths.count == 1 {
+                variantPath = uniquePaths.first
+            } else if specificOnly {
+                // We only want the one specific model, and won't accept fuzzy fallbacks
+                throw WhisperError.modelsUnavailable("Multiple models found matching \"\(modelSearchPath)\" and specificOnly was set")
+            } else {
+                // If the model name search returns more than one unique model folder, then prepend the default "openai" prefix from whisperkittools to disambiguate
+                Logging.debug("Multiple models found matching \"\(modelSearchPath)\"")
+                let adjustedModelSearchPath = "*openai*\(variant.description)"
+                Logging.debug("Searching for models matching \"\(adjustedModelSearchPath)\" in \(repo)")
+                let adjustedModelFiles = dirFiles.matching(glob: adjustedModelSearchPath)
+                uniquePaths = Set(adjustedModelFiles.map { $0.components(separatedBy: "/").first! })
+
+                if uniquePaths.count == 1 {
+                    variantPath = uniquePaths.first
+                }
+            }
+            
+            guard let variantPath else {
+                // If there is still ambiguity, throw an error
+                throw WhisperError.modelsUnavailable("Multiple models found matching \"\(modelSearchPath)\"")
+            }
+            
+            let truePath = repoDestination.appending(path: variantPath)
+            return truePath
+        } catch {
+            Logging.debug(error)
+            throw error
+        }
+    }
+    public static func modelInstalled(
+        variant: String,
+        downloadBase: URL? = nil,
+        from repo: String = "argmaxinc/whisperkit-coreml",
+        specificOnly: Bool = false
+    ) -> Bool {
+        do {
+            let location = try modelLocation(variant: variant, downloadBase: downloadBase, from: repo, specificOnly: specificOnly)
+            let isInstalled = try? location.resourceValues(forKeys: [.isDirectoryKey]).isDirectory
+            return isInstalled ?? false
+        } catch {
+            Logging.error(error)
+            return false
+        }
+    }
 
     /// Sets up the model folder either from a local path or by downloading from a repository.
     open func setupModels(
