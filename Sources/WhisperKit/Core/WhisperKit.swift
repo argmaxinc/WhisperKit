@@ -59,7 +59,7 @@ open class WhisperKit {
         try await setupModels(
             model: config.model,
             downloadBase: config.downloadBase,
-            modelRepo: config.modelRepo ?? "argmaxinc/whisperkit-coreml",
+            modelRepo: config.modelRepo,
             modelFolder: config.modelFolder,
             download: config.download
         )
@@ -79,7 +79,7 @@ open class WhisperKit {
     public convenience init(
         model: String? = nil,
         downloadBase: URL? = nil,
-        modelRepo: String = "argmaxinc/whisperkit-coreml",
+        modelRepo: String? = nil,
         modelFolder: String? = nil,
         tokenizerFolder: URL? = nil,
         computeOptions: ModelComputeOptions? = nil,
@@ -294,14 +294,16 @@ open class WhisperKit {
             
             var variantPath: String? = nil
             
-            if uniquePaths.count == 1 {
+            if uniquePaths.count == 0 {
+                throw WhisperError.modelsUnavailable("Could not find model matching \"\(modelSearchPath)\"")
+            } else if uniquePaths.count == 1 {
                 variantPath = uniquePaths.first
             } else if specificOnly {
                 // We only want the one specific model, and won't accept fuzzy fallbacks
                 throw WhisperError.modelsUnavailable("Multiple models found matching \"\(modelSearchPath)\" and specificOnly was set")
             } else {
                 // If the model name search returns more than one unique model folder, then prepend the default "openai" prefix from whisperkittools to disambiguate
-                Logging.debug("Multiple models found matching \"\(modelSearchPath)\"")
+                Logging.debug("No definitive model matching \"\(modelSearchPath)\"")
                 let adjustedModelSearchPath = "*openai*\(variant.description)"
                 Logging.debug("Searching for models matching \"\(adjustedModelSearchPath)\" in \(repo)")
                 let adjustedModelFiles = dirFiles.matching(glob: adjustedModelSearchPath)
@@ -314,7 +316,7 @@ open class WhisperKit {
             
             guard let variantPath else {
                 // If there is still ambiguity, throw an error
-                throw WhisperError.modelsUnavailable("Multiple models found matching \"\(modelSearchPath)\"")
+                throw WhisperError.modelsUnavailable("Could not find definitive model matching \"\(modelSearchPath)\"")
             }
             
             let truePath = repoDestination.appending(path: variantPath)
@@ -344,7 +346,7 @@ open class WhisperKit {
     open func setupModels(
         model: String?,
         downloadBase: URL? = nil,
-        modelRepo: String = "argmaxinc/whisperkit-coreml",
+        modelRepo: String? = nil,
         modelFolder: String?,
         download: Bool
     ) async throws {
@@ -356,12 +358,13 @@ open class WhisperKit {
             let modelSupport = await WhisperKit.recommendedRemoteModels()
             let modelVariant = model ?? modelSupport.default
 
+            let repo = modelRepo ?? "argmaxinc/whisperkit-coreml"
             do {
                 self.modelFolder = try await Self.download(
                     variant: modelVariant,
                     downloadBase: downloadBase,
                     useBackgroundSession: useBackgroundDownloadSession,
-                    from: modelRepo
+                    from: repo
                 )
             } catch {
                 // Handle errors related to model downloading
@@ -373,7 +376,8 @@ open class WhisperKit {
         } else {
             let modelSupport = WhisperKit.recommendedModels()
             let modelVariant = model ?? modelSupport.default
-            let folder = try Self.modelLocation(variant: modelVariant, downloadBase: downloadBase, from: modelRepo)
+            let repo = modelRepo ?? "argmaxinc/whisperkit-coreml"
+            guard let folder = try? Self.modelLocation(variant: modelVariant, downloadBase: downloadBase, from: repo) else { return }
             self.modelFolder = folder
         }
     }
