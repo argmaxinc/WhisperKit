@@ -631,6 +631,7 @@ public struct TranscriptionProgress {
 
 public typealias SegmentDiscoveryCallback = (([TranscriptionSegment]) -> Void)
 public typealias ModelStateCallback = ((ModelState?, ModelState) -> Void)
+public typealias FractionCompletedCallback = ((Float) -> Void)
 /// Callback to receive progress updates during transcription.
 ///
 /// - Parameters:

@@ -48,6 +48,7 @@ open class WhisperKit {
 
     /// Callbacks
     public var segmentDiscoveryCallback: SegmentDiscoveryCallback?
+    public var fractionCompletedCallback: FractionCompletedCallback?
     public var modelStateCallback: ModelStateCallback?
 
     public init(_ config: WhisperKitConfig = WhisperKitConfig(), modelStateDidChangeCallback: ModelStateCallback? = nil) async throws {
@@ -884,6 +885,7 @@ open class WhisperKit {
             )
 
             transcribeTask.segmentDiscoveryCallback = self.segmentDiscoveryCallback
+            transcribeTask.fractionCompletedCallback = self.fractionCompletedCallback
 
             let transcribeTaskResult = try await transcribeTask.run(
                 audioArray: audioArray,
