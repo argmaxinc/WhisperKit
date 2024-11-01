@@ -48,6 +48,7 @@ open class WhisperKit {
 
     /// Callbacks
     public var segmentDiscoveryCallback: SegmentDiscoveryCallback?
+    public var transcriptionPhaseCallback: TranscriptionPhaseCallback?
     public var fractionCompletedCallback: FractionCompletedCallback?
     public var modelStateCallback: ModelStateCallback?
 
@@ -745,6 +746,9 @@ open class WhisperKit {
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
     ) async throws -> [TranscriptionResult] {
+
+        transcriptionPhaseCallback?(.convertingAudio)
+
         // Process input audio file into audio samples
         let audioArray = try await withThrowingTaskGroup(of: [Float].self) { group -> [Float] in
             let convertAudioStart = Date()
@@ -758,6 +762,12 @@ open class WhisperKit {
             return try AudioProcessor.loadAudioAsFloatArray(fromPath: audioPath)
         }
 
+        transcriptionPhaseCallback?(.transcribing)
+        defer {
+            transcriptionPhaseCallback?(.finished)
+        }
+
+        // Send converted samples to be transcribed
         let transcribeResults: [TranscriptionResult] = try await transcribe(
             audioArray: audioArray,
             decodeOptions: decodeOptions,
