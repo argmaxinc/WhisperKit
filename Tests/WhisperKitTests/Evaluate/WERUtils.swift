@@ -125,9 +125,9 @@ enum WERUtils {
     }
 
     static func diffString(from diff: [[String?]]) -> String {
-        return diff.filter { $0[0] != " "}.compactMap { entry -> String? in
-            guard let word = entry[0] else { return nil }
-            if let changeType = entry[1], word != " " {
+        return diff.compactMap { entry -> String? in
+            guard let word = entry[0], word != " " else { return nil }
+            if let changeType = entry[1] {
                 return "\(changeType)\(word)"
             }
             return word
