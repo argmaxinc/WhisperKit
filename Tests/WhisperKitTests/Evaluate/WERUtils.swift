@@ -123,4 +123,14 @@ enum WERUtils {
         let (_, diff) = evaluate(originalTranscript: originalTranscript, generatedTranscript: generatedTranscript)
         return diff
     }
+
+    static func diffString(from diff: [[String?]]) -> String {
+        return diff.filter { $0[0] != " "}.compactMap { entry -> String? in
+            guard let word = entry[0] else { return nil }
+            if let changeType = entry[1], word != " " {
+                return "\(changeType)\(word)"
+            }
+            return word
+        }.joined(separator: " ")
+    }
 }
