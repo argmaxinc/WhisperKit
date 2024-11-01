@@ -1416,31 +1416,31 @@ final class UnitTests: XCTestCase {
     }
 
     func testVADAudioChunkerAccuracy() async throws {
-        let testResult = try await XCTUnwrapAsync(
-            await transcribe(with: .tiny, options: DecodingOptions(), audioFile: "ted_60.m4a"),
-            "Failed to transcribe"
-        )
-
-        let options = DecodingOptions(chunkingStrategy: .vad)
+        let options = DecodingOptions(temperatureFallbackCount: 0, chunkingStrategy: .vad)
 
         let chunkedResult = try await XCTUnwrapAsync(
             await transcribe(with: .tiny, options: options, audioFile: "ted_60.m4a"),
             "Failed to transcribe"
         )
 
+        let clipTimestamps = chunkedResult.compactMap(\.seekTime)
+        XCTAssertEqual(clipTimestamps, [0, 22.9, 39], "Clip timestamps should match the expected values, found \(clipTimestamps)")
+
+        // Run the test using same seek values for accuracy comparison
+        let testResult = try await XCTUnwrapAsync(
+            await transcribe(with: .tiny, options: DecodingOptions(temperatureFallbackCount: 0, clipTimestamps: [0, 22.9, 22.9, 39, 39, 60]), audioFile: "ted_60.m4a"),
+            "Failed to transcribe"
+        )
+
         XCTAssertFalse(testResult.text.isEmpty, "The test text should not be empty")
         XCTAssertFalse(chunkedResult.text.isEmpty, "The chunked text should not be empty")
 
-        // Select few sentences to compare at VAD border
-        // TODO: test that WER is in acceptable range
-//        XCTAssertTrue(testResult.text.normalized.contains("I would kind".normalized), "Expected text not found in \(testResult.text.normalized)")
-//        XCTAssertTrue(chunkedResult.text.normalized.contains("I would kind".normalized), "Expected text not found in \(chunkedResult.text.normalized)")
-//
-//        XCTAssertTrue(testResult.text.normalized.contains("every single paper".normalized), "Expected text not found in \(testResult.text.normalized)")
-//        XCTAssertTrue(chunkedResult.text.normalized.contains("every single paper".normalized), "Expected text not found in \(chunkedResult.text.normalized)")
+        // Check WER for the full audio and the chunked audio
+        let (wer, diff) = WERUtils.evaluate(originalTranscript: testResult.text, generatedTranscript: chunkedResult.text)
 
-        XCTAssertTrue(testResult.text.normalized.contains("But then came my 90 page senior".normalized), "Expected text not found in \(testResult.text.normalized)")
-        XCTAssertTrue(chunkedResult.text.normalized.contains("But then came my 90 page senior".normalized), "Expected text not found in \(chunkedResult.text.normalized)")
+        let diffDescription = WERUtils.diffString(from: diff)
+
+        XCTAssertEqual(wer, 0.0, "Transcripts should match with a WER of 0, found \(wer). Full diff: \(diffDescription)")
     }
 
     #if !os(watchOS) // FIXME: This test times out on watchOS when run on low compute runners
