@@ -629,6 +629,7 @@ public struct TranscriptionProgress {
     }
 }
 
+public typealias SegmentDiscoveryCallback = (([TranscriptionSegment]) -> Void)
 /// Callback to receive progress updates during transcription.
 ///
 /// - Parameters:

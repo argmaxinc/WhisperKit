@@ -42,6 +42,8 @@ open class WhisperKit {
     public var tokenizerFolder: URL?
     public private(set) var useBackgroundDownloadSession: Bool
 
+    /// Callbacks
+    public var segmentDiscoveryCallback: SegmentDiscoveryCallback?
     public init(_ config: WhisperKitConfig = WhisperKitConfig()) async throws {
         modelCompute = config.computeOptions ?? ModelComputeOptions()
         audioProcessor = config.audioProcessor ?? AudioProcessor()
@@ -871,6 +873,8 @@ open class WhisperKit {
                 textDecoder: textDecoder,
                 tokenizer: tokenizer
             )
+
+            transcribeTask.segmentDiscoveryCallback = self.segmentDiscoveryCallback
 
             let transcribeTaskResult = try await transcribeTask.run(
                 audioArray: audioArray,

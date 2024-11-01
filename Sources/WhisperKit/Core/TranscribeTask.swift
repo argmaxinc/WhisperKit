@@ -15,6 +15,7 @@ final class TranscribeTask {
     private let textDecoder: any TextDecoding
     private let tokenizer: any WhisperTokenizer
 
+    public var segmentDiscoveryCallback: (([TranscriptionSegment]) -> Void)?
     init(
         currentTimings: TranscriptionTimings,
         progress: Progress?,
@@ -229,6 +230,8 @@ final class TranscribeTask {
                         Logging.debug(line)
                     }
                 }
+
+                segmentDiscoveryCallback?(currentSegments)
 
                 // add them to the `allSegments` list
                 allSegments.append(contentsOf: currentSegments)
