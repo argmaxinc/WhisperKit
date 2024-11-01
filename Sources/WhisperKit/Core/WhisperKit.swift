@@ -13,7 +13,11 @@ import Tokenizers
 open class WhisperKit {
     /// Models
     public private(set) var modelVariant: ModelVariant = .tiny
-    public private(set) var modelState: ModelState = .unloaded
+    public private(set) var modelState: ModelState = .unloaded {
+        didSet {
+            modelStateCallback?(oldValue, modelState)
+        }
+    }
     public var modelCompute: ModelComputeOptions
     public var tokenizer: WhisperTokenizer?
 
@@ -44,7 +48,9 @@ open class WhisperKit {
 
     /// Callbacks
     public var segmentDiscoveryCallback: SegmentDiscoveryCallback?
-    public init(_ config: WhisperKitConfig = WhisperKitConfig()) async throws {
+    public var modelStateCallback: ModelStateCallback?
+
+    public init(_ config: WhisperKitConfig = WhisperKitConfig(), modelStateDidChangeCallback: ModelStateCallback? = nil) async throws {
         modelCompute = config.computeOptions ?? ModelComputeOptions()
         audioProcessor = config.audioProcessor ?? AudioProcessor()
         featureExtractor = config.featureExtractor ?? FeatureExtractor()
@@ -57,6 +63,8 @@ open class WhisperKit {
         useBackgroundDownloadSession = config.useBackgroundDownloadSession
         currentTimings = TranscriptionTimings()
         Logging.shared.logLevel = config.verbose ? config.logLevel : .none
+
+        self.modelStateCallback = modelStateDidChangeCallback
 
         try await setupModels(
             model: config.model,
@@ -96,7 +104,8 @@ open class WhisperKit {
         prewarm: Bool? = nil,
         load: Bool? = nil,
         download: Bool = true,
-        useBackgroundDownloadSession: Bool = false
+        useBackgroundDownloadSession: Bool = false,
+        modelStateDidChangeCallback: ModelStateCallback? = nil
     ) async throws {
         let config = WhisperKitConfig(
             model: model,
@@ -118,7 +127,7 @@ open class WhisperKit {
             download: download,
             useBackgroundDownloadSession: useBackgroundDownloadSession
         )
-        try await self.init(config)
+        try await self.init(config, modelStateDidChangeCallback: modelStateDidChangeCallback)
     }
 
     // MARK: - Model Loading
