@@ -46,7 +46,7 @@ open class WhisperKitConfig {
 
     public init(model: String? = nil,
                 downloadBase: URL? = nil,
-                modelRepo: String? = nil,
+                modelRepo: String = "argmaxinc/whisperkit-coreml",
                 modelFolder: String? = nil,
                 tokenizerFolder: URL? = nil,
                 computeOptions: ModelComputeOptions? = nil,

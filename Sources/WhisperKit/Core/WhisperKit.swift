@@ -59,7 +59,7 @@ open class WhisperKit {
         try await setupModels(
             model: config.model,
             downloadBase: config.downloadBase,
-            modelRepo: config.modelRepo,
+            modelRepo: config.modelRepo ?? "argmaxinc/whisperkit-coreml",
             modelFolder: config.modelFolder,
             download: config.download
         )
@@ -79,7 +79,7 @@ open class WhisperKit {
     public convenience init(
         model: String? = nil,
         downloadBase: URL? = nil,
-        modelRepo: String? = nil,
+        modelRepo: String = "argmaxinc/whisperkit-coreml",
         modelFolder: String? = nil,
         tokenizerFolder: URL? = nil,
         computeOptions: ModelComputeOptions? = nil,
@@ -344,7 +344,7 @@ open class WhisperKit {
     open func setupModels(
         model: String?,
         downloadBase: URL? = nil,
-        modelRepo: String?,
+        modelRepo: String = "argmaxinc/whisperkit-coreml",
         modelFolder: String?,
         download: Bool
     ) async throws {
@@ -356,13 +356,12 @@ open class WhisperKit {
             let modelSupport = await WhisperKit.recommendedRemoteModels()
             let modelVariant = model ?? modelSupport.default
 
-            let repo = modelRepo ?? "argmaxinc/whisperkit-coreml"
             do {
                 self.modelFolder = try await Self.download(
                     variant: modelVariant,
                     downloadBase: downloadBase,
                     useBackgroundSession: useBackgroundDownloadSession,
-                    from: repo
+                    from: modelRepo
                 )
             } catch {
                 // Handle errors related to model downloading
@@ -371,6 +370,11 @@ open class WhisperKit {
                 Error: \(error)
                 """)
             }
+        } else {
+            let modelSupport = WhisperKit.recommendedModels()
+            let modelVariant = model ?? modelSupport.default
+            let folder = try Self.modelLocation(variant: modelVariant, downloadBase: downloadBase, from: modelRepo)
+            self.modelFolder = folder
         }
     }
 
