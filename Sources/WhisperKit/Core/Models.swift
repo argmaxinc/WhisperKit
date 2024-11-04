@@ -1272,9 +1272,17 @@ extension WhisperTokenizerWrapper: Tokenizer {
     func tokenize(text: String) -> [String] {
         tokenizer.tokenize(text: text)
     }
+    
+    func callAsFunction(_ text: String, addSpecialTokens: Bool) -> [Int] {
+        tokenizer.callAsFunction(text, addSpecialTokens: addSpecialTokens)
+    }
 
     func encode(text: String) -> [Int] {
         tokenizer.encode(text: text)
+    }
+    
+    func encode(text: String, addSpecialTokens: Bool) -> [Int] {
+        tokenizer.encode(text: text, addSpecialTokens: addSpecialTokens)
     }
 
     func decode(tokens: [Int]) -> String {
@@ -1311,6 +1319,27 @@ extension WhisperTokenizerWrapper: Tokenizer {
 
     var unknownTokenId: Int? {
         tokenizer.unknownTokenId
+    }
+    
+    func applyChatTemplate(messages: [[String: String]]) throws -> [Int] {
+        try tokenizer.applyChatTemplate(messages: messages)
+    }
+    
+    func applyChatTemplate(
+        messages: [[String: String]],
+        chatTemplate: String?,
+        addGenerationPrompt: Bool,
+        truncation: Bool,
+        maxLength: Int?
+    ) throws -> [Int] {
+        try tokenizer
+            .applyChatTemplate(
+                messages: messages,
+                chatTemplate: chatTemplate,
+                addGenerationPrompt: addGenerationPrompt,
+                truncation: truncation,
+                maxLength: maxLength
+            )
     }
 }
 

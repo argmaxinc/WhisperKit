@@ -1,12 +1,21 @@
 {
   "pins" : [
     {
+      "identity" : "jinja",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/maiqingqiang/Jinja",
+      "state" : {
+        "revision" : "6dbe4c449469fb586d0f7339f900f0dd4d78b167",
+        "version" : "1.0.6"
+      }
+    },
+    {
       "identity" : "swift-argument-parser",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-argument-parser.git",
       "state" : {
-        "revision" : "c8ed701b513cf5177118a175d85fbbbcd707ab41",
-        "version" : "1.3.0"
+        "revision" : "0fbc8848e389af3bb55c182bc19ca9d5dc2f255b",
+        "version" : "1.4.0"
       }
     },
     {
@@ -14,8 +23,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/huggingface/swift-transformers.git",
       "state" : {
-        "revision" : "fc6543263e4caed9bf6107466d625cfae9357f08",
-        "version" : "0.1.8"
+        "revision" : "0f2306713d48a75b862026ebb291926793773f52",
+        "version" : "0.1.12"
       }
     }
   ],
