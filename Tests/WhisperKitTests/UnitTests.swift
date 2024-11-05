@@ -1067,6 +1067,43 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(result.segments.first?.text, " and so my fellow americans ask not what your country can do for you ask what you can do for your country.")
     }
 
+    func testCallbacks() async throws {
+        let config = try WhisperKitConfig(
+            modelFolder: tinyModelPath(),
+            verbose: true,
+            logLevel: .debug,
+            load: false
+        )
+        let whisperKit = try await WhisperKit(config)
+        let modelStateExpectation = XCTestExpectation(description: "Model state callback expectation")
+        whisperKit.modelStateCallback = { (oldState: ModelState?, newState: ModelState) in
+            Logging.debug("Model state: \(newState)")
+            modelStateExpectation.fulfill()
+        }
+
+        let segmentDiscoveryExpectation = XCTestExpectation(description: "Segment discovery callback expectation")
+        whisperKit.segmentDiscoveryCallback = { (segments: [TranscriptionSegment]) in
+            Logging.debug("Segments discovered: \(segments)")
+            segmentDiscoveryExpectation.fulfill()
+        }
+
+        let transcriptionStateExpectation = XCTestExpectation(description: "Transcription state callback expectation")
+        whisperKit.transcriptionStateCallback = { (state: TranscriptionState) in
+            Logging.debug("Transcription state: \(state)")
+            transcriptionStateExpectation.fulfill()
+        }
+
+        // Run the full pipeline
+        try await whisperKit.loadModels()
+        let audioFilePath = try XCTUnwrap(
+            Bundle.current.path(forResource: "jfk", ofType: "wav"),
+            "Audio file not found"
+        )
+        let _ = try await whisperKit.transcribe(audioPath: audioFilePath)
+
+        await fulfillment(of: [modelStateExpectation, segmentDiscoveryExpectation, transcriptionStateExpectation], timeout: 1)
+    }
+
     // MARK: - Utils Tests
 
     func testFillIndexesWithValue() throws {

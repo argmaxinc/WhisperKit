@@ -18,6 +18,7 @@ open class WhisperKit {
             modelStateCallback?(oldValue, modelState)
         }
     }
+
     public var modelCompute: ModelComputeOptions
     public var tokenizer: WhisperTokenizer?
 
@@ -48,11 +49,10 @@ open class WhisperKit {
 
     /// Callbacks
     public var segmentDiscoveryCallback: SegmentDiscoveryCallback?
-    public var transcriptionPhaseCallback: TranscriptionPhaseCallback?
-    public var fractionCompletedCallback: FractionCompletedCallback?
     public var modelStateCallback: ModelStateCallback?
+    public var transcriptionStateCallback: TranscriptionStateCallback?
 
-    public init(_ config: WhisperKitConfig = WhisperKitConfig(), modelStateDidChangeCallback: ModelStateCallback? = nil) async throws {
+    public init(_ config: WhisperKitConfig = WhisperKitConfig()) async throws {
         modelCompute = config.computeOptions ?? ModelComputeOptions()
         audioProcessor = config.audioProcessor ?? AudioProcessor()
         featureExtractor = config.featureExtractor ?? FeatureExtractor()
@@ -65,8 +65,6 @@ open class WhisperKit {
         useBackgroundDownloadSession = config.useBackgroundDownloadSession
         currentTimings = TranscriptionTimings()
         Logging.shared.logLevel = config.verbose ? config.logLevel : .none
-
-        self.modelStateCallback = modelStateDidChangeCallback
 
         try await setupModels(
             model: config.model,
@@ -129,7 +127,7 @@ open class WhisperKit {
             download: download,
             useBackgroundDownloadSession: useBackgroundDownloadSession
         )
-        try await self.init(config, modelStateDidChangeCallback: modelStateDidChangeCallback)
+        try await self.init(config)
     }
 
     // MARK: - Model Loading
@@ -378,7 +376,7 @@ open class WhisperKit {
             } else {
                 currentTimings.decoderLoadTime = CFAbsoluteTimeGetCurrent() - decoderLoadStart
             }
-            
+
             Logging.debug("Loaded text decoder in \(String(format: "%.2f", currentTimings.decoderLoadTime))s")
         }
 
@@ -391,13 +389,13 @@ open class WhisperKit {
                 computeUnits: modelCompute.audioEncoderCompute,
                 prewarmMode: prewarmMode
             )
-            
+
             if prewarmMode {
                 currentTimings.encoderSpecializationTime = CFAbsoluteTimeGetCurrent() - encoderLoadStart
             } else {
                 currentTimings.encoderLoadTime = CFAbsoluteTimeGetCurrent() - encoderLoadStart
             }
-            
+
             Logging.debug("Loaded audio encoder in \(String(format: "%.2f", currentTimings.encoderLoadTime))s")
         }
 
@@ -562,6 +560,8 @@ open class WhisperKit {
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
     ) async -> [Result<[TranscriptionResult], Swift.Error>] {
+        transcriptionStateCallback?(.convertingAudio)
+
         // Start timing the audio loading and conversion process
         let loadAudioStart = Date()
 
@@ -573,6 +573,11 @@ open class WhisperKit {
         let loadAndConvertTime = Date().timeIntervalSince(loadAudioStart)
         currentTimings.audioLoading = loadAndConvertTime
         Logging.debug("Total Audio Loading and Converting Time: \(loadAndConvertTime)")
+
+        transcriptionStateCallback?(.transcribing)
+        defer {
+            transcriptionStateCallback?(.finished)
+        }
 
         // Transcribe the loaded audio arrays
         let transcribeResults = await transcribeWithResults(
@@ -746,8 +751,7 @@ open class WhisperKit {
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
     ) async throws -> [TranscriptionResult] {
-
-        transcriptionPhaseCallback?(.convertingAudio)
+        transcriptionStateCallback?(.convertingAudio)
 
         // Process input audio file into audio samples
         let audioArray = try await withThrowingTaskGroup(of: [Float].self) { group -> [Float] in
@@ -762,9 +766,9 @@ open class WhisperKit {
             return try AudioProcessor.loadAudioAsFloatArray(fromPath: audioPath)
         }
 
-        transcriptionPhaseCallback?(.transcribing)
+        transcriptionStateCallback?(.transcribing)
         defer {
-            transcriptionPhaseCallback?(.finished)
+            transcriptionStateCallback?(.finished)
         }
 
         // Send converted samples to be transcribed
@@ -895,7 +899,6 @@ open class WhisperKit {
             )
 
             transcribeTask.segmentDiscoveryCallback = self.segmentDiscoveryCallback
-            transcribeTask.fractionCompletedCallback = self.fractionCompletedCallback
 
             let transcribeTaskResult = try await transcribeTask.run(
                 audioArray: audioArray,
