@@ -629,7 +629,7 @@ public struct TranscriptionProgress {
     }
 }
 
-/// Callbacks to receive state updates during transcription.
+// Callbacks to receive state updates during transcription.
 
 /// A callback that provides transcription segments as they are discovered.
 /// - Parameters:
