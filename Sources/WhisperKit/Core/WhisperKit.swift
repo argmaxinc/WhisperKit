@@ -104,8 +104,7 @@ open class WhisperKit {
         prewarm: Bool? = nil,
         load: Bool? = nil,
         download: Bool = true,
-        useBackgroundDownloadSession: Bool = false,
-        modelStateDidChangeCallback: ModelStateCallback? = nil
+        useBackgroundDownloadSession: Bool = false
     ) async throws {
         let config = WhisperKitConfig(
             model: model,
