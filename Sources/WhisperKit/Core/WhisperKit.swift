@@ -13,7 +13,12 @@ import Tokenizers
 open class WhisperKit {
     /// Models
     public private(set) var modelVariant: ModelVariant = .tiny
-    public private(set) var modelState: ModelState = .unloaded
+    public private(set) var modelState: ModelState = .unloaded {
+        didSet {
+            modelStateCallback?(oldValue, modelState)
+        }
+    }
+
     public var modelCompute: ModelComputeOptions
     public var tokenizer: WhisperTokenizer?
 
@@ -41,6 +46,11 @@ open class WhisperKit {
     public var modelFolder: URL?
     public var tokenizerFolder: URL?
     public private(set) var useBackgroundDownloadSession: Bool
+
+    /// Callbacks
+    public var segmentDiscoveryCallback: SegmentDiscoveryCallback?
+    public var modelStateCallback: ModelStateCallback?
+    public var transcriptionStateCallback: TranscriptionStateCallback?
 
     public init(_ config: WhisperKitConfig = WhisperKitConfig()) async throws {
         modelCompute = config.computeOptions ?? ModelComputeOptions()
@@ -365,7 +375,7 @@ open class WhisperKit {
             } else {
                 currentTimings.decoderLoadTime = CFAbsoluteTimeGetCurrent() - decoderLoadStart
             }
-            
+
             Logging.debug("Loaded text decoder in \(String(format: "%.2f", currentTimings.decoderLoadTime))s")
         }
 
@@ -378,13 +388,13 @@ open class WhisperKit {
                 computeUnits: modelCompute.audioEncoderCompute,
                 prewarmMode: prewarmMode
             )
-            
+
             if prewarmMode {
                 currentTimings.encoderSpecializationTime = CFAbsoluteTimeGetCurrent() - encoderLoadStart
             } else {
                 currentTimings.encoderLoadTime = CFAbsoluteTimeGetCurrent() - encoderLoadStart
             }
-            
+
             Logging.debug("Loaded audio encoder in \(String(format: "%.2f", currentTimings.encoderLoadTime))s")
         }
 
@@ -549,6 +559,8 @@ open class WhisperKit {
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
     ) async -> [Result<[TranscriptionResult], Swift.Error>] {
+        transcriptionStateCallback?(.convertingAudio)
+
         // Start timing the audio loading and conversion process
         let loadAudioStart = Date()
 
@@ -560,6 +572,11 @@ open class WhisperKit {
         let loadAndConvertTime = Date().timeIntervalSince(loadAudioStart)
         currentTimings.audioLoading = loadAndConvertTime
         Logging.debug("Total Audio Loading and Converting Time: \(loadAndConvertTime)")
+
+        transcriptionStateCallback?(.transcribing)
+        defer {
+            transcriptionStateCallback?(.finished)
+        }
 
         // Transcribe the loaded audio arrays
         let transcribeResults = await transcribeWithResults(
@@ -733,6 +750,8 @@ open class WhisperKit {
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
     ) async throws -> [TranscriptionResult] {
+        transcriptionStateCallback?(.convertingAudio)
+
         // Process input audio file into audio samples
         let audioArray = try await withThrowingTaskGroup(of: [Float].self) { group -> [Float] in
             let convertAudioStart = Date()
@@ -746,6 +765,12 @@ open class WhisperKit {
             return try AudioProcessor.loadAudioAsFloatArray(fromPath: audioPath)
         }
 
+        transcriptionStateCallback?(.transcribing)
+        defer {
+            transcriptionStateCallback?(.finished)
+        }
+
+        // Send converted samples to be transcribed
         let transcribeResults: [TranscriptionResult] = try await transcribe(
             audioArray: audioArray,
             decodeOptions: decodeOptions,
@@ -871,6 +896,8 @@ open class WhisperKit {
                 textDecoder: textDecoder,
                 tokenizer: tokenizer
             )
+
+            transcribeTask.segmentDiscoveryCallback = self.segmentDiscoveryCallback
 
             let transcribeTaskResult = try await transcribeTask.run(
                 audioArray: audioArray,

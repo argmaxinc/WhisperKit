@@ -629,6 +629,47 @@ public struct TranscriptionProgress {
     }
 }
 
+// Callbacks to receive state updates during transcription.
+
+/// A callback that provides transcription segments as they are discovered.
+/// - Parameters:
+///   - segments: An array of `TranscriptionSegment` objects representing the transcribed segments
+public typealias SegmentDiscoveryCallback = (_ segments: [TranscriptionSegment]) -> Void
+
+/// A callback that reports changes in the model's state.
+/// - Parameters:
+///   - oldState: The previous state of the model, if any
+///   - newState: The current state of the model
+public typealias ModelStateCallback = (_ oldState: ModelState?, _ newState: ModelState) -> Void
+
+/// A callback that reports changes in the transcription process.
+/// - Parameter state: The current `TranscriptionState` of the transcription process
+public typealias TranscriptionStateCallback = (_ state: TranscriptionState) -> Void
+
+/// Represents the different states of the transcription process.
+public enum TranscriptionState: CustomStringConvertible {
+    /// The audio is being converted to the required format for transcription
+    case convertingAudio
+
+    /// The audio is actively being transcribed to text
+    case transcribing
+
+    /// The transcription process has completed
+    case finished
+
+    /// A human-readable description of the transcription state
+    public var description: String {
+        switch self {
+            case .convertingAudio:
+                return "Converting Audio"
+            case .transcribing:
+                return "Transcribing"
+            case .finished:
+                return "Finished"
+        }
+    }
+}
+
 /// Callback to receive progress updates during transcription.
 ///
 /// - Parameters:
