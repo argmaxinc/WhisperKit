@@ -771,6 +771,7 @@ public class Logging {
 
     private let logger = OSLog(subsystem: Bundle.main.bundleIdentifier ?? "com.argmax.whisperkit", category: "WhisperKit")
 
+    @frozen
     public enum LogLevel: Int {
         case debug = 1
         case info = 2
