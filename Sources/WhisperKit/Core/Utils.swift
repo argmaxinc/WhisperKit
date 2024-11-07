@@ -762,12 +762,12 @@ public func getMemoryUsage() -> UInt64 {
 
 // MARK: - Singletons
 
-public class Logging {
-    static let shared = Logging()
-    var logLevel: LogLevel = .none
+open class Logging {
+    public static let shared = Logging()
+    public var logLevel: LogLevel = .none
 
     public typealias LoggingCallback = (_ message: String) -> Void
-    var loggingCallback: LoggingCallback?
+    public var loggingCallback: LoggingCallback?
 
     private let logger = OSLog(subsystem: Bundle.main.bundleIdentifier ?? "com.argmax.whisperkit", category: "WhisperKit")
 
