@@ -49,6 +49,7 @@ public extension WhisperMLModel {
 
 // MARK: - Whisper Models
 
+@frozen
 public enum ModelVariant: CustomStringConvertible, CaseIterable {
     case tiny
     case tinyEn
@@ -100,6 +101,7 @@ public enum ModelVariant: CustomStringConvertible, CaseIterable {
     }
 }
 
+@frozen
 public enum ModelState: CustomStringConvertible {
     case unloading
     case unloaded
@@ -282,6 +284,7 @@ public struct AudioChunk {
 
 // MARK: - Decoding
 
+@frozen
 public enum DecodingTask: Codable, CustomStringConvertible, CaseIterable {
     case transcribe
     case translate
@@ -355,6 +358,7 @@ public struct DecodingCache {
     }
 }
 
+@frozen
 public enum ChunkingStrategy: String, Codable, CaseIterable {
     case none
     case vad
@@ -444,6 +448,7 @@ public struct DecodingResult {
     }
 }
 
+@frozen
 public enum WhisperError: Error, LocalizedError, Equatable {
     case tokenizerUnavailable(String = "Tokenizer is unavailable")
     case modelsUnavailable(String = "Models are unavailable")
@@ -647,6 +652,7 @@ public typealias ModelStateCallback = (_ oldState: ModelState?, _ newState: Mode
 public typealias TranscriptionStateCallback = (_ state: TranscriptionState) -> Void
 
 /// Represents the different states of the transcription process.
+@frozen
 public enum TranscriptionState: CustomStringConvertible {
     /// The audio is being converted to the required format for transcription
     case convertingAudio
@@ -1372,6 +1378,7 @@ extension WhisperTokenizerWrapper {
 
 // MARK: Constants
 
+@frozen
 public enum Constants {
     enum Logging {
         static let subsystem = "com.argmax.whisperkit"
