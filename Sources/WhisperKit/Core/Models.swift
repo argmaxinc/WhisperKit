@@ -127,7 +127,7 @@ public enum ModelState: CustomStringConvertible {
             case .downloading:
                 return "Downloading"
             case .downloaded:
-                return "Downloading"
+                return "Downloaded"
         }
     }
 }
