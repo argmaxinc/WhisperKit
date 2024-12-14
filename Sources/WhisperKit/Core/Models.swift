@@ -1366,21 +1366,30 @@ extension WhisperTokenizerWrapper: Tokenizer {
         try tokenizer.applyChatTemplate(messages: messages)
     }
     
+    func applyChatTemplate(messages: [[String : String]], chatTemplate: Tokenizers.ChatTemplateArgument) throws -> [Int] {
+        try tokenizer.applyChatTemplate(messages: messages, chatTemplate: chatTemplate)
+    }
+    
+    func applyChatTemplate(messages: [[String : String]], chatTemplate: String) throws -> [Int] {
+        try tokenizer.applyChatTemplate(messages: messages, chatTemplate: chatTemplate)
+    }
+    
     func applyChatTemplate(
-        messages: [[String: String]],
-        chatTemplate: String?,
+        messages: [[String : String]],
+        chatTemplate: Tokenizers.ChatTemplateArgument?,
         addGenerationPrompt: Bool,
         truncation: Bool,
-        maxLength: Int?
-    ) throws -> [Int] {
-        try tokenizer
-            .applyChatTemplate(
-                messages: messages,
-                chatTemplate: chatTemplate,
-                addGenerationPrompt: addGenerationPrompt,
-                truncation: truncation,
-                maxLength: maxLength
-            )
+        maxLength: Int?,
+        tools: [[String : Any]]?) throws -> [Int]
+    {
+        try tokenizer.applyChatTemplate(
+            messages: messages,
+            chatTemplate: chatTemplate,
+            addGenerationPrompt: addGenerationPrompt,
+            truncation: truncation,
+            maxLength: maxLength,
+            tools: tools
+        )
     }
 }
 
