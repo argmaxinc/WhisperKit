@@ -278,6 +278,7 @@ public extension TextDecoding {
         let sliceShape = keySlice.shape.map { $0.intValue }
         let sliceStrides = keySlice.strides.map { $0.intValue } // same for val
         let bytesPerSample = MemoryLayout<FloatType>.size
+        let sliceLength = sliceShape[3] // Cache slice length
 
         keyTensor.withUnsafeMutableBytes { keyTensorPointer, keyTargetStrides in
             keySlice.withUnsafeBytes { keySlicePointer in
@@ -286,7 +287,7 @@ public extension TextDecoding {
                         // Assuming batch size is always 1
                         DispatchQueue.concurrentPerform(iterations: tensorShape[1]) { j in
                             // Slice size is 3 for prefill and 1 for decode loops
-                            for k in 0..<sliceShape[3] {
+                            for k in 0..<sliceLength {
                                 // Equivalent to:
                                 // `tensor[0, j, 0, k + index] = slice[0, j, 0, k + index]`
                                 let keyDestIndex = j * keyTargetStrides[1] + (index + k) * keyTargetStrides[3]
