@@ -469,7 +469,7 @@ public class AudioProcessor: NSObject, AudioProcessing {
     ) -> Bool {
         // Calculate the number of energy values to consider based on the duration of the next buffer
         // Each energy value corresponds to 1 buffer length (100ms of audio), hence we divide by 0.1
-        let energyValuesToConsider = Int(nextBufferInSeconds / 0.1)
+        let energyValuesToConsider = max(0, Int(nextBufferInSeconds / 0.1))
 
         // Extract the relevant portion of energy values from the currentRelativeEnergy array
         let nextBufferEnergies = relativeEnergy.suffix(energyValuesToConsider)
