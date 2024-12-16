@@ -592,12 +592,19 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         var hasAlignment = false
         var isFirstTokenLogProbTooLow = false
         let windowUUID = UUID()
-        Task { [weak self] in
-            guard let self = self else { return }
-            await MainActor.run {
-                self.shouldEarlyStop[windowUUID] = false
+
+        // Explicit initialize shouldEarlyStop on the main thread
+        await MainActor.run {
+            self.shouldEarlyStop[windowUUID] = false
+        }
+
+        defer {
+            // Cleanup guaranteed to run
+            Task { @MainActor in
+                self.shouldEarlyStop.removeValue(forKey: windowUUID)
             }
         }
+
         for tokenIndex in prefilledIndex..<loopCount {
             let loopStart = Date()
 
