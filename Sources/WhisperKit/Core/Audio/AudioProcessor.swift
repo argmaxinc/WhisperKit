@@ -178,7 +178,6 @@ public class AudioProcessor: NSObject, AudioProcessing {
     }
 
     public var audioBufferCallback: (([Float]) -> Void)?
-    public var maxBufferLength = WhisperKit.sampleRate * WhisperKit.chunkLength // 30 seconds of audio at 16,000 Hz
     public var minBufferLength = Int(Double(WhisperKit.sampleRate) * 0.1) // 0.1 second of audio at 16,000 Hz
 
     // MARK: - Loading and conversion

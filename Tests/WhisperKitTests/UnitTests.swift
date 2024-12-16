@@ -1420,6 +1420,8 @@ final class UnitTests: XCTestCase {
 
     func testVADAudioChunker() async throws {
         let chunker = VADAudioChunker()
+        // Setting windowSamples to default value as WhisperKit.windowSamples is not accessible in this scope
+        let windowSamples: Int = 480_000
 
         let singleChunkPath = try XCTUnwrap(
             Bundle.current.path(forResource: "jfk", ofType: "wav"),
@@ -1430,7 +1432,7 @@ final class UnitTests: XCTestCase {
 
         var audioChunks = try await chunker.chunkAll(
             audioArray: audioArray,
-            maxChunkLength: WhisperKit.windowSamples,
+            maxChunkLength: windowSamples,
             decodeOptions: DecodingOptions()
         )
 
@@ -1445,7 +1447,7 @@ final class UnitTests: XCTestCase {
 
         audioChunks = try await chunker.chunkAll(
             audioArray: audioArray,
-            maxChunkLength: WhisperKit.windowSamples,
+            maxChunkLength: windowSamples,
             decodeOptions: DecodingOptions()
         )
 

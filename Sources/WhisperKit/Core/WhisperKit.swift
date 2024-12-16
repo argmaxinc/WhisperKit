@@ -34,8 +34,6 @@ open class WhisperKit {
     /// Shapes
     public static let sampleRate: Int = 16000
     public static let hopLength: Int = 160
-    public static let chunkLength: Int = 30 // seconds
-    public static let windowSamples: Int = 480_000 // sampleRate * chunkLength
     public static let secondsPerTimeToken = Float(0.02)
 
     /// Progress
@@ -73,6 +71,7 @@ open class WhisperKit {
             modelFolder: config.modelFolder,
             download: config.download
         )
+        
 
         if let prewarm = config.prewarm, prewarm {
             Logging.info("Prewarming models...")
@@ -501,7 +500,11 @@ open class WhisperKit {
         decoderInputs.decoderKeyPaddingMask[0] = 0.0
 
         // Detect language using up to the first 30 seconds
-        guard let audioSamples = AudioProcessor.padOrTrimAudio(fromArray: audioArray, startAt: 0, toLength: WhisperKit.windowSamples) else {
+        guard let audioSamples = AudioProcessor.padOrTrimAudio(
+            fromArray: audioArray,
+            startAt: 0,
+            toLength: featureExtractor.windowSamples ?? Constants.defaultWindowSamples
+        ) else {
             throw WhisperError.transcriptionFailed("Audio samples are nil")
         }
         guard let melOutput = try await featureExtractor.logMelSpectrogram(fromAudio: audioSamples) else {
@@ -809,7 +812,7 @@ open class WhisperKit {
         var transcribeResults = [TranscriptionResult]()
 
         // Determine if the audio array requires chunking
-        let isChunkable = audioArray.count > WhisperKit.windowSamples
+        let isChunkable = audioArray.count > featureExtractor.windowSamples ?? Constants.defaultWindowSamples
         switch (isChunkable, decodeOptions?.chunkingStrategy) {
             case (true, .vad):
                 // We have some audio that will require multiple windows and a strategy to chunk them
@@ -817,7 +820,7 @@ open class WhisperKit {
                 let chunker = VADAudioChunker(vad: vad)
                 let audioChunks: [AudioChunk] = try await chunker.chunkAll(
                     audioArray: audioArray,
-                    maxChunkLength: WhisperKit.windowSamples,
+                    maxChunkLength: featureExtractor.windowSamples ?? Constants.defaultWindowSamples,
                     decodeOptions: decodeOptions
                 )
 
