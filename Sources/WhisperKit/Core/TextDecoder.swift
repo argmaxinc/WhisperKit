@@ -345,7 +345,6 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
     public var tokenizer: WhisperTokenizer?
     public var prefillData: WhisperMLModel?
     public var isModelMultilingual: Bool = false
-    @MainActor public var shouldEarlyStop = [UUID: Bool]()
     private var languageLogitsFilter: LanguageLogitsFilter?
 
     public init() {}
@@ -591,19 +590,8 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         Logging.debug("Running main loop for a maximum of \(loopCount) iterations, starting at index \(prefilledIndex)")
         var hasAlignment = false
         var isFirstTokenLogProbTooLow = false
-        let windowUUID = UUID()
 
-        // Explicit initialize shouldEarlyStop on the main thread
-        await MainActor.run {
-            self.shouldEarlyStop[windowUUID] = false
-        }
-
-        defer {
-            // Cleanup guaranteed to run
-            Task { @MainActor in
-                self.shouldEarlyStop.removeValue(forKey: windowUUID)
-            }
-        }
+        var shouldStop = false
 
         for tokenIndex in prefilledIndex..<loopCount {
             let loopStart = Date()
@@ -743,19 +731,13 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
 
                 let result = TranscriptionProgress(timings: timings, text: currentTranscript, tokens: currentTokens, avgLogprob: averageLogProb, compressionRatio: compressionRatio)
 
-                // Call the callback if it is provided on a background thread to avoid blocking the decoding loop
+                // Call the callback if provided to check if we should continue
                 if let callback = callback {
-                    DispatchQueue.global().async { [weak self] in
-                        guard let self = self else { return }
-                        let shouldContinue = callback(result)
-                        if let shouldContinue = shouldContinue, !shouldContinue, !isPrefill {
-                            Logging.debug("Early stopping")
-                            await MainActor.run {   
-                                if self.shouldEarlyStop.keys.contains(windowUUID) {
-                                    self.shouldEarlyStop[windowUUID] = true
-                                }
-                            }
-                        }
+                    let shouldContinue = callback(result)
+                    if let shouldContinue = shouldContinue, !shouldContinue, !isPrefill {
+                        Logging.debug("Early stopping")
+                        shouldStop = true
+                        break
                     }
                 }
             }
@@ -770,17 +752,8 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             }
 
             // Check if early stopping is triggered
-            await MainActor.run {
-                if let shouldStop = shouldEarlyStop[windowUUID], shouldStop {
-                    break
-                }
-            }
-        }
-
-        // Cleanup the early stop flag after loop completion
-        await MainActor.run {
-            if shouldEarlyStop.removeValue(forKey: windowUUID) == nil {
-                Logging.error("Early stop flag not found for window: \(windowUUID)")
+            if shouldStop {
+                break
             }
         }
 
