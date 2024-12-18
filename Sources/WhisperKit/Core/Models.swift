@@ -299,7 +299,7 @@ public enum DecodingTask: Codable, CustomStringConvertible, CaseIterable {
     }
 }
 
-public struct DecodingInputs {
+open class DecodingInputs {
     public var initialPrompt: [Int]
     public var inputIds: MLMultiArray
     public var cacheLength: MLMultiArray
@@ -580,6 +580,7 @@ public struct TranscriptionResult: Codable {
         Total Tokens:                  \(totalTokens)
         Tokens per Second:             \(String(format: "%.2f", tokensPerSecond)) tok/s
         Real Time Factor:              \(String(format: "%.3f", rtf))
+        Speed Factor:                  \(String(format: "%.3f", 1.0 / rtf))
         Fallbacks:                     \(timings.totalDecodingFallbacks)
         """)
     }

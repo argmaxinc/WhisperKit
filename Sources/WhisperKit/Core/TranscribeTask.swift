@@ -261,7 +261,7 @@ final class TranscribeTask {
         // MARK: - Decode with Fallback Logic
 
         func decodeWithFallback(
-            encoderSegment encoderOutput: MLMultiArray,
+            encoderSegment encoderOutput: any AudioEncoderOutputType,
             decodingOptions options: DecodingOptions,
             callback: TranscriptionCallback = nil
         ) async throws -> DecodingResult {

@@ -151,14 +151,22 @@ open class WhisperKit {
         return modelSupport(for: deviceName)
     }
 
-    public static func recommendedRemoteModels(from repo: String = "argmaxinc/whisperkit-coreml", downloadBase: URL? = nil) async -> ModelSupport {
+    public static func recommendedRemoteModels(
+        from repo: String = "argmaxinc/whisperkit-coreml",
+        downloadBase: URL? = nil,
+        token: String? = nil
+    ) async -> ModelSupport {
         let deviceName = Self.deviceName()
-        let config = await Self.fetchModelSupportConfig(from: repo, downloadBase: downloadBase)
+        let config = await Self.fetchModelSupportConfig(from: repo, downloadBase: downloadBase, token: token)
         return modelSupport(for: deviceName, from: config)
     }
 
-    public static func fetchModelSupportConfig(from repo: String = "argmaxinc/whisperkit-coreml", downloadBase: URL? = nil) async -> ModelSupportConfig {
-        let hubApi = HubApi(downloadBase: downloadBase)
+    public static func fetchModelSupportConfig(
+        from repo: String = "argmaxinc/whisperkit-coreml",
+        downloadBase: URL? = nil,
+        token: String? = nil
+    ) async -> ModelSupportConfig {
+        let hubApi = HubApi(downloadBase: downloadBase, hfToken: token)
         var modelSupportConfig = Constants.fallbackModelSupportConfig
 
         do {
@@ -175,8 +183,13 @@ open class WhisperKit {
         return modelSupportConfig
     }
 
-    public static func fetchAvailableModels(from repo: String = "argmaxinc/whisperkit-coreml", matching: [String] = ["*"], downloadBase: URL? = nil) async throws -> [String] {
-        let modelSupportConfig = await fetchModelSupportConfig(from: repo, downloadBase: downloadBase)
+    public static func fetchAvailableModels(
+        from repo: String = "argmaxinc/whisperkit-coreml",
+        matching: [String] = ["*"],
+        downloadBase: URL? = nil,
+        token: String? = nil
+    ) async throws -> [String] {
+        let modelSupportConfig = await fetchModelSupportConfig(from: repo, downloadBase: downloadBase, token: token)
         let supportedModels = modelSupportConfig.modelSupport().supported
         var filteredSupportSet: Set<String> = []
         for glob in matching {
@@ -228,9 +241,10 @@ open class WhisperKit {
         downloadBase: URL? = nil,
         useBackgroundSession: Bool = false,
         from repo: String = "argmaxinc/whisperkit-coreml",
+        token: String? = nil,
         progressCallback: ((Progress) -> Void)? = nil
     ) async throws -> URL {
-        let hubApi = HubApi(downloadBase: downloadBase, useBackgroundSession: useBackgroundSession)
+        let hubApi = HubApi(downloadBase: downloadBase, hfToken: token, useBackgroundSession: useBackgroundSession)
         let repo = Hub.Repo(id: repo, type: .models)
         let modelSearchPath = "*\(variant.description)/*"
         do {

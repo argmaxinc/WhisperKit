@@ -75,8 +75,19 @@ jobs:
           sleep 15
           xcrun simctl list devices
       - name: Build and Test - ${{ matrix.run-config['name'] }}
+        id: test-step
         if: ${{ matrix.run-config['condition'] == true }}
+        continue-on-error: true
         run: |
           set -o pipefail
           xcodebuild clean build-for-testing -scheme whisperkit-Package -destination '${{ matrix.run-config['clean-destination'] }}' | xcpretty
           xcodebuild test -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -destination '${{ matrix.run-config['test-destination'] }}'
+
+      - name: Upload Test Results
+        if: failure() && steps.test-step.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.run-config['name'] }}
+          path: |
+            ~/Library/Developer/Xcode/DerivedData/**/Logs/Test/*.xcresult
+          retention-days: 5

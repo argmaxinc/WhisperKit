@@ -93,7 +93,7 @@ public extension AudioProcessing {
     }
 
     static func padOrTrimAudio(fromArray audioArray: [Float], startAt startIndex: Int = 0, toLength frameLength: Int = 480_000, saveSegment: Bool = false) -> MLMultiArray? {
-        guard startIndex >= 0 && startIndex < audioArray.count else {
+        guard startIndex >= 0, startIndex < audioArray.count else {
             Logging.error("startIndex is outside the buffer size")
             return nil
         }
@@ -228,7 +228,11 @@ public class AudioProcessor: NSObject, AudioProcessing {
             guard let buffer = AVAudioPCMBuffer(pcmFormat: audioFile.processingFormat, frameCapacity: frameCount) else {
                 throw WhisperError.loadAudioFailed("Unable to create audio buffer")
             }
-            try audioFile.read(into: buffer, frameCount: frameCount)
+            do {
+                try audioFile.read(into: buffer, frameCount: frameCount)
+            } catch {
+                throw WhisperError.loadAudioFailed("Failed to read audio file: \(error)")
+            }
             outputBuffer = buffer
         } else {
             // Audio needs resampling to 16khz

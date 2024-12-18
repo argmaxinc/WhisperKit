@@ -7,10 +7,15 @@ import CoreGraphics
 import CoreML
 import Foundation
 
+public protocol FeatureExtractorOutputType {}
+extension MLMultiArray: FeatureExtractorOutputType {}
+
 public protocol FeatureExtracting {
+    associatedtype OutputType: FeatureExtractorOutputType
+
     var melCount: Int? { get }
     var windowSamples: Int? { get }
-    func logMelSpectrogram(fromAudio inputAudio: MLMultiArray) async throws -> MLMultiArray?
+    func logMelSpectrogram(fromAudio inputAudio: MLMultiArray) async throws -> OutputType?
 }
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
