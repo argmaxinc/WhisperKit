@@ -4,7 +4,7 @@
 import ArgumentParser
 import Foundation
 
-let VERSION: String = "development"
+let VERSION: String = "v0.10.0"
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 @main
