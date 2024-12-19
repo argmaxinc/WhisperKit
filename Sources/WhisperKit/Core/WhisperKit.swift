@@ -34,8 +34,6 @@ open class WhisperKit {
     /// Shapes
     public static let sampleRate: Int = 16000
     public static let hopLength: Int = 160
-    public static let chunkLength: Int = 30 // seconds
-    public static let windowSamples: Int = 480_000 // sampleRate * chunkLength
     public static let secondsPerTimeToken = Float(0.02)
 
     /// Progress
@@ -73,6 +71,7 @@ open class WhisperKit {
             modelFolder: config.modelFolder,
             download: config.download
         )
+        
 
         if let prewarm = config.prewarm, prewarm {
             Logging.info("Prewarming models...")
@@ -152,14 +151,22 @@ open class WhisperKit {
         return modelSupport(for: deviceName)
     }
 
-    public static func recommendedRemoteModels(from repo: String = "argmaxinc/whisperkit-coreml", downloadBase: URL? = nil) async -> ModelSupport {
+    public static func recommendedRemoteModels(
+        from repo: String = "argmaxinc/whisperkit-coreml",
+        downloadBase: URL? = nil,
+        token: String? = nil
+    ) async -> ModelSupport {
         let deviceName = Self.deviceName()
-        let config = await Self.fetchModelSupportConfig(from: repo, downloadBase: downloadBase)
+        let config = await Self.fetchModelSupportConfig(from: repo, downloadBase: downloadBase, token: token)
         return modelSupport(for: deviceName, from: config)
     }
 
-    public static func fetchModelSupportConfig(from repo: String = "argmaxinc/whisperkit-coreml", downloadBase: URL? = nil) async -> ModelSupportConfig {
-        let hubApi = HubApi(downloadBase: downloadBase)
+    public static func fetchModelSupportConfig(
+        from repo: String = "argmaxinc/whisperkit-coreml",
+        downloadBase: URL? = nil,
+        token: String? = nil
+    ) async -> ModelSupportConfig {
+        let hubApi = HubApi(downloadBase: downloadBase, hfToken: token)
         var modelSupportConfig = Constants.fallbackModelSupportConfig
 
         do {
@@ -176,8 +183,13 @@ open class WhisperKit {
         return modelSupportConfig
     }
 
-    public static func fetchAvailableModels(from repo: String = "argmaxinc/whisperkit-coreml", matching: [String] = ["*"], downloadBase: URL? = nil) async throws -> [String] {
-        let modelSupportConfig = await fetchModelSupportConfig(from: repo, downloadBase: downloadBase)
+    public static func fetchAvailableModels(
+        from repo: String = "argmaxinc/whisperkit-coreml",
+        matching: [String] = ["*"],
+        downloadBase: URL? = nil,
+        token: String? = nil
+    ) async throws -> [String] {
+        let modelSupportConfig = await fetchModelSupportConfig(from: repo, downloadBase: downloadBase, token: token)
         let supportedModels = modelSupportConfig.modelSupport().supported
         var filteredSupportSet: Set<String> = []
         for glob in matching {
@@ -229,9 +241,10 @@ open class WhisperKit {
         downloadBase: URL? = nil,
         useBackgroundSession: Bool = false,
         from repo: String = "argmaxinc/whisperkit-coreml",
+        token: String? = nil,
         progressCallback: ((Progress) -> Void)? = nil
     ) async throws -> URL {
-        let hubApi = HubApi(downloadBase: downloadBase, useBackgroundSession: useBackgroundSession)
+        let hubApi = HubApi(downloadBase: downloadBase, hfToken: token, useBackgroundSession: useBackgroundSession)
         let repo = Hub.Repo(id: repo, type: .models)
         let modelSearchPath = "*\(variant.description)/*"
         do {
@@ -501,7 +514,11 @@ open class WhisperKit {
         decoderInputs.decoderKeyPaddingMask[0] = 0.0
 
         // Detect language using up to the first 30 seconds
-        guard let audioSamples = AudioProcessor.padOrTrimAudio(fromArray: audioArray, startAt: 0, toLength: WhisperKit.windowSamples) else {
+        guard let audioSamples = AudioProcessor.padOrTrimAudio(
+            fromArray: audioArray,
+            startAt: 0,
+            toLength: featureExtractor.windowSamples ?? Constants.defaultWindowSamples
+        ) else {
             throw WhisperError.transcriptionFailed("Audio samples are nil")
         }
         guard let melOutput = try await featureExtractor.logMelSpectrogram(fromAudio: audioSamples) else {
@@ -809,7 +826,7 @@ open class WhisperKit {
         var transcribeResults = [TranscriptionResult]()
 
         // Determine if the audio array requires chunking
-        let isChunkable = audioArray.count > WhisperKit.windowSamples
+        let isChunkable = audioArray.count > featureExtractor.windowSamples ?? Constants.defaultWindowSamples
         switch (isChunkable, decodeOptions?.chunkingStrategy) {
             case (true, .vad):
                 // We have some audio that will require multiple windows and a strategy to chunk them
@@ -817,7 +834,7 @@ open class WhisperKit {
                 let chunker = VADAudioChunker(vad: vad)
                 let audioChunks: [AudioChunk] = try await chunker.chunkAll(
                     audioArray: audioArray,
-                    maxChunkLength: WhisperKit.windowSamples,
+                    maxChunkLength: featureExtractor.windowSamples ?? Constants.defaultWindowSamples,
                     decodeOptions: decodeOptions
                 )
 

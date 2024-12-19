@@ -49,6 +49,7 @@ public extension WhisperMLModel {
 
 // MARK: - Whisper Models
 
+@frozen
 public enum ModelVariant: CustomStringConvertible, CaseIterable {
     case tiny
     case tinyEn
@@ -100,6 +101,7 @@ public enum ModelVariant: CustomStringConvertible, CaseIterable {
     }
 }
 
+@frozen
 public enum ModelState: CustomStringConvertible {
     case unloading
     case unloaded
@@ -282,6 +284,7 @@ public struct AudioChunk {
 
 // MARK: - Decoding
 
+@frozen
 public enum DecodingTask: Codable, CustomStringConvertible, CaseIterable {
     case transcribe
     case translate
@@ -296,7 +299,7 @@ public enum DecodingTask: Codable, CustomStringConvertible, CaseIterable {
     }
 }
 
-public struct DecodingInputs {
+open class DecodingInputs {
     public var initialPrompt: [Int]
     public var inputIds: MLMultiArray
     public var cacheLength: MLMultiArray
@@ -355,6 +358,7 @@ public struct DecodingCache {
     }
 }
 
+@frozen
 public enum ChunkingStrategy: String, Codable, CaseIterable {
     case none
     case vad
@@ -444,6 +448,7 @@ public struct DecodingResult {
     }
 }
 
+@frozen
 public enum WhisperError: Error, LocalizedError, Equatable {
     case tokenizerUnavailable(String = "Tokenizer is unavailable")
     case modelsUnavailable(String = "Models are unavailable")
@@ -575,6 +580,7 @@ public struct TranscriptionResult: Codable {
         Total Tokens:                  \(totalTokens)
         Tokens per Second:             \(String(format: "%.2f", tokensPerSecond)) tok/s
         Real Time Factor:              \(String(format: "%.3f", rtf))
+        Speed Factor:                  \(String(format: "%.3f", 1.0 / rtf))
         Fallbacks:                     \(timings.totalDecodingFallbacks)
         """)
     }
@@ -647,6 +653,7 @@ public typealias ModelStateCallback = (_ oldState: ModelState?, _ newState: Mode
 public typealias TranscriptionStateCallback = (_ state: TranscriptionState) -> Void
 
 /// Represents the different states of the transcription process.
+@frozen
 public enum TranscriptionState: CustomStringConvertible {
     /// The audio is being converted to the required format for transcription
     case convertingAudio
@@ -1372,6 +1379,7 @@ extension WhisperTokenizerWrapper {
 
 // MARK: Constants
 
+@frozen
 public enum Constants {
     enum Logging {
         static let subsystem = "com.argmax.whisperkit"
@@ -1501,6 +1509,8 @@ public enum Constants {
     public static let defaultLanguageCode: String = "en"
 
     public static let defaultAudioReadFrameSize: AVAudioFrameCount = 1_323_000 // 30s of audio at commonly found 44.1khz sample rate
+
+    public static let defaultWindowSamples: Int = 480_000 // 30s of audio at 16khz sample rate default for Whisper models
 
     public static let fallbackModelSupportConfig: ModelSupportConfig = {
         var config = ModelSupportConfig(

@@ -3,17 +3,22 @@
 
 import CoreML
 
+public protocol AudioEncoderOutputType {}
+extension MLMultiArray: AudioEncoderOutputType {}
+
 /// AudioEncoding protocol defines the requirements for an audio encoding implementation.
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public protocol AudioEncoding {
     /// The size of the embedding produced by the encoder.
     var embedSize: Int? { get }
 
     /// Encodes the given audio features asynchronously.
     /// - Parameter features: The audio features to be encoded.
-    /// - Returns: An optional `MLMultiArray` containing the encoded features.
-    func encodeFeatures(_ features: MLMultiArray) async throws -> MLMultiArray?
+    /// - Returns: An optional tensor containing the encoded features.
+    func encodeFeatures(_ features: any FeatureExtractorOutputType) async throws -> (any AudioEncoderOutputType)?
 }
 
+/// Backwards-compatible AudioEncoder implementation
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class AudioEncoder: AudioEncoding, WhisperMLModel {
     public var model: MLModel?
@@ -36,8 +41,15 @@ public class AudioEncoder: AudioEncoding, WhisperMLModel {
 
     public init() {}
 
+    public func encodeFeatures(_ features: any FeatureExtractorOutputType) async throws -> (any AudioEncoderOutputType)? {
+        guard let features = features as? MLMultiArray else {
+            throw WhisperError.audioProcessingFailed("AudioEncoder input must be MLMultiArray")
+        }
+
+        return try await encodeFeatures(features)
+    }
+
     public func encodeFeatures(_ features: MLMultiArray) async throws -> MLMultiArray? {
-        // Make sure features is shape MultiArray (Float32 1 × {80,128} × 3000)
         guard let model else {
             throw WhisperError.modelsUnavailable()
         }

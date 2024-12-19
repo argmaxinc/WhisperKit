@@ -75,8 +75,9 @@ open class TimestampRulesFilter: LogitsFiltering {
 
     public func filterLogits(_ logits: MLMultiArray, withTokens tokens: [Int]) -> MLMultiArray {
         guard let sampleBegin = sampleBegin(for: tokens),
-              sampleBegin > tokens.count
+              sampleBegin <= tokens.count
         else {
+            // Early return if we are still prefilling the prompt
             return logits
         }
 

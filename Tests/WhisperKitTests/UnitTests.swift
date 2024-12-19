@@ -342,6 +342,202 @@ final class UnitTests: XCTestCase {
         XCTAssertGreaterThan(energyVeryLoud, energyLoud, "Audio energy is not very loud")
     }
 
+    // MARK: - Protocol Conformance Tests
+
+    func testMLMultiArrayConformsToFeatureExtractorOutputType() {
+        let array = try! MLMultiArray(shape: [1], dataType: .float16)
+        XCTAssertNotNil(array as FeatureExtractorOutputType)
+    }
+
+    func testMLMultiArrayConformsToAudioEncoderOutputType() {
+        let array = try! MLMultiArray(shape: [1], dataType: .float16)
+        XCTAssertNotNil(array as AudioEncoderOutputType)
+    }
+
+    func testMLMultiArrayConformsToTextDecoderTensorType() {
+        let array = try! MLMultiArray(shape: [1], dataType: .float16)
+        XCTAssertNotNil(array as TextDecoderTensorType)
+    }
+
+    // MARK: - Generic Type Tests
+
+    func testEncodeFeatureWithGenericType() async throws {
+        let audioEncoder = AudioEncoder()
+        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "AudioEncoder.mlmodelc")
+        try await audioEncoder.loadModel(at: modelPath, computeUnits: .cpuAndNeuralEngine)
+
+        // Create a test input that conforms to FeatureExtractorOutputType
+        let input = try MLMultiArray(shape: [1, 80, 1, 3000], dataType: .float16)
+
+        // Test encoding with generic type
+        let output = try await audioEncoder.encodeFeatures(input)
+
+        XCTAssertNotNil(output)
+        XCTAssertNotNil(output! as AudioEncoderOutputType)
+
+        // Test specific shape of output
+        if let mlOutput = output {
+            XCTAssertEqual(mlOutput.shape, [1, 384, 1, 1500])
+        } else {
+            XCTFail("Output should be MLMultiArray")
+        }
+    }
+
+    func testEncodeFeatureWithInvalidType() async throws {
+        let audioEncoder = AudioEncoder()
+        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "AudioEncoder.mlmodelc")
+        try await audioEncoder.loadModel(at: modelPath, computeUnits: .cpuAndNeuralEngine)
+
+        // Create an invalid input type
+        struct InvalidType: FeatureExtractorOutputType {}
+        let invalidInput = InvalidType()
+
+        // Test that encoding fails with invalid type
+        do {
+            _ = try await audioEncoder.encodeFeatures(invalidInput)
+            XCTFail("Should throw error for invalid input type")
+        } catch let WhisperError.audioProcessingFailed(message) {
+            XCTAssertEqual(message, "AudioEncoder input must be MLMultiArray")
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    // MARK: - TextDecoder Generic Type Tests
+
+    func testPredictLogitsWithGenericType() async throws {
+        let textDecoder = TextDecoder()
+        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
+
+        // Create test inputs
+        let input = try TextDecoderMLMultiArrayInputType(
+            inputIds: MLMultiArray(shape: [1], dataType: .int32),
+            cacheLength: MLMultiArray(shape: [1], dataType: .int32),
+            keyCache: MLMultiArray(shape: [1, 1536, 1, 224], dataType: .float16),
+            valueCache: MLMultiArray(shape: [1, 1536, 1, 224], dataType: .float16),
+            kvCacheUpdateMask: MLMultiArray(shape: [1, 224], dataType: .float16),
+            encoderOutputEmbeds: MLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16),
+            decoderKeyPaddingMask: MLMultiArray(shape: [1, 224], dataType: .float16)
+        )
+
+        // Test prediction with generic type
+        let output = try await textDecoder.predictLogits(input)
+
+        XCTAssertNotNil(output)
+        XCTAssertNotNil(output as? TextDecoderMLMultiArrayOutputType)
+    }
+
+    func testPredictLogitsWithInvalidType() async throws {
+        let textDecoder = TextDecoder()
+        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
+
+        // Create an invalid input type
+        struct InvalidType: TextDecoderInputType {}
+        let invalidInput = InvalidType()
+
+        // Test that prediction fails with invalid type
+        do {
+            _ = try await textDecoder.predictLogits(invalidInput)
+            XCTFail("Should throw error for invalid input type")
+        } catch let WhisperError.transcriptionFailed(message) {
+            XCTAssertEqual(message, "Input must be TextDecoderMLMultiArrayInputType")
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    func testTextDecoderMLMultiArrayInputType() {
+        let inputIds = try! MLMultiArray(shape: [1], dataType: .int32)
+        let cacheLength = try! MLMultiArray(shape: [1], dataType: .int32)
+        let keyCache = try! MLMultiArray(shape: [1, 1536, 1, 224], dataType: .float16)
+        let valueCache = try! MLMultiArray(shape: [1, 1536, 1, 224], dataType: .float16)
+        let kvCacheUpdateMask = try! MLMultiArray(shape: [1, 224], dataType: .float16)
+        let encoderOutputEmbeds = try! MLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16)
+        let decoderKeyPaddingMask = try! MLMultiArray(shape: [1, 224], dataType: .float16)
+        
+        let input = TextDecoderMLMultiArrayInputType(
+            inputIds: inputIds,
+            cacheLength: cacheLength,
+            keyCache: keyCache,
+            valueCache: valueCache,
+            kvCacheUpdateMask: kvCacheUpdateMask,
+            encoderOutputEmbeds: encoderOutputEmbeds,
+            decoderKeyPaddingMask: decoderKeyPaddingMask
+        )
+        
+        XCTAssertNotNil(input as TextDecoderInputType)
+        XCTAssertEqual(input.inputIds.shape, [1])
+        XCTAssertEqual(input.cacheLength.shape, [1])
+        XCTAssertEqual(input.keyCache.shape, [1, 1536, 1, 224])
+        XCTAssertEqual(input.valueCache.shape, [1, 1536, 1, 224])
+        XCTAssertEqual(input.kvCacheUpdateMask.shape, [1, 224])
+        XCTAssertEqual(input.encoderOutputEmbeds.shape, [1, 384, 1, 1500])
+        XCTAssertEqual(input.decoderKeyPaddingMask.shape, [1, 224])
+    }
+    
+    func testTextDecoderMLMultiArrayOutputType() {
+        let logits = try! MLMultiArray(shape: [1, 51865, 1, 1], dataType: .float16)
+        let cache = DecodingCache(
+            keyCache: try! MLMultiArray(shape: [1, 1536, 1, 224], dataType: .float16),
+            valueCache: try! MLMultiArray(shape: [1, 1536, 1, 224], dataType: .float16),
+            alignmentWeights: try! MLMultiArray(shape: [1, 224], dataType: .float16)
+        )
+        
+        let output = TextDecoderMLMultiArrayOutputType(logits: logits, cache: cache)
+        
+        XCTAssertNotNil(output as TextDecoderOutputType)
+        XCTAssertEqual(output.logits?.shape, [1, 51865, 1, 1])
+        XCTAssertNotNil(output.cache)
+        XCTAssertEqual(output.cache?.keyCache?.shape, [1, 1536, 1, 224])
+        XCTAssertEqual(output.cache?.valueCache?.shape, [1, 1536, 1, 224])
+        XCTAssertEqual(output.cache?.alignmentWeights?.shape, [1, 224])
+    }
+
+    func testTextDecoderMLMultiArrayOutputTypeWithNilValues() {
+        let output = TextDecoderMLMultiArrayOutputType()
+
+        XCTAssertNotNil(output as TextDecoderOutputType)
+        XCTAssertNil(output.logits)
+        XCTAssertNil(output.cache)
+    }
+    
+    func testDecodingCacheInitialization() {
+        let keyCache = try! MLMultiArray(shape: [1, 1536, 1, 224], dataType: .float16)
+        let valueCache = try! MLMultiArray(shape: [1, 1536, 1, 224], dataType: .float16)
+        let alignmentWeights = try! MLMultiArray(shape: [1, 224], dataType: .float16)
+        
+        let cache = DecodingCache(
+            keyCache: keyCache,
+            valueCache: valueCache,
+            alignmentWeights: alignmentWeights
+        )
+
+        XCTAssertEqual(cache.keyCache?.shape, [1, 1536, 1, 224])
+        XCTAssertEqual(cache.valueCache?.shape, [1, 1536, 1, 224])
+        XCTAssertEqual(cache.alignmentWeights?.shape, [1, 224])
+    }
+
+    func testDecodingCacheWithNilValues() {
+        let cache = DecodingCache()
+
+        XCTAssertNil(cache.keyCache)
+        XCTAssertNil(cache.valueCache)
+        XCTAssertNil(cache.alignmentWeights)
+    }
+    
+    func testDecodingCacheWithPartialValues() {
+        let keyCache = try! MLMultiArray(shape: [1, 1536, 1, 224], dataType: .float16)
+        
+        let cache = DecodingCache(keyCache: keyCache)
+        
+        XCTAssertNotNil(cache.keyCache)
+        XCTAssertNil(cache.valueCache)
+        XCTAssertNil(cache.alignmentWeights)
+        XCTAssertEqual(cache.keyCache?.shape, [1, 1536, 1, 224])
+    }
+
     // MARK: - Feature Extractor Tests
 
     func testLogmelOutput() async throws {
@@ -561,8 +757,8 @@ final class UnitTests: XCTestCase {
         )
 
         XCTAssertNotNil(result)
-        let tokenCount = result.segments.flatMap { $0.tokens }.count
-        let decodingTimePerToken = result.timings.decodingLoop / Double(tokenCount)
+        let tokenCountWithEarlyStop = result.segments.flatMap { $0.tokens }.count
+        let decodingTimePerTokenWithEarlyStop = result.timings.decodingLoop / Double(tokenCountWithEarlyStop)
 
         // Work done in the callback should not block the decoding loop
         let continuationCallbackWithWait: TranscriptionCallback = { (progress: TranscriptionProgress) -> Bool? in
@@ -581,10 +777,10 @@ final class UnitTests: XCTestCase {
         Logging.debug("Decoding loop without wait: \(result.timings.decodingLoop), with wait: \(resultWithWait.timings.decodingLoop)")
 
         // Assert that the decoding predictions per token are not slower with the waiting
-        XCTAssertEqual(decodingTimePerTokenWithWait, decodingTimePerToken, accuracy: decodingTimePerToken, "Decoding predictions per token should not be significantly slower with waiting")
+        XCTAssertEqual(decodingTimePerTokenWithWait, decodingTimePerTokenWithEarlyStop, accuracy: decodingTimePerTokenWithEarlyStop, "Decoding predictions per token should not be significantly slower with waiting")
 
         // Assert that more tokens are returned in the callback with waiting
-        XCTAssertGreaterThan(tokenCountWithWait, tokenCount, "More tokens should be returned in the callback with waiting")
+        XCTAssertGreaterThan(tokenCountWithWait, tokenCountWithEarlyStop, "More tokens should be returned in the callback with waiting")
     }
 
     // MARK: - Tokenizer Tests
@@ -662,7 +858,7 @@ final class UnitTests: XCTestCase {
 
         let transcribeResult: [TranscriptionResult] = try await whisperKit.transcribe(audioArray: multiWindowSamples, decodeOptions: options)
         let result = try XCTUnwrap(transcribeResult.first)
-        XCTAssertEqual(result.segments.count, 2, "Expected 3 segments")
+        XCTAssertEqual(result.segments.count, 3, "Expected 3 segments")
 
         // Compare last timestamp to the length of the audio
         let endTimestamp = try XCTUnwrap(
@@ -1064,7 +1260,7 @@ final class UnitTests: XCTestCase {
             "Failed to transcribe"
         )
 
-        XCTAssertEqual(result.segments.first?.text, " and so my fellow americans ask not what your country can do for you ask what you can do for your country.")
+        XCTAssertEqual(result.segments.first?.text, " and so my fellow americans ask not what your country can do for you ask what you can do for your country")
     }
 
     func testCallbacks() async throws {
@@ -1223,91 +1419,76 @@ final class UnitTests: XCTestCase {
     }
 
     func testTimestampRulesFilter() throws {
-        // NOTE: for non-multilingual models we supress tokens immediately
-        let tokensFilter1 = TimestampRulesFilter(
+        // NOTE: for non-multilingual models we suppress tokens immediately
+        let tokensFilter = TimestampRulesFilter(
             specialTokens: .default(
                 endToken: 3,
                 noTimestampsToken: 2,
-                timeTokenBegin: 4,
-                transcribeToken: 100,
-                translateToken: 101
+                timeTokenBegin: 6,
+                transcribeToken: 4,
+                translateToken: 5
             ),
-            sampleBegin: 2,
+            sampleBegin: 0,
             maxInitialTimestampIndex: nil,
             isModelMultilingual: false
         )
 
-        let logits1 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2])
-        let result1 = tokensFilter1.filterLogits(logits1, withTokens: [])
-        XCTAssertEqual(result1.data(for: 2), [1.1, 5.2, -.infinity, 0.4, 0.2, 0.1, 0.2])
 
-        let tokensFilter2 = TimestampRulesFilter(
-            specialTokens: .default(
-                endToken: 3,
-                noTimestampsToken: 2,
-                timeTokenBegin: 4,
-                transcribeToken: 100,
-                translateToken: 101
-            ),
-            sampleBegin: 2,
-            maxInitialTimestampIndex: nil,
-            isModelMultilingual: false
-        )
+        // noTimestampToken should always be suppressed if tokens pass sampleBegin
+        let logits1 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2, 0.1, 0.1])
+        let result1 = tokensFilter.filterLogits(logits1, withTokens: [4])
+        XCTAssertEqual(result1.data(for: 2), [1.1, 5.2, -.infinity, 0.4, 0.2, 0.1, 0.2, 0.1, 0.1])
 
-        let logits2 = try MLMultiArray.logits([1.1, 0.2, 0.3, 0.4, 0.2, 0.1, 0.2])
-        let result2 = tokensFilter2.filterLogits(logits2, withTokens: [])
-        XCTAssertEqual(result2.data(for: 2), [-.infinity, -.infinity, -.infinity, -.infinity, 0.2, 0.1, 0.2])
+        // Timestamps should not decrease (filters up to last seen timestamp)
+        let logits2 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2, 0.1, 0.1])
+        let result2 = tokensFilter.filterLogits(logits2, withTokens: [0, 6, 7, 3])
+        XCTAssertEqual(result2.data(for: 2), [1.1, 5.2, -.infinity, 0.4, 0.2, 0.1, -.infinity, -.infinity, 0.1])
+
+        // If last two tokens are timestamps, filter all timestamps (allows text token to be next)
+        let logits3 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2, 0.1, 0.1])
+        let result3 = tokensFilter.filterLogits(logits3, withTokens: [0, 6, 7])
+        XCTAssertEqual(result3.data(for: 2), [1.1, 5.2, -.infinity, 0.4, 0.2, 0.1, -.infinity, -.infinity, -.infinity])
+
+        // If only one previous token was a timestamp, filter all text and non-decreasing timestamps (to find matching timestamp pair)
+        let logits4 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2, 0.1, 0.1])
+        let result4 = tokensFilter.filterLogits(logits4, withTokens: [0, 4, 7])
+        XCTAssertEqual(result4.data(for: 2), [-.infinity, -.infinity, -.infinity, -.infinity, -.infinity, -.infinity, -.infinity, 0.1, 0.1])
     }
 
     func testTimestampRulesFilterMultilingual() throws {
-        // NOTE: for multilingual models we supress tokens only after transcribe or translate token
-        let tokensFilter1 = TimestampRulesFilter(
+        // NOTE: for multilingual models we suppress tokens only after transcribe or translate token
+        let tokensFilter = TimestampRulesFilter(
             specialTokens: .default(
                 endToken: 3,
                 noTimestampsToken: 2,
-                timeTokenBegin: 4,
-                transcribeToken: 100,
-                translateToken: 101
+                timeTokenBegin: 6,
+                transcribeToken: 4,
+                translateToken: 5
             ),
-            sampleBegin: 2,
+            sampleBegin: 0,
             maxInitialTimestampIndex: nil,
             isModelMultilingual: true
         )
-        let logits1 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2])
-        let result1 = tokensFilter1.filterLogits(logits1, withTokens: [])
-        XCTAssertEqual(result1.data(for: 2), [1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2])
 
-        let tokensFilter2 = TimestampRulesFilter(
-            specialTokens: .default(
-                endToken: 3,
-                noTimestampsToken: 2,
-                timeTokenBegin: 4,
-                transcribeToken: 100,
-                translateToken: 101
-            ),
-            sampleBegin: 2,
-            maxInitialTimestampIndex: nil,
-            isModelMultilingual: true
-        )
-        let logits2 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2])
-        let result2 = tokensFilter2.filterLogits(logits2, withTokens: [100])
-        XCTAssertEqual(result2.data(for: 2), [1.1, 5.2, -.infinity, 0.4, 0.2, 0.1, 0.2])
+        // Without task token, nothing should be suppressed even with tokens past sampleBegin
+        let logits1 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2, 0.1, 0.1])
+        let result1 = tokensFilter.filterLogits(logits1, withTokens: [0, 1, 2])
+        XCTAssertEqual(result1.data(for: 2), [1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2, 0.1, 0.1])
 
-        let tokensFilter3 = TimestampRulesFilter(
-            specialTokens: .default(
-                endToken: 3,
-                noTimestampsToken: 2,
-                timeTokenBegin: 4,
-                transcribeToken: 100,
-                translateToken: 101
-            ),
-            sampleBegin: 2,
-            maxInitialTimestampIndex: nil,
-            isModelMultilingual: true
-        )
-        let logits3 = try MLMultiArray.logits([1.1, 0.2, 0.3, 0.4, 0.2, 0.1, 0.2])
-        let result3 = tokensFilter3.filterLogits(logits3, withTokens: [101])
-        XCTAssertEqual(result3.data(for: 2), [-.infinity, -.infinity, -.infinity, -.infinity, 0.2, 0.1, 0.2])
+        // Timestamps should not decrease after task token (filters up to last seen timestamp)
+        let logits2 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2, 0.1, 0.1])
+        let result2 = tokensFilter.filterLogits(logits2, withTokens: [0, 4, 6, 7, 3])
+        XCTAssertEqual(result2.data(for: 2), [1.1, 5.2, -.infinity, 0.4, 0.2, 0.1, -.infinity, -.infinity, 0.1])
+
+        // If last two tokens after task are timestamps, filter all timestamps (allows text token to be next)
+        let logits3 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2, 0.1, 0.1])
+        let result3 = tokensFilter.filterLogits(logits3, withTokens: [0, 5, 6, 7])
+        XCTAssertEqual(result3.data(for: 2), [1.1, 5.2, -.infinity, 0.4, 0.2, 0.1, -.infinity, -.infinity, -.infinity])
+
+        // After transcribe token with text and single timestamp (should force timestamp tokens)
+        let logits4 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2, 0.1, 0.1])
+        let result4 = tokensFilter.filterLogits(logits4, withTokens: [0, 4, 0, 7])
+        XCTAssertEqual(result4.data(for: 2), [-.infinity, -.infinity, -.infinity, -.infinity, -.infinity, -.infinity, -.infinity, 0.1, 0.1])
     }
 
     // MARK: - VAD Tests
@@ -1420,6 +1601,8 @@ final class UnitTests: XCTestCase {
 
     func testVADAudioChunker() async throws {
         let chunker = VADAudioChunker()
+        // Setting windowSamples to default value as WhisperKit.windowSamples is not accessible in this scope
+        let windowSamples: Int = 480_000
 
         let singleChunkPath = try XCTUnwrap(
             Bundle.current.path(forResource: "jfk", ofType: "wav"),
@@ -1430,7 +1613,7 @@ final class UnitTests: XCTestCase {
 
         var audioChunks = try await chunker.chunkAll(
             audioArray: audioArray,
-            maxChunkLength: WhisperKit.windowSamples,
+            maxChunkLength: windowSamples,
             decodeOptions: DecodingOptions()
         )
 
@@ -1445,7 +1628,7 @@ final class UnitTests: XCTestCase {
 
         audioChunks = try await chunker.chunkAll(
             audioArray: audioArray,
-            maxChunkLength: WhisperKit.windowSamples,
+            maxChunkLength: windowSamples,
             decodeOptions: DecodingOptions()
         )
 
