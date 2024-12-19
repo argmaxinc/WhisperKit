@@ -117,7 +117,7 @@ open class VoiceActivityDetector {
         }
     }
 
-    // MARK - Utility
+    // MARK: - Utility
 
     func voiceActivityClipTimestamps(in waveform: [Float]) -> [Float] {
         let nonSilentChunks = calculateActiveChunks(in: waveform)
