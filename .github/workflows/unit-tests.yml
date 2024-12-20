@@ -51,7 +51,7 @@ jobs:
         if: ${{ matrix.run-config['condition'] != true }}
         run: |
           echo "Skipping tests for ${{ matrix.run-config['name'] }} with run condition ${{ matrix.run-config['condition'] }}"
-          exit 1
+          exit 0
       - name: Setup environment
         run: make setup
       - name: Setup Cache
