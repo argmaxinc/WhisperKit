@@ -47,6 +47,11 @@ jobs:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
+      - name: Check run condition
+        if: ${{ matrix.run-config['condition'] != true }}
+        run: |
+          echo "Skipping tests for ${{ matrix.run-config['name'] }} with run condition ${{ matrix.run-config['condition'] }}"
+          exit 1
       - name: Setup environment
         run: make setup
       - name: Setup Cache
@@ -75,7 +80,6 @@ jobs:
           sleep 15
           xcrun simctl list devices
       - name: Build and Test - ${{ matrix.run-config['name'] }}
-        if: ${{ matrix.run-config['condition'] == true }}
         run: |
           set -o pipefail
           xcodebuild clean build-for-testing -scheme whisperkit-Package -destination '${{ matrix.run-config['clean-destination'] }}' | xcpretty
