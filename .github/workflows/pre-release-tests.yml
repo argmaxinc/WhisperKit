@@ -12,9 +12,11 @@ jobs:
       matrix:
         include:
           - os: macos-13-xlarge
-            ios-version: "16.1" # Oldest available version
+            ios-version: "16.1" # Oldest available version on macOS 13
+          - os: macos-14
+            ios-version: "17.0" # Oldest available version on macOS 14
           - os: macos-15
-            ios-version: "18.1" # Latest available version
+            ios-version: "18.2" # Latest available version
     uses: ./.github/workflows/unit-tests.yml
     with:
       ios-version: ${{ matrix.ios-version }}
