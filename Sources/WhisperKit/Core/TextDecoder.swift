@@ -213,7 +213,7 @@ public extension TextDecoding {
             throw WhisperError.tokenizerUnavailable()
         }
 
-        var prefilledDecoderInputs = decoderInputs
+        let prefilledDecoderInputs = decoderInputs
 
         // Setup prefill tokens based on task and language
         var prefillTokens: [Int] = [tokenizer.specialTokens.startOfTranscriptToken] // SOT
@@ -828,7 +828,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
 
                 // Call the callback if it is provided on a background thread
                 if let callback = callback {
-                    Task.detached { [weak self] in
+                    Task(priority: .utility) { [weak self] in
                         guard let self = self else { return }
                         let shouldContinue = callback(result)
                         if let shouldContinue = shouldContinue, !shouldContinue, !isPrefill {
