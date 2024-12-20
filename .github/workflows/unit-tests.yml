@@ -84,7 +84,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results-${{ matrix.run-config['name'] }}
+          name: test-results-${{ matrix.run-config['name']}}-on-${{ inputs.macos-runner }}
           path: |
             ~/Library/Developer/Xcode/DerivedData/**/Logs/Test/*.xcresult
           retention-days: 5
