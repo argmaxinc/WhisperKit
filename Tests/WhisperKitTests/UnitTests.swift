@@ -456,7 +456,7 @@ final class UnitTests: XCTestCase {
         let kvCacheUpdateMask = try! MLMultiArray(shape: [1, 224], dataType: .float16)
         let encoderOutputEmbeds = try! MLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16)
         let decoderKeyPaddingMask = try! MLMultiArray(shape: [1, 224], dataType: .float16)
-        
+
         let input = TextDecoderMLMultiArrayInputType(
             inputIds: inputIds,
             cacheLength: cacheLength,
@@ -466,7 +466,7 @@ final class UnitTests: XCTestCase {
             encoderOutputEmbeds: encoderOutputEmbeds,
             decoderKeyPaddingMask: decoderKeyPaddingMask
         )
-        
+
         XCTAssertNotNil(input as TextDecoderInputType)
         XCTAssertEqual(input.inputIds.shape, [1])
         XCTAssertEqual(input.cacheLength.shape, [1])
@@ -476,7 +476,7 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(input.encoderOutputEmbeds.shape, [1, 384, 1, 1500])
         XCTAssertEqual(input.decoderKeyPaddingMask.shape, [1, 224])
     }
-    
+
     func testTextDecoderMLMultiArrayOutputType() {
         let logits = try! MLMultiArray(shape: [1, 51865, 1, 1], dataType: .float16)
         let cache = DecodingCache(
@@ -484,9 +484,9 @@ final class UnitTests: XCTestCase {
             valueCache: try! MLMultiArray(shape: [1, 1536, 1, 224], dataType: .float16),
             alignmentWeights: try! MLMultiArray(shape: [1, 224], dataType: .float16)
         )
-        
+
         let output = TextDecoderMLMultiArrayOutputType(logits: logits, cache: cache)
-        
+
         XCTAssertNotNil(output as TextDecoderOutputType)
         XCTAssertEqual(output.logits?.shape, [1, 51865, 1, 1])
         XCTAssertNotNil(output.cache)
@@ -502,12 +502,12 @@ final class UnitTests: XCTestCase {
         XCTAssertNil(output.logits)
         XCTAssertNil(output.cache)
     }
-    
+
     func testDecodingCacheInitialization() {
         let keyCache = try! MLMultiArray(shape: [1, 1536, 1, 224], dataType: .float16)
         let valueCache = try! MLMultiArray(shape: [1, 1536, 1, 224], dataType: .float16)
         let alignmentWeights = try! MLMultiArray(shape: [1, 224], dataType: .float16)
-        
+
         let cache = DecodingCache(
             keyCache: keyCache,
             valueCache: valueCache,
@@ -526,12 +526,12 @@ final class UnitTests: XCTestCase {
         XCTAssertNil(cache.valueCache)
         XCTAssertNil(cache.alignmentWeights)
     }
-    
+
     func testDecodingCacheWithPartialValues() {
         let keyCache = try! MLMultiArray(shape: [1, 1536, 1, 224], dataType: .float16)
-        
+
         let cache = DecodingCache(keyCache: keyCache)
-        
+
         XCTAssertNotNil(cache.keyCache)
         XCTAssertNil(cache.valueCache)
         XCTAssertNil(cache.alignmentWeights)
@@ -1449,7 +1449,6 @@ final class UnitTests: XCTestCase {
             isModelMultilingual: false
         )
 
-
         // noTimestampToken should always be suppressed if tokens pass sampleBegin
         let logits1 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2, 0.1, 0.1])
         let result1 = tokensFilter.filterLogits(logits1, withTokens: [4])
@@ -1618,7 +1617,7 @@ final class UnitTests: XCTestCase {
     func testVADAudioChunker() async throws {
         let chunker = VADAudioChunker()
         // Setting windowSamples to default value as WhisperKit.windowSamples is not accessible in this scope
-        let windowSamples: Int = 480_000
+        let windowSamples = 480_000
 
         let singleChunkPath = try XCTUnwrap(
             Bundle.current.path(forResource: "jfk", ofType: "wav"),
