@@ -47,8 +47,10 @@ jobs:
         include:
           - os: macos-13-xlarge
             ios-version: "16.1"
+            ios-device: "iPhone 14"
           - os: macos-14
             ios-version: "17.0.1"
+            ios-device: "iPhone 15"
     uses: ./.github/workflows/unit-tests.yml
     with:
       ios-version: ${{ matrix.ios-version }}

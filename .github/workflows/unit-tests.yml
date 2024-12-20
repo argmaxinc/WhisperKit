@@ -6,6 +6,9 @@ on:
       ios-version:
         required: true
         type: string
+      ios-device:
+        required: true
+        type: string
       macos-runner:
         required: true
         type: string
@@ -27,7 +30,7 @@ jobs:
               name: "iOS",
               condition: true,
               clean-destination: "generic/platform=iOS",
-              test-destination: "platform=iOS Simulator,OS=${{ inputs.ios-version }},name=iPhone 16",
+              test-destination: "platform=iOS Simulator,OS=${{ inputs.ios-version }},name=${{ inputs.ios-device }}",
             }
           - {
               name: "watchOS",
