@@ -109,6 +109,7 @@ extension MLMultiArray {
     }
 }
 
+#if swift(>=5.10)
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, visionOS 2.0, *)
 public extension MLTensor {
     func asIntArray() -> [Int] {
@@ -176,6 +177,7 @@ public extension MLTensor {
         return result
     }
 }
+#endif
 
 extension MLModel {
     func asyncPrediction(
