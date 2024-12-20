@@ -828,7 +828,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
 
                 // Call the callback if it is provided on a background thread
                 if let callback = callback {
-                    Task(priority: .background) { [weak self] in
+                    Task.detached(priority: .low) { [weak self] in
                         guard let self = self else { return }
                         let shouldContinue = callback(result)
                         if let shouldContinue = shouldContinue, !shouldContinue, !isPrefill {
