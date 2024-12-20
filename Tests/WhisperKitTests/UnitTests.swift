@@ -1260,6 +1260,7 @@ final class UnitTests: XCTestCase {
         await fulfillment(of: [modelStateExpectation, segmentDiscoveryExpectation, transcriptionStateExpectation], timeout: 1)
     }
 
+    #if !os(watchOS) // FIXME: watchOS ignores the priority here for some reason
     func testCallbackWithEarlyStopping() async throws {
         let callbackTestTask = Task(priority: .userInitiated) {
             let computeOptions = ModelComputeOptions(
@@ -1319,6 +1320,7 @@ final class UnitTests: XCTestCase {
 
         try await callbackTestTask.value
     }
+    #endif
 
     // MARK: - Utils Tests
 
