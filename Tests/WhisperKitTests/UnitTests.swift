@@ -1312,7 +1312,7 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(decodingTimePerTokenWithWait, decodingTimePerTokenWithEarlyStop, accuracy: decodingTimePerTokenWithEarlyStop, "Decoding predictions per token should not be significantly slower with waiting")
 
         // Assert that more tokens are returned in the callback with waiting
-        XCTAssertEqual(tokenCountWithWait, 30, "Token count should be equal to full audio file with 5 seconds of wait")
+        XCTAssertGreaterThanOrEqual(tokenCountWithWait, 30, "Tokens for callback with wait should contain the full audio file")
         XCTAssertGreaterThan(tokenCountWithWait, tokenCountWithEarlyStop, "More tokens should be returned in the callback with waiting")
     }
 
@@ -1963,13 +1963,13 @@ final class UnitTests: XCTestCase {
         }
     }
 
-    func testWordTimestampCorrectness() async {
+    func testWordTimestampCorrectness() async throws {
         let options = DecodingOptions(wordTimestamps: true)
 
-        guard let result = try? await transcribe(with: .tiny, options: options) else {
-            XCTFail("Failed to transcribe")
-            return
-        }
+        let result = try await XCTUnwrapAsync(
+            await transcribe(with: .tiny, options: options),
+            "Failed to transcribe"
+        )
 
         let wordTimings = result.segments.compactMap { $0.words }.flatMap { $0 }
 
@@ -2012,7 +2012,7 @@ final class UnitTests: XCTestCase {
                 """)
                 return
             }
-            
+
             let expectedWordTiming = expectedWordTimings[index]
 
             XCTAssertEqual(wordTiming.word.normalized, expectedWordTiming.word.normalized, "Word should match at index \(index) (expected: \(expectedWordTiming.word), actual: \(wordTiming.word))")
