@@ -2001,6 +2001,18 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(wordTimings.count, expectedWordTimings.count, "Number of word timings should match")
 
         for (index, wordTiming) in wordTimings.enumerated() {
+            guard index < expectedWordTimings.count else {
+                XCTFail("""
+                Index out of bounds at position \(index):
+                - Total actual words: \(wordTimings.count)
+                - Total expected words: \(expectedWordTimings.count)
+                - Current word: "\(wordTiming.word)"
+                - All actual words: \(wordTimings.map { $0.word })
+                - All expected words: \(expectedWordTimings.map { $0.word })
+                """)
+                return
+            }
+            
             let expectedWordTiming = expectedWordTimings[index]
 
             XCTAssertEqual(wordTiming.word.normalized, expectedWordTiming.word.normalized, "Word should match at index \(index) (expected: \(expectedWordTiming.word), actual: \(wordTiming.word))")

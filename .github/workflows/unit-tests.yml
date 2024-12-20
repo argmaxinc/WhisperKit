@@ -47,11 +47,6 @@ jobs:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
-      - name: Check run condition
-        if: ${{ matrix.run-config['condition'] != true }}
-        run: |
-          echo "Skipping tests for ${{ matrix.run-config['name'] }} with run condition ${{ matrix.run-config['condition'] }}"
-          exit 0
       - name: Setup environment
         run: make setup
       - name: Setup Cache
@@ -64,6 +59,7 @@ jobs:
         if: steps.model-cache.outputs.cache-hit != 'true'
         run: make download-model MODEL=tiny
       - name: Install and discover destinations
+        if: ${{ matrix.run-config['condition'] != true }}
         run: |
           if [[ "${{ matrix.run-config['name'] }}" != "macOS" ]]; then
             xcodebuild -downloadPlatform ${{ matrix.run-config['name'] }}
@@ -71,7 +67,7 @@ jobs:
           echo "Destinations for testing:"
           xcodebuild test-without-building -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -showdestinations
       - name: Boot Simulator and Wait
-        if: ${{ matrix.run-config['name'] != 'macOS' }} && ${{ inputs.macos-runner == 'macos-15' }}
+        if: ${{ matrix.run-config['condition'] != true }} && ${{ matrix.run-config['name'] != 'macOS' }} && ${{ inputs.macos-runner == 'macos-15' }}
         # Slower runners require some time to fully boot the simulator
         # Parse the simulator name from the destination string, boot it, and wait
         run: |
@@ -80,6 +76,7 @@ jobs:
           sleep 15
           xcrun simctl list devices
       - name: Build and Test - ${{ matrix.run-config['name'] }}
+        if: ${{ matrix.run-config['condition'] != true }}
         run: |
           set -o pipefail
           xcodebuild clean build-for-testing -scheme whisperkit-Package -destination '${{ matrix.run-config['clean-destination'] }}' | xcpretty
