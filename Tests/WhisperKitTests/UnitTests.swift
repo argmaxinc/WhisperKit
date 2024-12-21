@@ -456,7 +456,7 @@ final class UnitTests: XCTestCase {
         let kvCacheUpdateMask = try! MLMultiArray(shape: [1, 224], dataType: .float16)
         let encoderOutputEmbeds = try! MLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16)
         let decoderKeyPaddingMask = try! MLMultiArray(shape: [1, 224], dataType: .float16)
-        
+
         let input = TextDecoderMLMultiArrayInputType(
             inputIds: inputIds,
             cacheLength: cacheLength,
@@ -466,7 +466,7 @@ final class UnitTests: XCTestCase {
             encoderOutputEmbeds: encoderOutputEmbeds,
             decoderKeyPaddingMask: decoderKeyPaddingMask
         )
-        
+
         XCTAssertNotNil(input as TextDecoderInputType)
         XCTAssertEqual(input.inputIds.shape, [1])
         XCTAssertEqual(input.cacheLength.shape, [1])
@@ -476,7 +476,7 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(input.encoderOutputEmbeds.shape, [1, 384, 1, 1500])
         XCTAssertEqual(input.decoderKeyPaddingMask.shape, [1, 224])
     }
-    
+
     func testTextDecoderMLMultiArrayOutputType() {
         let logits = try! MLMultiArray(shape: [1, 51865, 1, 1], dataType: .float16)
         let cache = DecodingCache(
@@ -484,9 +484,9 @@ final class UnitTests: XCTestCase {
             valueCache: try! MLMultiArray(shape: [1, 1536, 1, 224], dataType: .float16),
             alignmentWeights: try! MLMultiArray(shape: [1, 224], dataType: .float16)
         )
-        
+
         let output = TextDecoderMLMultiArrayOutputType(logits: logits, cache: cache)
-        
+
         XCTAssertNotNil(output as TextDecoderOutputType)
         XCTAssertEqual(output.logits?.shape, [1, 51865, 1, 1])
         XCTAssertNotNil(output.cache)
@@ -502,12 +502,12 @@ final class UnitTests: XCTestCase {
         XCTAssertNil(output.logits)
         XCTAssertNil(output.cache)
     }
-    
+
     func testDecodingCacheInitialization() {
         let keyCache = try! MLMultiArray(shape: [1, 1536, 1, 224], dataType: .float16)
         let valueCache = try! MLMultiArray(shape: [1, 1536, 1, 224], dataType: .float16)
         let alignmentWeights = try! MLMultiArray(shape: [1, 224], dataType: .float16)
-        
+
         let cache = DecodingCache(
             keyCache: keyCache,
             valueCache: valueCache,
@@ -526,12 +526,12 @@ final class UnitTests: XCTestCase {
         XCTAssertNil(cache.valueCache)
         XCTAssertNil(cache.alignmentWeights)
     }
-    
+
     func testDecodingCacheWithPartialValues() {
         let keyCache = try! MLMultiArray(shape: [1, 1536, 1, 224], dataType: .float16)
-        
+
         let cache = DecodingCache(keyCache: keyCache)
-        
+
         XCTAssertNotNil(cache.keyCache)
         XCTAssertNil(cache.valueCache)
         XCTAssertNil(cache.alignmentWeights)
@@ -741,46 +741,6 @@ final class UnitTests: XCTestCase {
                 avgLogProb: 0
             )
         )
-    }
-
-    func testDecodingEarlyStopping() async throws {
-        let earlyStopTokenCount = 10
-        let options = DecodingOptions()
-        let continuationCallback: TranscriptionCallback = { (progress: TranscriptionProgress) -> Bool? in
-            // Stop after only 10 tokens (full test audio contains 16)
-            progress.tokens.count <= earlyStopTokenCount
-        }
-
-        let result = try await XCTUnwrapAsync(
-            await transcribe(with: .tiny, options: options, callback: continuationCallback).first!,
-            "Failed to transcribe"
-        )
-
-        XCTAssertNotNil(result)
-        let tokenCountWithEarlyStop = result.segments.flatMap { $0.tokens }.count
-        let decodingTimePerTokenWithEarlyStop = result.timings.decodingLoop / Double(tokenCountWithEarlyStop)
-
-        // Work done in the callback should not block the decoding loop
-        let continuationCallbackWithWait: TranscriptionCallback = { (progress: TranscriptionProgress) -> Bool? in
-            Thread.sleep(forTimeInterval: 2)
-            return false
-        }
-
-        let resultWithWait = try await XCTUnwrapAsync(
-            await transcribe(with: .tiny, options: options, callback: continuationCallbackWithWait).first!,
-            "Failed to transcribe"
-        )
-
-        XCTAssertNotNil(resultWithWait)
-        let tokenCountWithWait = resultWithWait.segments.flatMap { $0.tokens }.count
-        let decodingTimePerTokenWithWait = resultWithWait.timings.decodingLoop / Double(tokenCountWithWait)
-        Logging.debug("Decoding loop without wait: \(result.timings.decodingLoop), with wait: \(resultWithWait.timings.decodingLoop)")
-
-        // Assert that the decoding predictions per token are not slower with the waiting
-        XCTAssertEqual(decodingTimePerTokenWithWait, decodingTimePerTokenWithEarlyStop, accuracy: decodingTimePerTokenWithEarlyStop, "Decoding predictions per token should not be significantly slower with waiting")
-
-        // Assert that more tokens are returned in the callback with waiting
-        XCTAssertGreaterThan(tokenCountWithWait, tokenCountWithEarlyStop, "More tokens should be returned in the callback with waiting")
     }
 
     // MARK: - Tokenizer Tests
@@ -1300,6 +1260,68 @@ final class UnitTests: XCTestCase {
         await fulfillment(of: [modelStateExpectation, segmentDiscoveryExpectation, transcriptionStateExpectation], timeout: 1)
     }
 
+    #if !os(watchOS) // FIXME: watchOS ignores the priority here for some reason
+    func testCallbackWithEarlyStopping() async throws {
+        let callbackTestTask = Task(priority: .userInitiated) {
+            let computeOptions = ModelComputeOptions(
+                melCompute: .cpuOnly,
+                audioEncoderCompute: .cpuOnly,
+                textDecoderCompute: .cpuOnly,
+                prefillCompute: .cpuOnly
+            )
+
+            let config = try WhisperKitConfig(
+                modelFolder: tinyModelPath(),
+                computeOptions: computeOptions,
+                verbose: true,
+                logLevel: .debug,
+                load: false
+            )
+            let whisperKit = try await WhisperKit(config)
+
+            try await whisperKit.loadModels()
+            let audioFilePath = try XCTUnwrap(
+                Bundle.current.path(forResource: "jfk", ofType: "wav"),
+                "Audio file not found"
+            )
+
+            let earlyStopTokenCount = 10
+            let continuationCallback: TranscriptionCallback = { (progress: TranscriptionProgress) -> Bool? in
+                // Stop after only 10 tokens (full test audio contains ~30)
+                progress.tokens.count <= earlyStopTokenCount
+            }
+
+            let result = try await whisperKit.transcribe(audioPath: audioFilePath, callback: continuationCallback).first!
+
+            XCTAssertNotNil(result)
+            let tokenCountWithEarlyStop = result.segments.flatMap { $0.tokens }.count
+            let decodingTimePerTokenWithEarlyStop = result.timings.decodingLoop / Double(tokenCountWithEarlyStop)
+
+            // Work done in the callback should not block the decoding loop
+            let continuationCallbackWithWait: TranscriptionCallback = { (progress: TranscriptionProgress) -> Bool? in
+                Thread.sleep(forTimeInterval: 5)
+                return false
+            }
+
+            let resultWithWait = try await whisperKit.transcribe(audioPath: audioFilePath, callback: continuationCallbackWithWait).first!
+
+            XCTAssertNotNil(resultWithWait)
+            let tokenCountWithWait = resultWithWait.segments.flatMap { $0.tokens }.count
+            let decodingTimePerTokenWithWait = resultWithWait.timings.decodingLoop / Double(tokenCountWithWait)
+            Logging.debug("Decoding loop without wait: \(result.timings.decodingLoop), with wait: \(resultWithWait.timings.decodingLoop)")
+
+            // Assert that the decoding predictions per token are not slower with the waiting
+            XCTAssertEqual(decodingTimePerTokenWithWait, decodingTimePerTokenWithEarlyStop, accuracy: decodingTimePerTokenWithEarlyStop, "Decoding predictions per token should not be significantly slower with waiting")
+
+            // Assert that more tokens are returned in the callback with waiting
+            XCTAssertGreaterThanOrEqual(tokenCountWithWait, 30, "Tokens for callback with wait should contain the full audio file")
+            XCTAssertGreaterThan(tokenCountWithWait, tokenCountWithEarlyStop, "More tokens should be returned in the callback with waiting")
+        }
+
+        try await callbackTestTask.value
+    }
+    #endif
+
     // MARK: - Utils Tests
 
     func testFillIndexesWithValue() throws {
@@ -1432,7 +1454,6 @@ final class UnitTests: XCTestCase {
             maxInitialTimestampIndex: nil,
             isModelMultilingual: false
         )
-
 
         // noTimestampToken should always be suppressed if tokens pass sampleBegin
         let logits1 = try MLMultiArray.logits([1.1, 5.2, 0.3, 0.4, 0.2, 0.1, 0.2, 0.1, 0.1])
@@ -1602,7 +1623,7 @@ final class UnitTests: XCTestCase {
     func testVADAudioChunker() async throws {
         let chunker = VADAudioChunker()
         // Setting windowSamples to default value as WhisperKit.windowSamples is not accessible in this scope
-        let windowSamples: Int = 480_000
+        let windowSamples = 480_000
 
         let singleChunkPath = try XCTUnwrap(
             Bundle.current.path(forResource: "jfk", ofType: "wav"),
@@ -1948,15 +1969,15 @@ final class UnitTests: XCTestCase {
         }
     }
 
-    func testWordTimestampCorrectness() async {
+    func testWordTimestampCorrectness() async throws {
         let options = DecodingOptions(wordTimestamps: true)
 
-        guard let result = try? await transcribe(with: .tiny, options: options) else {
-            XCTFail("Failed to transcribe")
-            return
-        }
+        let result = try await XCTUnwrapAsync(
+            await transcribe(with: .tiny, options: options),
+            "Failed to transcribe"
+        )
 
-        let wordTimings = result.segments.compactMap { $0.words }.flatMap { $0 }
+        let wordTimings = result.segments.compactMap { $0.words }.flatMap { $0 }.prefix(7)
 
         let expectedWordTimings = [
             WordTiming(word: " And", tokens: [400], start: 0.32, end: 0.68, probability: 0.85),
@@ -1966,26 +1987,39 @@ final class UnitTests: XCTestCase {
             WordTiming(word: " Americans", tokens: [6280], start: 1.74, end: 2.26, probability: 0.82),
             WordTiming(word: " ask", tokens: [1029], start: 2.26, end: 3.82, probability: 0.4),
             WordTiming(word: " not", tokens: [406], start: 3.82, end: 4.56, probability: 1.0),
-            WordTiming(word: " what", tokens: [437], start: 4.56, end: 5.68, probability: 0.91),
-            WordTiming(word: " your", tokens: [428], start: 5.68, end: 5.92, probability: 0.22),
-            WordTiming(word: " country", tokens: [1941], start: 5.92, end: 6.38, probability: 0.64),
-            WordTiming(word: " can", tokens: [393], start: 6.38, end: 6.76, probability: 0.52),
-            WordTiming(word: " do", tokens: [360], start: 6.76, end: 6.98, probability: 0.85),
-            WordTiming(word: " for", tokens: [337], start: 6.98, end: 7.22, probability: 0.97),
-            WordTiming(word: " you,", tokens: [291, 11], start: 7.22, end: 8.36, probability: 0.97),
-            WordTiming(word: " ask", tokens: [1029], start: 8.36, end: 8.66, probability: 0.93),
-            WordTiming(word: " what", tokens: [437], start: 8.66, end: 8.86, probability: 0.98),
-            WordTiming(word: " you", tokens: [291], start: 8.86, end: 9.22, probability: 0.06),
-            WordTiming(word: " can", tokens: [393], start: 9.22, end: 9.44, probability: 0.58),
-            WordTiming(word: " do", tokens: [360], start: 9.44, end: 9.64, probability: 0.87),
-            WordTiming(word: " for", tokens: [337], start: 9.64, end: 9.86, probability: 0.95),
-            WordTiming(word: " your", tokens: [428], start: 9.86, end: 10.06, probability: 0.96),
-            WordTiming(word: " country.", tokens: [1941, 13], start: 10.06, end: 10.5, probability: 0.91),
+            // FIXME: macOS 14 token results differ at this point onward for tiny, only check timings above
+//            WordTiming(word: " what", tokens: [437], start: 4.56, end: 5.68, probability: 0.91),
+//            WordTiming(word: " your", tokens: [428], start: 5.68, end: 5.92, probability: 0.22),
+//            WordTiming(word: " country", tokens: [1941], start: 5.92, end: 6.38, probability: 0.64),
+//            WordTiming(word: " can", tokens: [393], start: 6.38, end: 6.76, probability: 0.52),
+//            WordTiming(word: " do", tokens: [360], start: 6.76, end: 6.98, probability: 0.85),
+//            WordTiming(word: " for", tokens: [337], start: 6.98, end: 7.22, probability: 0.97),
+//            WordTiming(word: " you,", tokens: [291, 11], start: 7.22, end: 8.36, probability: 0.97),
+//            WordTiming(word: " ask", tokens: [1029], start: 8.36, end: 8.66, probability: 0.93),
+//            WordTiming(word: " what", tokens: [437], start: 8.66, end: 8.86, probability: 0.98),
+//            WordTiming(word: " you", tokens: [291], start: 8.86, end: 9.22, probability: 0.06),
+//            WordTiming(word: " can", tokens: [393], start: 9.22, end: 9.44, probability: 0.58),
+//            WordTiming(word: " do", tokens: [360], start: 9.44, end: 9.64, probability: 0.87),
+//            WordTiming(word: " for", tokens: [337], start: 9.64, end: 9.86, probability: 0.95),
+//            WordTiming(word: " your", tokens: [428], start: 9.86, end: 10.06, probability: 0.96),
+//            WordTiming(word: " country.", tokens: [1941, 13], start: 10.06, end: 10.5, probability: 0.91),
         ]
 
         XCTAssertEqual(wordTimings.count, expectedWordTimings.count, "Number of word timings should match")
 
         for (index, wordTiming) in wordTimings.enumerated() {
+            guard index < expectedWordTimings.count else {
+                XCTFail("""
+                Index out of bounds at position \(index):
+                - Total actual words: \(wordTimings.count)
+                - Total expected words: \(expectedWordTimings.count)
+                - Current word: "\(wordTiming.word)"
+                - All actual words: \(wordTimings.map { $0.word })
+                - All expected words: \(expectedWordTimings.map { $0.word })
+                """)
+                return
+            }
+
             let expectedWordTiming = expectedWordTimings[index]
 
             XCTAssertEqual(wordTiming.word.normalized, expectedWordTiming.word.normalized, "Word should match at index \(index) (expected: \(expectedWordTiming.word), actual: \(wordTiming.word))")

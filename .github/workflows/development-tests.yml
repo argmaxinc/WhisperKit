@@ -15,7 +15,8 @@ jobs:
     name: "Build and Test"
     uses: ./.github/workflows/unit-tests.yml
     with:
-      ios-version: "18.1"
+      ios-version: "18.2"
+      ios-device: "iPhone 16"
       macos-runner: "macos-15"
 
   check-approvals:
@@ -42,7 +43,20 @@ jobs:
     name: "Pre-merge Tests"
     needs: [check-approvals]
     if: needs.check-approvals.outputs.reviews == 'APPROVED' || github.event_name == 'workflow_dispatch'
+    strategy:
+      matrix:
+        include:
+          - os: macos-13-xlarge
+            ios-version: "17.2"
+            ios-device: "iPhone 14"
+            xcode-version: "15.2"
+          - os: macos-14
+            ios-version: "17.2"
+            ios-device: "iPhone 15"
+            xcode-version: "15.2"
     uses: ./.github/workflows/unit-tests.yml
     with:
-      ios-version: "16.1"
-      macos-runner: "macos-13-xlarge"
+      macos-runner: ${{ matrix.os }}
+      ios-version: ${{ matrix.ios-version }}
+      ios-device: ${{ matrix.ios-device }}
+      xcode-version: ${{ matrix.xcode-version }}
