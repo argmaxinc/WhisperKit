@@ -70,6 +70,8 @@ jobs:
           if [[ "${{ matrix.run-config['name'] }}" != "macOS" ]]; then
             xcodebuild -downloadPlatform ${{ matrix.run-config['name'] }}
           fi
+          echo "Runtimes for testing:"
+          xcrun simctl list runtimes
           echo "Destinations for testing:"
           xcodebuild test-without-building -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -showdestinations
       - name: Boot Simulator and Wait
