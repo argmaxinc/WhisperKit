@@ -28,7 +28,7 @@ open class GreedyTokenSampler: TokenSampling {
         self.decodingOptions = decodingOptions
     }
 
-    #if swift(>=5.10)
+    #if canImport(CoreML.MLState)
     @available(macOS 15, iOS 18, watchOS 11, visionOS 2, *)
     private func sampleWithMLTensor(logits: MLMultiArray) -> (token: Int, logprob: Float) {
         // Use MLTensor operations if available for sampling
@@ -209,7 +209,7 @@ open class GreedyTokenSampler: TokenSampling {
         var completed = false
 
         var result: (token: Int, logprob: Float)
-        #if swift(>=5.10)
+        #if canImport(CoreML.MLState)
         if #available(macOS 15.0, iOS 18.0, watchOS 11.0, visionOS 2.0, *) {
             result = sampleWithMLTensor(logits: logits)
         } else {
