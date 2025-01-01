@@ -31,6 +31,46 @@ final class UnitTests: XCTestCase {
             "Failed to init WhisperKit"
         )
     }
+    func testModelIsInstalled() async throws {
+        XCTAssertTrue(
+            WhisperKit.modelInstalled(variant: "openai_whisper-tiny"),
+            "Model was not installed"
+            )
+        XCTAssertFalse(
+            WhisperKit.modelInstalled(variant: "THIS_MODEL_DOES_NOT_EXIST"),
+            "Model does not exist, but returned true"
+        )
+        XCTAssertTrue(
+            WhisperKit.modelInstalled(variant: "tiny"),
+            "Model was not installed"
+            )
+        XCTAssertTrue(
+            WhisperKit.modelInstalled(variant: "tiny.en"),
+            "Model was not installed"
+            )
+        let location = try WhisperKit.modelLocation(variant: "tiny")
+        let location2 = try WhisperKit.modelLocation(variant: "openai_whisper-tiny")
+        XCTAssertEqual(location, location2, "Auto fallback to OpenAI model returned a different result")
+    }
+    func testOfflineMode() async throws {
+    
+        let pipe = try await WhisperKit(WhisperKitConfig(model: "tiny.en", download: false))
+
+            let cancellable: AnyCancellable? = pipe.progress.publisher(for: \.fractionCompleted)
+                .removeDuplicates()
+                .withPrevious()
+                .sink { previous, current in
+                    if let previous {
+                        XCTAssertLessThan(previous, current)
+                    }
+                }
+            _ = try await pipe.transcribe(
+                audioPath: Bundle.current.path(forResource: "ted_60", ofType: "m4a")!,
+                decodeOptions: .init(chunkingStrategy: .vad)
+            )
+            cancellable?.cancel()
+        
+    }
 
     // MARK: - Config Tests
 
