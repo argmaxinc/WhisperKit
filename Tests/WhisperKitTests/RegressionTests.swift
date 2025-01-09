@@ -13,12 +13,13 @@ import WatchKit
 #endif
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-final class RegressionTests: XCTestCase {
+class RegressionTests: XCTestCase {
     var audioFileURLs: [URL]?
     var remoteFileURLs: [URL]?
     var metadataURL: URL?
     var testWERURLs: [URL]?
     var modelsToTest: [String] = []
+    var modelReposToTest: [String] = []
     var modelsTested: [String] = []
     var optionsToTest: [DecodingOptions] = [DecodingOptions()]
 
@@ -26,6 +27,7 @@ final class RegressionTests: XCTestCase {
         let dataset: String
         let modelComputeOptions: ModelComputeOptions
         var model: String
+        var modelRepo: String
         let decodingOptions: DecodingOptions
     }
 
@@ -34,6 +36,7 @@ final class RegressionTests: XCTestCase {
     var datasets = ["librispeech-10mins", "earnings22-10mins"]
     let debugDataset = ["earnings22-10mins"]
     let debugModels = ["tiny"]
+    let debugRepos = ["argmaxinc/whisperkit-coreml"]
 
     var computeOptions: [ModelComputeOptions] = [
         ModelComputeOptions(audioEncoderCompute: .cpuAndNeuralEngine, textDecoderCompute: .cpuAndNeuralEngine),
@@ -71,7 +74,7 @@ final class RegressionTests: XCTestCase {
         Logging.debug("Max memory before warning: \(maxMemory)")
     }
 
-    func testEnvConfigurations(defaultModels: [String]? = nil) {
+    func testEnvConfigurations(defaultModels: [String]? = nil, defaultRepos: [String]? = nil) {
         if let modelSizeEnv = ProcessInfo.processInfo.environment["MODEL_NAME"], !modelSizeEnv.isEmpty {
             modelsToTest = [modelSizeEnv]
             Logging.debug("Model size: \(modelSizeEnv)")
@@ -81,6 +84,7 @@ final class RegressionTests: XCTestCase {
             }
         } else {
             modelsToTest = defaultModels ?? debugModels
+            modelReposToTest = defaultRepos ?? debugRepos
             Logging.debug("Model size not set by env")
         }
     }
@@ -116,7 +120,7 @@ final class RegressionTests: XCTestCase {
 
     // MARK: - Test Pipeline
 
-    private func runRegressionTests(with testMatrix: [TestConfig]) async throws {
+    public func runRegressionTests(with testMatrix: [TestConfig]) async throws {
         var failureInfo: [String: String] = [:]
         var attachments: [String: String] = [:]
         let device = getCurrentDevice()
@@ -159,8 +163,7 @@ final class RegressionTests: XCTestCase {
 
         // Create WhisperKit instance with checks for memory usage
         let whisperKit = try await createWithMemoryCheck(
-            model: config.model,
-            computeOptions: config.modelComputeOptions,
+            testConfig: config,
             verbose: true,
             logLevel: .debug
         )
@@ -295,6 +298,7 @@ final class RegressionTests: XCTestCase {
             datasetDir: config.dataset,
             datasetRepo: datasetRepo,
             model: config.model,
+            modelRepo: config.modelRepo,
             modelSizeMB: modelSizeMB ?? -1,
             date: startTime.formatted(Date.ISO8601FormatStyle().dateSeparator(.dash)),
             timeElapsedInSeconds: Date().timeIntervalSince(startTime),
@@ -432,20 +436,23 @@ final class RegressionTests: XCTestCase {
         }
     }
 
-    private func getTestMatrix() -> [TestConfig] {
+    public func getTestMatrix() -> [TestConfig] {
         var regressionTestConfigMatrix: [TestConfig] = []
         for dataset in datasets {
             for computeOption in computeOptions {
                 for options in optionsToTest {
-                    for model in modelsToTest {
-                        regressionTestConfigMatrix.append(
-                            TestConfig(
-                                dataset: dataset,
-                                modelComputeOptions: computeOption,
-                                model: model,
-                                decodingOptions: options
+                    for repo in modelReposToTest {
+                        for model in modelsToTest {
+                            regressionTestConfigMatrix.append(
+                                TestConfig(
+                                    dataset: dataset,
+                                    modelComputeOptions: computeOption,
+                                    model: model,
+                                    modelRepo: repo,
+                                    decodingOptions: options
+                                )
                             )
-                        )
+                        }
                     }
                 }
             }
@@ -609,18 +616,14 @@ final class RegressionTests: XCTestCase {
         let modelSize = try fileManager.allocatedSizeOfDirectory(at: folder)
         return Double(modelSize / (1024 * 1024)) // Convert to MB
     }
-
-    func createWithMemoryCheck(
-        model: String,
-        computeOptions: ModelComputeOptions,
-        verbose: Bool,
-        logLevel: Logging.LogLevel
-    ) async throws -> WhisperKit {
+    
+    public func initWhisperKitTask(testConfig config: TestConfig, verbose: Bool, logLevel: Logging.LogLevel) -> Task<WhisperKit, Error> {
         // Create the initialization task
         let initializationTask = Task { () -> WhisperKit in
             let whisperKit = try await WhisperKit(WhisperKitConfig(
-                model: model,
-                computeOptions: computeOptions,
+                model: config.model,
+                modelRepo: config.modelRepo,
+                computeOptions: config.modelComputeOptions,
                 verbose: verbose,
                 logLevel: logLevel,
                 prewarm: true,
@@ -629,6 +632,20 @@ final class RegressionTests: XCTestCase {
             try Task.checkCancellation()
             return whisperKit
         }
+        return initializationTask
+    }
+
+    func createWithMemoryCheck(
+        testConfig: TestConfig,
+        verbose: Bool,
+        logLevel: Logging.LogLevel
+    ) async throws -> WhisperKit {
+        // Create the initialization task
+        let initializationTask = initWhisperKitTask(
+            testConfig: testConfig,
+            verbose: verbose,
+            logLevel: logLevel
+        )
 
         // Start the memory monitoring task
         let monitorTask = Task {
