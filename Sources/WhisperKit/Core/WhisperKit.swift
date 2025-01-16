@@ -68,10 +68,10 @@ open class WhisperKit {
             model: config.model,
             downloadBase: config.downloadBase,
             modelRepo: config.modelRepo,
+            modelToken: config.modelToken,
             modelFolder: config.modelFolder,
             download: config.download
         )
-        
 
         if let prewarm = config.prewarm, prewarm {
             Logging.info("Prewarming models...")
@@ -295,6 +295,7 @@ open class WhisperKit {
         model: String?,
         downloadBase: URL? = nil,
         modelRepo: String?,
+        modelToken: String? = nil,
         modelFolder: String?,
         download: Bool
     ) async throws {
@@ -312,7 +313,8 @@ open class WhisperKit {
                     variant: modelVariant,
                     downloadBase: downloadBase,
                     useBackgroundSession: useBackgroundDownloadSession,
-                    from: repo
+                    from: repo,
+                    token: modelToken
                 )
             } catch {
                 // Handle errors related to model downloading

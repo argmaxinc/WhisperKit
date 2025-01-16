@@ -54,6 +54,7 @@ class TestInfo: JSONCodable {
     let datasetDir: String
     let datasetRepo: String
     let model: String
+    let modelRepo: String
     let modelSizeMB: Double
     let date: String
     let timeElapsedInSeconds: TimeInterval
@@ -69,6 +70,7 @@ class TestInfo: JSONCodable {
         datasetDir: String,
         datasetRepo: String,
         model: String,
+        modelRepo: String,
         modelSizeMB: Double,
         date: String,
         timeElapsedInSeconds: TimeInterval,
@@ -83,6 +85,7 @@ class TestInfo: JSONCodable {
         self.datasetDir = datasetDir
         self.datasetRepo = datasetRepo
         self.model = model
+        self.modelRepo = modelRepo
         self.modelSizeMB = modelSizeMB
         self.date = date
         self.timeElapsedInSeconds = timeElapsedInSeconds
@@ -101,6 +104,7 @@ struct TestReport: JSONCodable {
     let osType: String
     let osVersion: String
     let modelsTested: [String]
+    let modelReposTested: [String]
     let failureInfo: [String: String]
     let attachments: [String: String]
 
@@ -109,6 +113,7 @@ struct TestReport: JSONCodable {
         osType: String,
         osVersion: String,
         modelsTested: [String],
+        modelReposTested: [String],
         failureInfo: [String: String],
         attachments: [String: String]
     ) {
@@ -116,6 +121,7 @@ struct TestReport: JSONCodable {
         self.osType = osType
         self.osVersion = osVersion
         self.modelsTested = modelsTested
+        self.modelReposTested = modelReposTested
         self.failureInfo = failureInfo
         self.attachments = attachments
     }

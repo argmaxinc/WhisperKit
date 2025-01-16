@@ -23,7 +23,7 @@ BASE_BENCHMARK_PATH = "#{WORKING_DIR}/benchmark_data".freeze
 BASE_UPLOAD_PATH = "#{WORKING_DIR}/upload_folder".freeze
 XCRESULT_PATH = File.expand_path("#{BASE_BENCHMARK_PATH}/#{COMMIT_TIMESTAMP}_#{COMMIT_HASH}/")
 BENCHMARK_REPO = 'argmaxinc/whisperkit-evals-dataset'.freeze
-BENCHMARK_CONFIGS = {
+BENCHMARK_CONFIGS ||= {
   full: {
     test_identifier: 'WhisperAXTests/RegressionTests/testModelPerformance',
     name: 'full',
@@ -50,12 +50,14 @@ BENCHMARK_CONFIGS = {
       'openai_whisper-large-v3-v20240930_turbo',
       'openai_whisper-large-v3-v20240930_626MB',
       'openai_whisper-large-v3-v20240930_turbo_632MB'
-    ]
+    ],
+    repo: 'argmaxinc/whisperkit-coreml'
   },
   debug: {
     test_identifier: 'WhisperAXTests/RegressionTests/testModelPerformanceWithDebugConfig',
     name: 'debug',
-    models: ['tiny', 'crash_test', 'unknown_model', 'small.en']
+    models: ['tiny', 'crash_test', 'unknown_model', 'small.en'],
+    repo: 'argmaxinc/whisperkit-coreml'
   }
 }.freeze
 
@@ -200,7 +202,9 @@ end
 
 def run_benchmark(devices, config)
   summaries = []
-  BENCHMARK_CONFIGS[config][:models].each do |model|
+  config_data = BENCHMARK_CONFIGS[config]
+
+  config_data[:models].each do |model|
     begin
       # Sanitize device name for use in file path
       devices_to_test = devices.map { |device_info| device_info[:name] }.compact
@@ -228,8 +232,12 @@ def run_benchmark(devices, config)
       UI.message "Running in #{BENCHMARK_CONFIGS[config][:name]} mode"
 
       UI.message "Running benchmark for model: #{model}"
+      UI.message 'Using Hugging Face:'
+      UI.message "  • Repository: #{config_data[:repo]}"
+
       xcargs = [
         "MODEL_NAME=#{model}",
+        "MODEL_REPO=#{config_data[:repo]}",
         '-allowProvisioningUpdates',
         '-allowProvisioningDeviceRegistration'
       ].join(' ')
