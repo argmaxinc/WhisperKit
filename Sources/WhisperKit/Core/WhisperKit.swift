@@ -72,7 +72,6 @@ open class WhisperKit {
             modelFolder: config.modelFolder,
             download: config.download
         )
-        
 
         if let prewarm = config.prewarm, prewarm {
             Logging.info("Prewarming models...")
@@ -314,7 +313,7 @@ open class WhisperKit {
                     variant: modelVariant,
                     downloadBase: downloadBase,
                     useBackgroundSession: useBackgroundDownloadSession,
-                    from: repo, 
+                    from: repo,
                     token: modelToken
                 )
             } catch {

@@ -84,7 +84,7 @@ class RegressionTests: XCTestCase {
         if let modelSizeEnv = ProcessInfo.processInfo.environment["MODEL_NAME"], !modelSizeEnv.isEmpty {
             modelsToTest = [modelSizeEnv]
             Logging.debug("Model size: \(modelSizeEnv)")
-            
+
             if let repoEnv = ProcessInfo.processInfo.environment["MODEL_REPO"] {
                 modelReposToTest = [repoEnv]
                 Logging.debug("Using repo: \(repoEnv)")
@@ -632,7 +632,7 @@ class RegressionTests: XCTestCase {
         let modelSize = try fileManager.allocatedSizeOfDirectory(at: folder)
         return Double(modelSize / (1024 * 1024)) // Convert to MB
     }
-    
+
     public func initWhisperKitTask(testConfig config: TestConfig, verbose: Bool, logLevel: Logging.LogLevel) -> Task<WhisperKit, Error> {
         // Create the initialization task
         let initializationTask = Task { () -> WhisperKit in
