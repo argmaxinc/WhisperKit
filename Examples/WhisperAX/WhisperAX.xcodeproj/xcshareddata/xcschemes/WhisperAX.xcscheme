@@ -79,6 +79,11 @@
             value = "$(MODEL_NAME)"
             isEnabled = "YES">
          </EnvironmentVariable>
+         <EnvironmentVariable
+            key = "MODEL_REPO"
+            value = "$(MODEL_REPO)"
+            isEnabled = "YES">
+         </EnvironmentVariable>
       </EnvironmentVariables>
    </LaunchAction>
    <ProfileAction

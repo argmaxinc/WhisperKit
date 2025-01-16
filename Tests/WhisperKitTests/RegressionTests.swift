@@ -21,6 +21,7 @@ class RegressionTests: XCTestCase {
     var modelsToTest: [String] = []
     var modelReposToTest: [String] = []
     var modelsTested: [String] = []
+    var modelReposTested: [String] = []
     var optionsToTest: [DecodingOptions] = [DecodingOptions()]
 
     struct TestConfig {
@@ -74,11 +75,23 @@ class RegressionTests: XCTestCase {
         Logging.debug("Max memory before warning: \(maxMemory)")
     }
 
+    class func getModelToken() -> String? {
+        // Add token here or override
+        return nil
+    }
+
     func testEnvConfigurations(defaultModels: [String]? = nil, defaultRepos: [String]? = nil) {
         if let modelSizeEnv = ProcessInfo.processInfo.environment["MODEL_NAME"], !modelSizeEnv.isEmpty {
             modelsToTest = [modelSizeEnv]
             Logging.debug("Model size: \(modelSizeEnv)")
+            
+            if let repoEnv = ProcessInfo.processInfo.environment["MODEL_REPO"] {
+                modelReposToTest = [repoEnv]
+                Logging.debug("Using repo: \(repoEnv)")
+            }
+
             XCTAssertTrue(modelsToTest.count > 0, "Invalid model size: \(modelSizeEnv)")
+
             if modelSizeEnv == "crash_test" {
                 fatalError("Crash test triggered")
             }
@@ -172,6 +185,8 @@ class RegressionTests: XCTestCase {
             config.model = modelFile
             modelsTested.append(modelFile)
             modelsTested = Array(Set(modelsTested))
+            modelReposTested.append(config.modelRepo)
+            modelReposTested = Array(Set(modelReposTested))
         }
 
         for audioFilePath in audioFilePaths {
@@ -562,6 +577,7 @@ class RegressionTests: XCTestCase {
             osType: osDetails.osType,
             osVersion: osDetails.osVersion,
             modelsTested: modelsTested,
+            modelReposTested: modelReposTested,
             failureInfo: failureInfo,
             attachments: attachments
         )
@@ -623,6 +639,7 @@ class RegressionTests: XCTestCase {
             let whisperKit = try await WhisperKit(WhisperKitConfig(
                 model: config.model,
                 modelRepo: config.modelRepo,
+                modelToken: Self.getModelToken(),
                 computeOptions: config.modelComputeOptions,
                 verbose: verbose,
                 logLevel: logLevel,

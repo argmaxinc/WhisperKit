@@ -104,6 +104,7 @@ struct TestReport: JSONCodable {
     let osType: String
     let osVersion: String
     let modelsTested: [String]
+    let modelReposTested: [String]
     let failureInfo: [String: String]
     let attachments: [String: String]
 
@@ -112,6 +113,7 @@ struct TestReport: JSONCodable {
         osType: String,
         osVersion: String,
         modelsTested: [String],
+        modelReposTested: [String],
         failureInfo: [String: String],
         attachments: [String: String]
     ) {
@@ -119,6 +121,7 @@ struct TestReport: JSONCodable {
         self.osType = osType
         self.osVersion = osVersion
         self.modelsTested = modelsTested
+        self.modelReposTested = modelReposTested
         self.failureInfo = failureInfo
         self.attachments = attachments
     }
