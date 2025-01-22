@@ -423,8 +423,8 @@ public class AudioProcessor: NSObject, AudioProcessing {
 
         // Check if the capacity is a whole number
         if capacity.truncatingRemainder(dividingBy: 1) != 0 {
-            // Round to the nearest whole number
-            let roundedCapacity = capacity.rounded(.toNearestOrEven)
+            // Round to the nearest whole number, which is non-zero
+            let roundedCapacity = max(1, capacity.rounded(.toNearestOrEven))
             Logging.debug("Rounding buffer frame capacity from \(capacity) to \(roundedCapacity) to better fit new sample rate")
             capacity = roundedCapacity
         }
