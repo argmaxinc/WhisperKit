@@ -1329,13 +1329,25 @@ extension WhisperTokenizerWrapper: Tokenizer {
     func decode(tokens: [Int]) -> String {
         tokenizer.decode(tokens: tokens)
     }
+    
+    func decode(tokens: [Int], skipSpecialTokens: Bool) -> String {
+        tokenizer.decode(tokens: tokens, skipSpecialTokens: skipSpecialTokens)
+    }
 
     func convertTokenToId(_ token: String) -> Int? {
         tokenizer.convertTokenToId(token)
     }
+    
+    func convertTokensToIds(_ tokens: [String]) -> [Int?] {
+        tokenizer.convertTokensToIds(tokens)
+    }
 
     func convertIdToToken(_ id: Int) -> String? {
         tokenizer.convertIdToToken(id)
+    }
+    
+    func convertIdsToTokens(_ ids: [Int]) -> [String?] {
+        tokenizer.convertIdsToTokens(ids)
     }
 
     var bosToken: String? {
@@ -1366,22 +1378,22 @@ extension WhisperTokenizerWrapper: Tokenizer {
         try tokenizer.applyChatTemplate(messages: messages)
     }
     
-    func applyChatTemplate(messages: [[String : String]], chatTemplate: Tokenizers.ChatTemplateArgument) throws -> [Int] {
+    func applyChatTemplate(messages: [[String: String]], chatTemplate: ChatTemplateArgument) throws -> [Int] {
         try tokenizer.applyChatTemplate(messages: messages, chatTemplate: chatTemplate)
     }
     
-    func applyChatTemplate(messages: [[String : String]], chatTemplate: String) throws -> [Int] {
+    func applyChatTemplate(messages: [[String: String]], chatTemplate: String) throws -> [Int] {
         try tokenizer.applyChatTemplate(messages: messages, chatTemplate: chatTemplate)
     }
     
     func applyChatTemplate(
-        messages: [[String : String]],
-        chatTemplate: Tokenizers.ChatTemplateArgument?,
+        messages: [[String: String]],
+        chatTemplate: ChatTemplateArgument?,
         addGenerationPrompt: Bool,
         truncation: Bool,
         maxLength: Int?,
-        tools: [[String : Any]]?) throws -> [Int]
-    {
+        tools: [[String: Any]]?
+    ) throws -> [Int] {
         try tokenizer.applyChatTemplate(
             messages: messages,
             chatTemplate: chatTemplate,
