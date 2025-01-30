@@ -19,11 +19,12 @@
 
 </div>
 
-WhisperKit is a Swift package that integrates OpenAI's popular [Whisper](https://github.com/openai/whisper) speech recognition model with Apple's CoreML framework for efficient, local inference on Apple devices.
+WhisperKit is an [Argmax](https://www.takeargmax.com) framework for deploying state-of-the-art speech-to-text systems (e.g. [Whisper](https://github.com/openai/whisper)) on device with advanced features such as real-time streaming, word timestamps, voice activity detection, and more.
 
-Check out the demo app on [TestFlight](https://testflight.apple.com/join/LPVOyJZW).
+[[TestFlight Demo App]](https://testflight.apple.com/join/LPVOyJZW) [[Python Tools]](https://github.com/argmaxinc/whisperkittools) [[Benchmarks & Device Support]](https://huggingface.co/spaces/argmaxinc/whisperkit-benchmarks) [[WhisperKit Android]](https://github.com/argmaxinc/WhisperKitAndroid)
 
-[[Blog Post]](https://www.takeargmax.com/blog/whisperkit) [[Python Tools Repo]](https://github.com/argmaxinc/whisperkittools)
+> [!IMPORTANT]
+> If you are looking for more features such as speaker diarization and upgraded performance, check out [WhisperKit Pro](https://huggingface.co/argmaxinc/whisperkit-pro) and [SpeakerKit Pro](https://huggingface.co/argmaxinc/speakerkit-pro)! For commercial use or evaluation, please reach out to [whisperkitpro@argmaxinc.com](mailto:whisperkitpro@argmaxinc.com).
 
 ## Table of Contents
 
@@ -183,7 +184,7 @@ WhisperKit is released under the MIT License. See [LICENSE](LICENSE) for more de
 
 ## Citation
 
-If you use WhisperKit for something cool or just find it useful, please drop us a note at [info@takeargmax.com](mailto:info@takeargmax.com)!
+If you use WhisperKit for something cool or just find it useful, please drop us a note at [info@argmaxinc.com](mailto:info@argmaxinc.com)!
 
 If you use WhisperKit for academic work, here is the BibTeX:
 
