@@ -56,7 +56,7 @@ extension Array where Element: Hashable {
 }
 
 extension MLMultiArray {
-    /// Calculate the linear offset by summing the products of each dimension’s index with the dimension’s stride.
+    /// Calculate the linear offset by summing the products of each dimension's index with the dimension's stride.
     /// More info [here](https://developer.apple.com/documentation/coreml/mlmultiarray/2879231-subscript)
     /// - Parameters:
     ///  - index: The index of the element
@@ -251,11 +251,8 @@ public extension Float {
 
 public extension String {
     var normalized: String {
-        // Trim whitespace and newlines
-        let trimmedString = self.trimmingCharacters(in: .whitespacesAndNewlines)
-
         // Convert to lowercase
-        let lowercaseString = trimmedString.lowercased()
+        let lowercaseString = self.lowercased()
 
         // Replace dashes with spaces
         let noDashesString = lowercaseString.replacingOccurrences(of: "-", with: " ")
@@ -265,8 +262,11 @@ public extension String {
 
         // Replace multiple spaces with a single space
         let singleSpacedString = noPunctuationString.replacingOccurrences(of: " +", with: " ", options: .regularExpression)
-
-        return singleSpacedString
+        
+        // Trim whitespace and newlines
+        let trimmedString = singleSpacedString.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        return trimmedString
     }
 
     func trimmingSpecialTokenCharacters() -> String {

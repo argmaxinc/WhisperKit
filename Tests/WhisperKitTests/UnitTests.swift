@@ -1353,6 +1353,32 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual([Int]().batched(into: 3), [])
         XCTAssertEqual([1, 2, 3, 4].batched(into: 3), [[1, 2, 3], [4]])
     }
+    
+    func testStringNormalization() throws {
+        // Basic cases
+        XCTAssertEqual("Hello World!".normalized, "hello world")
+        XCTAssertEqual("hello   world".normalized, "hello world")
+        XCTAssertEqual("HELLO WORLD".normalized, "hello world")
+        
+        // Punctuation
+        XCTAssertEqual("Hello, World!".normalized, "hello world")
+        XCTAssertEqual("Hello... World???".normalized, "hello world")
+        XCTAssertEqual("'Hello' \"World\"".normalized, "hello world")
+        
+        // Dashes and hyphens
+        XCTAssertEqual("hello-world".normalized, "hello world")
+        XCTAssertEqual("hello -- world".normalized, "hello world")
+        
+        // Whitespace handling
+        XCTAssertEqual("   hello   world   ".normalized, "hello world")
+        
+        // Mixed cases
+        XCTAssertEqual("Hello!!!---World???".normalized, "hello world")
+        
+        // Numbers and special characters
+        XCTAssertEqual("Hello: World".normalized, "hello world")
+        XCTAssertEqual("Hello% world 100".normalized, "hello world 100")
+    }
 
     func testTrimmingSpecialTokenCharacters() {
         XCTAssertEqual("<|en|>".trimmingSpecialTokenCharacters(), "en")
@@ -1967,6 +1993,30 @@ final class UnitTests: XCTestCase {
             XCTAssertEqual(mergedAlignmentTiming[i].end, expectedWordTimings[i].end, "End time at index \(i) does not match")
             XCTAssertEqual(mergedAlignmentTiming[i].probability, expectedWordTimings[i].probability, "Probability at index \(i) does not match")
         }
+    }
+
+    func testWordTimingComparison() throws {
+        let word1 = WordTiming(word: "Hello!", tokens: [1], start: 0, end: 1, probability: 1.0)
+        let word2 = WordTiming(word: "hello", tokens: [2], start: 0, end: 1, probability: 1.0)
+        let word3 = WordTiming(word: "World!", tokens: [3], start: 1, end: 2, probability: 1.0)
+        let word4 = WordTiming(word: "WORLD", tokens: [4], start: 1, end: 2, probability: 1.0)
+        
+        // Test common prefix finding
+        let sequence1 = [word1, word3]
+        let sequence2 = [word2, word4]
+        
+        let commonPrefix = findLongestCommonPrefix(sequence1, sequence2)
+        XCTAssertEqual(commonPrefix.count, 2)
+        XCTAssertEqual(commonPrefix[0].word, "hello")
+        XCTAssertEqual(commonPrefix[1].word, "WORLD")
+        
+        // Test different suffix finding
+        let sequence3 = [word1, word3]
+        let sequence4 = [word2, word4, WordTiming(word: "suffix", tokens: [5], start: 2, end: 3, probability: 1.0)]
+        
+        let differentSuffix = findLongestDifferentSuffix(sequence3, sequence4)
+        XCTAssertEqual(differentSuffix.count, 1)
+        XCTAssertEqual(differentSuffix[0].word, "suffix")
     }
 
     func testWordTimestampCorrectness() async throws {
