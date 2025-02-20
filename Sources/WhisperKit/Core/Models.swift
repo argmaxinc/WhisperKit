@@ -1198,17 +1198,40 @@ public struct SpecialTokens {
     }
 }
 
-public protocol WhisperTokenizer: Tokenizer {
+public protocol WhisperTokenizer {
+    // swift-transformers pass through
+    func encode(text: String) -> [Int]
+    func decode(tokens: [Int]) -> String
+    func convertTokenToId(_ token: String) -> Int?
+    func convertIdToToken(_ id: Int) -> String?
+
+    // WhisperKit specific
     var specialTokens: SpecialTokens { get }
     var allLanguageTokens: Set<Int> { get }
 
     func splitToWordTokens(tokenIds: [Int]) -> (words: [String], wordTokens: [[Int]])
 }
 
-struct WhisperTokenizerWrapper: WhisperTokenizer {
+open class WhisperTokenizerWrapper: WhisperTokenizer {
     let tokenizer: any Tokenizer
-    let specialTokens: SpecialTokens
-    let allLanguageTokens: Set<Int>
+    public let specialTokens: SpecialTokens
+    public let allLanguageTokens: Set<Int>
+
+    public func encode(text: String) -> [Int] {
+        tokenizer.encode(text: text)
+    }
+
+    public func decode(tokens: [Int]) -> String {
+        tokenizer.decode(tokens: tokens)
+    }
+
+    public func convertTokenToId(_ token: String) -> Int? {
+        tokenizer.convertTokenToId(token)
+    }
+
+    public func convertIdToToken(_ id: Int) -> String? {
+        tokenizer.convertIdToToken(id)
+    }
 
     init(tokenizer: any Tokenizer) {
         let specialTokens = SpecialTokens(
@@ -1300,7 +1323,7 @@ struct WhisperTokenizerWrapper: WhisperTokenizer {
     /// Decodes token ids into individual words and per-word subtokens
     /// - Parameter tokenIds: Array of tokens to decode and then split
     /// - Returns: Tuple containing and array of the split words and all tokens for each word
-    func splitToWordTokens(tokenIds: [Int]) -> (words: [String], wordTokens: [[Int]]) {
+    public func splitToWordTokens(tokenIds: [Int]) -> (words: [String], wordTokens: [[Int]]) {
         let decodedWords = tokenizer.decode(tokens: tokenIds.filter { $0 < specialTokens.specialTokenBegin })
 
         // Detect language of input text
@@ -1314,93 +1337,6 @@ struct WhisperTokenizerWrapper: WhisperTokenizer {
             return splitTokensOnSpaces(tokens: tokenIds)
         }
     }
-}
-
-extension WhisperTokenizerWrapper: Tokenizer {
-    func tokenize(text: String) -> [String] {
-        tokenizer.tokenize(text: text)
-    }
-
-    func encode(text: String) -> [Int] {
-        tokenizer.encode(text: text)
-    }
-
-
-    func decode(tokens: [Int]) -> String {
-        tokenizer.decode(tokens: tokens)
-    }
-
-    func convertTokenToId(_ token: String) -> Int? {
-        tokenizer.convertTokenToId(token)
-    }
-
-    func convertIdToToken(_ id: Int) -> String? {
-        tokenizer.convertIdToToken(id)
-    }
-
-    var bosToken: String? {
-        tokenizer.bosToken
-    }
-
-    var bosTokenId: Int? {
-        tokenizer.bosTokenId
-    }
-
-    var eosToken: String? {
-        tokenizer.eosToken
-    }
-
-    var eosTokenId: Int? {
-        tokenizer.eosTokenId
-    }
-
-    var unknownToken: String? {
-        tokenizer.unknownToken
-    }
-
-    var unknownTokenId: Int? {
-        tokenizer.unknownTokenId
-    }
-
-    // MARK: Jinja template protocol methods
-
-    #if canImport(Jinja)
-    func encode(text: String, addSpecialTokens: Bool) -> [Int] {
-        tokenizer.encode(text: text, addSpecialTokens: addSpecialTokens)
-    }
-
-    func decode(tokens: [Int], skipSpecialTokens: Bool) -> String {
-        tokenizer.decode(tokens: tokens, skipSpecialTokens: skipSpecialTokens)
-    }
-
-    func applyChatTemplate(messages: [Tokenizers.Message]) throws -> [Int] {
-        try tokenizer.applyChatTemplate(messages: messages)
-    }
-
-    func applyChatTemplate(messages: [Tokenizers.Message], tools: [Tokenizers.ToolSpec]?) throws -> [Int] {
-        try tokenizer.applyChatTemplate(messages: messages, tools: tools)
-    }
-
-    func applyChatTemplate(messages: [Tokenizers.Message], tools: [Tokenizers.ToolSpec]?, additionalContext: [String : Any]?) throws -> [Int] {
-        try tokenizer.applyChatTemplate(messages: messages, tools: tools, additionalContext: additionalContext)
-    }
-
-    func applyChatTemplate(messages: [Tokenizers.Message], chatTemplate: Tokenizers.ChatTemplateArgument) throws -> [Int] {
-        try tokenizer.applyChatTemplate(messages: messages, chatTemplate: chatTemplate)
-    }
-
-    func applyChatTemplate(messages: [Tokenizers.Message], chatTemplate: String) throws -> [Int] {
-        try tokenizer.applyChatTemplate(messages: messages, chatTemplate: chatTemplate)
-    }
-
-    func applyChatTemplate(messages: [Tokenizers.Message], chatTemplate: Tokenizers.ChatTemplateArgument?, addGenerationPrompt: Bool, truncation: Bool, maxLength: Int?, tools: [Tokenizers.ToolSpec]?) throws -> [Int] {
-        try tokenizer.applyChatTemplate(messages: messages, chatTemplate: chatTemplate, addGenerationPrompt: addGenerationPrompt, truncation: truncation, maxLength: maxLength, tools: tools)
-    }
-
-    func applyChatTemplate(messages: [Tokenizers.Message], chatTemplate: Tokenizers.ChatTemplateArgument?, addGenerationPrompt: Bool, truncation: Bool, maxLength: Int?, tools: [Tokenizers.ToolSpec]?, additionalContext: [String : Any]?) throws -> [Int] {
-        try tokenizer.applyChatTemplate(messages: messages, chatTemplate: chatTemplate, addGenerationPrompt: addGenerationPrompt, truncation: truncation, maxLength: maxLength, tools: tools, additionalContext: additionalContext)
-    }
-    #endif
 }
 
 extension WhisperTokenizerWrapper {
