@@ -1512,6 +1512,9 @@ public enum Constants {
 
     public static let defaultWindowSamples: Int = 480_000 // 30s of audio at 16khz sample rate default for Whisper models
 
+    public static let defaultPrependPunctuations: String = "\"'“¡¿([{-"
+    public static let defaultAppendPunctuations: String = "\"'.。,，!！?？:：”)]}、"
+
     public static let fallbackModelSupportConfig: ModelSupportConfig = {
         var config = ModelSupportConfig(
             repoName: "whisperkit-coreml-fallback",

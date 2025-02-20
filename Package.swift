@@ -20,8 +20,8 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/huggingface/swift-transformers.git", exact: "0.1.8"),
-        .package(url: "https://github.com/apple/swift-argument-parser.git", exact: "1.3.0"),
+        .package(url: "https://github.com/huggingface/swift-transformers.git", .upToNextMajor(from: "0.1.8")),
+        .package(url: "https://github.com/apple/swift-argument-parser.git", .upToNextMajor(from: "1.3.0")),
     ],
     targets: [
         .target(

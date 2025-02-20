@@ -192,8 +192,8 @@ final class TranscribeTask {
                         tokenizer: tokenizer,
                         seek: previousSeek,
                         segmentSize: segmentSize,
-                        prependPunctuations: "\"'“¿([{-",
-                        appendPunctuations: "\"'.。,，!！?？:：”)]}、",
+                        prependPunctuations: Constants.defaultPrependPunctuations,
+                        appendPunctuations: Constants.defaultAppendPunctuations,
                         lastSpeechTimestamp: Float(Double(previousSeek) / Double(WhisperKit.sampleRate)),
                         options: options,
                         timings: timings
