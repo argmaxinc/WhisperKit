@@ -658,6 +658,11 @@ public struct TranscriptionSegment: Hashable, Codable {
     public var noSpeechProb: Float = 0.0
     public var words: [WordTiming]? = nil
 
+    /// Computed property for the duration of the segment
+    public var duration: Float {
+        return end - start
+    }
+
     public init(
         id: Int = 0,
         seek: Int = 0,
@@ -693,6 +698,11 @@ public struct WordTiming: Hashable, Codable {
     public var start: Float
     public var end: Float
     public var probability: Float
+
+    /// Computed property for the duration of the word
+    public var duration: Float {
+        return end - start
+    }
 
     public init(word: String, tokens: [Int], start: Float, end: Float, probability: Float) {
         self.word = word

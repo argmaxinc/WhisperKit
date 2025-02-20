@@ -490,7 +490,7 @@ open class SegmentSeeker: SegmentSeeking {
     }
 
     public func calculateWordDurationConstraints(alignment: [WordTiming]) -> (Float, Float) {
-        var wordDurations = alignment.map { $0.end - $0.start }
+        var wordDurations = alignment.map { $0.duration }
         wordDurations = wordDurations.filter { $0 > 0 }
 
         let medianDuration: Float = wordDurations.isEmpty ? 0.0 : wordDurations.sorted(by: <)[wordDurations.count / 2]
@@ -506,7 +506,7 @@ open class SegmentSeeker: SegmentSeeking {
 
         if !truncatedAlignment.isEmpty {
             for i in 1..<truncatedAlignment.count {
-                if truncatedAlignment[i].end - truncatedAlignment[i].start > maxDuration {
+                if truncatedAlignment[i].duration > maxDuration {
                     if sentenceEndMarks.contains(truncatedAlignment[i].word) {
                         truncatedAlignment[i].end = truncatedAlignment[i].start + maxDuration
                     } else if i > 0, sentenceEndMarks.contains(truncatedAlignment[i - 1].word) {
@@ -570,11 +570,11 @@ open class SegmentSeeker: SegmentSeeking {
                 // Ensure the first and second word after a pause is not longer than
                 // twice the median word duration.
                 if firstWord.end - lastSpeechTimestamp > constrainedMedianDuration * 4 &&
-                    (firstWord.end - firstWord.start > maxDuration ||
+                    (firstWord.duration > maxDuration ||
                         (wordsInSegment.count > 1 && wordsInSegment[1].end - firstWord.start > maxDuration * 2))
                 {
                     // First word or both words are too long
-                    if wordsInSegment.count > 1 && wordsInSegment[1].end - wordsInSegment[1].start > maxDuration {
+                    if wordsInSegment.count > 1 && wordsInSegment[1].duration > maxDuration {
                         // Second word is too long, set it to max duration and shorten first word to fit
                         let boundary = min(wordsInSegment[1].start + maxDuration, wordsInSegment[1].end / 2)
                         wordsInSegment[0].end = boundary

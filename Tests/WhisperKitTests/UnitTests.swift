@@ -2143,7 +2143,7 @@ final class UnitTests: XCTestCase {
         let updatedWords = updatedSegments.compactMap { $0.words }.flatMap { $0 }
 
         // Test that long segments are properly truncated
-        let longSegmentDuration = updatedWords.last!.end - updatedWords.last!.start
+        let longSegmentDuration = updatedWords.last!.duration
         XCTAssertEqual(
             longSegmentDuration,
             maxDuration,
@@ -2158,7 +2158,7 @@ final class UnitTests: XCTestCase {
 
         // Test the long word
         let longWordIndex = updatedWords.firstIndex { $0.word == " ending." }!
-        let longWordDuration = updatedWords[longWordIndex].end - updatedWords[longWordIndex].start
+        let longWordDuration = updatedWords[longWordIndex].duration
         XCTAssertEqual(
             longWordDuration,
             maxDuration,
@@ -2187,7 +2187,7 @@ final class UnitTests: XCTestCase {
 
         // Test that sentence boundaries are properly handled
         let endWordIndex = updatedWords.firstIndex { $0.word == " ending." }!
-        let endWordDuration = updatedWords[endWordIndex].end - updatedWords[endWordIndex].start
+        let endWordDuration = updatedWords[endWordIndex].duration
         XCTAssertEqual(
             endWordDuration,
             maxDuration,
@@ -2242,7 +2242,7 @@ final class UnitTests: XCTestCase {
 
         // Test that long single tokens are properly truncated
         let firstLongIndex = updatedWords.firstIndex { $0.word == " Hello" }!
-        let firstLongDuration = updatedWords[firstLongIndex].end - updatedWords[firstLongIndex].start
+        let firstLongDuration = updatedWords[firstLongIndex].duration
         XCTAssertLessThanOrEqual(
             firstLongDuration,
             maxDuration,
@@ -2258,7 +2258,7 @@ final class UnitTests: XCTestCase {
                 "Start time should not be earlier than previous end time"
             )
             XCTAssertLessThanOrEqual(
-                timing.end - timing.start,
+                timing.duration,
                 maxDuration,
                 "No word duration should significantly exceed maximum allowed duration"
             )
