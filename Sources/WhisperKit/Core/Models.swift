@@ -1325,16 +1325,9 @@ extension WhisperTokenizerWrapper: Tokenizer {
         tokenizer.encode(text: text)
     }
 
-    func encode(text: String, addSpecialTokens: Bool) -> [Int] {
-        tokenizer.encode(text: text, addSpecialTokens: addSpecialTokens)
-    }
 
     func decode(tokens: [Int]) -> String {
         tokenizer.decode(tokens: tokens)
-    }
-
-    func decode(tokens: [Int], skipSpecialTokens: Bool) -> String {
-        tokenizer.decode(tokens: tokens, skipSpecialTokens: skipSpecialTokens)
     }
 
     func convertTokenToId(_ token: String) -> Int? {
@@ -1371,6 +1364,15 @@ extension WhisperTokenizerWrapper: Tokenizer {
 
     // MARK: Jinja template protocol methods
 
+    #if canImport(Jinja)
+    func encode(text: String, addSpecialTokens: Bool) -> [Int] {
+        tokenizer.encode(text: text, addSpecialTokens: addSpecialTokens)
+    }
+
+    func decode(tokens: [Int], skipSpecialTokens: Bool) -> String {
+        tokenizer.decode(tokens: tokens, skipSpecialTokens: skipSpecialTokens)
+    }
+
     func applyChatTemplate(messages: [Tokenizers.Message]) throws -> [Int] {
         try tokenizer.applyChatTemplate(messages: messages)
     }
@@ -1398,6 +1400,7 @@ extension WhisperTokenizerWrapper: Tokenizer {
     func applyChatTemplate(messages: [Tokenizers.Message], chatTemplate: Tokenizers.ChatTemplateArgument?, addGenerationPrompt: Bool, truncation: Bool, maxLength: Int?, tools: [Tokenizers.ToolSpec]?, additionalContext: [String : Any]?) throws -> [Int] {
         try tokenizer.applyChatTemplate(messages: messages, chatTemplate: chatTemplate, addGenerationPrompt: addGenerationPrompt, truncation: truncation, maxLength: maxLength, tools: tools, additionalContext: additionalContext)
     }
+    #endif
 }
 
 extension WhisperTokenizerWrapper {
