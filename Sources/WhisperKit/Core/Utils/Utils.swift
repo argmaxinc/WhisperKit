@@ -262,10 +262,10 @@ public extension String {
 
         // Replace multiple spaces with a single space
         let singleSpacedString = noPunctuationString.replacingOccurrences(of: " +", with: " ", options: .regularExpression)
-        
+
         // Trim whitespace and newlines
         let trimmedString = singleSpacedString.trimmingCharacters(in: .whitespacesAndNewlines)
-        
+
         return trimmedString
     }
 

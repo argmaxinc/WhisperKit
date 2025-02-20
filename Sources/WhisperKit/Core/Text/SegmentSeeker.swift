@@ -279,7 +279,7 @@ open class SegmentSeeker: SegmentSeeking {
 
         return (textIndices.reversed(), timeIndices.reversed())
     }
-    
+
     func mergePunctuations(
         alignment: [WordTiming],
         prepended: String = Constants.defaultPrependPunctuations,
@@ -489,22 +489,21 @@ open class SegmentSeeker: SegmentSeeking {
         return updatedSegments
     }
 
-
     public func calculateWordDurationConstraints(alignment: [WordTiming]) -> (Float, Float) {
         var wordDurations = alignment.map { $0.end - $0.start }
         wordDurations = wordDurations.filter { $0 > 0 }
-        
+
         let medianDuration: Float = wordDurations.isEmpty ? 0.0 : wordDurations.sorted(by: <)[wordDurations.count / 2]
         let constrainedMedianDuration = min(0.7, medianDuration)
         let maxDuration = constrainedMedianDuration * 2
-        
+
         return (constrainedMedianDuration, maxDuration)
     }
-    
+
     public func truncateLongWordsAtSentenceBoundaries(_ alignment: [WordTiming], maxDuration: Float) -> [WordTiming] {
         let sentenceEndMarks = [".", "。", "!", "！", "?", "？"]
         var truncatedAlignment = alignment
-        
+
         if !truncatedAlignment.isEmpty {
             for i in 1..<truncatedAlignment.count {
                 if truncatedAlignment[i].end - truncatedAlignment[i].start > maxDuration {
@@ -516,7 +515,7 @@ open class SegmentSeeker: SegmentSeeking {
                 }
             }
         }
-        
+
         return truncatedAlignment
     }
 
@@ -572,7 +571,7 @@ open class SegmentSeeker: SegmentSeeking {
                 // twice the median word duration.
                 if firstWord.end - lastSpeechTimestamp > constrainedMedianDuration * 4 &&
                     (firstWord.end - firstWord.start > maxDuration ||
-                     (wordsInSegment.count > 1 && wordsInSegment[1].end - firstWord.start > maxDuration * 2))
+                        (wordsInSegment.count > 1 && wordsInSegment[1].end - firstWord.start > maxDuration * 2))
                 {
                     // First word or both words are too long
                     if wordsInSegment.count > 1 && wordsInSegment[1].end - wordsInSegment[1].start > maxDuration {
@@ -581,7 +580,7 @@ open class SegmentSeeker: SegmentSeeking {
                         wordsInSegment[0].end = boundary
                         wordsInSegment[1].start = boundary
                     }
-                    
+
                     // First word is too long, keep its start time and adjust its end time
                     wordsInSegment[0].end = min(wordsInSegment[0].start + maxDuration, wordsInSegment[0].end)
                 }
