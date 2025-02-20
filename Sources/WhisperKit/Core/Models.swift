@@ -1325,8 +1325,16 @@ extension WhisperTokenizerWrapper: Tokenizer {
         tokenizer.encode(text: text)
     }
 
+    func encode(text: String, addSpecialTokens: Bool) -> [Int] {
+        tokenizer.encode(text: text, addSpecialTokens: addSpecialTokens)
+    }
+
     func decode(tokens: [Int]) -> String {
         tokenizer.decode(tokens: tokens)
+    }
+
+    func decode(tokens: [Int], skipSpecialTokens: Bool) -> String {
+        tokenizer.decode(tokens: tokens, skipSpecialTokens: skipSpecialTokens)
     }
 
     func convertTokenToId(_ token: String) -> Int? {
@@ -1359,6 +1367,36 @@ extension WhisperTokenizerWrapper: Tokenizer {
 
     var unknownTokenId: Int? {
         tokenizer.unknownTokenId
+    }
+
+    // MARK: Jinja template protocol methods
+
+    func applyChatTemplate(messages: [Tokenizers.Message]) throws -> [Int] {
+        try tokenizer.applyChatTemplate(messages: messages)
+    }
+
+    func applyChatTemplate(messages: [Tokenizers.Message], tools: [Tokenizers.ToolSpec]?) throws -> [Int] {
+        try tokenizer.applyChatTemplate(messages: messages, tools: tools)
+    }
+
+    func applyChatTemplate(messages: [Tokenizers.Message], tools: [Tokenizers.ToolSpec]?, additionalContext: [String : Any]?) throws -> [Int] {
+        try tokenizer.applyChatTemplate(messages: messages, tools: tools, additionalContext: additionalContext)
+    }
+
+    func applyChatTemplate(messages: [Tokenizers.Message], chatTemplate: Tokenizers.ChatTemplateArgument) throws -> [Int] {
+        try tokenizer.applyChatTemplate(messages: messages, chatTemplate: chatTemplate)
+    }
+
+    func applyChatTemplate(messages: [Tokenizers.Message], chatTemplate: String) throws -> [Int] {
+        try tokenizer.applyChatTemplate(messages: messages, chatTemplate: chatTemplate)
+    }
+
+    func applyChatTemplate(messages: [Tokenizers.Message], chatTemplate: Tokenizers.ChatTemplateArgument?, addGenerationPrompt: Bool, truncation: Bool, maxLength: Int?, tools: [Tokenizers.ToolSpec]?) throws -> [Int] {
+        try tokenizer.applyChatTemplate(messages: messages, chatTemplate: chatTemplate, addGenerationPrompt: addGenerationPrompt, truncation: truncation, maxLength: maxLength, tools: tools)
+    }
+
+    func applyChatTemplate(messages: [Tokenizers.Message], chatTemplate: Tokenizers.ChatTemplateArgument?, addGenerationPrompt: Bool, truncation: Bool, maxLength: Int?, tools: [Tokenizers.ToolSpec]?, additionalContext: [String : Any]?) throws -> [Int] {
+        try tokenizer.applyChatTemplate(messages: messages, chatTemplate: chatTemplate, addGenerationPrompt: addGenerationPrompt, truncation: truncation, maxLength: maxLength, tools: tools, additionalContext: additionalContext)
     }
 }
 
