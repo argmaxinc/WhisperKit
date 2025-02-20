@@ -280,6 +280,11 @@ public struct ModelSupportConfig: Codable {
 public struct AudioChunk {
     public var seekOffsetIndex: Int
     public var audioSamples: [Float]
+
+    public init(seekOffsetIndex: Int, audioSamples: [Float]) {
+        self.seekOffsetIndex = seekOffsetIndex
+        self.audioSamples = audioSamples
+    }
 }
 
 // MARK: - Decoding

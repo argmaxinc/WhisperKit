@@ -179,7 +179,7 @@ public extension MLTensor {
 }
 #endif
 
-extension MLModel {
+public extension MLModel {
     func asyncPrediction(
         from input: MLFeatureProvider,
         options: MLPredictionOptions
