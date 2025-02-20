@@ -176,11 +176,26 @@ public struct ModelSupport: Codable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case `default`, supported
     }
+
+    public init(
+        `default`: String,
+        supported: [String],
+        disabled: [String] = []
+    ) {
+        self.`default` = `default`
+        self.supported = supported
+        self.disabled = disabled
+    }
 }
 
 public struct DeviceSupport: Codable {
     public let identifiers: [String]
     public var models: ModelSupport
+
+    public init(identifiers: [String], models: ModelSupport) {
+        self.identifiers = identifiers
+        self.models = models
+    }
 }
 
 public struct ModelSupportConfig: Codable {
@@ -356,7 +371,12 @@ public struct DecodingCache {
     public var keyCache: MLMultiArray?
     public var valueCache: MLMultiArray?
     public var alignmentWeights: MLMultiArray?
-    public init(keyCache: MLMultiArray? = nil, valueCache: MLMultiArray? = nil, alignmentWeights: MLMultiArray? = nil) {
+
+    public init(
+        keyCache: MLMultiArray? = nil,
+        valueCache: MLMultiArray? = nil,
+        alignmentWeights: MLMultiArray? = nil
+    ) {
         self.keyCache = keyCache
         self.valueCache = valueCache
         self.alignmentWeights = alignmentWeights
@@ -437,7 +457,20 @@ public struct DecodingResult {
                               fallback: nil)
     }
 
-    public init(language: String, languageProbs: [String: Float], tokens: [Int], tokenLogProbs: [[Int: Float]], text: String, avgLogProb: Float, noSpeechProb: Float, temperature: Float, compressionRatio: Float, cache: DecodingCache? = nil, timings: TranscriptionTimings? = nil, fallback: DecodingFallback? = nil) {
+    public init(
+        language: String,
+        languageProbs: [String: Float],
+        tokens: [Int],
+        tokenLogProbs: [[Int: Float]],
+        text: String,
+        avgLogProb: Float,
+        noSpeechProb: Float,
+        temperature: Float,
+        compressionRatio: Float,
+        cache: DecodingCache? = nil,
+        timings: TranscriptionTimings? = nil,
+        fallback: DecodingFallback? = nil
+    ) {
         self.language = language
         self.languageProbs = languageProbs
         self.tokens = tokens
@@ -514,6 +547,20 @@ public struct TranscriptionResult: Codable {
     public var language: String
     public var timings: TranscriptionTimings
     public var seekTime: Float?
+
+    public init(
+        text: String,
+        segments: [TranscriptionSegment],
+        language: String,
+        timings: TranscriptionTimings,
+        seekTime: Float? = nil
+    ) {
+        self.text = text
+        self.segments = segments
+        self.language = language
+        self.timings = timings
+        self.seekTime = seekTime
+    }
 
     public func logSegments() {
         for (i, segment) in segments.enumerated() {
@@ -610,6 +657,34 @@ public struct TranscriptionSegment: Hashable, Codable {
     public var compressionRatio: Float = 1.0
     public var noSpeechProb: Float = 0.0
     public var words: [WordTiming]? = nil
+
+    public init(
+        id: Int = 0,
+        seek: Int = 0,
+        start: Float = 0.0,
+        end: Float = 0.0,
+        text: String = "",
+        tokens: [Int] = [],
+        tokenLogProbs: [[Int : Float]] = [[:]],
+        temperature: Float = 1.0,
+        avgLogprob: Float = 0.0,
+        compressionRatio: Float = 1.0,
+        noSpeechProb: Float = 0.0,
+        words: [WordTiming]? = nil
+    ) {
+        self.id = id
+        self.seek = seek
+        self.start = start
+        self.end = end
+        self.text = text
+        self.tokens = tokens
+        self.tokenLogProbs = tokenLogProbs
+        self.temperature = temperature
+        self.avgLogprob = avgLogprob
+        self.compressionRatio = compressionRatio
+        self.noSpeechProb = noSpeechProb
+        self.words = words
+    }
 }
 
 public struct WordTiming: Hashable, Codable {
@@ -618,6 +693,14 @@ public struct WordTiming: Hashable, Codable {
     public var start: Float
     public var end: Float
     public var probability: Float
+
+    public init(word: String, tokens: [Int], start: Float, end: Float, probability: Float) {
+        self.word = word
+        self.tokens = tokens
+        self.start = start
+        self.end = end
+        self.probability = probability
+    }
 }
 
 public struct TranscriptionProgress {
