@@ -1285,9 +1285,9 @@ final class UnitTests: XCTestCase {
                 "Audio file not found"
             )
 
-            let earlyStopTokenCount = 10
+            let earlyStopTokenCount = 5
             let continuationCallback: TranscriptionCallback = { (progress: TranscriptionProgress) -> Bool? in
-                // Stop after only 10 tokens (full test audio contains ~30)
+                // Stop after only 5 tokens (full test audio contains ~30)
                 progress.tokens.count <= earlyStopTokenCount
             }
 
