@@ -1260,67 +1260,68 @@ final class UnitTests: XCTestCase {
         await fulfillment(of: [modelStateExpectation, segmentDiscoveryExpectation, transcriptionStateExpectation], timeout: 1)
     }
 
-    #if !os(watchOS) // FIXME: watchOS ignores the priority here for some reason
     func testCallbackWithEarlyStopping() async throws {
-        let callbackTestTask = Task(priority: .userInitiated) {
-            let computeOptions = ModelComputeOptions(
-                melCompute: .cpuOnly,
-                audioEncoderCompute: .cpuOnly,
-                textDecoderCompute: .cpuOnly,
-                prefillCompute: .cpuOnly
-            )
+        let computeOptions = ModelComputeOptions(
+            melCompute: .cpuOnly,
+            audioEncoderCompute: .cpuOnly,
+            textDecoderCompute: .cpuOnly,
+            prefillCompute: .cpuOnly
+        )
 
-            let config = try WhisperKitConfig(
-                modelFolder: tinyModelPath(),
-                computeOptions: computeOptions,
-                verbose: true,
-                logLevel: .debug,
-                load: false
-            )
-            let whisperKit = try await WhisperKit(config)
+        let config = try WhisperKitConfig(
+            modelFolder: self.tinyModelPath(),
+            computeOptions: computeOptions,
+            verbose: true,
+            logLevel: .debug,
+            load: false
+        )
+        let whisperKit = try await WhisperKit(config)
 
-            try await whisperKit.loadModels()
-            let audioFilePath = try XCTUnwrap(
-                Bundle.current.path(forResource: "jfk", ofType: "wav"),
-                "Audio file not found"
-            )
+        try await whisperKit.loadModels()
+        let audioFilePath = try XCTUnwrap(
+            Bundle.current.path(forResource: "jfk", ofType: "wav"),
+            "Audio file not found"
+        )
 
-            let earlyStopTokenCount = 5
-            let continuationCallback: TranscriptionCallback = { (progress: TranscriptionProgress) -> Bool? in
-                // Stop after only 5 tokens (full test audio contains ~30)
-                progress.tokens.count <= earlyStopTokenCount
-            }
-
-            let result = try await whisperKit.transcribe(audioPath: audioFilePath, callback: continuationCallback).first!
-
-            XCTAssertNotNil(result)
-            let tokenCountWithEarlyStop = result.segments.flatMap { $0.tokens }.count
-            let decodingTimePerTokenWithEarlyStop = result.timings.decodingLoop / Double(tokenCountWithEarlyStop)
-
-            // Work done in the callback should not block the decoding loop
-            let continuationCallbackWithWait: TranscriptionCallback = { (progress: TranscriptionProgress) -> Bool? in
-                Thread.sleep(forTimeInterval: 5)
-                return false
-            }
-
-            let resultWithWait = try await whisperKit.transcribe(audioPath: audioFilePath, callback: continuationCallbackWithWait).first!
-
-            XCTAssertNotNil(resultWithWait)
-            let tokenCountWithWait = resultWithWait.segments.flatMap { $0.tokens }.count
-            let decodingTimePerTokenWithWait = resultWithWait.timings.decodingLoop / Double(tokenCountWithWait)
-            Logging.debug("Decoding loop without wait: \(result.timings.decodingLoop), with wait: \(resultWithWait.timings.decodingLoop)")
-
-            // Assert that the decoding predictions per token are not slower with the waiting
-            XCTAssertEqual(decodingTimePerTokenWithWait, decodingTimePerTokenWithEarlyStop, accuracy: decodingTimePerTokenWithEarlyStop, "Decoding predictions per token should not be significantly slower with waiting")
-
-            // Assert that more tokens are returned in the callback with waiting
-            XCTAssertGreaterThanOrEqual(tokenCountWithWait, 30, "Tokens for callback with wait should contain the full audio file")
-            XCTAssertGreaterThan(tokenCountWithWait, tokenCountWithEarlyStop, "More tokens should be returned in the callback with waiting")
+        let earlyStopTokenCount = 5
+        let continuationCallback: TranscriptionCallback = { (progress: TranscriptionProgress) -> Bool? in
+            // Stop after only 5 tokens (full test audio contains ~30)
+            progress.tokens.count <= earlyStopTokenCount
         }
 
-        try await callbackTestTask.value
+        let result = try await Task.detached(priority: .userInitiated) {
+            try await whisperKit.transcribe(audioPath: audioFilePath, callback: continuationCallback).first!
+        }.value
+
+        XCTAssertNotNil(result)
+        let tokenCountWithEarlyStop = result.segments.flatMap { $0.tokens }.count
+        let decodingTimePerTokenWithEarlyStop = result.timings.decodingLoop / Double(tokenCountWithEarlyStop)
+
+        // Work done in the callback should not block the decoding loop
+        let continuationCallbackWithWait: TranscriptionCallback = { (progress: TranscriptionProgress) -> Bool? in
+            Thread.sleep(forTimeInterval: 5)
+            return false
+        }
+
+        // Explicitly create a new task for the second transcription
+        let resultWithWait = try await Task.detached(priority: .userInitiated) {
+            try await whisperKit.transcribe(audioPath: audioFilePath, callback: continuationCallbackWithWait).first!
+        }.value
+
+        XCTAssertNotNil(resultWithWait)
+        let tokenCountWithWait = resultWithWait.segments.flatMap { $0.tokens }.count
+        let decodingTimePerTokenWithWait = resultWithWait.timings.decodingLoop / Double(tokenCountWithWait)
+        Logging.debug("Decoding loop without wait: \(result.timings.decodingLoop), with wait: \(resultWithWait.timings.decodingLoop)")
+        Logging.debug("Token count without wait: \(tokenCountWithEarlyStop)")
+        Logging.debug("Token count with wait: \(tokenCountWithWait)")
+
+        // Assert that the decoding predictions per token are not slower with the waiting
+        XCTAssertEqual(decodingTimePerTokenWithWait, decodingTimePerTokenWithEarlyStop, accuracy: decodingTimePerTokenWithEarlyStop, "Decoding predictions per token should not be significantly slower with waiting")
+
+        // Assert that more tokens are returned in the callback with waiting
+        XCTAssertGreaterThanOrEqual(tokenCountWithWait, 30, "Tokens for callback with wait should contain the full audio file")
+        XCTAssertGreaterThan(tokenCountWithWait, tokenCountWithEarlyStop, "More tokens should be returned in the callback with waiting (early stop: \(tokenCountWithEarlyStop), with wait: \(tokenCountWithWait))")
     }
-    #endif
 
     // MARK: - Utils Tests
 
