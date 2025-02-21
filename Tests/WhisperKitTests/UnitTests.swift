@@ -1298,8 +1298,16 @@ final class UnitTests: XCTestCase {
         let decodingTimePerTokenWithEarlyStop = result.timings.decodingLoop / Double(tokenCountWithEarlyStop)
 
         // Work done in the callback should not block the decoding loop
+        let queue = DispatchQueue(label: "EarlyStoppingQueue")
+        let semaphore = DispatchSemaphore(value: 0)
         let continuationCallbackWithWait: TranscriptionCallback = { (progress: TranscriptionProgress) -> Bool? in
-            Thread.sleep(forTimeInterval: 5)
+            // Wait for 5 seconds before returning false
+            queue.async {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                    semaphore.signal()
+                }
+            }
+            _ = semaphore.wait(timeout: .now() + 5)
             return false
         }
 
