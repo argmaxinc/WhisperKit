@@ -686,12 +686,23 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             let loopStart = Date()
 
             let isPrefill = tokenIndex < intialPromptIndex - 1 // Prefill stops at the last token of the initial prompt
+            let isLastPrefillToken = tokenIndex == intialPromptIndex - 1
             let isFirstToken = tokenIndex == prefilledIndex
 
             // Check if current index is part of the initial prompt
             if tokenIndex < intialPromptIndex {
-                nextToken = currentTokens[tokenIndex]
-                Logging.debug("Forcing prompt tokenIndex: \(tokenIndex), token: \(nextToken), text: \(tokenizer.decode(tokens: [nextToken]))")
+                let isTimestampToken = currentTokens[tokenIndex] >= tokenizer.specialTokens.timeTokenBegin
+                let modelPredictedTimestamp = nextToken >= tokenizer.specialTokens.timeTokenBegin
+                
+                // Force the token unless it's the last prefill token and both are timestamps
+                if !(isLastPrefillToken && isTimestampToken && modelPredictedTimestamp) {
+                    nextToken = currentTokens[tokenIndex]
+                    Logging.debug("Forcing prompt tokenIndex: \(tokenIndex), token: \(nextToken), text: \(tokenizer.decode(tokens: [nextToken]))")
+                } else {
+                    // Last prefill was a timestamp but the model predicted a timestamp
+                    currentTokens[tokenIndex] = nextToken
+                    Logging.debug("Skipping prompt tokenIndex: \(tokenIndex), token: \(nextToken), text: \(tokenizer.decode(tokens: [nextToken]))")
+                }
             }
 
             // Set the current token as model input

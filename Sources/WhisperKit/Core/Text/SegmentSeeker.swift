@@ -473,12 +473,14 @@ open class SegmentSeeker: SegmentSeeking {
         alignment = truncateLongWordsAtSentenceBoundaries(alignment, maxDuration: maxDuration)
 
         // Process alignment for punctuations
-        let mergedAlignment = mergePunctuations(alignment: alignment, prepended: prependPunctuations, appended: appendPunctuations)
+        if !alignment.isEmpty {
+            alignment = mergePunctuations(alignment: alignment, prepended: prependPunctuations, appended: appendPunctuations)
+        }
 
         // Update segments based on more accurate word timings
         let updatedSegments = updateSegmentsWithWordTimings(
             segments: segments,
-            mergedAlignment: mergedAlignment,
+            mergedAlignment: alignment,
             seek: seek,
             lastSpeechTimestamp: lastSpeechTimestamp,
             constrainedMedianDuration: constrainedMedianDuration,
@@ -533,7 +535,7 @@ open class SegmentSeeker: SegmentSeeking {
         var lastSpeechTimestamp = lastSpeechTimestamp // Create a mutable copy, it will be updated below
         var updatedSegments = [TranscriptionSegment]()
 
-        for segment in segments {
+        for (segmentIndex, segment) in segments.enumerated() {
             var savedTokens = 0
             let textTokens = segment.tokens.filter { $0 < tokenizer.specialTokens.specialTokenBegin }
             var wordsInSegment = [WordTiming]()
@@ -547,10 +549,42 @@ open class SegmentSeeker: SegmentSeeking {
                     continue
                 }
 
-                let start = (timeOffset + timing.start).rounded(2)
+                // Retokenize the word if some tokens were filtered out
+                let word = timingTokens.count < timing.tokens.count ?
+                    tokenizer.decode(tokens: timingTokens) :
+                    timing.word
+
+                var start = (timeOffset + timing.start).rounded(2)
                 let end = (timeOffset + timing.end).rounded(2)
+
+                // Handle short duration words by moving their start time back if there's space
+                if end - start < constrainedMedianDuration / 4 {
+                    if wordsInSegment.count >= 1,
+                       let previousTiming = wordsInSegment.last
+                    {
+                        let previousEnd = previousTiming.end
+
+                        // If there's space between this word and the previous word
+                        if start > previousEnd {
+                            // Move the word back, using either median duration or space available
+                            let spaceAvailable = start - previousEnd
+                            let desiredDuration = min(spaceAvailable, constrainedMedianDuration / 2)
+                            start = (start - desiredDuration).rounded(2)
+                        }
+                    } else if wordsInSegment.isEmpty,
+                              segmentIndex > 0,
+                              updatedSegments.count > segmentIndex - 1,
+                              start > updatedSegments[segmentIndex - 1].end
+                    {
+                        // First word of segment - check space from last segment
+                        let spaceAvailable = start - updatedSegments[segmentIndex - 1].end
+                        let desiredDuration = min(spaceAvailable, constrainedMedianDuration / 2)
+                        start = (start - desiredDuration).rounded(2)
+                    }
+                }
+
                 let probability = timing.probability.rounded(2)
-                let wordTiming = WordTiming(word: timing.word,
+                let wordTiming = WordTiming(word: word,
                                             tokens: timingTokens,
                                             start: start,
                                             end: end,
@@ -569,20 +603,21 @@ open class SegmentSeeker: SegmentSeeking {
             if let firstWord = wordsInSegment.first {
                 // Ensure the first and second word after a pause is not longer than
                 // twice the median word duration.
-                if firstWord.end - lastSpeechTimestamp > constrainedMedianDuration * 4 &&
-                    (firstWord.duration > maxDuration ||
-                        (wordsInSegment.count > 1 && wordsInSegment[1].end - firstWord.start > maxDuration * 2))
+                let pauseLength = firstWord.end - lastSpeechTimestamp
+                let firstWordTooLong = firstWord.duration > maxDuration
+                let bothWordsTooLong = wordsInSegment.count > 1 && wordsInSegment[1].end - firstWord.start > maxDuration * 2
+                if pauseLength > constrainedMedianDuration * 4 &&
+                    (firstWordTooLong || bothWordsTooLong)
                 {
                     // First word or both words are too long
                     if wordsInSegment.count > 1 && wordsInSegment[1].duration > maxDuration {
-                        // Second word is too long, set it to max duration and shorten first word to fit
-                        let boundary = min(wordsInSegment[1].start + maxDuration, wordsInSegment[1].end / 2)
+                        // Second word is too long, find a good boundary to readjust the words
+                        let boundary = max(wordsInSegment[1].end / 2, wordsInSegment[1].end - maxDuration)
                         wordsInSegment[0].end = boundary
                         wordsInSegment[1].start = boundary
                     }
-
-                    // First word is too long, keep its start time and adjust its end time
-                    wordsInSegment[0].end = min(wordsInSegment[0].start + maxDuration, wordsInSegment[0].end)
+                    // In either case, make sure the first word is not too long
+                    wordsInSegment[0].start = max(lastSpeechTimestamp, wordsInSegment[0].end - maxDuration)
                 }
 
                 // Prefer segment-level start timestamp if the first word is too long.
