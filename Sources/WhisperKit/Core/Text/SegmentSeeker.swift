@@ -469,8 +469,8 @@ open class SegmentSeeker: SegmentSeeking {
 
         // TODO: This section is considered a "hack" in the source repo
         // Reference: https://github.com/openai/whisper/blob/ba3f3cd54b0e5b8ce1ab3de13e32122d0d5f98ab/whisper/timing.py#L305
-        let (constrainedMedianDuration, maxDuration) = calculateWordDurationConstraints(alignment: alignment)
-        alignment = truncateLongWordsAtSentenceBoundaries(alignment, maxDuration: maxDuration)
+        let wordDurations = calculateWordDurationConstraints(alignment: alignment)
+        alignment = truncateLongWordsAtSentenceBoundaries(alignment, maxDuration: wordDurations.max)
 
         // Process alignment for punctuations
         if !alignment.isEmpty {
@@ -483,15 +483,15 @@ open class SegmentSeeker: SegmentSeeking {
             mergedAlignment: alignment,
             seek: seek,
             lastSpeechTimestamp: lastSpeechTimestamp,
-            constrainedMedianDuration: constrainedMedianDuration,
-            maxDuration: maxDuration,
+            constrainedMedianDuration: wordDurations.median,
+            maxDuration: wordDurations.max,
             tokenizer: tokenizer
         )
 
         return updatedSegments
     }
 
-    public func calculateWordDurationConstraints(alignment: [WordTiming]) -> (Float, Float) {
+    public func calculateWordDurationConstraints(alignment: [WordTiming]) -> (median: Float, max: Float) {
         var wordDurations = alignment.map { $0.duration }
         wordDurations = wordDurations.filter { $0 > 0 }
 
@@ -558,6 +558,7 @@ open class SegmentSeeker: SegmentSeeking {
                 let end = (timeOffset + timing.end).rounded(2)
 
                 // Handle short duration words by moving their start time back if there's space
+                // There is most commonly space when there is timestamp tokens or merged punctuations between words
                 if end - start < constrainedMedianDuration / 4 {
                     if wordsInSegment.count >= 1,
                        let previousTiming = wordsInSegment.last
@@ -567,6 +568,11 @@ open class SegmentSeeker: SegmentSeeking {
                         // If there's space between this word and the previous word
                         if start > previousEnd {
                             // Move the word back, using either median duration or space available
+                            // Eg: [[0.5 - 2.0], [3.0 - 3.0]] (two word timings with one second gap)
+                            // ->  [[0.5 - 2.0], [2.7 - 3.0]] (second word start moved back)
+                            // however, if there is no space, it will not be adjusted
+                            // Eg: [[0.5 - 2.0], [2.0 - 2.0]] (two word timings with no gap)
+                            // ->  [[0.5 - 2.0], [2.0 - 2.0]] (second word start not moved back)
                             let spaceAvailable = start - previousEnd
                             let desiredDuration = min(spaceAvailable, constrainedMedianDuration / 2)
                             start = (start - desiredDuration).rounded(2)
@@ -577,6 +583,8 @@ open class SegmentSeeker: SegmentSeeking {
                               start > updatedSegments[segmentIndex - 1].end
                     {
                         // First word of segment - check space from last segment
+                        // Eg: [[0.5 - 1.5], [1.5 - 2.0]], [[3.0 - 3.0]] (two segments with one second gap)
+                        // ->  [[0.5 - 1.5], [1.5 - 2.0]], [[2.7 - 3.0]] (first word start of new segment moved back)
                         let spaceAvailable = start - updatedSegments[segmentIndex - 1].end
                         let desiredDuration = min(spaceAvailable, constrainedMedianDuration / 2)
                         start = (start - desiredDuration).rounded(2)

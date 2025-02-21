@@ -178,11 +178,11 @@ public struct ModelSupport: Codable, Equatable {
     }
 
     public init(
-        `default`: String,
+        default: String,
         supported: [String],
         disabled: [String] = []
     ) {
-        self.`default` = `default`
+        self.default = `default`
         self.supported = supported
         self.disabled = disabled
     }
@@ -645,18 +645,18 @@ public extension TranscriptionResult {
 }
 
 public struct TranscriptionSegment: Hashable, Codable {
-    public var id: Int = 0
-    public var seek: Int = 0
-    public var start: Float = 0.0
-    public var end: Float = 0.0
-    public var text: String = ""
-    public var tokens: [Int] = []
-    public var tokenLogProbs: [[Int: Float]] = [[:]]
-    public var temperature: Float = 1.0
-    public var avgLogprob: Float = 0.0
-    public var compressionRatio: Float = 1.0
-    public var noSpeechProb: Float = 0.0
-    public var words: [WordTiming]? = nil
+    public var id: Int
+    public var seek: Int
+    public var start: Float
+    public var end: Float
+    public var text: String
+    public var tokens: [Int]
+    public var tokenLogProbs: [[Int: Float]]
+    public var temperature: Float
+    public var avgLogprob: Float
+    public var compressionRatio: Float
+    public var noSpeechProb: Float
+    public var words: [WordTiming]?
 
     /// Computed property for the duration of the segment
     public var duration: Float {
@@ -670,7 +670,7 @@ public struct TranscriptionSegment: Hashable, Codable {
         end: Float = 0.0,
         text: String = "",
         tokens: [Int] = [],
-        tokenLogProbs: [[Int : Float]] = [[:]],
+        tokenLogProbs: [[Int: Float]] = [[:]],
         temperature: Float = 1.0,
         avgLogprob: Float = 0.0,
         compressionRatio: Float = 1.0,
@@ -1297,13 +1297,13 @@ public struct SpecialTokens {
 }
 
 public protocol WhisperTokenizer {
-    // swift-transformers pass through
+    /// swift-transformers pass through
     func encode(text: String) -> [Int]
     func decode(tokens: [Int]) -> String
     func convertTokenToId(_ token: String) -> Int?
     func convertIdToToken(_ id: Int) -> String?
 
-    // WhisperKit specific
+    /// WhisperKit specific
     var specialTokens: SpecialTokens { get }
     var allLanguageTokens: Set<Int> { get }
 

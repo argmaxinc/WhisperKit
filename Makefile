@@ -131,6 +131,6 @@ upload-benchmark-results:
 	@fastlane upload_results
 
 clean-package-caches:
-	@trash ~/Library/Developer/Xcode/DerivedData/WhisperKit*
+	@trash ~/Library/Developer/Xcode/DerivedData/WhisperKit* || true
 	@swift package purge-cache
 	@swift package reset
