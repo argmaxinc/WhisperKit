@@ -1275,7 +1275,7 @@ final class UnitTests: XCTestCase {
             logLevel: .debug,
             load: false
         )
-        var whisperKit = try await WhisperKit(config)
+        let whisperKit = try await WhisperKit(config)
         try await whisperKit.loadModels()
 
         let audioFilePath = try XCTUnwrap(
@@ -1294,9 +1294,6 @@ final class UnitTests: XCTestCase {
         }.value
         continuationCallback = nil
 
-        // Reset whisperkit
-        whisperKit = try await WhisperKit(config)
-        try await whisperKit.loadModels()
         XCTAssertNotNil(result)
         let tokenCountWithEarlyStop = result.segments.flatMap { $0.tokens }.count
         let decodingTimePerTokenWithEarlyStop = result.timings.decodingLoop / Double(tokenCountWithEarlyStop)
