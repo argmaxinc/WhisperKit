@@ -1279,7 +1279,7 @@ final class UnitTests: XCTestCase {
 
         try await whisperKit.loadModels()
         let audioFilePath = try XCTUnwrap(
-            Bundle.current.path(forResource: "jfk", ofType: "wav"),
+            Bundle.current.path(forResource: "ted_60", ofType: "m4a"),
             "Audio file not found"
         )
 
@@ -1319,7 +1319,7 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(decodingTimePerTokenWithWait, decodingTimePerTokenWithEarlyStop, accuracy: decodingTimePerTokenWithEarlyStop, "Decoding predictions per token should not be significantly slower with waiting")
 
         // Assert that more tokens are returned in the callback with waiting
-        XCTAssertGreaterThanOrEqual(tokenCountWithWait, 30, "Tokens for callback with wait should contain the full audio file")
+        XCTAssertGreaterThanOrEqual(tokenCountWithWait, 200, "Tokens for callback with wait should contain the full audio file")
         XCTAssertGreaterThan(tokenCountWithWait, tokenCountWithEarlyStop, "More tokens should be returned in the callback with waiting (early stop: \(tokenCountWithEarlyStop), with wait: \(tokenCountWithWait))")
     }
 
