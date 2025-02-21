@@ -1260,7 +1260,6 @@ final class UnitTests: XCTestCase {
         await fulfillment(of: [modelStateExpectation, segmentDiscoveryExpectation, transcriptionStateExpectation], timeout: 1)
     }
 
-    #if !os(watchOS) // FIXME: watchOS ignores the priority here for some reason
     func testCallbackWithEarlyStopping() async throws {
         let computeOptions = ModelComputeOptions(
             melCompute: .cpuOnly,
@@ -1276,16 +1275,16 @@ final class UnitTests: XCTestCase {
             logLevel: .debug,
             load: false
         )
-        let whisperKit = try await WhisperKit(config)
-
+        var whisperKit = try await WhisperKit(config)
         try await whisperKit.loadModels()
+
         let audioFilePath = try XCTUnwrap(
             Bundle.current.path(forResource: "ted_60", ofType: "m4a"),
             "Audio file not found"
         )
 
         let earlyStopTokenCount = 5
-        let continuationCallback: TranscriptionCallback = { (progress: TranscriptionProgress) -> Bool? in
+        var continuationCallback: TranscriptionCallback = { (progress: TranscriptionProgress) -> Bool? in
             // Stop after only 5 tokens (full test audio contains ~30)
             progress.tokens.count <= earlyStopTokenCount
         }
@@ -1293,7 +1292,11 @@ final class UnitTests: XCTestCase {
         let result = try await Task.detached(priority: .userInitiated) {
             try await whisperKit.transcribe(audioPath: audioFilePath, callback: continuationCallback).first!
         }.value
+        continuationCallback = nil
 
+        // Reset whisperkit
+        whisperKit = try await WhisperKit(config)
+        try await whisperKit.loadModels()
         XCTAssertNotNil(result)
         let tokenCountWithEarlyStop = result.segments.flatMap { $0.tokens }.count
         let decodingTimePerTokenWithEarlyStop = result.timings.decodingLoop / Double(tokenCountWithEarlyStop)
@@ -1329,9 +1332,13 @@ final class UnitTests: XCTestCase {
 
         // Assert that more tokens are returned in the callback with waiting
         XCTAssertGreaterThanOrEqual(tokenCountWithWait, 200, "Tokens for callback with wait should contain the full audio file")
+
+        #if os(watchOS) || os(iOS) // FIXME: Some OS ignore the priority here on github action runners for some reason
+        XCTAssertGreaterThanOrEqual(tokenCountWithWait, tokenCountWithEarlyStop, "More tokens should be returned in the callback with waiting (early stop: \(tokenCountWithEarlyStop), with wait: \(tokenCountWithWait))")
+        #else
         XCTAssertGreaterThan(tokenCountWithWait, tokenCountWithEarlyStop, "More tokens should be returned in the callback with waiting (early stop: \(tokenCountWithEarlyStop), with wait: \(tokenCountWithWait))")
+        #endif
     }
-    #endif
     // MARK: - Utils Tests
 
     func testFillIndexesWithValue() throws {
