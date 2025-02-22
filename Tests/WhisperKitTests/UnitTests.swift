@@ -2089,12 +2089,12 @@ final class UnitTests: XCTestCase {
             // Normal duration words
             WordTiming(word: " The", tokens: [264], start: 0.5, end: 1.0, probability: 1),
             WordTiming(word: " first", tokens: [4589], start: 1.0, end: 2.0, probability: 1),
-            // Long duration word (30 seconds)
+            // Long duration word
             WordTiming(word: " segment", tokens: [234], start: 2.0, end: 3.0, probability: 1),
             // Normal words
             WordTiming(word: " with", tokens: [567], start: 3.0, end: 4.0, probability: 1),
             WordTiming(word: " a", tokens: [257], start: 4.0, end: 5.0, probability: 1),
-            // Very long duration word (100 seconds)
+            // Very long duration word
             WordTiming(word: " long", tokens: [890], start: 5.0, end: 6.0, probability: 1),
             // Normal duration ending
             WordTiming(word: " ending", tokens: [123], start: 6.0, end: 35.0, probability: 1),
