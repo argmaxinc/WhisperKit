@@ -37,7 +37,7 @@ open class FeatureExtractor: FeatureExtracting, WhisperMLModel {
         guard inputDescription.type == .multiArray else { return nil }
         guard let shapeConstraint = inputDescription.multiArrayConstraint else { return nil }
         let shape = shapeConstraint.shape.map { $0.intValue }
-        return shape[0]  // The audio input is a 1D array
+        return shape[0] // The audio input is a 1D array
     }
 
     public func logMelSpectrogram(fromAudio inputAudio: MLMultiArray) async throws -> MLMultiArray? {
@@ -54,5 +54,4 @@ open class FeatureExtractor: FeatureExtracting, WhisperMLModel {
         let output = MelSpectrogramOutput(features: outputFeatures)
         return output.melspectrogramFeatures
     }
-
 }

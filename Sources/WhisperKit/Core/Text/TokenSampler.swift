@@ -14,6 +14,16 @@ public struct SamplingResult {
     public var tokens: [Int]
     public var logProbs: [Float]
     public var completed: Bool
+
+    public init(
+        tokens: [Int],
+        logProbs: [Float],
+        completed: Bool
+    ) {
+        self.tokens = tokens
+        self.logProbs = logProbs
+        self.completed = completed
+    }
 }
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)

@@ -176,11 +176,26 @@ public struct ModelSupport: Codable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case `default`, supported
     }
+
+    public init(
+        default: String,
+        supported: [String],
+        disabled: [String] = []
+    ) {
+        self.default = `default`
+        self.supported = supported
+        self.disabled = disabled
+    }
 }
 
 public struct DeviceSupport: Codable {
     public let identifiers: [String]
     public var models: ModelSupport
+
+    public init(identifiers: [String], models: ModelSupport) {
+        self.identifiers = identifiers
+        self.models = models
+    }
 }
 
 public struct ModelSupportConfig: Codable {
@@ -280,6 +295,11 @@ public struct ModelSupportConfig: Codable {
 public struct AudioChunk {
     public var seekOffsetIndex: Int
     public var audioSamples: [Float]
+
+    public init(seekOffsetIndex: Int, audioSamples: [Float]) {
+        self.seekOffsetIndex = seekOffsetIndex
+        self.audioSamples = audioSamples
+    }
 }
 
 // MARK: - Decoding
@@ -351,7 +371,12 @@ public struct DecodingCache {
     public var keyCache: MLMultiArray?
     public var valueCache: MLMultiArray?
     public var alignmentWeights: MLMultiArray?
-    public init(keyCache: MLMultiArray? = nil, valueCache: MLMultiArray? = nil, alignmentWeights: MLMultiArray? = nil) {
+
+    public init(
+        keyCache: MLMultiArray? = nil,
+        valueCache: MLMultiArray? = nil,
+        alignmentWeights: MLMultiArray? = nil
+    ) {
         self.keyCache = keyCache
         self.valueCache = valueCache
         self.alignmentWeights = alignmentWeights
@@ -432,7 +457,20 @@ public struct DecodingResult {
                               fallback: nil)
     }
 
-    public init(language: String, languageProbs: [String: Float], tokens: [Int], tokenLogProbs: [[Int: Float]], text: String, avgLogProb: Float, noSpeechProb: Float, temperature: Float, compressionRatio: Float, cache: DecodingCache? = nil, timings: TranscriptionTimings? = nil, fallback: DecodingFallback? = nil) {
+    public init(
+        language: String,
+        languageProbs: [String: Float],
+        tokens: [Int],
+        tokenLogProbs: [[Int: Float]],
+        text: String,
+        avgLogProb: Float,
+        noSpeechProb: Float,
+        temperature: Float,
+        compressionRatio: Float,
+        cache: DecodingCache? = nil,
+        timings: TranscriptionTimings? = nil,
+        fallback: DecodingFallback? = nil
+    ) {
         self.language = language
         self.languageProbs = languageProbs
         self.tokens = tokens
@@ -509,6 +547,20 @@ public struct TranscriptionResult: Codable {
     public var language: String
     public var timings: TranscriptionTimings
     public var seekTime: Float?
+
+    public init(
+        text: String,
+        segments: [TranscriptionSegment],
+        language: String,
+        timings: TranscriptionTimings,
+        seekTime: Float? = nil
+    ) {
+        self.text = text
+        self.segments = segments
+        self.language = language
+        self.timings = timings
+        self.seekTime = seekTime
+    }
 
     public func logSegments() {
         for (i, segment) in segments.enumerated() {
@@ -593,18 +645,51 @@ public extension TranscriptionResult {
 }
 
 public struct TranscriptionSegment: Hashable, Codable {
-    public var id: Int = 0
-    public var seek: Int = 0
-    public var start: Float = 0.0
-    public var end: Float = 0.0
-    public var text: String = ""
-    public var tokens: [Int] = []
-    public var tokenLogProbs: [[Int: Float]] = [[:]]
-    public var temperature: Float = 1.0
-    public var avgLogprob: Float = 0.0
-    public var compressionRatio: Float = 1.0
-    public var noSpeechProb: Float = 0.0
-    public var words: [WordTiming]? = nil
+    public var id: Int
+    public var seek: Int
+    public var start: Float
+    public var end: Float
+    public var text: String
+    public var tokens: [Int]
+    public var tokenLogProbs: [[Int: Float]]
+    public var temperature: Float
+    public var avgLogprob: Float
+    public var compressionRatio: Float
+    public var noSpeechProb: Float
+    public var words: [WordTiming]?
+
+    /// Computed property for the duration of the segment
+    public var duration: Float {
+        return end - start
+    }
+
+    public init(
+        id: Int = 0,
+        seek: Int = 0,
+        start: Float = 0.0,
+        end: Float = 0.0,
+        text: String = "",
+        tokens: [Int] = [],
+        tokenLogProbs: [[Int: Float]] = [[:]],
+        temperature: Float = 1.0,
+        avgLogprob: Float = 0.0,
+        compressionRatio: Float = 1.0,
+        noSpeechProb: Float = 0.0,
+        words: [WordTiming]? = nil
+    ) {
+        self.id = id
+        self.seek = seek
+        self.start = start
+        self.end = end
+        self.text = text
+        self.tokens = tokens
+        self.tokenLogProbs = tokenLogProbs
+        self.temperature = temperature
+        self.avgLogprob = avgLogprob
+        self.compressionRatio = compressionRatio
+        self.noSpeechProb = noSpeechProb
+        self.words = words
+    }
 }
 
 public struct WordTiming: Hashable, Codable {
@@ -613,6 +698,19 @@ public struct WordTiming: Hashable, Codable {
     public var start: Float
     public var end: Float
     public var probability: Float
+
+    /// Computed property for the duration of the word
+    public var duration: Float {
+        return end - start
+    }
+
+    public init(word: String, tokens: [Int], start: Float, end: Float, probability: Float) {
+        self.word = word
+        self.tokens = tokens
+        self.start = start
+        self.end = end
+        self.probability = probability
+    }
 }
 
 public struct TranscriptionProgress {
@@ -1198,17 +1296,40 @@ public struct SpecialTokens {
     }
 }
 
-public protocol WhisperTokenizer: Tokenizer {
+public protocol WhisperTokenizer {
+    /// swift-transformers pass through
+    func encode(text: String) -> [Int]
+    func decode(tokens: [Int]) -> String
+    func convertTokenToId(_ token: String) -> Int?
+    func convertIdToToken(_ id: Int) -> String?
+
+    /// WhisperKit specific
     var specialTokens: SpecialTokens { get }
     var allLanguageTokens: Set<Int> { get }
 
     func splitToWordTokens(tokenIds: [Int]) -> (words: [String], wordTokens: [[Int]])
 }
 
-struct WhisperTokenizerWrapper: WhisperTokenizer {
+open class WhisperTokenizerWrapper: WhisperTokenizer {
     let tokenizer: any Tokenizer
-    let specialTokens: SpecialTokens
-    let allLanguageTokens: Set<Int>
+    public let specialTokens: SpecialTokens
+    public let allLanguageTokens: Set<Int>
+
+    public func encode(text: String) -> [Int] {
+        tokenizer.encode(text: text)
+    }
+
+    public func decode(tokens: [Int]) -> String {
+        tokenizer.decode(tokens: tokens)
+    }
+
+    public func convertTokenToId(_ token: String) -> Int? {
+        tokenizer.convertTokenToId(token)
+    }
+
+    public func convertIdToToken(_ id: Int) -> String? {
+        tokenizer.convertIdToToken(id)
+    }
 
     init(tokenizer: any Tokenizer) {
         let specialTokens = SpecialTokens(
@@ -1300,7 +1421,7 @@ struct WhisperTokenizerWrapper: WhisperTokenizer {
     /// Decodes token ids into individual words and per-word subtokens
     /// - Parameter tokenIds: Array of tokens to decode and then split
     /// - Returns: Tuple containing and array of the split words and all tokens for each word
-    func splitToWordTokens(tokenIds: [Int]) -> (words: [String], wordTokens: [[Int]]) {
+    public func splitToWordTokens(tokenIds: [Int]) -> (words: [String], wordTokens: [[Int]]) {
         let decodedWords = tokenizer.decode(tokens: tokenIds.filter { $0 < specialTokens.specialTokenBegin })
 
         // Detect language of input text
@@ -1313,52 +1434,6 @@ struct WhisperTokenizerWrapper: WhisperTokenizer {
         } else {
             return splitTokensOnSpaces(tokens: tokenIds)
         }
-    }
-}
-
-extension WhisperTokenizerWrapper: Tokenizer {
-    func tokenize(text: String) -> [String] {
-        tokenizer.tokenize(text: text)
-    }
-
-    func encode(text: String) -> [Int] {
-        tokenizer.encode(text: text)
-    }
-
-    func decode(tokens: [Int]) -> String {
-        tokenizer.decode(tokens: tokens)
-    }
-
-    func convertTokenToId(_ token: String) -> Int? {
-        tokenizer.convertTokenToId(token)
-    }
-
-    func convertIdToToken(_ id: Int) -> String? {
-        tokenizer.convertIdToToken(id)
-    }
-
-    var bosToken: String? {
-        tokenizer.bosToken
-    }
-
-    var bosTokenId: Int? {
-        tokenizer.bosTokenId
-    }
-
-    var eosToken: String? {
-        tokenizer.eosToken
-    }
-
-    var eosTokenId: Int? {
-        tokenizer.eosTokenId
-    }
-
-    var unknownToken: String? {
-        tokenizer.unknownToken
-    }
-
-    var unknownTokenId: Int? {
-        tokenizer.unknownTokenId
     }
 }
 
@@ -1511,6 +1586,9 @@ public enum Constants {
     public static let defaultAudioReadFrameSize: AVAudioFrameCount = 1_323_000 // 30s of audio at commonly found 44.1khz sample rate
 
     public static let defaultWindowSamples: Int = 480_000 // 30s of audio at 16khz sample rate default for Whisper models
+
+    public static let defaultPrependPunctuations: String = "\"'“¡¿([{-"
+    public static let defaultAppendPunctuations: String = "\"'.。,，!！?？:：”)]}、"
 
     public static let fallbackModelSupportConfig: ModelSupportConfig = {
         var config = ModelSupportConfig(

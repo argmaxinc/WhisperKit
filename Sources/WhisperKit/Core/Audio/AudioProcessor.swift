@@ -16,6 +16,11 @@ public typealias DeviceID = String
 public struct AudioDevice: Identifiable, Hashable {
     public let id: DeviceID
     public let name: String
+
+    public init(id: DeviceID, name: String) {
+        self.id = id
+        self.name = name
+    }
 }
 
 public protocol AudioProcessing {
