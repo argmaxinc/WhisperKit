@@ -1289,9 +1289,7 @@ final class UnitTests: XCTestCase {
             progress.tokens.count <= earlyStopTokenCount
         }
 
-        let result = try await Task.detached(priority: .userInitiated) {
-            try await whisperKit.transcribe(audioPath: audioFilePath, callback: continuationCallback).first!
-        }.value
+        let result = try await whisperKit.transcribe(audioPath: audioFilePath, callback: continuationCallback).first!
         continuationCallback = nil
 
         XCTAssertNotNil(result)
@@ -1312,10 +1310,7 @@ final class UnitTests: XCTestCase {
             return false
         }
 
-        // Explicitly create a new task for the second transcription
-        let resultWithWait = try await Task.detached(priority: .userInitiated) {
-            try await whisperKit.transcribe(audioPath: audioFilePath, callback: continuationCallbackWithWait).first!
-        }.value
+        let resultWithWait = try await whisperKit.transcribe(audioPath: audioFilePath, callback: continuationCallbackWithWait).first!
 
         XCTAssertNotNil(resultWithWait)
         let tokenCountWithWait = resultWithWait.segments.flatMap { $0.tokens }.count
