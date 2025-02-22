@@ -693,7 +693,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             if tokenIndex < intialPromptIndex {
                 let isTimestampToken = currentTokens[tokenIndex] >= tokenizer.specialTokens.timeTokenBegin
                 let modelPredictedTimestamp = nextToken >= tokenizer.specialTokens.timeTokenBegin
-                
+
                 // Force the token unless it's the last prefill token and both are timestamps
                 if !(isLastPrefillToken && isTimestampToken && modelPredictedTimestamp) {
                     nextToken = currentTokens[tokenIndex]

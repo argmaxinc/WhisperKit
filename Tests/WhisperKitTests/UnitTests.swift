@@ -1324,6 +1324,7 @@ final class UnitTests: XCTestCase {
 
         try await callbackTestTask.value
     }
+
     // MARK: - Utils Tests
 
     func testFillIndexesWithValue() throws {
