@@ -134,7 +134,7 @@ open class TimestampRulesFilter: LogitsFiltering {
 
     private func sampleBegin(for tokens: [Int]) -> Int? {
         if isModelMultilingual {
-            // NOTE: for multilingual model we don't want to supress "<|transcribe|>" or "<|translate|>" tokens
+            // NOTE: for multilingual model we don't want to suppress "<|transcribe|>" or "<|translate|>" tokens
             if let taskTokenIndex = tokens.prefix(3).firstIndex(where: { $0 == specialTokens.transcribeToken || $0 == specialTokens.translateToken }) {
                 return max(taskTokenIndex + 1, sampleBegin)
             } else {
