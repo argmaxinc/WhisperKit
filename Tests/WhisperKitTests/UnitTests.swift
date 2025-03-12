@@ -2355,4 +2355,88 @@ final class UnitTests: XCTestCase {
 
         XCTAssertEqual(finalWords.normalized, " And so my fellow Americans. Ask not what your country can do for you ask what you can do for your country.".normalized)
     }
+    
+    // MARK: - Audio Channel Processing Tests
+
+    func testAudioInputModeChannelModeAllChannels() async throws {
+        let targetLanguage = "en"
+        let options = DecodingOptions(task: .transcribe, language: targetLanguage, channelMode: .sumChannels(nil))
+
+        let result = try await XCTUnwrapAsync(
+            await transcribe(with: .tiny, options: options, audioFile: "8_Channel_ID.m4a"),
+            "Failed to transcribe"
+        )
+        XCTAssertEqual(result.text.normalized, "front left front right center back left back right music auxiliary left auxiliary right")
+    }
+    
+    func testAudioInputModeChannelModeSumSpecificChannels() async throws {
+        let targetLanguage = "en"
+        let options = DecodingOptions(task: .transcribe, language: targetLanguage, channelMode: .sumChannels([1, 3, 5]))
+
+        let result = try await XCTUnwrapAsync(
+            await transcribe(with: .tiny, options: options, audioFile: "8_Channel_ID.m4a"),
+            "Failed to transcribe"
+        )
+        XCTAssertEqual(result.text.normalized, "front left back left auxiliary left")
+    }
+    
+    func testAudioInputModeChannelModeSpecificChannel() async throws {
+        let targetLanguage = "en"
+        let options = DecodingOptions(
+            task: .transcribe,
+            language: targetLanguage,
+            channelMode: .specificChannel(0)
+        )
+
+        let result = try await XCTUnwrapAsync(
+            await transcribe(with: .tiny, options: options, audioFile: "8_Channel_ID.m4a"),
+            "Failed to transcribe"
+        )
+        XCTAssertEqual(result.text.normalized, "center")
+    }
+        
+    func testChannelProcessingScaling() throws {
+        // Use a single 8-channel audio file
+        let audioPath = try XCTUnwrap(
+            Bundle.current.path(forResource: "8_Channel_ID", ofType: "m4a"),
+            "8-channel audio file not found"
+        )
+        
+        // Load the audio file
+        let originalBuffer = try AudioProcessor.loadAudio(fromPath: audioPath)
+        
+        // Create a longer buffer by looping the audio
+        let repeatCount = 1342   // Creates ~3 hours of audio (assuming 8-second original)
+        let extendedBuffer = createExtendedBuffer(from: originalBuffer, repeatCount: repeatCount)
+        
+        Logging.info("\nCreated extended audio buffer:")
+        Logging.info("  Original length: \(originalBuffer.frameLength) frames (\(Double(originalBuffer.frameLength) / originalBuffer.format.sampleRate) seconds)")
+        Logging.info("  Extended length: \(extendedBuffer.frameLength) frames (\(Double(extendedBuffer.frameLength) / extendedBuffer.format.sampleRate) seconds)")
+        
+        // Define channel counts to test
+        let channelCounts = [1, 2, 4, 8] // All possible channel counts for our 8-channel file
+        let iterations = 5
+        
+        Logging.info("\n=== CHANNEL PROCESSING SCALING TEST ===")
+        Logging.info("Testing with 8-channel audio, comparing different channel combinations")
+        
+        // Test specific channel selection
+        Logging.info("\nSpecific Channel Selection (always first channel):")
+        var specificResults: [(channels: Int, time: Double)] = []
+        for _ in channelCounts {
+            let time = measureChannelProcessing(buffer: extendedBuffer, mode: .specificChannel(0), iterations: iterations)
+            specificResults.append((1, time)) // always 1 channel selected
+            Logging.info("  From \(extendedBuffer.format.channelCount)-channel source: \(formatChannelProcessingTime(time))")
+        }
+        
+        // Test summing different numbers of channels
+        Logging.info("\nSumming Channels:")
+        var sumResults: [(channels: Int, time: Double)] = []
+        for channelCount in channelCounts {
+            let channelIndices = Array(0..<channelCount)
+            let time = measureChannelProcessing(buffer: extendedBuffer, mode: .sumChannels(channelIndices), iterations: iterations)
+            sumResults.append((channelCount, time))
+            Logging.info("  Summing \(channelCount) channels: \(formatChannelProcessingTime(time))")
+        }
+    }
 }

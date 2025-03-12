@@ -584,7 +584,7 @@ open class WhisperKit {
         let loadAudioStart = Date()
 
         // Load and extract audio data from the provided file paths
-        let loadedAudioResult = await AudioProcessor.loadAudio(at: audioPaths)
+        let loadedAudioResult = await AudioProcessor.loadAudio(at: audioPaths, channelMode: decodeOptions?.channelMode ?? .sumChannels(nil))
         let audioArrays = loadedAudioResult.compactMap { try? $0.get() }
 
         // Calculate the time taken to load and convert audio
@@ -780,8 +780,7 @@ open class WhisperKit {
                 Logging.debug("Audio loading and convert time: \(convertTime)")
                 logCurrentMemoryUsage("Audio Loading and Convert")
             }
-
-            return try AudioProcessor.loadAudioAsFloatArray(fromPath: audioPath)
+            return try AudioProcessor.loadAudioAsFloatArray(fromPath: audioPath, channelMode: decodeOptions?.channelMode ?? .sumChannels(nil))
         }
 
         transcriptionStateCallback?(.transcribing)

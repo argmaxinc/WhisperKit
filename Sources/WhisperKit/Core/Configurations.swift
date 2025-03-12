@@ -129,6 +129,7 @@ public struct DecodingOptions: Codable {
     public var temperature: Float
     public var temperatureIncrementOnFallback: Float
     public var temperatureFallbackCount: Int
+    public var channelMode: AudioInputConfig.ChannelMode
     public var sampleLength: Int
     public var topK: Int
     public var usePrefillPrompt: Bool
@@ -157,6 +158,7 @@ public struct DecodingOptions: Codable {
         temperature: Float = 0.0,
         temperatureIncrementOnFallback: Float = 0.2,
         temperatureFallbackCount: Int = 5,
+        channelMode: AudioInputConfig.ChannelMode = .sumChannels(nil),
         sampleLength: Int = Constants.maxTokenContext,
         topK: Int = 5,
         usePrefillPrompt: Bool = true,
@@ -184,6 +186,7 @@ public struct DecodingOptions: Codable {
         self.temperature = temperature
         self.temperatureIncrementOnFallback = temperatureIncrementOnFallback
         self.temperatureFallbackCount = temperatureFallbackCount
+        self.channelMode = channelMode
         self.sampleLength = sampleLength
         self.topK = topK
         self.usePrefillPrompt = usePrefillPrompt

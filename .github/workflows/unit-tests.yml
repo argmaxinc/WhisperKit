@@ -39,7 +39,7 @@ jobs:
               name: "watchOS",
               condition: "${{ inputs.macos-runner == 'macos-15' }}",
               clean-destination: "generic/platform=watchOS",
-              test-destination: "platform=watchOS Simulator,OS=11.1,name=Apple Watch Ultra 2 (49mm)",
+              test-destination: "platform=watchOS Simulator,OS=11.4,name=Apple Watch Ultra 2 (49mm)",
             }
           - {
               name: "visionOS",
