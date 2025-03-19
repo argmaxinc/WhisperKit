@@ -1,12 +1,12 @@
 //  For licensing see accompanying LICENSE.md file.
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
+import AVFAudio
 import Combine
 import CoreML
 import Foundation
 @testable import WhisperKit
 import XCTest
-import AVFAudio
 
 enum TestError: Error {
     case missingFile(String)
@@ -238,62 +238,63 @@ extension XCTestCase {
             XCTAssertNil(instance, "Detected potential memory leak", file: file, line: line)
         }
     }
-    
+
     /// Helper to create an extended audio buffer by repeating the original buffer
-   func createExtendedBuffer(from originalBuffer: AVAudioPCMBuffer, repeatCount: Int) -> AVAudioPCMBuffer {
-       let frameCount = originalBuffer.frameLength
-       let totalFrames = frameCount * AVAudioFrameCount(repeatCount)
-       
-       // Create new buffer with same format but longer length
-       let extendedBuffer = AVAudioPCMBuffer(
-           pcmFormat: originalBuffer.format,
-           frameCapacity: totalFrames
-       )!
-       extendedBuffer.frameLength = totalFrames
-       
-       // Copy the original buffer data multiple times
-       for i in 0..<repeatCount {
-           let targetFrame = AVAudioFrameCount(i) * frameCount
-           
-           // For each channel
-           for channel in 0..<originalBuffer.format.channelCount {
-               if let sourceData = originalBuffer.floatChannelData?[Int(channel)],
-                  let targetData = extendedBuffer.floatChannelData?[Int(channel)] {
-                   // Copy this channel's data to the target position
-                   for frame in 0..<Int(frameCount) {
-                       targetData[Int(targetFrame) + frame] = sourceData[frame]
-                   }
-               }
-           }
-       }
-       
-       return extendedBuffer
-   }
-   
-   /// Helper to measure channel processing operations
-   func measureChannelProcessing(buffer: AVAudioPCMBuffer, mode: AudioInputConfig.ChannelMode, iterations: Int = 5) -> Double {
-       var totalTime: Double = 0
-       
-       for _ in 0..<iterations {
-           let start = CFAbsoluteTimeGetCurrent()
-           _ = AudioProcessor.processAudioChannels(buffer, mode: mode)
-           let end = CFAbsoluteTimeGetCurrent()
-           totalTime += (end - start)
-       }
-       
-       return totalTime / Double(iterations)
-   }
-   
-   /// Format time for display in performance tests
-   func formatChannelProcessingTime(_ time: Double) -> String {
-       if time < 0.001 {
-           return String(format: "%.3f μs", time * 1_000_000)
-       } else if time < 1 {
-           return String(format: "%.3f ms", time * 1_000)
-       } else {
-           return String(format: "%.3f s", time)
-       }
-   }
+    func createExtendedBuffer(from originalBuffer: AVAudioPCMBuffer, repeatCount: Int) -> AVAudioPCMBuffer {
+        let frameCount = originalBuffer.frameLength
+        let totalFrames = frameCount * AVAudioFrameCount(repeatCount)
+
+        // Create new buffer with same format but longer length
+        let extendedBuffer = AVAudioPCMBuffer(
+            pcmFormat: originalBuffer.format,
+            frameCapacity: totalFrames
+        )!
+        extendedBuffer.frameLength = totalFrames
+
+        // Copy the original buffer data multiple times
+        for i in 0..<repeatCount {
+            let targetFrame = AVAudioFrameCount(i) * frameCount
+
+            // For each channel
+            for channel in 0..<originalBuffer.format.channelCount {
+                if let sourceData = originalBuffer.floatChannelData?[Int(channel)],
+                   let targetData = extendedBuffer.floatChannelData?[Int(channel)]
+                {
+                    // Copy this channel's data to the target position
+                    for frame in 0..<Int(frameCount) {
+                        targetData[Int(targetFrame) + frame] = sourceData[frame]
+                    }
+                }
+            }
+        }
+
+        return extendedBuffer
+    }
+
+    /// Helper to measure channel processing operations
+    func measureChannelProcessing(buffer: AVAudioPCMBuffer, mode: AudioInputConfig.ChannelMode, iterations: Int = 5) -> Double {
+        var totalTime: Double = 0
+
+        for _ in 0..<iterations {
+            let start = CFAbsoluteTimeGetCurrent()
+            _ = AudioProcessor.convertToMono(buffer, mode: mode)
+            let end = CFAbsoluteTimeGetCurrent()
+            totalTime += (end - start)
+        }
+
+        return totalTime / Double(iterations)
+    }
+
+    /// Format time for display in performance tests
+    func formatChannelProcessingTime(_ time: Double) -> String {
+        if time < 0.001 {
+            return String(format: "%.3f μs", time * 1_000_000)
+        } else if time < 1 {
+            return String(format: "%.3f ms", time * 1000)
+        } else {
+            return String(format: "%.3f s", time)
+        }
+    }
 }
 
 extension SpecialTokens {

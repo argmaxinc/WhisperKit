@@ -22,9 +22,10 @@ open class WhisperKitConfig {
 
     /// Model compute options, see `ModelComputeOptions`
     public var computeOptions: ModelComputeOptions?
+    /// Audio input config to define how to process audio input
+    public var audioInputConfig: AudioInputConfig?
     /// Audio processor for the model
     public var audioProcessor: (any AudioProcessing)?
-    /// Audio processor for the model
     public var featureExtractor: (any FeatureExtracting)?
     public var audioEncoder: (any AudioEncoding)?
     public var textDecoder: (any TextDecoding)?
@@ -53,6 +54,7 @@ open class WhisperKitConfig {
                 modelFolder: String? = nil,
                 tokenizerFolder: URL? = nil,
                 computeOptions: ModelComputeOptions? = nil,
+                audioInputConfig: AudioInputConfig? = nil,
                 audioProcessor: (any AudioProcessing)? = nil,
                 featureExtractor: (any FeatureExtracting)? = nil,
                 audioEncoder: (any AudioEncoding)? = nil,
@@ -74,6 +76,7 @@ open class WhisperKitConfig {
         self.modelFolder = modelFolder
         self.tokenizerFolder = tokenizerFolder
         self.computeOptions = computeOptions
+        self.audioInputConfig = audioInputConfig
         self.audioProcessor = audioProcessor
         self.featureExtractor = featureExtractor
         self.audioEncoder = audioEncoder
@@ -129,7 +132,6 @@ public struct DecodingOptions: Codable {
     public var temperature: Float
     public var temperatureIncrementOnFallback: Float
     public var temperatureFallbackCount: Int
-    public var channelMode: AudioInputConfig.ChannelMode
     public var sampleLength: Int
     public var topK: Int
     public var usePrefillPrompt: Bool
@@ -158,7 +160,6 @@ public struct DecodingOptions: Codable {
         temperature: Float = 0.0,
         temperatureIncrementOnFallback: Float = 0.2,
         temperatureFallbackCount: Int = 5,
-        channelMode: AudioInputConfig.ChannelMode = .sumChannels(nil),
         sampleLength: Int = Constants.maxTokenContext,
         topK: Int = 5,
         usePrefillPrompt: Bool = true,
@@ -186,7 +187,6 @@ public struct DecodingOptions: Codable {
         self.temperature = temperature
         self.temperatureIncrementOnFallback = temperatureIncrementOnFallback
         self.temperatureFallbackCount = temperatureFallbackCount
-        self.channelMode = channelMode
         self.sampleLength = sampleLength
         self.topK = topK
         self.usePrefillPrompt = usePrefillPrompt

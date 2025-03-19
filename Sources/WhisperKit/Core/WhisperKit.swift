@@ -20,6 +20,7 @@ open class WhisperKit {
     }
 
     public var modelCompute: ModelComputeOptions
+    public var audioInputConfig: AudioInputConfig
     public var tokenizer: WhisperTokenizer?
 
     /// Protocols
@@ -52,6 +53,7 @@ open class WhisperKit {
 
     public init(_ config: WhisperKitConfig = WhisperKitConfig()) async throws {
         modelCompute = config.computeOptions ?? ModelComputeOptions()
+        audioInputConfig = config.audioInputConfig ?? AudioInputConfig()
         audioProcessor = config.audioProcessor ?? AudioProcessor()
         featureExtractor = config.featureExtractor ?? FeatureExtractor()
         audioEncoder = config.audioEncoder ?? AudioEncoder()
@@ -584,7 +586,7 @@ open class WhisperKit {
         let loadAudioStart = Date()
 
         // Load and extract audio data from the provided file paths
-        let loadedAudioResult = await AudioProcessor.loadAudio(at: audioPaths, channelMode: decodeOptions?.channelMode ?? .sumChannels(nil))
+        let loadedAudioResult = await AudioProcessor.loadAudio(at: audioPaths, channelMode: audioInputConfig.channelMode)
         let audioArrays = loadedAudioResult.compactMap { try? $0.get() }
 
         // Calculate the time taken to load and convert audio
@@ -780,7 +782,7 @@ open class WhisperKit {
                 Logging.debug("Audio loading and convert time: \(convertTime)")
                 logCurrentMemoryUsage("Audio Loading and Convert")
             }
-            return try AudioProcessor.loadAudioAsFloatArray(fromPath: audioPath, channelMode: decodeOptions?.channelMode ?? .sumChannels(nil))
+            return try AudioProcessor.loadAudioAsFloatArray(fromPath: audioPath, channelMode: audioInputConfig.channelMode)
         }
 
         transcriptionStateCallback?(.transcribing)
