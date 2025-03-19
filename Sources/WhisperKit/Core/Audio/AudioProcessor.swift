@@ -510,14 +510,17 @@ public class AudioProcessor: NSObject, AudioProcessing {
     ///   - mode: The channel processing mode
     /// - Returns: A mono-channel audio buffer
     public static func convertToMono(_ buffer: AVAudioPCMBuffer, mode: ChannelMode) -> AVAudioPCMBuffer? {
-        guard let channelData = buffer.floatChannelData else { return buffer }
-
         let channelCount = Int(buffer.format.channelCount)
         let frameLength = Int(buffer.frameLength)
 
         if channelCount <= 1 {
-            // No processing needed for mono audio
+            // Early return, audio is already mono format
             return buffer
+        }
+
+        guard let channelData = buffer.floatChannelData else {
+            Logging.error("Buffer did not contain floatChannelData.")
+            return nil
         }
 
         // Create a new single-channel buffer
@@ -526,24 +529,34 @@ public class AudioProcessor: NSObject, AudioProcessing {
             sampleRate: buffer.format.sampleRate,
             channels: 1,
             interleaved: false
-        ) else { return buffer }
+        ) else {
+            Logging.error("Failed to create AVAudioFormat object.")
+            return nil
+        }
 
-        let monoBuffer = AVAudioPCMBuffer(
+        guard let monoBuffer = AVAudioPCMBuffer(
             pcmFormat: monoFormat,
             frameCapacity: buffer.frameCapacity
-        )!
+        ) else {
+            Logging.error("Failed to create mono buffer.")
+            return nil
+        }
+
         monoBuffer.frameLength = buffer.frameLength
 
+        // Make sure mono buffer has channel data
+        guard let monoChannelData = monoBuffer.floatChannelData else { return buffer }
+
         // Clear the buffer to ensure it starts with zeros
-        vDSP_vclr(monoBuffer.floatChannelData![0], 1, vDSP_Length(frameLength))
+        vDSP_vclr(monoChannelData[0], 1, vDSP_Length(frameLength))
 
         switch mode {
-            case let .specificChannel(channelIndex):
+            case .specificChannel(let channelIndex):
                 // Copy the specified channel, defaulting to first channel if out of range
                 let safeIndex = (channelIndex >= 0 && channelIndex < channelCount) ? channelIndex : 0
-                memcpy(monoBuffer.floatChannelData![0], channelData[safeIndex], frameLength * MemoryLayout<Float>.size)
+                memcpy(monoChannelData[0], channelData[safeIndex], frameLength * MemoryLayout<Float>.size)
 
-            case let .sumChannels(channelIndices):
+            case .sumChannels(let channelIndices):
                 // Determine which channels to sum
                 let indicesToSum: [Int]
 
@@ -553,7 +566,7 @@ public class AudioProcessor: NSObject, AudioProcessing {
 
                     // Handle case where all specified indices are invalid
                     if indicesToSum.isEmpty {
-                        memcpy(monoBuffer.floatChannelData![0], channelData[0], frameLength * MemoryLayout<Float>.size)
+                        memcpy(monoChannelData[0], channelData[0], frameLength * MemoryLayout<Float>.size)
                         Logging.debug("No valid channel indices provided, defaulting to first channel")
                         return monoBuffer
                     }
@@ -573,23 +586,23 @@ public class AudioProcessor: NSObject, AudioProcessing {
                 // Sum the specified channels
                 for channelIndex in indicesToSum {
                     vDSP_vadd(
-                        monoBuffer.floatChannelData![0], 1,
+                        monoChannelData[0], 1,
                         channelData[channelIndex], 1,
-                        monoBuffer.floatChannelData![0], 1,
+                        monoChannelData[0], 1,
                         vDSP_Length(frameLength)
                     )
                 }
 
                 // Find the peak in the mono mix
                 var monoPeak: Float = 0.0
-                vDSP_maxmgv(monoBuffer.floatChannelData![0], 1, &monoPeak, vDSP_Length(frameLength))
+                vDSP_maxmgv(monoChannelData[0], 1, &monoPeak, vDSP_Length(frameLength))
 
                 // Scale based on peak ratio (avoid division by zero)
                 var scale = maxOriginalPeak / max(monoPeak, 0.0001)
                 vDSP_vsmul(
-                    monoBuffer.floatChannelData![0], 1,
+                    monoChannelData[0], 1,
                     &scale,
-                    monoBuffer.floatChannelData![0], 1,
+                    monoChannelData[0], 1,
                     vDSP_Length(frameLength)
                 )
         }
@@ -743,6 +756,8 @@ public class AudioProcessor: NSObject, AudioProcessing {
 
             result.append(contentsOf: chunk)
             currentFrame += currentChunkSize
+
+            memset(startPointer.advanced(by: currentFrame - currentChunkSize), 0, currentChunkSize * MemoryLayout<Float>.size)
         }
 
         return result

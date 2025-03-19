@@ -7,6 +7,7 @@ import CoreML
 import Foundation
 @testable import WhisperKit
 import XCTest
+import Accelerate
 
 enum TestError: Error {
     case missingFile(String)
@@ -251,19 +252,24 @@ extension XCTestCase {
         )!
         extendedBuffer.frameLength = totalFrames
 
-        // Copy the original buffer data multiple times
-        for i in 0..<repeatCount {
-            let targetFrame = AVAudioFrameCount(i) * frameCount
+        // For each channel
+        for channel in 0..<originalBuffer.format.channelCount {
+            if let sourceData = originalBuffer.floatChannelData?[Int(channel)],
+               let targetData = extendedBuffer.floatChannelData?[Int(channel)]
+            {
+                // Use vDSP to fill the extended buffer with repeated copies
+                for i in 0..<repeatCount {
+                    let targetOffset = Int(i * Int(frameCount))
 
-            // For each channel
-            for channel in 0..<originalBuffer.format.channelCount {
-                if let sourceData = originalBuffer.floatChannelData?[Int(channel)],
-                   let targetData = extendedBuffer.floatChannelData?[Int(channel)]
-                {
-                    // Copy this channel's data to the target position
-                    for frame in 0..<Int(frameCount) {
-                        targetData[Int(targetFrame) + frame] = sourceData[frame]
-                    }
+                    // Use vDSP_mmov to copy memory blocks efficiently
+                    vDSP_mmov(
+                        sourceData,                      // Source pointer
+                        targetData.advanced(by: targetOffset), // Destination pointer
+                        vDSP_Length(frameCount),         // Frame count
+                        1,                               // Number of channels (always 1 here since we're processing per channel)
+                        1,                               // Source stride
+                        1                                // Destination stride
+                    )
                 }
             }
         }
@@ -271,10 +277,38 @@ extension XCTestCase {
         return extendedBuffer
     }
 
+    /// Helper to create a buffer out of a multi-channel audio file preserving the number of channels
+    func loadMultichannelAudio(fromPath audioFilePath: String) throws -> AVAudioPCMBuffer {
+        guard FileManager.default.fileExists(atPath: audioFilePath) else {
+            throw WhisperError.loadAudioFailed("Resource path does not exist \(audioFilePath)")
+        }
+
+        let audioFileURL = URL(fileURLWithPath: audioFilePath)
+
+        // Create an audio file with original format preserved
+        let audioFile = try AVAudioFile(forReading: audioFileURL)
+
+        // Create a buffer with the original format (preserving all channels)
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: audioFile.processingFormat,
+                                           frameCapacity: AVAudioFrameCount(audioFile.length)) else {
+            throw WhisperError.loadAudioFailed("Unable to create audio buffer")
+        }
+
+        // Read the entire file into the buffer
+        try audioFile.read(into: buffer)
+
+        return buffer
+    }
+
     /// Helper to measure channel processing operations
     func measureChannelProcessing(buffer: AVAudioPCMBuffer, mode: AudioInputConfig.ChannelMode, iterations: Int = 5) -> Double {
-        var totalTime: Double = 0
+        // Add warm-up iterations
+        for _ in 0..<3 {
+            _ = AudioProcessor.convertToMono(buffer, mode: mode)
+        }
 
+        var totalTime: Double = 0
+        // Then measure the actual timing
         for _ in 0..<iterations {
             let start = CFAbsoluteTimeGetCurrent()
             _ = AudioProcessor.convertToMono(buffer, mode: mode)
@@ -283,17 +317,6 @@ extension XCTestCase {
         }
 
         return totalTime / Double(iterations)
-    }
-
-    /// Format time for display in performance tests
-    func formatChannelProcessingTime(_ time: Double) -> String {
-        if time < 0.001 {
-            return String(format: "%.3f μs", time * 1_000_000)
-        } else if time < 1 {
-            return String(format: "%.3f ms", time * 1000)
-        } else {
-            return String(format: "%.3f s", time)
-        }
     }
 }
 
