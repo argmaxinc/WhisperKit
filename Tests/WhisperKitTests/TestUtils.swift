@@ -1,13 +1,13 @@
 //  For licensing see accompanying LICENSE.md file.
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
+import Accelerate
 import AVFAudio
 import Combine
 import CoreML
 import Foundation
 @testable import WhisperKit
 import XCTest
-import Accelerate
 
 enum TestError: Error {
     case missingFile(String)
@@ -263,12 +263,12 @@ extension XCTestCase {
 
                     // Use vDSP_mmov to copy memory blocks efficiently
                     vDSP_mmov(
-                        sourceData,                      // Source pointer
+                        sourceData, // Source pointer
                         targetData.advanced(by: targetOffset), // Destination pointer
-                        vDSP_Length(frameCount),         // Frame count
-                        1,                               // Number of channels (always 1 here since we're processing per channel)
-                        1,                               // Source stride
-                        1                                // Destination stride
+                        vDSP_Length(frameCount), // Frame count
+                        1, // Number of channels (always 1 here since we're processing per channel)
+                        1, // Source stride
+                        1 // Destination stride
                     )
                 }
             }
@@ -290,7 +290,8 @@ extension XCTestCase {
 
         // Create a buffer with the original format (preserving all channels)
         guard let buffer = AVAudioPCMBuffer(pcmFormat: audioFile.processingFormat,
-                                           frameCapacity: AVAudioFrameCount(audioFile.length)) else {
+                                            frameCapacity: AVAudioFrameCount(audioFile.length))
+        else {
             throw WhisperError.loadAudioFailed("Unable to create audio buffer")
         }
 

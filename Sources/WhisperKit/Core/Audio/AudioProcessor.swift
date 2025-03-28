@@ -551,12 +551,12 @@ public class AudioProcessor: NSObject, AudioProcessing {
         vDSP_vclr(monoChannelData[0], 1, vDSP_Length(frameLength))
 
         switch mode {
-            case .specificChannel(let channelIndex):
+            case let .specificChannel(channelIndex):
                 // Copy the specified channel, defaulting to first channel if out of range
                 let safeIndex = (channelIndex >= 0 && channelIndex < channelCount) ? channelIndex : 0
                 memcpy(monoChannelData[0], channelData[safeIndex], frameLength * MemoryLayout<Float>.size)
 
-            case .sumChannels(let channelIndices):
+            case let .sumChannels(channelIndices):
                 // Determine which channels to sum
                 let indicesToSum: [Int]
 
