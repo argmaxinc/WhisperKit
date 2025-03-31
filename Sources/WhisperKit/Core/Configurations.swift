@@ -175,7 +175,7 @@ public struct DecodingOptions: Codable {
         logProbThreshold: Float? = -1.0,
         firstTokenLogProbThreshold: Float? = -1.5,
         noSpeechThreshold: Float? = 0.6,
-        concurrentWorkerCount: Int = 16,
+        concurrentWorkerCount: Int? = nil,
         chunkingStrategy: ChunkingStrategy? = nil
     ) {
         self.verbose = verbose
@@ -202,7 +202,13 @@ public struct DecodingOptions: Codable {
         self.logProbThreshold = logProbThreshold
         self.firstTokenLogProbThreshold = firstTokenLogProbThreshold
         self.noSpeechThreshold = noSpeechThreshold
-        self.concurrentWorkerCount = concurrentWorkerCount
+        // Set platform-specific default worker count if not explicitly provided
+        // Non-macOS devices have shown regressions with >4 workers, default to 4 for safety
+        #if os(macOS)
+        self.concurrentWorkerCount = concurrentWorkerCount ?? 16
+        #else
+        self.concurrentWorkerCount = concurrentWorkerCount ?? 4
+        #endif
         self.chunkingStrategy = chunkingStrategy
     }
 }
