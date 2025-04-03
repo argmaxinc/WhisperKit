@@ -1,6 +1,8 @@
 //  For licensing see accompanying LICENSE.md file.
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
+import Accelerate
+import AVFAudio
 import Combine
 import CoreML
 import Foundation
@@ -236,6 +238,86 @@ extension XCTestCase {
         addTeardownBlock { [weak instance] in
             XCTAssertNil(instance, "Detected potential memory leak", file: file, line: line)
         }
+    }
+
+    /// Helper to create an extended audio buffer by repeating the original buffer
+    func createExtendedBuffer(from originalBuffer: AVAudioPCMBuffer, repeatCount: Int) -> AVAudioPCMBuffer {
+        let frameCount = originalBuffer.frameLength
+        let totalFrames = frameCount * AVAudioFrameCount(repeatCount)
+
+        // Create new buffer with same format but longer length
+        let extendedBuffer = AVAudioPCMBuffer(
+            pcmFormat: originalBuffer.format,
+            frameCapacity: totalFrames
+        )!
+        extendedBuffer.frameLength = totalFrames
+
+        // For each channel
+        for channel in 0..<originalBuffer.format.channelCount {
+            if let sourceData = originalBuffer.floatChannelData?[Int(channel)],
+               let targetData = extendedBuffer.floatChannelData?[Int(channel)]
+            {
+                // Use vDSP to fill the extended buffer with repeated copies
+                for i in 0..<repeatCount {
+                    let targetOffset = Int(i * Int(frameCount))
+
+                    // Use vDSP_mmov to copy memory blocks efficiently
+                    vDSP_mmov(
+                        sourceData, // Source pointer
+                        targetData.advanced(by: targetOffset), // Destination pointer
+                        vDSP_Length(frameCount), // Frame count
+                        1, // Number of channels (always 1 here since we're processing per channel)
+                        1, // Source stride
+                        1 // Destination stride
+                    )
+                }
+            }
+        }
+
+        return extendedBuffer
+    }
+
+    /// Helper to create a buffer out of a multi-channel audio file preserving the number of channels
+    func loadMultichannelAudio(fromPath audioFilePath: String) throws -> AVAudioPCMBuffer {
+        guard FileManager.default.fileExists(atPath: audioFilePath) else {
+            throw WhisperError.loadAudioFailed("Resource path does not exist \(audioFilePath)")
+        }
+
+        let audioFileURL = URL(fileURLWithPath: audioFilePath)
+
+        // Create an audio file with original format preserved
+        let audioFile = try AVAudioFile(forReading: audioFileURL)
+
+        // Create a buffer with the original format (preserving all channels)
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: audioFile.processingFormat,
+                                            frameCapacity: AVAudioFrameCount(audioFile.length))
+        else {
+            throw WhisperError.loadAudioFailed("Unable to create audio buffer")
+        }
+
+        // Read the entire file into the buffer
+        try audioFile.read(into: buffer)
+
+        return buffer
+    }
+
+    /// Helper to measure channel processing operations
+    func measureChannelProcessing(buffer: AVAudioPCMBuffer, mode: AudioInputConfig.ChannelMode, iterations: Int = 5) -> Double {
+        // Add warm-up iterations
+        for _ in 0..<3 {
+            _ = AudioProcessor.convertToMono(buffer, mode: mode)
+        }
+
+        var totalTime: Double = 0
+        // Then measure the actual timing
+        for _ in 0..<iterations {
+            let start = CFAbsoluteTimeGetCurrent()
+            _ = AudioProcessor.convertToMono(buffer, mode: mode)
+            let end = CFAbsoluteTimeGetCurrent()
+            totalTime += (end - start)
+        }
+
+        return totalTime / Double(iterations)
     }
 }
 

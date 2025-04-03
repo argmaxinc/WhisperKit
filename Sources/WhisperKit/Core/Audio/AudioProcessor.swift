@@ -12,6 +12,7 @@ public typealias DeviceID = AudioDeviceID
 #else
 public typealias DeviceID = String
 #endif
+public typealias ChannelMode = AudioInputConfig.ChannelMode
 
 public struct AudioDevice: Identifiable, Hashable {
     public let id: DeviceID
@@ -23,19 +24,43 @@ public struct AudioDevice: Identifiable, Hashable {
     }
 }
 
+/// Configuration for audio input including device selection and channel processing options.
+public struct AudioInputConfig {
+    /// Specifies how to handle audio channels when processing multi-channel audio.
+    public enum ChannelMode: Hashable, Codable {
+        /// Selects a single specific channel by index.
+        /// - Parameter index: The zero-based index of the channel to use.
+        ///                    0 selects the first channel, 1 selects the second, etc.
+        case specificChannel(Int)
+
+        /// Mixes all channels together with peak normalization if parameter is left `nil`.
+        /// - Parameter channels: Array of zero-based channel indices to mix.
+        ///                       For example, `[0, 2]` mixes just the first and third channels.
+        ///                       The resulting mono audio will maintain the same peak level as the
+        ///                       loudest original channel to prevent clipping.
+        case sumChannels([Int]?)
+    }
+
+    /// Specifies how to process channels from multi-channel audio sources.
+    /// Defaults to summing all channels if not explicitly set.
+    public var channelMode: ChannelMode = .sumChannels(nil)
+}
+
 public protocol AudioProcessing {
     /// Loads audio data from a specified file path.
     /// - Parameters:
     ///   - audioFilePath: The file path of the audio file.
+    ///   - channelMode: Channel Mode selected for loadAudio
     ///   - startTime: Optional start time in seconds to read from
     ///   - endTime: Optional end time in seconds to read until
     /// - Returns: `AVAudioPCMBuffer` containing the audio data.
-    static func loadAudio(fromPath audioFilePath: String, startTime: Double?, endTime: Double?, maxReadFrameSize: AVAudioFrameCount?) throws -> AVAudioPCMBuffer
+    static func loadAudio(fromPath audioFilePath: String, channelMode: ChannelMode, startTime: Double?, endTime: Double?, maxReadFrameSize: AVAudioFrameCount?) throws -> AVAudioPCMBuffer
 
     /// Loads and converts audio data from a specified file paths.
     /// - Parameter audioPaths: The file paths of the audio files.
+    /// - Parameter channelMode: Channel Mode selected for loadAudio
     /// - Returns: Array of `.success` if the file was loaded and converted correctly, otherwise `.failure`
-    static func loadAudio(at audioPaths: [String]) async -> [Result<[Float], Swift.Error>]
+    static func loadAudio(at audioPaths: [String], channelMode: ChannelMode) async -> [Result<[Float], Swift.Error>]
 
     ///  Pad or trim the audio data to the desired length.
     /// - Parameters:
@@ -189,6 +214,7 @@ public class AudioProcessor: NSObject, AudioProcessing {
 
     public static func loadAudio(
         fromPath audioFilePath: String,
+        channelMode: ChannelMode = .sumChannels(nil),
         startTime: Double? = 0,
         endTime: Double? = nil,
         maxReadFrameSize: AVAudioFrameCount? = nil
@@ -196,14 +222,14 @@ public class AudioProcessor: NSObject, AudioProcessing {
         guard FileManager.default.fileExists(atPath: audioFilePath) else {
             throw WhisperError.loadAudioFailed("Resource path does not exist \(audioFilePath)")
         }
-
         let audioFileURL = URL(fileURLWithPath: audioFilePath)
         let audioFile = try AVAudioFile(forReading: audioFileURL, commonFormat: .pcmFormatFloat32, interleaved: false)
-        return try loadAudio(fromFile: audioFile, startTime: startTime, endTime: endTime, maxReadFrameSize: maxReadFrameSize)
+        return try loadAudio(fromFile: audioFile, channelMode: channelMode, startTime: startTime, endTime: endTime, maxReadFrameSize: maxReadFrameSize)
     }
 
     public static func loadAudio(
         fromFile audioFile: AVAudioFile,
+        channelMode: ChannelMode = .sumChannels(nil),
         startTime: Double? = 0,
         endTime: Double? = nil,
         maxReadFrameSize: AVAudioFrameCount? = nil
@@ -241,8 +267,15 @@ public class AudioProcessor: NSObject, AudioProcessing {
             outputBuffer = buffer
         } else {
             // Audio needs resampling to 16khz
-            let maxReadFrameSize = maxReadFrameSize ?? Constants.defaultAudioReadFrameSize
-            outputBuffer = resampleAudio(fromFile: audioFile, toSampleRate: 16000, channelCount: 1, frameCount: frameCount, maxReadFrameSize: maxReadFrameSize)
+            let maxReadSize = maxReadFrameSize ?? Constants.defaultAudioReadFrameSize
+            outputBuffer = resampleAudio(
+                fromFile: audioFile,
+                toSampleRate: 16000,
+                channelCount: 1,
+                channelMode: channelMode,
+                frameCount: frameCount,
+                maxReadFrameSize: maxReadSize
+            )
         }
 
         if let outputBuffer = outputBuffer {
@@ -259,13 +292,13 @@ public class AudioProcessor: NSObject, AudioProcessing {
 
     public static func loadAudioAsFloatArray(
         fromPath audioFilePath: String,
+        channelMode: ChannelMode = .sumChannels(nil),
         startTime: Double? = 0,
         endTime: Double? = nil
     ) throws -> [Float] {
         guard FileManager.default.fileExists(atPath: audioFilePath) else {
             throw WhisperError.loadAudioFailed("Resource path does not exist \(audioFilePath)")
         }
-
         let audioFileURL = URL(fileURLWithPath: audioFilePath)
         let audioFile = try AVAudioFile(forReading: audioFileURL, commonFormat: .pcmFormatFloat32, interleaved: false)
         let inputSampleRate = audioFile.fileFormat.sampleRate
@@ -287,6 +320,7 @@ public class AudioProcessor: NSObject, AudioProcessing {
             try autoreleasepool {
                 let buffer = try loadAudio(
                     fromFile: audioFile,
+                    channelMode: channelMode,
                     startTime: currentTime,
                     endTime: chunkEnd
                 )
@@ -301,12 +335,12 @@ public class AudioProcessor: NSObject, AudioProcessing {
         return result
     }
 
-    public static func loadAudio(at audioPaths: [String]) async -> [Result<[Float], Swift.Error>] {
+    public static func loadAudio(at audioPaths: [String], channelMode: ChannelMode = .sumChannels(nil)) async -> [Result<[Float], Swift.Error>] {
         await withTaskGroup(of: [(index: Int, result: Result<[Float], Swift.Error>)].self) { taskGroup -> [Result<[Float], Swift.Error>] in
             for (index, audioPath) in audioPaths.enumerated() {
                 taskGroup.addTask {
                     do {
-                        let audio = try AudioProcessor.loadAudioAsFloatArray(fromPath: audioPath)
+                        let audio = try AudioProcessor.loadAudioAsFloatArray(fromPath: audioPath, channelMode: channelMode)
                         return [(index: index, result: .success(audio))]
                     } catch {
                         return [(index: index, result: .failure(error))]
@@ -334,6 +368,7 @@ public class AudioProcessor: NSObject, AudioProcessing {
         fromFile audioFile: AVAudioFile,
         toSampleRate sampleRate: Double,
         channelCount: AVAudioChannelCount,
+        channelMode: ChannelMode = .sumChannels(nil),
         frameCount: AVAudioFrameCount? = nil,
         maxReadFrameSize: AVAudioFrameCount = Constants.defaultAudioReadFrameSize
     ) -> AVAudioPCMBuffer? {
@@ -370,7 +405,15 @@ public class AudioProcessor: NSObject, AudioProcessing {
 
             do {
                 try audioFile.read(into: inputBuffer, frameCount: framesToRead)
-                guard let resampledChunk = resampleAudio(fromBuffer: inputBuffer,
+
+                // Convert to mono if needed
+                guard let monoChunk = convertToMono(inputBuffer, mode: channelMode) else {
+                    Logging.error("Failed to process audio channels")
+                    return nil
+                }
+
+                // Resample mono audio
+                guard let resampledChunk = resampleAudio(fromBuffer: monoChunk,
                                                          toSampleRate: outputFormat.sampleRate,
                                                          channelCount: outputFormat.channelCount)
                 else {
@@ -459,6 +502,112 @@ public class AudioProcessor: NSObject, AudioProcessing {
         }
 
         return convertedBuffer
+    }
+
+    /// Convert multi channel audio to mono based on the specified mode
+    /// - Parameters:
+    ///   - buffer: The input audio buffer with multiple channels
+    ///   - mode: The channel processing mode
+    /// - Returns: A mono-channel audio buffer
+    public static func convertToMono(_ buffer: AVAudioPCMBuffer, mode: ChannelMode) -> AVAudioPCMBuffer? {
+        let channelCount = Int(buffer.format.channelCount)
+        let frameLength = Int(buffer.frameLength)
+
+        if channelCount <= 1 {
+            // Early return, audio is already mono format
+            return buffer
+        }
+
+        guard let channelData = buffer.floatChannelData else {
+            Logging.error("Buffer did not contain floatChannelData.")
+            return nil
+        }
+
+        // Create a new single-channel buffer
+        guard let monoFormat = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: buffer.format.sampleRate,
+            channels: 1,
+            interleaved: false
+        ) else {
+            Logging.error("Failed to create AVAudioFormat object.")
+            return nil
+        }
+
+        guard let monoBuffer = AVAudioPCMBuffer(
+            pcmFormat: monoFormat,
+            frameCapacity: buffer.frameCapacity
+        ) else {
+            Logging.error("Failed to create mono buffer.")
+            return nil
+        }
+
+        monoBuffer.frameLength = buffer.frameLength
+
+        // Make sure mono buffer has channel data
+        guard let monoChannelData = monoBuffer.floatChannelData else { return buffer }
+
+        // Clear the buffer to ensure it starts with zeros
+        vDSP_vclr(monoChannelData[0], 1, vDSP_Length(frameLength))
+
+        switch mode {
+            case let .specificChannel(channelIndex):
+                // Copy the specified channel, defaulting to first channel if out of range
+                let safeIndex = (channelIndex >= 0 && channelIndex < channelCount) ? channelIndex : 0
+                memcpy(monoChannelData[0], channelData[safeIndex], frameLength * MemoryLayout<Float>.size)
+
+            case let .sumChannels(channelIndices):
+                // Determine which channels to sum
+                let indicesToSum: [Int]
+
+                if let indices = channelIndices, !indices.isEmpty {
+                    // Sum specific channels (filter out invalid indices)
+                    indicesToSum = indices.filter { $0 >= 0 && $0 < channelCount }
+
+                    // Handle case where all specified indices are invalid
+                    if indicesToSum.isEmpty {
+                        memcpy(monoChannelData[0], channelData[0], frameLength * MemoryLayout<Float>.size)
+                        Logging.debug("No valid channel indices provided, defaulting to first channel")
+                        return monoBuffer
+                    }
+                } else {
+                    // Sum all channels (nil or empty array provided)
+                    indicesToSum = Array(0..<channelCount)
+                }
+
+                // First, find the maximum peak across selected input channels
+                var maxOriginalPeak: Float = 0.0
+                for channelIndex in indicesToSum {
+                    var channelPeak: Float = 0.0
+                    vDSP_maxmgv(channelData[channelIndex], 1, &channelPeak, vDSP_Length(frameLength))
+                    maxOriginalPeak = max(maxOriginalPeak, channelPeak)
+                }
+
+                // Sum the specified channels
+                for channelIndex in indicesToSum {
+                    vDSP_vadd(
+                        monoChannelData[0], 1,
+                        channelData[channelIndex], 1,
+                        monoChannelData[0], 1,
+                        vDSP_Length(frameLength)
+                    )
+                }
+
+                // Find the peak in the mono mix
+                var monoPeak: Float = 0.0
+                vDSP_maxmgv(monoChannelData[0], 1, &monoPeak, vDSP_Length(frameLength))
+
+                // Scale based on peak ratio (avoid division by zero)
+                var scale = maxOriginalPeak / max(monoPeak, 0.0001)
+                vDSP_vsmul(
+                    monoChannelData[0], 1,
+                    &scale,
+                    monoChannelData[0], 1,
+                    vDSP_Length(frameLength)
+                )
+        }
+
+        return monoBuffer
     }
 
     // MARK: - Utility
@@ -584,7 +733,6 @@ public class AudioProcessor: NSObject, AudioProcessing {
 
         let frameLength = Int(buffer.frameLength)
         let startPointer = channelData[0]
-
         var result: [Float] = []
         result.reserveCapacity(frameLength) // Reserve the capacity to avoid multiple allocations
 
