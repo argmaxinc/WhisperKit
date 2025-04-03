@@ -118,7 +118,7 @@ open class WhisperKitConfig {
 ///   - promptTokens: Array of token IDs to use as the conditioning prompt for the decoder. These are prepended to the prefill tokens.
 ///   - prefixTokens: Array of token IDs to use as the initial prefix for the decoder. These are appended to the prefill tokens.
 ///   - suppressBlank: If true, blank tokens will be suppressed during decoding.
-///   - supressTokens: List of token IDs to suppress during decoding.
+///   - suppressTokens: List of token IDs to suppress during decoding.
 ///   - compressionRatioThreshold: If the compression ratio of the transcription text is above this value, it is too repetitive and treated as failed.
 ///   - logProbThreshold: If the average log probability over sampled tokens is below this value, treat as failed.
 ///   - firstTokenLogProbThreshold: If the log probability over the first sampled token is below this value, treat as failed.
@@ -145,7 +145,7 @@ public struct DecodingOptions: Codable {
     public var promptTokens: [Int]?
     public var prefixTokens: [Int]?
     public var suppressBlank: Bool
-    public var supressTokens: [Int]
+    public var suppressTokens: [Int]
     public var compressionRatioThreshold: Float?
     public var logProbThreshold: Float?
     public var firstTokenLogProbThreshold: Float?
@@ -173,7 +173,7 @@ public struct DecodingOptions: Codable {
         promptTokens: [Int]? = nil,
         prefixTokens: [Int]? = nil,
         suppressBlank: Bool = false,
-        supressTokens: [Int]? = nil,
+        suppressTokens: [Int]? = nil,
         compressionRatioThreshold: Float? = 2.4,
         logProbThreshold: Float? = -1.0,
         firstTokenLogProbThreshold: Float? = -1.5,
@@ -200,7 +200,7 @@ public struct DecodingOptions: Codable {
         self.promptTokens = promptTokens
         self.prefixTokens = prefixTokens
         self.suppressBlank = suppressBlank
-        self.supressTokens = supressTokens ?? [] // nonSpeechTokens() // TODO: implement these as default
+        self.suppressTokens = suppressTokens ?? [] // nonSpeechTokens() // TODO: implement these as default
         self.compressionRatioThreshold = compressionRatioThreshold
         self.logProbThreshold = logProbThreshold
         self.firstTokenLogProbThreshold = firstTokenLogProbThreshold
