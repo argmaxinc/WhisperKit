@@ -140,12 +140,12 @@ extension XCTestCase {
         file: StaticString = #file,
         line: UInt = #line
     ) async throws -> [TranscriptionResult] {
-        let modelPath: String
+        let modelName: String
         switch variant {
             case .largev3:
-                modelPath = try largev3ModelPath()
+                modelName = "large-v3"
             default:
-                modelPath = try tinyModelPath()
+                modelName = "tiny"
         }
         let computeOptions = ModelComputeOptions(
             melCompute: .cpuOnly,
@@ -153,7 +153,7 @@ extension XCTestCase {
             textDecoderCompute: .cpuOnly,
             prefillCompute: .cpuOnly
         )
-        let config = WhisperKitConfig(modelFolder: modelPath, computeOptions: computeOptions, verbose: true, logLevel: .debug)
+        let config = WhisperKitConfig(model: modelName, computeOptions: computeOptions, verbose: true, logLevel: .debug)
         let whisperKit = try await WhisperKit(config)
         trackForMemoryLeaks(on: whisperKit, file: file, line: line)
 
@@ -164,12 +164,9 @@ extension XCTestCase {
         return try await whisperKit.transcribe(audioPath: audioFileURL, decodeOptions: options, callback: callback)
     }
 
-    func tinyModelPath() throws -> String {
-        let modelDir = "whisperkit-coreml/openai_whisper-tiny"
-        guard let modelPath = Bundle.current.urls(forResourcesWithExtension: "mlmodelc", subdirectory: modelDir)?.first?.deletingLastPathComponent().path else {
-            throw TestError.missingFile("Failed to load model, ensure \"Models/\(modelDir)\" exists via Makefile command: `make download-models`")
-        }
-        return modelPath
+    func tinyModelPath() async throws -> String {
+        let modelDir = try await WhisperKit.download(variant: "tiny").path()
+        return modelDir
     }
 
     func largev3ModelPath() throws -> String {

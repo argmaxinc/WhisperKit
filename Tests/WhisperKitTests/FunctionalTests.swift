@@ -14,7 +14,7 @@ final class FunctionalTests: XCTestCase {
     }
 
     func testRealTimeFactorTiny() async throws {
-        let modelPath = try tinyModelPath()
+        let modelPath = try await tinyModelPath()
 
         let metrics: [XCTMetric] = [XCTMemoryMetric(), XCTStorageMetric(), XCTClockMetric()]
 
