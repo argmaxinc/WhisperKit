@@ -189,11 +189,14 @@ public struct ModelSupport: Codable, Equatable {
 }
 
 public struct DeviceSupport: Codable {
-    public let chips: [String]
+    /// Optional chip name string, intended for annotation only, e.g. "A16, A17"
+    public let chips: String?
+    /// Device identifiers, e.g. ["iPhone15,2", "iPhone15,3"]
     public let identifiers: [String]
+    /// Model support for the device identifiers provided
     public var models: ModelSupport
 
-    public init(chips: [String], identifiers: [String], models: ModelSupport) {
+    public init(chips: String? = nil, identifiers: [String], models: ModelSupport) {
         self.chips = chips
         self.identifiers = identifiers
         self.models = models
@@ -227,7 +230,9 @@ public struct ModelSupportConfig: Codable {
         self.repoName = repoName
         self.repoVersion = repoVersion
 
-        if includeFallback {
+        // Only use fallback for associated model repo
+        if includeFallback,
+           Constants.fallbackModelSupportConfig.repoName.contains(repoName) {
             self.deviceSupports = Self.mergeDeviceSupport(remote: deviceSupports, fallback: Constants.fallbackModelSupportConfig.deviceSupports)
             self.knownModels = self.deviceSupports.flatMap { $0.models.supported }.orderedSet
         } else {
@@ -237,7 +242,6 @@ public struct ModelSupportConfig: Codable {
 
         // Add default device support with all models supported for unknown devices
         self.defaultSupport = DeviceSupport(
-            chips: [],
             identifiers: [],
             models: ModelSupport(
                 default: "openai_whisper-base",
@@ -1599,7 +1603,7 @@ public enum Constants {
             repoVersion: "0.3",
             deviceSupports: [
                 DeviceSupport(
-                    chips: ["A12, A13, S9, S10"],
+                    chips: "A12, A13, S9, S10",
                     identifiers: [
                         "iPhone11",
                         "iPhone12",
@@ -1617,7 +1621,7 @@ public enum Constants {
                     )
                 ),
                 DeviceSupport(
-                    chips: ["A14"],
+                    chips: "A14",
                     identifiers: [
                         "iPhone13",
                         "iPad13,1",
@@ -1638,7 +1642,7 @@ public enum Constants {
                     )
                 ),
                 DeviceSupport(
-                    chips: ["A15, A16, A17 Pro, A18"],
+                    chips: "A15, A16, A17 Pro, A18",
                     identifiers: [
                         "iPhone14",
                         "iPhone15",
@@ -1672,7 +1676,7 @@ public enum Constants {
                     )
                 ),
                 DeviceSupport(
-                    chips: ["M1"],
+                    chips: "M1",
                     identifiers: [
                         "MacBookPro17,1",
                         "MacBookPro18,1",
@@ -1696,7 +1700,7 @@ public enum Constants {
                         "iPad13,17"
                     ],
                     models: ModelSupport(
-                        default: "openai_whisper-large-v3-v20240930",
+                        default: "openai_whisper-large-v3-v20240930_626MB",
                         supported: [
                             "openai_whisper-tiny",
                             "openai_whisper-tiny.en",
@@ -1716,7 +1720,7 @@ public enum Constants {
                     )
                 ),
                 DeviceSupport(
-                    chips: ["M2, M3, M4"],
+                    chips: "M2, M3, M4",
                     identifiers: [
                         "Mac14",
                         "Mac15",

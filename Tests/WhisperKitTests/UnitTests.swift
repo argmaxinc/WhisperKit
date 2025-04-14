@@ -37,7 +37,7 @@ final class UnitTests: XCTestCase {
     func testModelSupportConfigFallback() {
         let fallbackRepoConfig = Constants.fallbackModelSupportConfig
         XCTAssertEqual(fallbackRepoConfig.repoName, "whisperkit-coreml-fallback")
-        XCTAssertEqual(fallbackRepoConfig.repoVersion, "0.2")
+        XCTAssertEqual(fallbackRepoConfig.repoVersion, "0.3")
         XCTAssertGreaterThanOrEqual(fallbackRepoConfig.deviceSupports.count, 5)
 
         // Test that all device supports have their disabled models set except devices that should support all known models
@@ -56,9 +56,73 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(defaultSupport.models.supported.sorted(), Constants.knownModels.sorted())
     }
 
-    func testModelSupportConfigFromJson() throws {
+    func testModelSupportConfigFallbackMergingFromJSON() throws {
+        let sameRepoConfig = ModelSupportConfig(
+            repoName: "whisperkit-coreml",
+            repoVersion: "0.3",
+            deviceSupports: [DeviceSupport(
+                identifiers: ["some_new_device"],
+                models: ModelSupport(
+                    default: "some_default",
+                    supported: ["some_non_default"]
+                )
+            )],
+        )
+
+        // Support from same repo should be merged
+        XCTAssertEqual(sameRepoConfig.repoName, "whisperkit-coreml")
+        XCTAssertEqual(sameRepoConfig.repoVersion, "0.3")
+        XCTAssertEqual(sameRepoConfig.deviceSupports.count, 6)
+
+        let differentRepoConfig = ModelSupportConfig(
+            repoName: "whisperkit-somerepo",
+            repoVersion: "0.3",
+            deviceSupports: [DeviceSupport(
+                identifiers: ["some_new_device"],
+                models: ModelSupport(
+                    default: "some_default",
+                    supported: ["some_non_default"]
+                )
+            )],
+        )
+
+        // Support from a different repo should not be merged
+        XCTAssertEqual(differentRepoConfig.repoName, "whisperkit-somerepo")
+        XCTAssertEqual(differentRepoConfig.repoVersion, "0.3")
+        XCTAssertEqual(differentRepoConfig.deviceSupports.count, 1)
+    }
+
+    func testModelSupportConfigv02FromJson() throws {
         let configFilePath = try XCTUnwrap(
-            Bundle.current.path(forResource: "config", ofType: "json"),
+            Bundle.current.path(forResource: "config-v02", ofType: "json"),
+            "Config file not found"
+        )
+
+        let jsonData = try Data(contentsOf: URL(fileURLWithPath: configFilePath))
+        let decoder = JSONDecoder()
+        let loadedConfig = try decoder.decode(ModelSupportConfig.self, from: jsonData)
+
+        // Compare loaded config with fallback config
+        XCTAssertEqual(loadedConfig.repoName, "whisperkit-coreml")
+        XCTAssertLessThan(loadedConfig.repoVersion, Constants.fallbackModelSupportConfig.repoVersion)
+        XCTAssertEqual(loadedConfig.deviceSupports.count, Constants.fallbackModelSupportConfig.deviceSupports.count)
+
+        // Compare device supports
+        for (loadedDeviceSupport, fallbackDeviceSupport) in zip(loadedConfig.deviceSupports, Constants.fallbackModelSupportConfig.deviceSupports) {
+            let loadedSupport = Set(loadedDeviceSupport.models.supported)
+            let fallbackSupport = Set(fallbackDeviceSupport.models.supported)
+            let loadedDisabled = Set(loadedDeviceSupport.models.disabled)
+            let fallbackDisabled = Set(fallbackDeviceSupport.models.disabled)
+            XCTAssertTrue(loadedSupport.isSubset(of: fallbackSupport),
+                          "Supported models should be a subset of fallback models for \(loadedDeviceSupport.identifiers), found missing model(s): \(loadedSupport.subtracting(fallbackSupport))")
+            XCTAssertTrue(loadedDisabled.isSubset(of: fallbackDisabled),
+                          "Disabled models should be a subset of fallback models for \(loadedDeviceSupport.identifiers), found missing model(s): \(loadedDisabled.subtracting(fallbackDisabled))")
+        }
+    }
+
+    func testModelSupportConfigv03FromJson() throws {
+        let configFilePath = try XCTUnwrap(
+            Bundle.current.path(forResource: "config-v03", ofType: "json"),
             "Config file not found"
         )
 
@@ -103,7 +167,6 @@ final class UnitTests: XCTestCase {
         let newModel = "some_new_model"
         let newDevice = "some_new_device"
         let newDeviceSupport = config.deviceSupports + [DeviceSupport(
-            chips: [],
             identifiers: [newDevice],
             models: ModelSupport(
                 default: "openai_whisper-base",
@@ -130,10 +193,9 @@ final class UnitTests: XCTestCase {
         let knownLocalModel = Constants.fallbackModelSupportConfig.modelSupport(for: "iPhone13,1").supported.first!
         let remoteModel = "remote_model"
         let remoteConfig = ModelSupportConfig(
-            repoName: "test",
+            repoName: "whisperkit-coreml",
             repoVersion: "test",
             deviceSupports: [DeviceSupport(
-                chips: [],
                 identifiers: ["test_device"],
                 models: ModelSupport(
                     default: remoteModel,
