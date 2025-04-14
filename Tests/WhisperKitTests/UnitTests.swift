@@ -57,9 +57,8 @@ final class UnitTests: XCTestCase {
     }
 
     func testModelSupportConfigFromJson() throws {
-        print(Bundle.current.bundlePath)
         let configFilePath = try XCTUnwrap(
-            Bundle.current.path(forResource: "config", ofType: "json"),
+            Bundle.current(for: self).path(forResource: "config", ofType: "json"),
             "Config file not found"
         )
 
@@ -191,7 +190,7 @@ final class UnitTests: XCTestCase {
 
     func testAudioFileLoading() throws {
         let audioFilePath = try XCTUnwrap(
-            Bundle.current.path(forResource: "jfk", ofType: "wav"),
+            Bundle.current(for: self).path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
         let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
@@ -212,7 +211,7 @@ final class UnitTests: XCTestCase {
 
     func testAudioFileLoadingWithResampling() throws {
         let audioFilePath = try XCTUnwrap(
-            Bundle.current.path(forResource: "jfk_441khz", ofType: "m4a"),
+            Bundle.current(for: self).path(forResource: "jfk_441khz", ofType: "m4a"),
             "Audio file not found"
         )
         let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
@@ -257,7 +256,7 @@ final class UnitTests: XCTestCase {
 
     func testAudioResample() throws {
         let audioFileURL = try XCTUnwrap(
-            Bundle.current.url(forResource: "jfk", withExtension: "wav"),
+            Bundle.current(for: self).url(forResource: "jfk", withExtension: "wav"),
             "Audio file not found"
         )
         let audioFile = try AVAudioFile(forReading: audioFileURL)
@@ -276,7 +275,7 @@ final class UnitTests: XCTestCase {
 
     func testAudioResampleFromFile() throws {
         let audioFileURL = try XCTUnwrap(
-            Bundle.current.url(forResource: "jfk", withExtension: "wav"),
+            Bundle.current(for: self).url(forResource: "jfk", withExtension: "wav"),
             "Audio file not found"
         )
         let audioFile = try AVAudioFile(forReading: audioFileURL)
@@ -807,7 +806,7 @@ final class UnitTests: XCTestCase {
         let whisperKit = try await WhisperKit(config)
 
         let audioFilePath = try XCTUnwrap(
-            Bundle.current.path(forResource: "jfk", ofType: "wav"),
+            Bundle.current(for: self).path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
         let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
@@ -934,7 +933,7 @@ final class UnitTests: XCTestCase {
         let whisperKit = try await WhisperKit(config)
 
         let audioFilePath = try XCTUnwrap(
-            Bundle.current.path(forResource: "es_test_clip", ofType: "wav"),
+            Bundle.current(for: self).path(forResource: "es_test_clip", ofType: "wav"),
             "Audio file not found"
         )
 
@@ -1009,7 +1008,7 @@ final class UnitTests: XCTestCase {
         let whisperKit = try await WhisperKit(config)
 
         let audioFilePath = try XCTUnwrap(
-            Bundle.current.path(forResource: "ja_test_clip", ofType: "wav"),
+            Bundle.current(for: self).path(forResource: "ja_test_clip", ofType: "wav"),
             "Audio file not found"
         )
 
@@ -1060,7 +1059,7 @@ final class UnitTests: XCTestCase {
 
         for language in targetLanguages {
             let audioFilePath = try XCTUnwrap(
-                Bundle.current.path(forResource: "\(language)_test_clip", ofType: "wav"),
+                Bundle.current(for: self).path(forResource: "\(language)_test_clip", ofType: "wav"),
                 "Audio file not found"
             )
 
@@ -1253,7 +1252,7 @@ final class UnitTests: XCTestCase {
         // Run the full pipeline
         try await whisperKit.loadModels()
         let audioFilePath = try XCTUnwrap(
-            Bundle.current.path(forResource: "jfk", ofType: "wav"),
+            Bundle.current(for: self).path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
         let _ = try await whisperKit.transcribe(audioPath: audioFilePath)
@@ -1270,7 +1269,7 @@ final class UnitTests: XCTestCase {
                 prefillCompute: .cpuOnly
             )
 
-            let config = try WhisperKitConfig(
+            let config = WhisperKitConfig(
                 model: "tiny",
                 computeOptions: computeOptions,
                 verbose: true,
@@ -1281,7 +1280,7 @@ final class UnitTests: XCTestCase {
 
             try await whisperKit.loadModels()
             let audioFilePath = try XCTUnwrap(
-                Bundle.current.path(forResource: "jfk", ofType: "wav"),
+                Bundle.current(for: self).path(forResource: "jfk", ofType: "wav"),
                 "Audio file not found"
             )
 
@@ -1550,7 +1549,7 @@ final class UnitTests: XCTestCase {
         XCTAssertTrue(vad.voiceActivity(in: []).isEmpty)
 
         let audioFilePath = try XCTUnwrap(
-            Bundle.current.path(forResource: "jfk", ofType: "wav"),
+            Bundle.current(for: self).path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
         let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
@@ -1656,7 +1655,7 @@ final class UnitTests: XCTestCase {
         let windowSamples = 480_000
 
         let singleChunkPath = try XCTUnwrap(
-            Bundle.current.path(forResource: "jfk", ofType: "wav"),
+            Bundle.current(for: self).path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
         var audioBuffer = try AudioProcessor.loadAudio(fromPath: singleChunkPath)
@@ -1671,7 +1670,7 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(audioChunks.count, 1)
 
         let multiChunkPath = try XCTUnwrap(
-            Bundle.current.path(forResource: "ted_60", ofType: "m4a"),
+            Bundle.current(for: self).path(forResource: "ted_60", ofType: "m4a"),
             "Audio file not found"
         )
         audioBuffer = try AudioProcessor.loadAudio(fromPath: multiChunkPath)
@@ -1726,8 +1725,12 @@ final class UnitTests: XCTestCase {
                     XCTAssertLessThan(previous, current)
                 }
             }
+        let vadAudioPath = try XCTUnwrap(
+            Bundle.current(for: self).path(forResource: "ted_60", ofType: "m4a"),
+            "Audio file not found"
+        )
         _ = try await pipe.transcribe(
-            audioPath: Bundle.current.path(forResource: "ted_60", ofType: "m4a")!,
+            audioPath: vadAudioPath,
             decodeOptions: .init(chunkingStrategy: .vad)
         )
         cancellable?.cancel()
@@ -2281,7 +2284,7 @@ final class UnitTests: XCTestCase {
 
         let startTime = Date()
         let audioComponents = audioFile.components(separatedBy: ".")
-        guard let audioFileURL = Bundle.current.path(forResource: audioComponents.first, ofType: audioComponents.last) else {
+        guard let audioFileURL = Bundle.current(for: self).path(forResource: audioComponents.first, ofType: audioComponents.last) else {
             XCTFail("Audio file not found")
             return
         }
