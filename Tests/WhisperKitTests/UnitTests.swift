@@ -66,7 +66,7 @@ final class UnitTests: XCTestCase {
                     default: "some_default",
                     supported: ["some_non_default"]
                 )
-            )],
+            )]
         )
 
         // Support from same repo should be merged
@@ -83,7 +83,7 @@ final class UnitTests: XCTestCase {
                     default: "some_default",
                     supported: ["some_non_default"]
                 )
-            )],
+            )]
         )
 
         // Support from a different repo should not be merged
