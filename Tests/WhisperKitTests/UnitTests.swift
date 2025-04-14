@@ -103,6 +103,7 @@ final class UnitTests: XCTestCase {
         let newModel = "some_new_model"
         let newDevice = "some_new_device"
         let newDeviceSupport = config.deviceSupports + [DeviceSupport(
+            chips: [],
             identifiers: [newDevice],
             models: ModelSupport(
                 default: "openai_whisper-base",
@@ -132,6 +133,7 @@ final class UnitTests: XCTestCase {
             repoName: "test",
             repoVersion: "test",
             deviceSupports: [DeviceSupport(
+                chips: [],
                 identifiers: ["test_device"],
                 models: ModelSupport(
                     default: remoteModel,
