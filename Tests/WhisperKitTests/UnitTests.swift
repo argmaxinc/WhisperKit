@@ -37,7 +37,7 @@ final class UnitTests: XCTestCase {
     func testModelSupportConfigFallback() {
         let fallbackRepoConfig = Constants.fallbackModelSupportConfig
         XCTAssertEqual(fallbackRepoConfig.repoName, "whisperkit-coreml-fallback")
-        XCTAssertEqual(fallbackRepoConfig.repoVersion, "0.2")
+        XCTAssertEqual(fallbackRepoConfig.repoVersion, "0.3")
         XCTAssertGreaterThanOrEqual(fallbackRepoConfig.deviceSupports.count, 5)
 
         // Test that all device supports have their disabled models set except devices that should support all known models
@@ -56,9 +56,73 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(defaultSupport.models.supported.sorted(), Constants.knownModels.sorted())
     }
 
-    func testModelSupportConfigFromJson() throws {
+    func testModelSupportConfigFallbackMergingFromJSON() throws {
+        let sameRepoConfig = ModelSupportConfig(
+            repoName: "whisperkit-coreml",
+            repoVersion: "0.3",
+            deviceSupports: [DeviceSupport(
+                identifiers: ["some_new_device"],
+                models: ModelSupport(
+                    default: "some_default",
+                    supported: ["some_non_default"]
+                )
+            )]
+        )
+
+        // Support from same repo should be merged
+        XCTAssertEqual(sameRepoConfig.repoName, "whisperkit-coreml")
+        XCTAssertEqual(sameRepoConfig.repoVersion, "0.3")
+        XCTAssertEqual(sameRepoConfig.deviceSupports.count, 6)
+
+        let differentRepoConfig = ModelSupportConfig(
+            repoName: "whisperkit-somerepo",
+            repoVersion: "0.3",
+            deviceSupports: [DeviceSupport(
+                identifiers: ["some_new_device"],
+                models: ModelSupport(
+                    default: "some_default",
+                    supported: ["some_non_default"]
+                )
+            )]
+        )
+
+        // Support from a different repo should not be merged
+        XCTAssertEqual(differentRepoConfig.repoName, "whisperkit-somerepo")
+        XCTAssertEqual(differentRepoConfig.repoVersion, "0.3")
+        XCTAssertEqual(differentRepoConfig.deviceSupports.count, 1)
+    }
+
+    func testModelSupportConfigv02FromJson() throws {
         let configFilePath = try XCTUnwrap(
-            Bundle.current(for: self).path(forResource: "config", ofType: "json"),
+            Bundle.current(for: self).path(forResource: "config-v02", ofType: "json"),
+            "Config file not found"
+        )
+
+        let jsonData = try Data(contentsOf: URL(fileURLWithPath: configFilePath))
+        let decoder = JSONDecoder()
+        let loadedConfig = try decoder.decode(ModelSupportConfig.self, from: jsonData)
+
+        // Compare loaded config with fallback config
+        XCTAssertEqual(loadedConfig.repoName, "whisperkit-coreml")
+        XCTAssertLessThan(loadedConfig.repoVersion, Constants.fallbackModelSupportConfig.repoVersion)
+        XCTAssertEqual(loadedConfig.deviceSupports.count, Constants.fallbackModelSupportConfig.deviceSupports.count)
+
+        // Compare device supports
+        for (loadedDeviceSupport, fallbackDeviceSupport) in zip(loadedConfig.deviceSupports, Constants.fallbackModelSupportConfig.deviceSupports) {
+            let loadedSupport = Set(loadedDeviceSupport.models.supported)
+            let fallbackSupport = Set(fallbackDeviceSupport.models.supported)
+            let loadedDisabled = Set(loadedDeviceSupport.models.disabled)
+            let fallbackDisabled = Set(fallbackDeviceSupport.models.disabled)
+            XCTAssertTrue(loadedSupport.isSubset(of: fallbackSupport),
+                          "Supported models should be a subset of fallback models for \(loadedDeviceSupport.identifiers), found missing model(s): \(loadedSupport.subtracting(fallbackSupport))")
+            XCTAssertTrue(loadedDisabled.isSubset(of: fallbackDisabled),
+                          "Disabled models should be a subset of fallback models for \(loadedDeviceSupport.identifiers), found missing model(s): \(loadedDisabled.subtracting(fallbackDisabled))")
+        }
+    }
+
+    func testModelSupportConfigv03FromJson() throws {
+        let configFilePath = try XCTUnwrap(
+            Bundle.current(for: self).path(forResource: "config-v03", ofType: "json"),
             "Config file not found"
         )
 
@@ -129,7 +193,7 @@ final class UnitTests: XCTestCase {
         let knownLocalModel = Constants.fallbackModelSupportConfig.modelSupport(for: "iPhone13,1").supported.first!
         let remoteModel = "remote_model"
         let remoteConfig = ModelSupportConfig(
-            repoName: "test",
+            repoName: "whisperkit-coreml",
             repoVersion: "test",
             deviceSupports: [DeviceSupport(
                 identifiers: ["test_device"],
@@ -2358,5 +2422,105 @@ final class UnitTests: XCTestCase {
         Logging.info("[testStreamingTimestamps] Done")
 
         XCTAssertEqual(finalWords.normalized, " And so my fellow Americans. Ask not what your country can do for you ask what you can do for your country.".normalized)
+    }
+
+    // MARK: - Audio Channel Processing Tests
+
+    func testAudioInputModeChannelModeAllChannels() async throws {
+        // Use a single 8-channel audio file
+        let audioPath = try XCTUnwrap(
+            Bundle.module.path(forResource: "8_Channel_ID", ofType: "m4a"),
+            "8-channel audio file not found"
+        )
+        let modelPath = try tinyModelPath()
+
+        // .sumChannels is default for AudioInputConfig
+        let config = WhisperKitConfig(modelFolder: modelPath, verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(config)
+
+        let result: TranscriptionResult = try await whisperKit.transcribe(audioPath: audioPath).first!
+        let expectedText = "front left front right center back left back right"
+        let containsExpectedText = result.text.normalized.contains(expectedText)
+        XCTAssert(containsExpectedText, "Expected text not found in transcription and the transcription was \(result)")
+    }
+
+    func testAudioInputModeChannelModeSumSpecificChannels() async throws {
+        // Use a single 8-channel audio file
+        let audioPath = try XCTUnwrap(
+            Bundle.module.path(forResource: "8_Channel_ID", ofType: "m4a"),
+            "8-channel audio file not found"
+        )
+        let modelPath = try tinyModelPath()
+
+        let config = WhisperKitConfig(modelFolder: modelPath, audioInputConfig: AudioInputConfig(channelMode: .sumChannels([1, 3, 5])), verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(config)
+
+        let result: TranscriptionResult = try await whisperKit.transcribe(audioPath: audioPath).first!
+        let expectedText = "front left"
+        let containsExpectedText = result.text.normalized.contains(expectedText)
+        XCTAssert(containsExpectedText, "Expected text not found in transcription and the transcription was \(result)")
+    }
+
+    func testAudioInputModeChannelModeSpecificChannel() async throws {
+        // Use a single 8-channel audio file
+        let audioPath = try XCTUnwrap(
+            Bundle.module.path(forResource: "8_Channel_ID", ofType: "m4a"),
+            "8-channel audio file not found"
+        )
+        let modelPath = try tinyModelPath()
+
+        let config = WhisperKitConfig(modelFolder: modelPath, audioInputConfig: AudioInputConfig(channelMode: .specificChannel(0)), verbose: true, logLevel: .debug)
+        let whisperKit = try await WhisperKit(config)
+
+        let result: TranscriptionResult = try await whisperKit.transcribe(audioPath: audioPath).first!
+        let expectedText = "center"
+        let containsExpectedText = result.text.normalized.contains(expectedText)
+        XCTAssert(containsExpectedText, "Expected text not found in transcription and the transcription was \(result)")
+    }
+
+    func testChannelProcessingLargeFile() throws {
+        // Use a single 8-channel audio file
+        let audioPath = try XCTUnwrap(
+            Bundle.module.path(forResource: "8_Channel_ID", ofType: "m4a"),
+            "8-channel audio file not found"
+        )
+        var failureCount = 0
+        // Load the audio file
+        let originalBuffer = try loadMultichannelAudio(fromPath: audioPath)
+
+        // Create a longer buffer by looping the audio
+        let repeatCount = 10 * 60 / 8 // Creates ~10 mins of audio (assuming 8-second original)
+        let extendedBuffer = createExtendedBuffer(from: originalBuffer, repeatCount: repeatCount)
+
+        // Define channel counts to test - ASCENDING ORDER
+        let channelCounts = [1, 2, 4, 8] // Testing from fewest to most channels
+        let iterations = 5
+        for _ in channelCounts {
+            let time = measureChannelProcessing(buffer: extendedBuffer, mode: .specificChannel(0), iterations: iterations)
+            // Single channel extraction should be fast regardless of source channels
+            XCTAssertLessThan(time, 2.0, "Single channel extraction should complete in under 2 seconds")
+        }
+
+        // Test summing different numbers of channels
+        var previousTime: Double? = nil
+
+        for channelCount in channelCounts {
+            let channelIndices = Array(0..<channelCount)
+            let time = measureChannelProcessing(buffer: extendedBuffer, mode: .sumChannels(channelIndices), iterations: iterations)
+            if let prevTime = previousTime {
+                let previousChannelCount = channelCounts[channelCounts.firstIndex(of: channelCount)! - 1]
+
+                // Check if processing time decreased
+                if time < prevTime {
+                    if failureCount == 0 {
+                        failureCount += 1
+                    } else {
+                        // If this is the second or later failure, fail the test
+                        XCTFail("Processing time decreased multiple times: from \(previousChannelCount) to \(channelCount) channels (\(prevTime) → \(time))")
+                    }
+                }
+            }
+            previousTime = time
+        }
     }
 }

@@ -51,7 +51,6 @@ class RegressionTests: XCTestCase {
     let vadDecodingOptions = DecodingOptions(
         verbose: true,
         task: .transcribe,
-        concurrentWorkerCount: 16,
         chunkingStrategy: .vad
     )
 

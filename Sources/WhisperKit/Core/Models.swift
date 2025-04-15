@@ -189,10 +189,15 @@ public struct ModelSupport: Codable, Equatable {
 }
 
 public struct DeviceSupport: Codable {
+    /// Optional chip name string, intended for annotation only, e.g. "A16, A17"
+    public let chips: String?
+    /// Device identifiers, e.g. ["iPhone15,2", "iPhone15,3"]
     public let identifiers: [String]
+    /// Model support for the device identifiers provided
     public var models: ModelSupport
 
-    public init(identifiers: [String], models: ModelSupport) {
+    public init(chips: String? = nil, identifiers: [String], models: ModelSupport) {
+        self.chips = chips
         self.identifiers = identifiers
         self.models = models
     }
@@ -225,7 +230,9 @@ public struct ModelSupportConfig: Codable {
         self.repoName = repoName
         self.repoVersion = repoVersion
 
-        if includeFallback {
+        // Only use fallback for associated model repo
+        if includeFallback,
+           Constants.fallbackModelSupportConfig.repoName.contains(repoName) {
             self.deviceSupports = Self.mergeDeviceSupport(remote: deviceSupports, fallback: Constants.fallbackModelSupportConfig.deviceSupports)
             self.knownModels = self.deviceSupports.flatMap { $0.models.supported }.orderedSet
         } else {
@@ -275,7 +282,7 @@ public struct ModelSupportConfig: Codable {
                     default: remoteSupport.models.default,
                     supported: (remoteSupport.models.supported + fallbackSupport.models.supported).orderedSet
                 )
-                mergedSupports.append(DeviceSupport(identifiers: remoteSupport.identifiers, models: mergedModels))
+                mergedSupports.append(DeviceSupport(chips: remoteSupport.chips, identifiers: remoteSupport.identifiers, models: mergedModels))
             } else {
                 mergedSupports.append(remoteSupport)
             }
@@ -1593,10 +1600,16 @@ public enum Constants {
     public static let fallbackModelSupportConfig: ModelSupportConfig = {
         var config = ModelSupportConfig(
             repoName: "whisperkit-coreml-fallback",
-            repoVersion: "0.2",
+            repoVersion: "0.3",
             deviceSupports: [
                 DeviceSupport(
-                    identifiers: ["iPhone11", "iPhone12", "Watch7", "Watch8"],
+                    chips: "A12, A13, S9, S10",
+                    identifiers: [
+                        "iPhone11",
+                        "iPhone12",
+                        "Watch7",
+                        "Watch8"
+                    ],
                     models: ModelSupport(
                         default: "openai_whisper-tiny",
                         supported: [
@@ -1608,7 +1621,14 @@ public enum Constants {
                     )
                 ),
                 DeviceSupport(
-                    identifiers: ["iPhone13", "iPad13,18", "iPad13,1"],
+                    chips: "A14",
+                    identifiers: [
+                        "iPhone13",
+                        "iPad13,1",
+                        "iPad13,2",
+                        "iPad13,18",
+                        "iPad13,19"
+                    ],
                     models: ModelSupport(
                         default: "openai_whisper-base",
                         supported: [
@@ -1622,7 +1642,19 @@ public enum Constants {
                     )
                 ),
                 DeviceSupport(
-                    identifiers: ["iPhone14", "iPhone15", "iPhone16", "iPhone17", "iPad14,1", "iPad14,2"],
+                    chips: "A15, A16, A17 Pro, A18",
+                    identifiers: [
+                        "iPhone14",
+                        "iPhone15",
+                        "iPhone16",
+                        "iPhone17",
+                        "iPad14,1",
+                        "iPad14,2",
+                        "iPad15,7",
+                        "iPad15,8",
+                        "iPad16,1",
+                        "iPad16,2"
+                    ],
                     models: ModelSupport(
                         default: "openai_whisper-base",
                         supported: [
@@ -1644,19 +1676,31 @@ public enum Constants {
                     )
                 ),
                 DeviceSupport(
+                    chips: "M1",
                     identifiers: [
-                        "Mac13",
-                        "iMac21",
+                        "MacBookPro17,1",
+                        "MacBookPro18,1",
+                        "MacBookPro18,2",
+                        "MacBookPro18,3",
+                        "MacBookPro18,4",
                         "MacBookAir10,1",
-                        "MacBookPro17",
-                        "MacBookPro18",
-                        "Macmini9",
-                        "iPad13,16",
+                        "Macmini9,1",
+                        "iMac21,1",
+                        "iMac21,2",
+                        "Mac13",
                         "iPad13,4",
+                        "iPad13,5",
+                        "iPad13,6",
+                        "iPad13,7",
                         "iPad13,8",
+                        "iPad13,9",
+                        "iPad13,10",
+                        "iPad13,11",
+                        "iPad13,16",
+                        "iPad13,17"
                     ],
                     models: ModelSupport(
-                        default: "openai_whisper-large-v3-v20240930",
+                        default: "openai_whisper-large-v3-v20240930_626MB",
                         supported: [
                             "openai_whisper-tiny",
                             "openai_whisper-tiny.en",
@@ -1676,6 +1720,7 @@ public enum Constants {
                     )
                 ),
                 DeviceSupport(
+                    chips: "M2, M3, M4",
                     identifiers: [
                         "Mac14",
                         "Mac15",
@@ -1688,6 +1733,7 @@ public enum Constants {
                         "iPad14,9",
                         "iPad14,10",
                         "iPad14,11",
+                        "iPad15",
                         "iPad16",
                     ],
                     models: ModelSupport(

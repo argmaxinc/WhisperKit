@@ -22,9 +22,10 @@ open class WhisperKitConfig {
 
     /// Model compute options, see `ModelComputeOptions`
     public var computeOptions: ModelComputeOptions?
+    /// Audio input config to define how to process audio input
+    public var audioInputConfig: AudioInputConfig?
     /// Audio processor for the model
     public var audioProcessor: (any AudioProcessing)?
-    /// Audio processor for the model
     public var featureExtractor: (any FeatureExtracting)?
     public var audioEncoder: (any AudioEncoding)?
     public var textDecoder: (any TextDecoding)?
@@ -53,6 +54,7 @@ open class WhisperKitConfig {
                 modelFolder: String? = nil,
                 tokenizerFolder: URL? = nil,
                 computeOptions: ModelComputeOptions? = nil,
+                audioInputConfig: AudioInputConfig? = nil,
                 audioProcessor: (any AudioProcessing)? = nil,
                 featureExtractor: (any FeatureExtracting)? = nil,
                 audioEncoder: (any AudioEncoding)? = nil,
@@ -74,6 +76,7 @@ open class WhisperKitConfig {
         self.modelFolder = modelFolder
         self.tokenizerFolder = tokenizerFolder
         self.computeOptions = computeOptions
+        self.audioInputConfig = audioInputConfig
         self.audioProcessor = audioProcessor
         self.featureExtractor = featureExtractor
         self.audioEncoder = audioEncoder
@@ -175,7 +178,7 @@ public struct DecodingOptions: Codable {
         logProbThreshold: Float? = -1.0,
         firstTokenLogProbThreshold: Float? = -1.5,
         noSpeechThreshold: Float? = 0.6,
-        concurrentWorkerCount: Int = 16,
+        concurrentWorkerCount: Int? = nil,
         chunkingStrategy: ChunkingStrategy? = nil
     ) {
         self.verbose = verbose
@@ -202,7 +205,13 @@ public struct DecodingOptions: Codable {
         self.logProbThreshold = logProbThreshold
         self.firstTokenLogProbThreshold = firstTokenLogProbThreshold
         self.noSpeechThreshold = noSpeechThreshold
-        self.concurrentWorkerCount = concurrentWorkerCount
+        // Set platform-specific default worker count if not explicitly provided
+        // Non-macOS devices have shown regressions with >4 workers, default to 4 for safety
+        #if os(macOS)
+        self.concurrentWorkerCount = concurrentWorkerCount ?? 16
+        #else
+        self.concurrentWorkerCount = concurrentWorkerCount ?? 4
+        #endif
         self.chunkingStrategy = chunkingStrategy
     }
 }
