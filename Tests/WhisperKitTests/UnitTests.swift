@@ -27,7 +27,7 @@ final class UnitTests: XCTestCase {
 
     func testInitTiny() async throws {
         try await XCTUnwrapAsync(
-            await WhisperKit(modelFolder: tinyModelPath(), logLevel: .error),
+            await WhisperKit(model: "tiny", logLevel: .error),
             "Failed to init WhisperKit"
         )
     }
@@ -94,7 +94,7 @@ final class UnitTests: XCTestCase {
 
     func testModelSupportConfigv02FromJson() throws {
         let configFilePath = try XCTUnwrap(
-            Bundle.current.path(forResource: "config-v02", ofType: "json"),
+            Bundle.current(for: self).path(forResource: "config-v02", ofType: "json"),
             "Config file not found"
         )
 
@@ -122,7 +122,7 @@ final class UnitTests: XCTestCase {
 
     func testModelSupportConfigv03FromJson() throws {
         let configFilePath = try XCTUnwrap(
-            Bundle.current.path(forResource: "config-v03", ofType: "json"),
+            Bundle.current(for: self).path(forResource: "config-v03", ofType: "json"),
             "Config file not found"
         )
 
@@ -254,7 +254,7 @@ final class UnitTests: XCTestCase {
 
     func testAudioFileLoading() throws {
         let audioFilePath = try XCTUnwrap(
-            Bundle.current.path(forResource: "jfk", ofType: "wav"),
+            Bundle.current(for: self).path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
         let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
@@ -275,7 +275,7 @@ final class UnitTests: XCTestCase {
 
     func testAudioFileLoadingWithResampling() throws {
         let audioFilePath = try XCTUnwrap(
-            Bundle.current.path(forResource: "jfk_441khz", ofType: "m4a"),
+            Bundle.current(for: self).path(forResource: "jfk_441khz", ofType: "m4a"),
             "Audio file not found"
         )
         let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
@@ -320,7 +320,7 @@ final class UnitTests: XCTestCase {
 
     func testAudioResample() throws {
         let audioFileURL = try XCTUnwrap(
-            Bundle.current.url(forResource: "jfk", withExtension: "wav"),
+            Bundle.current(for: self).url(forResource: "jfk", withExtension: "wav"),
             "Audio file not found"
         )
         let audioFile = try AVAudioFile(forReading: audioFileURL)
@@ -339,7 +339,7 @@ final class UnitTests: XCTestCase {
 
     func testAudioResampleFromFile() throws {
         let audioFileURL = try XCTUnwrap(
-            Bundle.current.url(forResource: "jfk", withExtension: "wav"),
+            Bundle.current(for: self).url(forResource: "jfk", withExtension: "wav"),
             "Audio file not found"
         )
         let audioFile = try AVAudioFile(forReading: audioFileURL)
@@ -427,7 +427,7 @@ final class UnitTests: XCTestCase {
 
     func testEncodeFeatureWithGenericType() async throws {
         let audioEncoder = AudioEncoder()
-        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "AudioEncoder.mlmodelc")
+        let modelPath = try await URL(filePath: tinyModelPath()).appending(path: "AudioEncoder.mlmodelc")
         try await audioEncoder.loadModel(at: modelPath, computeUnits: .cpuAndNeuralEngine)
 
         // Create a test input that conforms to FeatureExtractorOutputType
@@ -449,7 +449,7 @@ final class UnitTests: XCTestCase {
 
     func testEncodeFeatureWithInvalidType() async throws {
         let audioEncoder = AudioEncoder()
-        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "AudioEncoder.mlmodelc")
+        let modelPath = try await URL(filePath: tinyModelPath()).appending(path: "AudioEncoder.mlmodelc")
         try await audioEncoder.loadModel(at: modelPath, computeUnits: .cpuAndNeuralEngine)
 
         // Create an invalid input type
@@ -471,7 +471,7 @@ final class UnitTests: XCTestCase {
 
     func testPredictLogitsWithGenericType() async throws {
         let textDecoder = TextDecoder()
-        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        let modelPath = try await URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
 
         // Create test inputs
@@ -494,7 +494,7 @@ final class UnitTests: XCTestCase {
 
     func testPredictLogitsWithInvalidType() async throws {
         let textDecoder = TextDecoder()
-        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        let modelPath = try await URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
 
         // Create an invalid input type
@@ -611,7 +611,7 @@ final class UnitTests: XCTestCase {
             "Failed to pad audio samples"
         )
         let featureExtractor = FeatureExtractor()
-        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "MelSpectrogram.mlmodelc")
+        let modelPath = try await URL(filePath: tinyModelPath()).appending(path: "MelSpectrogram.mlmodelc")
         try await featureExtractor.loadModel(at: modelPath, computeUnits: ModelComputeOptions().melCompute)
         let melSpectrogram = try await XCTUnwrapAsync(
             await featureExtractor.logMelSpectrogram(fromAudio: paddedSamples),
@@ -650,7 +650,7 @@ final class UnitTests: XCTestCase {
 
     func testEncoderOutput() async throws {
         let audioEncoder = AudioEncoder()
-        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "AudioEncoder.mlmodelc")
+        let modelPath = try await URL(filePath: tinyModelPath()).appending(path: "AudioEncoder.mlmodelc")
         try? await audioEncoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().audioEncoderCompute)
 
         let encoderInput = try MLMultiArray(shape: [1, 80, 1, 3000], dataType: .float16)
@@ -666,7 +666,7 @@ final class UnitTests: XCTestCase {
     func testDecoderOutput() async throws {
         let textDecoder = TextDecoder()
         let decodingOptions = DecodingOptions()
-        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        let modelPath = try await URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         await XCTAssertNoThrowAsync(
             try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute),
             "Failed to load the model"
@@ -704,7 +704,7 @@ final class UnitTests: XCTestCase {
             noSpeechThreshold: nil
         )
         let textDecoder = TextDecoder()
-        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        let modelPath = try await URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
         textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
 
@@ -728,7 +728,7 @@ final class UnitTests: XCTestCase {
             noSpeechThreshold: nil
         )
         let textDecoder = TextDecoder()
-        let modelPath = try URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
+        let modelPath = try await URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
         textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
 
@@ -860,17 +860,11 @@ final class UnitTests: XCTestCase {
     }
 
     func testWindowing() async throws {
-        let computeOptions = ModelComputeOptions(
-            melCompute: .cpuOnly
-        )
-        let config = try WhisperKitConfig(modelFolder: tinyModelPath(),
-                                          computeOptions: computeOptions,
-                                          verbose: true,
-                                          logLevel: .debug)
+        let config = WhisperKitConfig(model: "tiny", verbose: true, logLevel: .debug)
         let whisperKit = try await WhisperKit(config)
 
         let audioFilePath = try XCTUnwrap(
-            Bundle.current.path(forResource: "jfk", ofType: "wav"),
+            Bundle.current(for: self).path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
         let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
@@ -993,11 +987,11 @@ final class UnitTests: XCTestCase {
 
     func testDetectSpanish() async throws {
         let targetLanguage = "es"
-        let config = try WhisperKitConfig(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let config = WhisperKitConfig(model: "tiny", verbose: true, logLevel: .debug)
         let whisperKit = try await WhisperKit(config)
 
         let audioFilePath = try XCTUnwrap(
-            Bundle.current.path(forResource: "es_test_clip", ofType: "wav"),
+            Bundle.current(for: self).path(forResource: "es_test_clip", ofType: "wav"),
             "Audio file not found"
         )
 
@@ -1068,11 +1062,11 @@ final class UnitTests: XCTestCase {
 
     func testDetectJapanese() async throws {
         let targetLanguage = "ja"
-        let config = try WhisperKitConfig(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let config = WhisperKitConfig(model: "tiny", verbose: true, logLevel: .debug)
         let whisperKit = try await WhisperKit(config)
 
         let audioFilePath = try XCTUnwrap(
-            Bundle.current.path(forResource: "ja_test_clip", ofType: "wav"),
+            Bundle.current(for: self).path(forResource: "ja_test_clip", ofType: "wav"),
             "Audio file not found"
         )
 
@@ -1118,12 +1112,12 @@ final class UnitTests: XCTestCase {
 
     func testDetectLanguageHelperMethod() async throws {
         let targetLanguages = ["es", "ja"]
-        let config = try WhisperKitConfig(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let config = WhisperKitConfig(model: "tiny", verbose: true, logLevel: .debug)
         let whisperKit = try await WhisperKit(config)
 
         for language in targetLanguages {
             let audioFilePath = try XCTUnwrap(
-                Bundle.current.path(forResource: "\(language)_test_clip", ofType: "wav"),
+                Bundle.current(for: self).path(forResource: "\(language)_test_clip", ofType: "wav"),
                 "Audio file not found"
             )
 
@@ -1177,7 +1171,7 @@ final class UnitTests: XCTestCase {
     }
 
     func testSilence() async throws {
-        let config = try WhisperKitConfig(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let config = WhisperKitConfig(model: "tiny", verbose: true, logLevel: .debug)
         let whisperKit = try await WhisperKit(config)
         let audioSamples = [Float](repeating: 0.0, count: 30 * 16000)
         let options = DecodingOptions(usePrefillPrompt: false, skipSpecialTokens: false)
@@ -1190,7 +1184,7 @@ final class UnitTests: XCTestCase {
     }
 
     func testTemperatureIncrement() async throws {
-        let config = try WhisperKitConfig(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let config = WhisperKitConfig(model: "tiny", verbose: true, logLevel: .debug)
         let whisperKit = try await WhisperKit(config)
 
         // Generate random audio samples
@@ -1254,7 +1248,7 @@ final class UnitTests: XCTestCase {
     }
 
     func testPromptTokens() async throws {
-        let config = try WhisperKitConfig(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let config = WhisperKitConfig(model: "tiny", verbose: true, logLevel: .debug, load: true)
         let whisperKit = try await WhisperKit(config)
         let promptText = " prompt to encourage output without any punctuation and without capitalizing americans as if it was already normalized"
         let tokenizer = try XCTUnwrap(whisperKit.tokenizer)
@@ -1271,7 +1265,7 @@ final class UnitTests: XCTestCase {
     }
 
     func testPrefixTokens() async throws {
-        let config = try WhisperKitConfig(modelFolder: tinyModelPath(), verbose: true, logLevel: .debug)
+        let config = WhisperKitConfig(model: "tiny", verbose: true, logLevel: .debug, load: true)
         let whisperKit = try await WhisperKit(config)
         // Prefix to encourage output without any punctuation and without capitalizing americans as if it was already normalized
         let prefixText = " and so my fellow americans"
@@ -1288,8 +1282,8 @@ final class UnitTests: XCTestCase {
     }
 
     func testCallbacks() async throws {
-        let config = try WhisperKitConfig(
-            modelFolder: tinyModelPath(),
+        let config = WhisperKitConfig(
+            model: "tiny",
             verbose: true,
             logLevel: .debug,
             load: false
@@ -1316,7 +1310,7 @@ final class UnitTests: XCTestCase {
         // Run the full pipeline
         try await whisperKit.loadModels()
         let audioFilePath = try XCTUnwrap(
-            Bundle.current.path(forResource: "jfk", ofType: "wav"),
+            Bundle.current(for: self).path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
         let _ = try await whisperKit.transcribe(audioPath: audioFilePath)
@@ -1326,16 +1320,8 @@ final class UnitTests: XCTestCase {
 
     func testCallbackWithEarlyStopping() async throws {
         let callbackTestTask = Task(priority: .userInitiated) {
-            let computeOptions = ModelComputeOptions(
-                melCompute: .cpuOnly,
-                audioEncoderCompute: .cpuOnly,
-                textDecoderCompute: .cpuOnly,
-                prefillCompute: .cpuOnly
-            )
-
-            let config = try WhisperKitConfig(
-                modelFolder: tinyModelPath(),
-                computeOptions: computeOptions,
+            let config = WhisperKitConfig(
+                model: "tiny",
                 verbose: true,
                 logLevel: .debug,
                 load: false
@@ -1344,7 +1330,7 @@ final class UnitTests: XCTestCase {
 
             try await whisperKit.loadModels()
             let audioFilePath = try XCTUnwrap(
-                Bundle.current.path(forResource: "jfk", ofType: "wav"),
+                Bundle.current(for: self).path(forResource: "jfk", ofType: "wav"),
                 "Audio file not found"
             )
 
@@ -1613,7 +1599,7 @@ final class UnitTests: XCTestCase {
         XCTAssertTrue(vad.voiceActivity(in: []).isEmpty)
 
         let audioFilePath = try XCTUnwrap(
-            Bundle.current.path(forResource: "jfk", ofType: "wav"),
+            Bundle.current(for: self).path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
         let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
@@ -1719,7 +1705,7 @@ final class UnitTests: XCTestCase {
         let windowSamples = 480_000
 
         let singleChunkPath = try XCTUnwrap(
-            Bundle.current.path(forResource: "jfk", ofType: "wav"),
+            Bundle.current(for: self).path(forResource: "jfk", ofType: "wav"),
             "Audio file not found"
         )
         var audioBuffer = try AudioProcessor.loadAudio(fromPath: singleChunkPath)
@@ -1734,7 +1720,7 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(audioChunks.count, 1)
 
         let multiChunkPath = try XCTUnwrap(
-            Bundle.current.path(forResource: "ted_60", ofType: "m4a"),
+            Bundle.current(for: self).path(forResource: "ted_60", ofType: "m4a"),
             "Audio file not found"
         )
         audioBuffer = try AudioProcessor.loadAudio(fromPath: multiChunkPath)
@@ -1789,8 +1775,12 @@ final class UnitTests: XCTestCase {
                     XCTAssertLessThan(previous, current)
                 }
             }
+        let vadAudioPath = try XCTUnwrap(
+            Bundle.current(for: self).path(forResource: "ted_60", ofType: "m4a"),
+            "Audio file not found"
+        )
         _ = try await pipe.transcribe(
-            audioPath: Bundle.current.path(forResource: "ted_60", ofType: "m4a")!,
+            audioPath: vadAudioPath,
             decodeOptions: .init(chunkingStrategy: .vad)
         )
         cancellable?.cancel()
@@ -2337,14 +2327,14 @@ final class UnitTests: XCTestCase {
     func testStreamingTimestamps() async throws {
         let options = DecodingOptions(usePrefillPrompt: true, wordTimestamps: true)
         let audioFile = "jfk.wav"
-        let modelPath = try tinyModelPath()
+        let modelPath = try await tinyModelPath()
 
         let config = WhisperKitConfig(modelFolder: modelPath, /* computeOptions: computeOptions,*/ verbose: true, logLevel: .debug)
         let whisperKit = try await WhisperKit(config)
 
         let startTime = Date()
         let audioComponents = audioFile.components(separatedBy: ".")
-        guard let audioFileURL = Bundle.current.path(forResource: audioComponents.first, ofType: audioComponents.last) else {
+        guard let audioFileURL = Bundle.current(for: self).path(forResource: audioComponents.first, ofType: audioComponents.last) else {
             XCTFail("Audio file not found")
             return
         }
@@ -2425,10 +2415,10 @@ final class UnitTests: XCTestCase {
     func testAudioInputModeChannelModeAllChannels() async throws {
         // Use a single 8-channel audio file
         let audioPath = try XCTUnwrap(
-            Bundle.module.path(forResource: "8_Channel_ID", ofType: "m4a"),
+            Bundle.current(for: self).path(forResource: "8_Channel_ID", ofType: "m4a"),
             "8-channel audio file not found"
         )
-        let modelPath = try tinyModelPath()
+        let modelPath = try await tinyModelPath()
 
         // .sumChannels is default for AudioInputConfig
         let config = WhisperKitConfig(modelFolder: modelPath, verbose: true, logLevel: .debug)
@@ -2443,10 +2433,10 @@ final class UnitTests: XCTestCase {
     func testAudioInputModeChannelModeSumSpecificChannels() async throws {
         // Use a single 8-channel audio file
         let audioPath = try XCTUnwrap(
-            Bundle.module.path(forResource: "8_Channel_ID", ofType: "m4a"),
+            Bundle.current(for: self).path(forResource: "8_Channel_ID", ofType: "m4a"),
             "8-channel audio file not found"
         )
-        let modelPath = try tinyModelPath()
+        let modelPath = try await tinyModelPath()
 
         let config = WhisperKitConfig(modelFolder: modelPath, audioInputConfig: AudioInputConfig(channelMode: .sumChannels([1, 3, 5])), verbose: true, logLevel: .debug)
         let whisperKit = try await WhisperKit(config)
@@ -2460,10 +2450,10 @@ final class UnitTests: XCTestCase {
     func testAudioInputModeChannelModeSpecificChannel() async throws {
         // Use a single 8-channel audio file
         let audioPath = try XCTUnwrap(
-            Bundle.module.path(forResource: "8_Channel_ID", ofType: "m4a"),
+            Bundle.current(for: self).path(forResource: "8_Channel_ID", ofType: "m4a"),
             "8-channel audio file not found"
         )
-        let modelPath = try tinyModelPath()
+        let modelPath = try await tinyModelPath()
 
         let config = WhisperKitConfig(modelFolder: modelPath, audioInputConfig: AudioInputConfig(channelMode: .specificChannel(0)), verbose: true, logLevel: .debug)
         let whisperKit = try await WhisperKit(config)
@@ -2477,7 +2467,7 @@ final class UnitTests: XCTestCase {
     func testChannelProcessingLargeFile() throws {
         // Use a single 8-channel audio file
         let audioPath = try XCTUnwrap(
-            Bundle.module.path(forResource: "8_Channel_ID", ofType: "m4a"),
+            Bundle.current(for: self).path(forResource: "8_Channel_ID", ofType: "m4a"),
             "8-channel audio file not found"
         )
         var failureCount = 0

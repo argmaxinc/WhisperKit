@@ -79,11 +79,16 @@ func XCTAssertNoThrowAsync(
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 extension Bundle {
-    static var current: Bundle {
+    static func current(for classObject: AnyObject? = nil) -> Bundle {
         #if SWIFT_PACKAGE
         return Bundle.module
         #else
-        return Bundle.main
+        // Use bundle for class type if passed in
+        if let classObject = classObject {
+            return Bundle(for: type(of: classObject))
+        } else {
+            return Bundle.main
+        }
         #endif
     }
 }
@@ -142,41 +147,32 @@ extension XCTestCase {
         file: StaticString = #file,
         line: UInt = #line
     ) async throws -> [TranscriptionResult] {
-        let modelPath: String
+        let modelName: String
         switch variant {
             case .largev3:
-                modelPath = try largev3ModelPath()
+                modelName = "large-v3"
             default:
-                modelPath = try tinyModelPath()
+                modelName = "tiny"
         }
-        let computeOptions = ModelComputeOptions(
-            melCompute: .cpuOnly,
-            audioEncoderCompute: .cpuOnly,
-            textDecoderCompute: .cpuOnly,
-            prefillCompute: .cpuOnly
-        )
-        let config = WhisperKitConfig(modelFolder: modelPath, computeOptions: computeOptions, verbose: true, logLevel: .debug)
+        let config = WhisperKitConfig(model: modelName, verbose: true, logLevel: .debug)
         let whisperKit = try await WhisperKit(config)
         trackForMemoryLeaks(on: whisperKit, file: file, line: line)
 
         let audioComponents = audioFile.components(separatedBy: ".")
-        guard let audioFileURL = Bundle.current.path(forResource: audioComponents.first, ofType: audioComponents.last) else {
+        guard let audioFileURL = Bundle.current(for: self).path(forResource: audioComponents.first, ofType: audioComponents.last) else {
             throw TestError.missingFile("Missing audio file")
         }
         return try await whisperKit.transcribe(audioPath: audioFileURL, decodeOptions: options, callback: callback)
     }
 
-    func tinyModelPath() throws -> String {
-        let modelDir = "whisperkit-coreml/openai_whisper-tiny"
-        guard let modelPath = Bundle.current.urls(forResourcesWithExtension: "mlmodelc", subdirectory: modelDir)?.first?.deletingLastPathComponent().path else {
-            throw TestError.missingFile("Failed to load model, ensure \"Models/\(modelDir)\" exists via Makefile command: `make download-models`")
-        }
-        return modelPath
+    func tinyModelPath() async throws -> String {
+        let modelDir = try await WhisperKit.download(variant: "tiny").path()
+        return modelDir
     }
 
     func largev3ModelPath() throws -> String {
         let modelDir = "whisperkit-coreml/openai_whisper-large-v3" // use faster to compile model for tests
-        guard let modelPath = Bundle.current.urls(forResourcesWithExtension: "mlmodelc", subdirectory: modelDir)?.first?.deletingLastPathComponent().path else {
+        guard let modelPath = Bundle.current(for: self).urls(forResourcesWithExtension: "mlmodelc", subdirectory: modelDir)?.first?.deletingLastPathComponent().path else {
             throw TestError.missingFile("Failed to load model, ensure \"Models/\(modelDir)\" exists via Makefile command: `make download-models`")
         }
         return modelPath
@@ -184,7 +180,7 @@ extension XCTestCase {
 
     func largev3TurboModelPath() throws -> String {
         let modelDir = "whisperkit-coreml/openai_whisper-large-v3_turbo"
-        guard let modelPath = Bundle.current.urls(forResourcesWithExtension: "mlmodelc", subdirectory: modelDir)?.first?.deletingLastPathComponent().path else {
+        guard let modelPath = Bundle.current(for: self).urls(forResourcesWithExtension: "mlmodelc", subdirectory: modelDir)?.first?.deletingLastPathComponent().path else {
             throw TestError.missingFile("Failed to load model, ensure \"Models/\(modelDir)\" exists via Makefile command: `make download-models`")
         }
         return modelPath
@@ -195,7 +191,7 @@ extension XCTestCase {
         var modelPaths: [String] = []
         let directory = "whisperkit-coreml"
         let resourceKeys: [URLResourceKey] = [.isDirectoryKey]
-        guard let baseurl = Bundle.current.resourceURL?.appendingPathComponent(directory) else {
+        guard let baseurl = Bundle.current(for: self).resourceURL?.appendingPathComponent(directory) else {
             throw TestError.missingDirectory("Base URL for directory \(directory) not found.")
         }
         let directoryContents = try fileManager.contentsOfDirectory(at: baseurl, includingPropertiesForKeys: resourceKeys, options: .skipsHiddenFiles)
