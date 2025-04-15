@@ -2429,10 +2429,10 @@ final class UnitTests: XCTestCase {
     func testAudioInputModeChannelModeAllChannels() async throws {
         // Use a single 8-channel audio file
         let audioPath = try XCTUnwrap(
-            Bundle.module.path(forResource: "8_Channel_ID", ofType: "m4a"),
+            Bundle.current(for: self).path(forResource: "8_Channel_ID", ofType: "m4a"),
             "8-channel audio file not found"
         )
-        let modelPath = try tinyModelPath()
+        let modelPath = try await tinyModelPath()
 
         // .sumChannels is default for AudioInputConfig
         let config = WhisperKitConfig(modelFolder: modelPath, verbose: true, logLevel: .debug)
@@ -2447,10 +2447,10 @@ final class UnitTests: XCTestCase {
     func testAudioInputModeChannelModeSumSpecificChannels() async throws {
         // Use a single 8-channel audio file
         let audioPath = try XCTUnwrap(
-            Bundle.module.path(forResource: "8_Channel_ID", ofType: "m4a"),
+            Bundle.current(for: self).path(forResource: "8_Channel_ID", ofType: "m4a"),
             "8-channel audio file not found"
         )
-        let modelPath = try tinyModelPath()
+        let modelPath = try await tinyModelPath()
 
         let config = WhisperKitConfig(modelFolder: modelPath, audioInputConfig: AudioInputConfig(channelMode: .sumChannels([1, 3, 5])), verbose: true, logLevel: .debug)
         let whisperKit = try await WhisperKit(config)
@@ -2464,10 +2464,10 @@ final class UnitTests: XCTestCase {
     func testAudioInputModeChannelModeSpecificChannel() async throws {
         // Use a single 8-channel audio file
         let audioPath = try XCTUnwrap(
-            Bundle.module.path(forResource: "8_Channel_ID", ofType: "m4a"),
+            Bundle.current(for: self).path(forResource: "8_Channel_ID", ofType: "m4a"),
             "8-channel audio file not found"
         )
-        let modelPath = try tinyModelPath()
+        let modelPath = try await tinyModelPath()
 
         let config = WhisperKitConfig(modelFolder: modelPath, audioInputConfig: AudioInputConfig(channelMode: .specificChannel(0)), verbose: true, logLevel: .debug)
         let whisperKit = try await WhisperKit(config)
@@ -2481,7 +2481,7 @@ final class UnitTests: XCTestCase {
     func testChannelProcessingLargeFile() throws {
         // Use a single 8-channel audio file
         let audioPath = try XCTUnwrap(
-            Bundle.module.path(forResource: "8_Channel_ID", ofType: "m4a"),
+            Bundle.current(for: self).path(forResource: "8_Channel_ID", ofType: "m4a"),
             "8-channel audio file not found"
         )
         var failureCount = 0
