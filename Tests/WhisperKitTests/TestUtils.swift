@@ -154,13 +154,7 @@ extension XCTestCase {
             default:
                 modelName = "tiny"
         }
-        let computeOptions = ModelComputeOptions(
-            melCompute: .cpuOnly,
-            audioEncoderCompute: .cpuOnly,
-            textDecoderCompute: .cpuOnly,
-            prefillCompute: .cpuOnly
-        )
-        let config = WhisperKitConfig(model: modelName, computeOptions: computeOptions, verbose: true, logLevel: .debug)
+        let config = WhisperKitConfig(model: modelName, verbose: true, logLevel: .debug)
         let whisperKit = try await WhisperKit(config)
         trackForMemoryLeaks(on: whisperKit, file: file, line: line)
 

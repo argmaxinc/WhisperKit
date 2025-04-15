@@ -860,13 +860,7 @@ final class UnitTests: XCTestCase {
     }
 
     func testWindowing() async throws {
-        let computeOptions = ModelComputeOptions(
-            melCompute: .cpuOnly
-        )
-        let config = try WhisperKitConfig(model: "tiny",
-                                          computeOptions: computeOptions,
-                                          verbose: true,
-                                          logLevel: .debug)
+        let config = WhisperKitConfig(model: "tiny", verbose: true, logLevel: .debug)
         let whisperKit = try await WhisperKit(config)
 
         let audioFilePath = try XCTUnwrap(
@@ -993,7 +987,7 @@ final class UnitTests: XCTestCase {
 
     func testDetectSpanish() async throws {
         let targetLanguage = "es"
-        let config = try WhisperKitConfig(model: "tiny", verbose: true, logLevel: .debug)
+        let config = WhisperKitConfig(model: "tiny", verbose: true, logLevel: .debug)
         let whisperKit = try await WhisperKit(config)
 
         let audioFilePath = try XCTUnwrap(
@@ -1068,7 +1062,7 @@ final class UnitTests: XCTestCase {
 
     func testDetectJapanese() async throws {
         let targetLanguage = "ja"
-        let config = try WhisperKitConfig(model: "tiny", verbose: true, logLevel: .debug)
+        let config = WhisperKitConfig(model: "tiny", verbose: true, logLevel: .debug)
         let whisperKit = try await WhisperKit(config)
 
         let audioFilePath = try XCTUnwrap(
@@ -1118,7 +1112,7 @@ final class UnitTests: XCTestCase {
 
     func testDetectLanguageHelperMethod() async throws {
         let targetLanguages = ["es", "ja"]
-        let config = try WhisperKitConfig(model: "tiny", verbose: true, logLevel: .debug)
+        let config = WhisperKitConfig(model: "tiny", verbose: true, logLevel: .debug)
         let whisperKit = try await WhisperKit(config)
 
         for language in targetLanguages {
@@ -1177,7 +1171,7 @@ final class UnitTests: XCTestCase {
     }
 
     func testSilence() async throws {
-        let config = try WhisperKitConfig(model: "tiny", verbose: true, logLevel: .debug)
+        let config = WhisperKitConfig(model: "tiny", verbose: true, logLevel: .debug)
         let whisperKit = try await WhisperKit(config)
         let audioSamples = [Float](repeating: 0.0, count: 30 * 16000)
         let options = DecodingOptions(usePrefillPrompt: false, skipSpecialTokens: false)
@@ -1190,7 +1184,7 @@ final class UnitTests: XCTestCase {
     }
 
     func testTemperatureIncrement() async throws {
-        let config = try WhisperKitConfig(model: "tiny", verbose: true, logLevel: .debug)
+        let config = WhisperKitConfig(model: "tiny", verbose: true, logLevel: .debug)
         let whisperKit = try await WhisperKit(config)
 
         // Generate random audio samples
@@ -1254,7 +1248,7 @@ final class UnitTests: XCTestCase {
     }
 
     func testPromptTokens() async throws {
-        let config = try WhisperKitConfig(model: "tiny", verbose: true, logLevel: .debug, load: true)
+        let config = WhisperKitConfig(model: "tiny", verbose: true, logLevel: .debug, load: true)
         let whisperKit = try await WhisperKit(config)
         let promptText = " prompt to encourage output without any punctuation and without capitalizing americans as if it was already normalized"
         let tokenizer = try XCTUnwrap(whisperKit.tokenizer)
@@ -1271,7 +1265,7 @@ final class UnitTests: XCTestCase {
     }
 
     func testPrefixTokens() async throws {
-        let config = try WhisperKitConfig(model: "tiny", verbose: true, logLevel: .debug, load: true)
+        let config = WhisperKitConfig(model: "tiny", verbose: true, logLevel: .debug, load: true)
         let whisperKit = try await WhisperKit(config)
         // Prefix to encourage output without any punctuation and without capitalizing americans as if it was already normalized
         let prefixText = " and so my fellow americans"
@@ -1288,7 +1282,7 @@ final class UnitTests: XCTestCase {
     }
 
     func testCallbacks() async throws {
-        let config = try WhisperKitConfig(
+        let config = WhisperKitConfig(
             model: "tiny",
             verbose: true,
             logLevel: .debug,
@@ -1326,16 +1320,8 @@ final class UnitTests: XCTestCase {
 
     func testCallbackWithEarlyStopping() async throws {
         let callbackTestTask = Task(priority: .userInitiated) {
-            let computeOptions = ModelComputeOptions(
-                melCompute: .cpuOnly,
-                audioEncoderCompute: .cpuOnly,
-                textDecoderCompute: .cpuOnly,
-                prefillCompute: .cpuOnly
-            )
-
             let config = WhisperKitConfig(
                 model: "tiny",
-                computeOptions: computeOptions,
                 verbose: true,
                 logLevel: .debug,
                 load: false
