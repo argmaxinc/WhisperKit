@@ -218,6 +218,78 @@ final class UnitTests: XCTestCase {
         }
     }
 
+    func testModelSupportForiOSDevices() throws {
+        let defaultDevicesList = [
+            // --- iPads ---
+            "iPad2,1", "iPad2,2", "iPad2,3", "iPad2,4", "iPad2,5", "iPad2,6", "iPad2,7",
+            "iPad3,1", "iPad3,2", "iPad3,3", "iPad3,4", "iPad3,5", "iPad3,6",
+            "iPad4,1", "iPad4,2", "iPad4,3", "iPad4,4", "iPad4,5", "iPad4,6", "iPad4,7", "iPad4,8", "iPad4,9",
+            "iPad5,1", "iPad5,2", "iPad5,3", "iPad5,4", "iPad6,11", "iPad6,12", "iPad6,3", "iPad6,4", "iPad6,7", "iPad6,8",
+            "iPad7,1", "iPad7,2", "iPad7,3", "iPad7,4", "iPad7,5", "iPad7,6", "iPad7,11", "iPad7,12",
+            "iPad8,1", "iPad8,2", "iPad8,3", "iPad8,4", "iPad8,5", "iPad8,6", "iPad8,7", "iPad8,8", "iPad8,9", "iPad8,10", "iPad8,11", "iPad8,12",
+            "iPad11,1", "iPad11,2", "iPad11,3", "iPad11,4", "iPad11,6", "iPad11,7",
+            "iPad12,1", "iPad12,2", // (should be A13 config, need new config)
+
+            // -- iPhones ---
+            "iPhone10,1", "iPhone10,2", "iPhone10,3", "iPhone10,4", "iPhone10,5", "iPhone10,6",
+            "iPhone4,1",
+            "iPhone5,1", "iPhone5,2", "iPhone5,3", "iPhone5,4",
+            "iPhone6,1", "iPhone6,2",
+            "iPhone7,1", "iPhone7,2",
+            "iPhone8,1", "iPhone8,2", "iPhone8,4",
+            "iPhone9,1", "iPhone9,2", "iPhone9,3", "iPhone9,4"
+        ]
+
+        let deviceMap = [
+            "A12": ["iPhone11,2", "iPhone11,4", "iPhone11,6", "iPhone11,8"],
+            "A13": ["iPhone12,1", "iPhone12,3", "iPhone12,5", "iPhone12,8"],
+            "A14": ["iPad13,1", "iPad13,18", "iPad13,19", "iPad13,2", "iPhone13,1", "iPhone13,2", "iPhone13,3", "iPhone13,4"],
+            "A15": ["iPad14,1", "iPad14,2", "iPhone14,2", "iPhone14,3", "iPhone14,4", "iPhone14,5", "iPhone14,6", "iPhone14,7", "iPhone14,8"],
+            "A16": ["iPhone15,2", "iPhone15,3", "iPhone15,4", "iPhone15,5"],
+            "A17": ["iPhone16,1", "iPhone16,2"],
+            "A18": ["iPhone17,1", "iPhone17,2", "iPhone17,3", "iPhone17,4"],
+            "M1": ["iPad13,10", "iPad13,11", "iPad13,16", "iPad13,17", "iPad13,4", "iPad13,5", "iPad13,6", "iPad13,7", "iPad13,8", "iPad13,9"],
+            "M2": ["iPad14,3", "iPad14,4", "iPad14,5", "iPad14,6", "iPad14,10", "iPad14,11", "iPad14,8", "iPad14,9"],
+            "A17 Pro": ["iPad16,1", "iPad16,2"],
+            "M4": ["iPad16,3", "iPad16,4", "iPad16,5", "iPad16,6"]
+        ]
+
+        let configFilePath = try XCTUnwrap(
+            Bundle.current(for: self).path(forResource: "config-v03", ofType: "json"),
+            "Config file not found"
+        )
+
+        let jsonData = try Data(contentsOf: URL(fileURLWithPath: configFilePath))
+        let decoder = JSONDecoder()
+        let loadedConfig = try decoder.decode(ModelSupportConfig.self, from: jsonData)
+
+        func supportedModels(chip: String) -> ModelSupport {
+            var supportedModels = loadedConfig.defaultSupport.models
+            for deviceSupport in loadedConfig.deviceSupports {
+                if let chips = deviceSupport.chips, chips.contains(chip) {
+                    supportedModels = deviceSupport.models
+                    break
+                }
+            }
+            return supportedModels
+        }
+
+        for device in deviceMap {
+            let supportedModelsForChip = supportedModels(chip: device.key)
+            for deviceIdentifier in device.value {
+                let modelSupport = modelSupport(for: deviceIdentifier, from: loadedConfig)
+                XCTAssertEqual(modelSupport, supportedModelsForChip, "Device: \(deviceIdentifier) (\(device.key))")
+            }
+        }
+
+        // Test devices that should use default configuration
+        let defaultModelSupport = loadedConfig.defaultSupport.models
+        for deviceIdentifier in defaultDevicesList {
+            let modelSupport = modelSupport(for: deviceIdentifier, from: loadedConfig)
+            XCTAssertEqual(modelSupport, defaultModelSupport, "Device: \(deviceIdentifier)")
+        }
+    }
+
     func testModelSupportConfigFetch() async throws {
         // Make sure remote repo config loads successfully from HF
         let modelRepoConfig = await WhisperKit.fetchModelSupportConfig()
