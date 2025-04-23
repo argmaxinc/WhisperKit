@@ -652,8 +652,8 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             )
         }
 
-        if !options.supressTokens.isEmpty {
-            logitsFilters.append(SuppressTokensFilter(suppressTokens: options.supressTokens))
+        if !options.suppressTokens.isEmpty {
+            logitsFilters.append(SuppressTokensFilter(suppressTokens: options.suppressTokens))
         }
 
         if !options.withoutTimestamps {
