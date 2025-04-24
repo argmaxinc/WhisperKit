@@ -77,7 +77,7 @@ struct CLIArguments: ParsableArguments {
     var clipTimestamps: [Float] = []
 
     @Option(parsing: .upToNextOption, help: "List of tokens to supress in the output (example: --supress-tokens 1 2 3)")
-    var supressTokens: [Int] = []
+    var suppressTokens: [Int] = []
 
     @Option(help: "Gzip compression ratio threshold for decoding failure")
     var compressionRatioThreshold: Float?
