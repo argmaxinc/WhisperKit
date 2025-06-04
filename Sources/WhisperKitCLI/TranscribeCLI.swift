@@ -345,7 +345,7 @@ struct TranscribeCLI: AsyncParsableCommand {
         transcribeResult: TranscriptionResult?
     ) {
         let audioFile = URL(fileURLWithPath: audioPath).lastPathComponent
-        let audioFileName = audioFile.components(separatedBy: ".").first!
+        let audioFileName = URL(fileURLWithPath: audioPath).deletingPathExtension().lastPathComponent
         let transcription = transcribeResult?.text ?? "Transcription failed"
 
         if cliArguments.report, let result = transcribeResult {
