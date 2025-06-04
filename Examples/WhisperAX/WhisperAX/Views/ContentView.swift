@@ -1423,6 +1423,15 @@ struct ContentView: View {
             return nil
         }
 
+        let segmentCallback: SegmentDiscoveryCallback = { segments in
+            // Log segments as they are discovered from the segment discovery callback
+            for segment in segments {
+                Logging.debug("Discovered segment: \(segment.id) (\(segment.seek))): \(segment.start) -> \(segment.end) \(segment.text)")
+            }
+        }
+
+        whisperKit.segmentDiscoveryCallback = segmentCallback
+
         let transcriptionResults: [TranscriptionResult] = try await whisperKit.transcribe(
             audioArray: samples,
             decodeOptions: options,
@@ -1645,6 +1654,14 @@ struct ContentView: View {
         }
 
         Logging.info("[EagerMode] \(lastAgreedSeconds)-\(Double(samples.count) / 16000.0) seconds")
+
+        let segmentCallback: SegmentDiscoveryCallback = { segments in
+            // Log segments as they are discovered from the segment discovery callback
+            for segment in segments {
+                Logging.debug("Discovered segment: \(segment.id) (\(segment.seek))): \(segment.start) -> \(segment.end)")
+            }
+        }
+        whisperKit.segmentDiscoveryCallback = segmentCallback
 
         let streamingAudio = samples
         var streamOptions = options

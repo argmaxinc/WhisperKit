@@ -666,26 +666,35 @@ open class WhisperKit {
         return await transcribeWithOptions(
             audioArrays: audioArrays,
             decodeOptionsArray: decodeOptionsArray,
+            seekOffsets: nil,
             callback: callback
         )
     }
 
-    /// Method to transcribe multiple audio arrays asynchronously with optional associated decoding options and return the results as an array of `Result` objects.
+    /// Method to transcribe multiple audio arrays asynchronously with optional associated decoding options and seek offset indexes for position tracking.
     /// - Parameters:
     ///  - audioArrays: An array of arrays, each containing audio
     ///  - decodeOptionsArray: An array of optional decoding options corresponding to each audio array
+    ///  - seekOffsets: Optional array of seek offset indexes for each audio array in the original audio
     ///  - callback: Optional callback to receive updates during the transcription process.
     ///
     /// - Returns: An array of `Result` objects, each containing either a successful transcription result or an error.
     open func transcribeWithOptions(
         audioArrays: [[Float]],
         decodeOptionsArray: [DecodingOptions?] = [nil],
+        seekOffsets: [Int]? = nil,
         callback: TranscriptionCallback = nil
     ) async -> [Result<[TranscriptionResult], Swift.Error>] {
         var result = [Result<[TranscriptionResult], Swift.Error>]()
 
         guard audioArrays.count == decodeOptionsArray.count else {
             return [.failure(WhisperError.transcriptionFailed("The number of audio arrays and decoding options must be balanced."))]
+        }
+        
+        if let seekOffsets {
+            guard audioArrays.count == seekOffsets.count else {
+                return [.failure(WhisperError.transcriptionFailed("The number of audio arrays and seek offset indexes must be balanced."))]
+            }
         }
 
         // Determine the number of concurrent workers from decodeOptions based on the maximum value or default to 0
@@ -706,6 +715,20 @@ open class WhisperKit {
                         return callback?(batchedProgress)
                     }
 
+                    // Setup segment callback to track chunk seek positions for segment discovery
+                    var batchedSegmentCallback: SegmentDiscoveryCallback? = self.segmentDiscoveryCallback
+                    if let seekOffsets {
+                        batchedSegmentCallback = { segments in
+                            let windowId = audioIndex + batchIndex * audioArrayBatch.count
+                            let seekOffset = seekOffsets[windowId]
+                            var adjustedSegments = segments
+                            for i in 0..<adjustedSegments.count {
+                                adjustedSegments[i].seek += Int(seekOffset)
+                            }
+                            self.segmentDiscoveryCallback?(adjustedSegments)
+                        }
+                    }
+
                     // Setup decoding options for the current audio array
                     let batchedDecodeOptions = decodeOptionsArray[audioIndex]
 
@@ -715,7 +738,8 @@ open class WhisperKit {
                             let transcribeResult: [TranscriptionResult] = try await self.transcribe(
                                 audioArray: audioArray,
                                 decodeOptions: batchedDecodeOptions,
-                                callback: batchedAudioCallback
+                                callback: batchedAudioCallback,
+                                segmentCallback: batchedSegmentCallback ?? self.segmentDiscoveryCallback
                             )
                             // Return the successful transcription result with its index
                             return [(index: audioIndex, result: .success(transcribeResult))]
@@ -819,12 +843,14 @@ open class WhisperKit {
     ///   - audioArray: Array of 16khz raw float audio samples
     ///   - decodeOptions: Options for how to transcribe audio. Including a chunking strategy and the number of concurrent workers will paralleize this task.
     ///   - callback: Optional callback to receive updates during the transcription process.
+    ///   - segmentCallback: Optional callback to receive segment discovery updates during transcription.
     /// - Returns: An array of sorted `TranscriptionResult`.
     /// - Throws: An error if the transcription fails.
     open func transcribe(
         audioArray: [Float],
         decodeOptions: DecodingOptions? = nil,
-        callback: TranscriptionCallback = nil
+        callback: TranscriptionCallback = nil,
+        segmentCallback: SegmentDiscoveryCallback? = nil
     ) async throws -> [TranscriptionResult] {
         var transcribeResults = [TranscriptionResult]()
 
@@ -841,6 +867,8 @@ open class WhisperKit {
                     decodeOptions: decodeOptions
                 )
 
+                Logging.debug("Found \(audioChunks.count) VAD chunks")
+
                 progress.totalUnitCount = max(progress.totalUnitCount, Int64(audioChunks.count))
 
                 // Reset the seek times since we've already chunked the audio
@@ -852,6 +880,7 @@ open class WhisperKit {
                 let chunkedResults: [Result<[TranscriptionResult], Swift.Error>] = await transcribeWithOptions(
                     audioArrays: audioChunks.map { $0.audioSamples },
                     decodeOptionsArray: chunkedDecodeOptions,
+                    seekOffsets: audioChunks.map { $0.seekOffsetIndex },
                     callback: callback
                 )
 
@@ -867,7 +896,8 @@ open class WhisperKit {
                 transcribeResults = try await runTranscribeTask(
                     audioArray: audioArray,
                     decodeOptions: decodeOptions,
-                    callback: callback
+                    callback: callback,
+                    segmentCallback: segmentCallback ?? self.segmentDiscoveryCallback
                 )
         }
 
@@ -882,13 +912,14 @@ open class WhisperKit {
         return transcribeResults
     }
 
-    /// Runs the transcription task on a single audio sample array asynchronously.
+    /// Runs the transcription task on a single audio sample array asynchronously with custom segment callback.
     /// - Returns: An array of `TranscriptionResult`.
     /// - Throws: An error if the transcription fails or if the tokenizer is unavailable.
     open func runTranscribeTask(
         audioArray: [Float],
         decodeOptions: DecodingOptions? = nil,
-        callback: TranscriptionCallback = nil
+        callback: TranscriptionCallback = nil,
+        segmentCallback: SegmentDiscoveryCallback? = nil
     ) async throws -> [TranscriptionResult] {
         if modelState != .loaded {
             try await loadModels()
@@ -917,7 +948,7 @@ open class WhisperKit {
                 tokenizer: tokenizer
             )
 
-            transcribeTask.segmentDiscoveryCallback = self.segmentDiscoveryCallback
+            transcribeTask.segmentDiscoveryCallback = segmentCallback
 
             let transcribeTaskResult = try await transcribeTask.run(
                 audioArray: audioArray,
