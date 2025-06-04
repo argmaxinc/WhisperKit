@@ -1661,6 +1661,7 @@ struct ContentView: View {
                 Logging.debug("Discovered segment: \(segment.id) (\(segment.seek))): \(segment.start) -> \(segment.end)")
             }
         }
+
         whisperKit.segmentDiscoveryCallback = segmentCallback
 
         let streamingAudio = samples

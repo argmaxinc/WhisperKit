@@ -716,9 +716,8 @@ open class WhisperKit {
                     }
 
                     // Setup segment callback to track chunk seek positions for segment discovery
-                    var batchedSegmentCallback: SegmentDiscoveryCallback? = self.segmentDiscoveryCallback
-                    if let seekOffsets {
-                        batchedSegmentCallback = { segments in
+                    let batchedSegmentCallback: SegmentDiscoveryCallback? = if let seekOffsets {
+                        { segments in
                             let windowId = audioIndex + batchIndex * audioArrayBatch.count
                             let seekOffset = seekOffsets[windowId]
                             var adjustedSegments = segments
@@ -727,6 +726,8 @@ open class WhisperKit {
                             }
                             self.segmentDiscoveryCallback?(adjustedSegments)
                         }
+                    } else {
+                        self.segmentDiscoveryCallback
                     }
 
                     // Setup decoding options for the current audio array
