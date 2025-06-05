@@ -32,7 +32,7 @@ struct ContentView: View {
     @State private var availableModels: [String] = []
     @State private var availableLanguages: [String] = []
     @State private var disabledModels: [String] = WhisperKit.recommendedModels().disabled
-
+    @AppStorage("promptText") private var promptText: String?
     @AppStorage("selectedAudioInput") private var selectedAudioInput: String = "No Audio Input"
     @AppStorage("selectedModel") private var selectedModel: String = WhisperKit.recommendedModels().default
     @AppStorage("selectedTab") private var selectedTab: String = "Transcribe"
@@ -792,6 +792,11 @@ struct ContentView: View {
 
     var settingsForm: some View {
         List {
+        
+                        
+                    
+            
+            
             HStack {
                 Text("Show Timestamps")
                 InfoButton("Toggling this will include/exclude timestamps in both the UI and the prefill tokens.\nEither <|notimestamps|> or <|0.00|> will be forced based on this setting unless \"Prompt Prefill\" is de-selected.")
@@ -850,6 +855,14 @@ struct ContentView: View {
                     InfoButton("How many workers to run transcription concurrently. Higher values increase memory usage but saturate the selected compute unit more, resulting in faster transcriptions. A value of 0 will use unlimited workers.")
                 }
             }
+            .padding(.horizontal)
+            .padding(.bottom)
+            
+            TextField("Enter prompt text", text: Binding(
+                get: { self.promptText ?? "" },
+                set: { self.promptText = $0.isEmpty ? nil : $0 }
+            ))
+            .textFieldStyle(.roundedBorder)
             .padding(.horizontal)
             .padding(.bottom)
 
@@ -1352,7 +1365,7 @@ struct ContentView: View {
         let task: DecodingTask = selectedTask == "transcribe" ? .transcribe : .translate
         let seekClip: [Float] = [lastConfirmedSegmentEndSeconds]
 
-        let options = DecodingOptions(
+        var options = DecodingOptions(
             verbose: true,
             task: task,
             language: languageCode,
@@ -1368,6 +1381,19 @@ struct ContentView: View {
             concurrentWorkerCount: Int(concurrentWorkerCount),
             chunkingStrategy: chunkingStrategy
         )
+        
+        // Prompt
+        if let promptText = promptText {
+            guard whisperKit.tokenizer != nil else {
+                throw WhisperError.tokenizerUnavailable()
+            }
+            
+            if promptText.count > 0, let tokenizer = whisperKit.tokenizer {
+                options.promptTokens = tokenizer.encode(text: " " + promptText.trimmingCharacters(in: .whitespaces)).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
+                options.usePrefillPrompt = true
+            }
+        }
+
 
         // Early stopping checks
         let decodingCallback: ((TranscriptionProgress) -> Bool?) = { (progress: TranscriptionProgress) in
@@ -1603,7 +1629,7 @@ struct ContentView: View {
         print(selectedLanguage)
         print(languageCode)
 
-        let options = DecodingOptions(
+        var options = DecodingOptions(
             verbose: true,
             task: task,
             language: languageCode,
@@ -1618,6 +1644,18 @@ struct ContentView: View {
             firstTokenLogProbThreshold: -1.5, // higher threshold to prevent fallbacks from running to often
             chunkingStrategy: ChunkingStrategy.none
         )
+        
+        // Prompt
+        if let promptText = promptText {
+            guard whisperKit.tokenizer != nil else {
+                throw WhisperError.tokenizerUnavailable()
+            }
+            
+            if promptText.count > 0, let tokenizer = whisperKit.tokenizer {
+                options.promptTokens = tokenizer.encode(text: " " + promptText.trimmingCharacters(in: .whitespaces)).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
+                options.usePrefillPrompt = true
+            }
+        }
 
         // Early stopping checks
         let decodingCallback: ((TranscriptionProgress) -> Bool?) = { progress in
