@@ -54,9 +54,21 @@ struct TranscribeCLI: AsyncParsableCommand {
     }
 
     private func transcribe() async throws {
+        if cliArguments.verbose {
+            print("\nStarting transcription process...")
+        }
+
         let resolvedAudioPaths = cliArguments.audioPath.map { resolveAbsolutePath($0) }
+        if cliArguments.verbose {
+            print("\nResolved audio paths:")
+            resolvedAudioPaths.forEach { print("  - \($0)") }
+        }
+
         for resolvedAudioPath in resolvedAudioPaths {
             guard FileManager.default.fileExists(atPath: resolvedAudioPath) else {
+                if cliArguments.verbose {
+                    print("\nError: File not found at path: \(resolvedAudioPath)")
+                }
                 throw CocoaError.error(.fileNoSuchFile)
             }
         }
@@ -64,8 +76,14 @@ struct TranscribeCLI: AsyncParsableCommand {
         let task: DecodingTask
         if cliArguments.task.lowercased() == "translate" {
             task = .translate
+            if cliArguments.verbose {
+                print("\nUsing translation task")
+            }
         } else {
             task = .transcribe
+            if cliArguments.verbose {
+                print("\nUsing transcription task")
+            }
         }
 
         if cliArguments.verbose {
@@ -76,20 +94,99 @@ struct TranscribeCLI: AsyncParsableCommand {
         let whisperKit = try await setupWhisperKit()
 
         if cliArguments.verbose {
-            print("Models initialized")
+            print("\nModel initialization complete:")
+            print("  - Model folder: \(whisperKit.modelFolder?.path ?? "Not specified")")
+            print("  - Tokenizer folder: \(whisperKit.tokenizerFolder?.path ?? "Not specified")")
+            print("  - Total load time: \(String(format: "%.2f", whisperKit.currentTimings.modelLoading)) seconds")
+            print("  - Encoder load time: \(String(format: "%.2f", whisperKit.currentTimings.encoderLoadTime)) seconds")
+            print("  - Decoder load time: \(String(format: "%.2f", whisperKit.currentTimings.decoderLoadTime)) seconds")
+            print("  - Tokenizer load time: \(String(format: "%.2f", whisperKit.currentTimings.tokenizerLoadTime)) seconds")
         }
 
         var options = decodingOptions(task: task)
+        if cliArguments.verbose {
+            print("\nConfiguring decoding options...")
+        }
+
         if let promptText = cliArguments.prompt, promptText.count > 0, let tokenizer = whisperKit.tokenizer {
+            if cliArguments.verbose {
+                print("Processing prompt text: \"\(promptText)\"")
+            }
             options.promptTokens = tokenizer.encode(text: " " + promptText.trimmingCharacters(in: .whitespaces)).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
             options.usePrefillPrompt = true
+            if cliArguments.verbose {
+                print("Encoded prompt tokens: \(options.promptTokens ?? [])")
+            }
         }
 
         if let prefixText = cliArguments.prefix, prefixText.count > 0, let tokenizer = whisperKit.tokenizer {
+            if cliArguments.verbose {
+                print("Processing prefix text: \"\(prefixText)\"")
+            }
             options.prefixTokens = tokenizer.encode(text: " " + prefixText.trimmingCharacters(in: .whitespaces)).filter { $0 < tokenizer.specialTokens.specialTokenBegin }
             options.usePrefillPrompt = true
+            if cliArguments.verbose {
+                print("Encoded prefix tokens: \(options.prefixTokens ?? [])")
+            }
         }
 
+        if cliArguments.verbose {
+            print("\nStarting transcription with progress tracking...")
+        }
+
+        var isTranscribing = true
+
+        // Record the start time
+        let startTime = Date()
+
+        // Variables for estimated time remaining
+        var estimatedTimeRemaining: TimeInterval = 0
+        var emaEstimatedTotalTime: TimeInterval = 0
+        let smoothingFactor = 0.1 // For exponential moving average
+
+        // Start the progress bar task
+        let progressBarTask = Task {
+            while isTranscribing {
+                let progress = whisperKit.progress.fractionCompleted
+                let progressPercentage = Int(progress * 100)
+                let barLength = 50
+                let completedLength = Int(progress * Double(barLength))
+                let bar = String(repeating: "=", count: completedLength) + String(repeating: " ", count: barLength - completedLength)
+
+                let currentTime = Date()
+                let elapsedTime = currentTime.timeIntervalSince(startTime)
+
+                // Update estimated total time and remaining time
+                var estimatedTimeRemainingString = "Estimating..."
+                if progress > 0.05 { // Start estimating after 5% progress
+                    let currentEstimatedTotalTime = elapsedTime / progress
+                    // Apply exponential moving average for smoothing
+                    if emaEstimatedTotalTime == 0 {
+                        emaEstimatedTotalTime = currentEstimatedTotalTime
+                    } else {
+                        emaEstimatedTotalTime = smoothingFactor * currentEstimatedTotalTime + (1 - smoothingFactor) * emaEstimatedTotalTime
+                    }
+                    estimatedTimeRemaining = max(emaEstimatedTotalTime - elapsedTime, 0)
+                    estimatedTimeRemainingString = String(format: "%.2f s", estimatedTimeRemaining)
+                }
+
+                // Clear the current line and return to the beginning
+                print("\r\u{001B}[K", terminator: "")
+                
+                var statusLine = "[\(bar)] \(progressPercentage)%"
+                statusLine += String(format: " | Elapsed Time: %.2f s", elapsedTime)
+                statusLine += " | Remaining: \(estimatedTimeRemainingString)"
+
+                print(statusLine, terminator: "")
+                fflush(stdout) // Ensure the output is flushed immediately
+
+                try? await Task.sleep(nanoseconds: 100_000_000) // Sleep for 0.1 seconds
+            }
+            // Move to new line after finishing
+            print()
+        }
+
+        // Start the transcription
         let transcribeResult: [Result<[TranscriptionResult], Swift.Error>] = await whisperKit.transcribeWithResults(
             audioPaths: resolvedAudioPaths,
             decodeOptions: options
@@ -97,12 +194,24 @@ struct TranscribeCLI: AsyncParsableCommand {
 
         // TODO: we need to track the results between audio files, and shouldnt merge them
         // ONLY merge results for different chunks of the same audio file or array
+        // Indicate that transcription is done
+        isTranscribing = false
+        // Wait for the progress bar task to finish
+        await progressBarTask.value
+
+        // Continue with processing the transcription results
         let allSuccessfulResults = transcribeResult.compactMap { try? $0.get() }.flatMap { $0 }
 
         // Log timings for full transcription run
         if cliArguments.verbose {
             let mergedResult = mergeTranscriptionResults(allSuccessfulResults)
             mergedResult.logTimings()
+            // Output tokensPerSecond, realTimeFactor, and speedFactor
+            let timings = mergedResult.timings
+            print("Transcription Performance:")
+            print(String(format: "  - Tokens per second: %.2f", timings.tokensPerSecond))
+            print(String(format: "  - Real-time factor: %.2f", timings.realTimeFactor))
+            print(String(format: "  - Speed factor: %.2f", timings.speedFactor))
         }
 
         for (audioPath, result) in zip(resolvedAudioPaths, transcribeResult) {
@@ -266,6 +375,10 @@ struct TranscribeCLI: AsyncParsableCommand {
     }
 
     private func setupWhisperKit() async throws -> WhisperKit {
+        if cliArguments.verbose {
+            print("Setting up WhisperKit with compute options...")
+        }
+
         var audioEncoderComputeUnits = cliArguments.audioEncoderComputeUnits.asMLComputeUnits
         let textDecoderComputeUnits = cliArguments.textDecoderComputeUnits.asMLComputeUnits
 
@@ -273,7 +386,15 @@ struct TranscribeCLI: AsyncParsableCommand {
         if audioEncoderComputeUnits == .cpuAndNeuralEngine {
             if #unavailable(macOS 14.0) {
                 audioEncoderComputeUnits = .cpuAndGPU
+                if cliArguments.verbose {
+                    print("macOS < 14.0 detected, switching audio encoder to CPU+GPU")
+                }
             }
+        }
+
+        if cliArguments.verbose {
+            print("Audio Encoder compute units: \(audioEncoderComputeUnits)")
+            print("Text Decoder compute units: \(textDecoderComputeUnits)")
         }
 
         let computeOptions = ModelComputeOptions(
@@ -302,6 +423,10 @@ struct TranscribeCLI: AsyncParsableCommand {
                 nil
             }
 
+        if cliArguments.verbose {
+            print("Creating WhisperKit configuration...")
+        }
+
         let config = WhisperKitConfig(model: modelName,
                                       downloadBase: downloadModelFolder,
                                       modelFolder: cliArguments.modelPath,
@@ -312,10 +437,31 @@ struct TranscribeCLI: AsyncParsableCommand {
                                       prewarm: false,
                                       load: true,
                                       useBackgroundDownloadSession: false)
+
+        if cliArguments.verbose {
+            print("Initializing WhisperKit with configuration...")
+        }
+
         return try await WhisperKit(config)
     }
 
     private func decodingOptions(task: DecodingTask) -> DecodingOptions {
+        if cliArguments.verbose {
+            print("\nConfiguring decoding options:")
+            print("  - Task: \(task)")
+            print("  - Language: \(cliArguments.language ?? "auto")")
+            print("  - Temperature: \(cliArguments.temperature)")
+            print("  - Temperature increment on fallback: \(cliArguments.temperatureIncrementOnFallback)")
+            print("  - Temperature fallback count: \(cliArguments.temperatureFallbackCount)")
+            print("  - Top K: \(cliArguments.bestOf)")
+            print("  - Use prefill prompt: \(cliArguments.usePrefillPrompt || cliArguments.language != nil)")
+            print("  - Use prefill cache: \(cliArguments.usePrefillCache)")
+            print("  - Skip special tokens: \(cliArguments.skipSpecialTokens)")
+            print("  - Without timestamps: \(cliArguments.withoutTimestamps)")
+            print("  - Word timestamps: \(cliArguments.wordTimestamps || cliArguments.streamSimulated)")
+            print("  - Chunking strategy: \(cliArguments.chunkingStrategy)")
+        }
+
         return DecodingOptions(
             verbose: cliArguments.verbose,
             task: task,
@@ -344,13 +490,25 @@ struct TranscribeCLI: AsyncParsableCommand {
         audioPath: String,
         transcribeResult: TranscriptionResult?
     ) {
+        if cliArguments.verbose {
+            print("\nProcessing transcription result for: \(audioPath)")
+        }
+
         let audioFile = URL(fileURLWithPath: audioPath).lastPathComponent
         let audioFileName = URL(fileURLWithPath: audioPath).deletingPathExtension().lastPathComponent
         let transcription = transcribeResult?.text ?? "Transcription failed"
 
         if cliArguments.report, let result = transcribeResult {
+            if cliArguments.verbose {
+                print("\nGenerating reports...")
+            }
+
             // Write SRT (SubRip Subtitle Format) for the transcription
             let srtReportWriter = WriteSRT(outputDir: cliArguments.reportPath)
+            if cliArguments.verbose {
+                print("Writing SRT report to: \(cliArguments.reportPath)")
+            }
+
             let savedSrtReport = srtReportWriter.write(result: result, to: audioFileName)
             if cliArguments.verbose {
                 switch savedSrtReport {
