@@ -1447,6 +1447,82 @@ final class UnitTests: XCTestCase {
         try await callbackTestTask.value
     }
 
+    func testCallbackWithVAD() async throws {
+        let config = WhisperKitConfig(
+            model: "tiny",
+            verbose: true,
+            logLevel: .debug,
+            load: false
+        )
+        let whisperKit = try await WhisperKit(config)
+
+        // Set up expectations
+        let segmentExpectation = XCTestExpectation(description: "Segment discovery with VAD")
+        segmentExpectation.expectedFulfillmentCount = 3 // Expect at least 3 segment callbacks
+
+        // Keep track of discovered segments
+        var discoveredSegments = [[TranscriptionSegment]]()
+
+        // Set up segment discovery callback
+        whisperKit.segmentDiscoveryCallback = { segments in
+            Logging.debug("Segments discovered with ids: \(segments.map { $0.id }) and seek: \(segments.map { $0.seek })")
+            discoveredSegments.append(segments)
+            segmentExpectation.fulfill()
+        }
+
+        // Use a longer audio file that will be chunked by VAD
+        try await whisperKit.loadModels()
+        let audioFilePath = try XCTUnwrap(
+            Bundle.current(for: self).path(forResource: "ted_60", ofType: "m4a"),
+            "Audio file not found"
+        )
+
+        // Configure with VAD chunking
+        let decodeOptions = DecodingOptions(chunkingStrategy: .vad)
+
+        // Transcribe with VAD chunking
+        let results = try await whisperKit.transcribe(audioPath: audioFilePath, decodeOptions: decodeOptions)
+
+        // Wait for segment callbacks
+        await fulfillment(of: [segmentExpectation], timeout: 1)
+
+        // Verify segments were discovered across multiple chunks
+        XCTAssertGreaterThanOrEqual(discoveredSegments.count, 3, "Should have discovered segments in multiple chunks")
+
+        // Verify that segments have different seek positions
+        let allSeekPositions = Set(discoveredSegments.flatMap { $0.map { $0.seek } })
+        XCTAssertGreaterThanOrEqual(allSeekPositions.count, 3, "Should have segments with different seek positions")
+
+        // Verify that the seek positions are sensible (not negative)
+        for position in allSeekPositions {
+            XCTAssertGreaterThanOrEqual(position, 0, "Seek position should not be negative")
+        }
+
+        // Verify that segment times are reasonable
+        let allSegments = discoveredSegments.flatMap { $0 }
+        for segment in allSegments {
+            XCTAssertGreaterThanOrEqual(segment.start, 0, "Segment start time should not be negative")
+            XCTAssertGreaterThan(segment.end, segment.start, "Segment end time should be greater than start time")
+        }
+
+        // Verify text content in discovered segments
+        let allDiscoveredText = allSegments.map { $0.text }.joined()
+        XCTAssertFalse(allDiscoveredText.isEmpty, "Discovered segments should contain text")
+
+        // Verify that the segment seek times in results match the discovered seek positions
+        let resultSeekPositions = Set(results.flatMap { $0.segments.map { $0.seek } })
+
+        // Each segment seek position in results should match one of the discovered seek positions
+        for seekPosition in resultSeekPositions {
+            XCTAssertTrue(allSeekPositions.contains(seekPosition), "Segment seek position \(seekPosition) in results should match one of the discovered seek positions \(allSeekPositions)")
+        }
+
+        // Verify text content in transcription results
+        XCTAssertFalse(results.isEmpty, "Should have transcription results")
+        let allText = results.flatMap { $0.segments.map { $0.text } }.joined()
+        XCTAssertFalse(allText.isEmpty, "Transcription should contain text")
+    }
+
     // MARK: - Utils Tests
 
     func testFillIndexesWithValue() throws {
