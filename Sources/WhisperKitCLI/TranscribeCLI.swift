@@ -130,60 +130,44 @@ struct TranscribeCLI: AsyncParsableCommand {
             }
         }
 
-        if cliArguments.verbose {
-            print("\nStarting transcription with progress tracking...")
-        }
-
-        var isTranscribing = true
-
         // Record the start time
         let startTime = Date()
+        var isTranscribing = true
+        var progressBarTask: Task<Void, Never>?
+        
+        if cliArguments.verbose {
+            print("\nStarting transcription with progress tracking...")
 
-        // Variables for estimated time remaining
-        var estimatedTimeRemaining: TimeInterval = 0
-        var emaEstimatedTotalTime: TimeInterval = 0
-        let smoothingFactor = 0.1 // For exponential moving average
+            // Variables for estimated time remaining
+            var estimatedTimeRemaining: TimeInterval = 0
+            var emaEstimatedTotalTime: TimeInterval = 0
+            let smoothingFactor = 0.1 // For exponential moving average
 
-        // Start the progress bar task
-        let progressBarTask = Task {
-            while isTranscribing {
-                let progress = whisperKit.progress.fractionCompleted
-                let progressPercentage = Int(progress * 100)
-                let barLength = 50
-                let completedLength = Int(progress * Double(barLength))
-                let bar = String(repeating: "=", count: completedLength) + String(repeating: " ", count: barLength - completedLength)
+            // Start the progress bar task
+            progressBarTask = Task {
+                while isTranscribing {
+                    let progress = whisperKit.progress.fractionCompleted
+                    let currentTime = Date()
+                    let elapsedTime = currentTime.timeIntervalSince(startTime)
 
-                let currentTime = Date()
-                let elapsedTime = currentTime.timeIntervalSince(startTime)
-
-                // Update estimated total time and remaining time
-                var estimatedTimeRemainingString = "Estimating..."
-                if progress > 0.05 { // Start estimating after 5% progress
-                    let currentEstimatedTotalTime = elapsedTime / progress
-                    // Apply exponential moving average for smoothing
-                    if emaEstimatedTotalTime == 0 {
-                        emaEstimatedTotalTime = currentEstimatedTotalTime
-                    } else {
-                        emaEstimatedTotalTime = smoothingFactor * currentEstimatedTotalTime + (1 - smoothingFactor) * emaEstimatedTotalTime
+                    // Update estimated total time and remaining time
+                    var estimatedTimeRemaining: TimeInterval? = nil
+                    if progress > 0.05 { // Start estimating after 5% progress
+                        let currentEstimatedTotalTime = elapsedTime / progress
+                        // Apply exponential moving average for smoothing
+                        if emaEstimatedTotalTime == 0 {
+                            emaEstimatedTotalTime = currentEstimatedTotalTime
+                        } else {
+                            emaEstimatedTotalTime = smoothingFactor * currentEstimatedTotalTime + (1 - smoothingFactor) * emaEstimatedTotalTime
+                        }
+                        estimatedTimeRemaining = max(emaEstimatedTotalTime - elapsedTime, 0)
                     }
-                    estimatedTimeRemaining = max(emaEstimatedTotalTime - elapsedTime, 0)
-                    estimatedTimeRemainingString = String(format: "%.2f s", estimatedTimeRemaining)
+
+                    printProgressBar(progress: progress, elapsedTime: elapsedTime, estimatedTimeRemaining: estimatedTimeRemaining)
+
+                    try? await Task.sleep(nanoseconds: 100_000_000) // Sleep for 0.1 seconds
                 }
-
-                // Clear the current line and return to the beginning
-                print("\r\u{001B}[K", terminator: "")
-                
-                var statusLine = "[\(bar)] \(progressPercentage)%"
-                statusLine += String(format: " | Elapsed Time: %.2f s", elapsedTime)
-                statusLine += " | Remaining: \(estimatedTimeRemainingString)"
-
-                print(statusLine, terminator: "")
-                fflush(stdout) // Ensure the output is flushed immediately
-
-                try? await Task.sleep(nanoseconds: 100_000_000) // Sleep for 0.1 seconds
             }
-            // Move to new line after finishing
-            print()
         }
 
         // Start the transcription
@@ -192,12 +176,21 @@ struct TranscribeCLI: AsyncParsableCommand {
             decodeOptions: options
         )
 
+        if cliArguments.verbose {
+            // Indicate that transcription is done
+            isTranscribing = false
+            // Wait for the progress bar task to finish
+            await progressBarTask?.value
+            
+            let finalElapsedTime = Date().timeIntervalSince(startTime)
+            printProgressBar(progress: 1.0, elapsedTime: finalElapsedTime, estimatedTimeRemaining: 0)
+            
+            // Move to new line after finishing
+            print()
+        }
+
         // TODO: we need to track the results between audio files, and shouldnt merge them
         // ONLY merge results for different chunks of the same audio file or array
-        // Indicate that transcription is done
-        isTranscribing = false
-        // Wait for the progress bar task to finish
-        await progressBarTask.value
 
         // Continue with processing the transcription results
         let allSuccessfulResults = transcribeResult.compactMap { try? $0.get() }.flatMap { $0 }
@@ -537,5 +530,29 @@ struct TranscribeCLI: AsyncParsableCommand {
         } else {
             print(transcription)
         }
+    }
+
+    private func printProgressBar(progress: Double, elapsedTime: TimeInterval, estimatedTimeRemaining: TimeInterval?) {
+        let progressPercentage = Int(progress * 100)
+        let barLength = 50
+        let completedLength = Int(progress * Double(barLength))
+        let bar = String(repeating: "=", count: completedLength) + String(repeating: " ", count: barLength - completedLength)
+
+        let estimatedTimeRemainingString: String
+        if let estimatedTimeRemaining = estimatedTimeRemaining {
+            estimatedTimeRemainingString = String(format: "%.2f s", estimatedTimeRemaining)
+        } else {
+            estimatedTimeRemainingString = "Estimating..."
+        }
+
+        // Clear the current line and return to the beginning
+        print("\r\u{001B}[K", terminator: "")
+        
+        var statusLine = "[\(bar)] \(progressPercentage)%"
+        statusLine += String(format: " | Elapsed Time: %.2f s", elapsedTime)
+        statusLine += " | Remaining: \(estimatedTimeRemainingString)"
+
+        print(statusLine, terminator: "")
+        fflush(stdout) // Ensure the output is flushed immediately
     }
 }
