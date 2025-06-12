@@ -443,7 +443,7 @@ open class SegmentSeeker: SegmentSeeking {
             throw WhisperError.segmentingFailed("Invalid shape in alignmentWeights")
         }
 
-        let filteredAlignmentWeights = initMLMultiArray(shape: [filteredIndices.count, columnCount] as [NSNumber], dataType: alignmentWeights.dataType, initialValue: FloatType(0))
+        let filteredAlignmentWeights = try MLMultiArray(shape: [filteredIndices.count, columnCount] as [NSNumber], dataType: alignmentWeights.dataType, initialValue: FloatType(0))
 
         alignmentWeights.withUnsafeMutableBytes { weightsPointer, weightsStride in
             filteredAlignmentWeights.withUnsafeMutableBytes { filteredWeightsPointer, filteredWeightsStride in

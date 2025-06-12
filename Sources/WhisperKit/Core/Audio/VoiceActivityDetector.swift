@@ -39,6 +39,14 @@ open class VoiceActivityDetector {
         fatalError("`voiceActivity` must be implemented by subclass")
     }
 
+    /// Analyzes the provided audio waveform to determine which segments contain voice activity.
+    /// - Parameter waveform: An array of `Float` values representing the audio waveform.
+    /// - Returns: An array of `Bool` values where `true` indicates the presence of voice activity and `false` indicates silence.
+    /// - Throws: An error if voice activity detection fails.
+    open func voiceActivityAsync(in waveform: [Float]) async throws -> [Bool] {
+        return voiceActivity(in: waveform)
+    }
+
     /// Calculates and returns a list of active audio chunks, each represented by a start and end index.
     /// - Parameter waveform: An array of `Float` values representing the audio waveform.
     /// - Returns: An array of tuples where each tuple contains the start and end indices of an active audio chunk.
@@ -136,7 +144,7 @@ open class VoiceActivityDetector {
     func calculateNonSilentSeekClips(in waveform: [Float]) -> [(start: Int, end: Int)] {
         let clipTimestamps = voiceActivityClipTimestamps(in: waveform)
         let options = DecodingOptions(clipTimestamps: clipTimestamps)
-        let seekClips = prepareSeekClips(contentFrames: waveform.count, decodeOptions: options)
+        let seekClips = options.prepareSeekClips(contentFrames: waveform.count)
         return seekClips
     }
 

@@ -46,7 +46,11 @@ public struct AudioInputConfig {
     public var channelMode: ChannelMode = .sumChannels(nil)
 }
 
+public protocol AudioProcessorOutputType {}
+extension MLMultiArray : AudioProcessorOutputType {}
+
 public protocol AudioProcessing {
+    
     /// Loads audio data from a specified file path.
     /// - Parameters:
     ///   - audioFilePath: The file path of the audio file.
@@ -100,6 +104,18 @@ public protocol AudioProcessing {
 
     /// Resume recording audio from the specified input device, appending to continuous `audioArray` after pause
     func resumeRecordingLive(inputDeviceID: DeviceID?, callback: (([Float]) -> Void)?) throws
+    
+    ///  Pad or trim the audio data to the desired length.
+    /// - Parameters:
+    ///   - audioArray: An array of audio frames to be padded or trimmed.
+    ///   - startIndex: The index of the audio frame to start at.
+    ///   - frameLength: The desired length of the audio data in frames.
+    /// - Returns: An optional `AudioProcessorOutputType` containing the audio data.
+    func padOrTrim(
+        fromArray audioArray: [Float],
+        startAt startIndex: Int,
+        toLength frameLength: Int
+    ) -> (any AudioProcessorOutputType)?
 }
 
 /// Overrideable default methods for AudioProcessing
@@ -144,27 +160,6 @@ public extension AudioProcessing {
             vDSP_vclr(audioSamplesArray.dataPointer.assumingMemoryBound(to: Float.self).advanced(by: actualFrameLength), 1, vDSP_Length(frameLength - actualFrameLength))
         }
 
-        // Save the file for debugging
-        if saveSegment {
-            let desiredFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16000, channels: 1, interleaved: false)!
-            let newBuffer = AVAudioPCMBuffer(pcmFormat: desiredFormat, frameCapacity: AVAudioFrameCount(frameLength))!
-            for i in 0..<frameLength {
-                newBuffer.floatChannelData?[0][i] = audioSamplesArray[i].floatValue
-            }
-            newBuffer.frameLength = AVAudioFrameCount(frameLength)
-
-            // Save to file
-            let filename = "segment_\(Double(startIndex) / 16000.0).wav"
-            var fileURL = getDownloadsDirectory().appendingPathComponent("WhisperKitSegments")
-            fileURL = fileURL.appendingPathComponent(filename)
-            do {
-                try saveBuffer(newBuffer, to: fileURL)
-                Logging.debug("Saved audio segment to \(fileURL)")
-            } catch {
-                Logging.debug("Could not save file: \(error)")
-            }
-        }
-
         return audioSamplesArray
     }
 
@@ -197,7 +192,7 @@ public extension AudioProcessing {
 }
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-public class AudioProcessor: NSObject, AudioProcessing {
+open class AudioProcessor: NSObject, AudioProcessing {
     private var lastInputDevice: DeviceID?
     public var audioEngine: AVAudioEngine?
     public var audioSamples: ContiguousArray<Float> = []
@@ -209,7 +204,11 @@ public class AudioProcessor: NSObject, AudioProcessing {
 
     public var audioBufferCallback: (([Float]) -> Void)?
     public var minBufferLength = Int(Double(WhisperKit.sampleRate) * 0.1) // 0.1 second of audio at 16,000 Hz
-
+    
+    open func padOrTrim(fromArray audioArray: [Float], startAt startIndex: Int, toLength frameLength: Int) -> (any AudioProcessorOutputType)? {
+        return AudioProcessor.padOrTrimAudio(fromArray: audioArray, startAt: startIndex, toLength: frameLength, saveSegment: false)
+    }
+    
     // MARK: - Loading and conversion
 
     public static func loadAudio(
@@ -282,7 +281,7 @@ public class AudioProcessor: NSObject, AudioProcessing {
             Logging.debug("Audio source details - Sample Rate: \(sampleRate) Hz, Channel Count: \(channelCount), Frame Length: \(frameLength), Duration: \(Double(frameLength) / sampleRate)s")
             Logging.debug("Audio buffer details - Sample Rate: \(outputBuffer.format.sampleRate) Hz, Channel Count: \(outputBuffer.format.channelCount), Frame Length: \(outputBuffer.frameLength), Duration: \(Double(outputBuffer.frameLength) / outputBuffer.format.sampleRate)s")
 
-            logCurrentMemoryUsage("After loadAudio function")
+            Logging.logCurrentMemoryUsage("After loadAudio function")
 
             return outputBuffer
         } else {
@@ -720,7 +719,7 @@ public class AudioProcessor: NSObject, AudioProcessing {
 
         // Normalize based on reference
         // NOTE: since signalEnergy elements are floats from 0 to 1, max (full volume) is always 0dB
-        let normalizedEnergy = rescale(value: dbEnergy, min: refEnergy, max: 0)
+        let normalizedEnergy = (dbEnergy - refEnergy) / (0 - refEnergy)
 
         // Clamp from 0 to 1
         return max(0, min(normalizedEnergy, 1))

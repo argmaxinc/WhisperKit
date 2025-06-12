@@ -225,7 +225,7 @@ struct ContentView: View {
                 ToolbarItem {
                     Button {
                         if !enableEagerDecoding {
-                            let fullTranscript = formatSegments(confirmedSegments + unconfirmedSegments, withTimestamps: enableTimestamps).joined(separator: "\n")
+                            let fullTranscript = TranscriptionUtilities.formatSegments(confirmedSegments + unconfirmedSegments, withTimestamps: enableTimestamps).joined(separator: "\n")
                             #if os(iOS)
                             UIPasteboard.general.string = fullTranscript
                             #elseif os(macOS)
@@ -1410,7 +1410,7 @@ struct ContentView: View {
             let checkWindow = Int(compressionCheckWindow)
             if currentTokens.count > checkWindow {
                 let checkTokens: [Int] = currentTokens.suffix(checkWindow)
-                let compressionRatio = compressionRatio(of: checkTokens)
+                let compressionRatio = TextUtilities.compressionRatio(of: checkTokens)
                 if compressionRatio > options.compressionRatioThreshold! {
                     Logging.debug("Early stopping due to compression threshold")
                     return false
@@ -1438,7 +1438,7 @@ struct ContentView: View {
             callback: decodingCallback
         )
 
-        let mergedResults = mergeTranscriptionResults(transcriptionResults)
+        let mergedResults = TranscriptionUtilities.mergeTranscriptionResults(transcriptionResults)
 
         return mergedResults
     }
@@ -1639,7 +1639,7 @@ struct ContentView: View {
             let checkWindow = Int(compressionCheckWindow)
             if currentTokens.count > checkWindow {
                 let checkTokens: [Int] = currentTokens.suffix(checkWindow)
-                let compressionRatio = compressionRatio(of: checkTokens)
+                let compressionRatio = TextUtilities.compressionRatio(of: checkTokens)
                 if compressionRatio > options.compressionRatioThreshold! {
                     Logging.debug("Early stopping due to compression threshold")
                     return false
@@ -1678,7 +1678,7 @@ struct ContentView: View {
 
                     if let prevResult = prevResult {
                         prevWords = prevResult.allWords.filter { $0.start >= lastAgreedSeconds }
-                        let commonPrefix = findLongestCommonPrefix(prevWords, hypothesisWords)
+                        let commonPrefix = TranscriptionUtilities.findLongestCommonPrefix(prevWords, hypothesisWords)
                         Logging.info("[EagerMode] Prev \"\((prevWords.map { $0.word }).joined())\"")
                         Logging.info("[EagerMode] Next \"\((hypothesisWords.map { $0.word }).joined())\"")
                         Logging.info("[EagerMode] Found common prefix \"\((commonPrefix.map { $0.word }).joined())\"")
@@ -1709,7 +1709,7 @@ struct ContentView: View {
                 confirmedText = finalWords
 
                 // Accept the final hypothesis because it is the last of the available audio
-                let lastHypothesis = lastAgreedWords + findLongestDifferentSuffix(prevWords, hypothesisWords)
+                let lastHypothesis = lastAgreedWords + TranscriptionUtilities.findLongestDifferentSuffix(prevWords, hypothesisWords)
                 hypothesisText = lastHypothesis.map { $0.word }.joined()
             }
         } catch {
@@ -1717,7 +1717,7 @@ struct ContentView: View {
             finalizeText()
         }
 
-        let mergedResult = mergeTranscriptionResults(eagerResults, confirmedWords: confirmedWords)
+        let mergedResult = TranscriptionUtilities.mergeTranscriptionResults(eagerResults, confirmedWords: confirmedWords)
 
         return mergedResult
     }
