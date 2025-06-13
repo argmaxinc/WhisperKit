@@ -283,7 +283,7 @@ class RegressionTests: XCTestCase {
             XCTFail("Tokens per second below expected for compute unit \(currentTPS), potential CPU fallback")
         }
 
-        let transcriptionResult = mergeTranscriptionResults(transcriptionResults)
+        let transcriptionResult = TranscriptionUtilities.mergeTranscriptionResults(transcriptionResults)
 
         // Store final measurements
         let (finalMemoryStats, finalLatencyStats) = await testState.processFinalMeasurements()

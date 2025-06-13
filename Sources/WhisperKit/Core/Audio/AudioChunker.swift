@@ -25,7 +25,7 @@ public extension AudioChunking {
                     for result in results {
                         var updatedSegments = [TranscriptionSegment]()
                         for segment in result.segments {
-                            let updatedSegment = updateSegmentTimings(segment: segment, seekTime: seekTime)
+                            let updatedSegment = TranscriptionUtilities.updateSegmentTimings(segment: segment, seekTime: seekTime)
                             updatedSegments.append(updatedSegment)
                         }
                         var updatedResult = result
@@ -73,7 +73,8 @@ open class VADAudioChunker: AudioChunking {
         }
 
         // First create chunks from seek clips
-        let seekClips = prepareSeekClips(contentFrames: audioArray.count, decodeOptions: decodeOptions)
+        let options = decodeOptions ?? DecodingOptions()
+        let seekClips = options.prepareSeekClips(contentFrames: audioArray.count)
 
         var chunkedAudio = [AudioChunk]()
         for (seekClipStart, seekClipEnd) in seekClips {
@@ -99,7 +100,7 @@ open class VADAudioChunker: AudioChunking {
                 guard endIndex > startIndex else {
                     break
                 }
-                Logging.debug("Found chunk from \(formatTimestamp(Float(startIndex) / Float(WhisperKit.sampleRate))) to \(formatTimestamp(Float(endIndex) / Float(WhisperKit.sampleRate)))")
+                Logging.debug("Found chunk from \(Logging.formatTimestamp(Float(startIndex) / Float(WhisperKit.sampleRate))) to \(Logging.formatTimestamp(Float(endIndex) / Float(WhisperKit.sampleRate)))")
                 let audioSlice = AudioChunk(seekOffsetIndex: startIndex, audioSamples: Array(audioArray[startIndex..<endIndex]))
                 chunkedAudio.append(audioSlice)
                 startIndex = endIndex

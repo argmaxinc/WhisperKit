@@ -277,7 +277,7 @@ final class UnitTests: XCTestCase {
         for device in deviceMap {
             let supportedModelsForChip = supportedModels(chip: device.key)
             for deviceIdentifier in device.value {
-                let modelSupport = modelSupport(for: deviceIdentifier, from: loadedConfig)
+                let modelSupport = ModelUtilities.modelSupport(for: deviceIdentifier, from: loadedConfig)
                 XCTAssertEqual(modelSupport, supportedModelsForChip, "Device: \(deviceIdentifier) (\(device.key))")
             }
         }
@@ -285,7 +285,7 @@ final class UnitTests: XCTestCase {
         // Test devices that should use default configuration
         let defaultModelSupport = loadedConfig.defaultSupport.models
         for deviceIdentifier in defaultDevicesList {
-            let modelSupport = modelSupport(for: deviceIdentifier, from: loadedConfig)
+            let modelSupport = ModelUtilities.modelSupport(for: deviceIdentifier, from: loadedConfig)
             XCTAssertEqual(modelSupport, defaultModelSupport, "Device: \(deviceIdentifier)")
         }
     }
@@ -377,17 +377,19 @@ final class UnitTests: XCTestCase {
     }
 
     func testAudioPad() {
+        let audioProcessor = AudioProcessor()
         let audioSamples = [Float](repeating: 0.0, count: 1000)
-        let paddedSamples = AudioProcessor.padOrTrimAudio(fromArray: audioSamples, startAt: 0, toLength: 1600)
+        let paddedSamples = audioProcessor.padOrTrim(fromArray: audioSamples, startAt: 0, toLength: 1600) as! MLMultiArray
         XCTAssertNotNil(paddedSamples, "Failed to pad audio samples")
-        XCTAssertEqual(paddedSamples?.count, 1600, "Padded or trimmed samples count is not as expected")
+        XCTAssertEqual(paddedSamples.count, 1600, "Padded or trimmed samples count is not as expected")
     }
 
     func testAudioTrim() {
+        let audioProcessor = AudioProcessor()
         let audioSamples = [Float](repeating: 0.0, count: 2000)
-        let paddedSamples = AudioProcessor.padOrTrimAudio(fromArray: audioSamples, startAt: 0, toLength: 1600)
+        let paddedSamples = audioProcessor.padOrTrim(fromArray: audioSamples, startAt: 0, toLength: 1600) as! MLMultiArray
         XCTAssertNotNil(paddedSamples, "Failed to trim audio samples")
-        XCTAssertEqual(paddedSamples?.count, 1600, "Padded or trimmed samples count is not as expected")
+        XCTAssertEqual(paddedSamples.count, 1600, "Padded or trimmed samples count is not as expected")
     }
 
     func testAudioResample() throws {
@@ -677,16 +679,17 @@ final class UnitTests: XCTestCase {
     // MARK: - Feature Extractor Tests
 
     func testLogmelOutput() async throws {
+        let audioProcessor = AudioProcessor()
         let audioSamples = [Float](repeating: 0.0, count: 16000)
         let paddedSamples = try XCTUnwrap(
-            AudioProcessor.padOrTrimAudio(fromArray: audioSamples, startAt: 0, toLength: 480_000),
+            audioProcessor.padOrTrim(fromArray: audioSamples, startAt: 0, toLength: 480_000),
             "Failed to pad audio samples"
         )
         let featureExtractor = FeatureExtractor()
         let modelPath = try await URL(filePath: tinyModelPath()).appending(path: "MelSpectrogram.mlmodelc")
         try await featureExtractor.loadModel(at: modelPath, computeUnits: ModelComputeOptions().melCompute)
         let melSpectrogram = try await XCTUnwrapAsync(
-            await featureExtractor.logMelSpectrogram(fromAudio: paddedSamples),
+            await featureExtractor.logMelSpectrogram(fromAudio: paddedSamples) as! MLMultiArray,
             "Failed to produce Mel spectrogram from audio samples"
         )
         let expectedShape: [NSNumber] = [1, 80, 1, 3000]
@@ -696,11 +699,11 @@ final class UnitTests: XCTestCase {
 
     func testCompressionRatioIntArray() {
         let uniqueArray = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-        let uniqueRatio = compressionRatio(of: uniqueArray)
+        let uniqueRatio = TextUtilities.compressionRatio(of: uniqueArray)
         let repeatedArray = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-        let repeatedRatio = compressionRatio(of: repeatedArray)
+        let repeatedRatio = TextUtilities.compressionRatio(of: repeatedArray)
         let repeatedLongArray = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-        let repeatedLongRatio = compressionRatio(of: repeatedLongArray)
+        let repeatedLongRatio = TextUtilities.compressionRatio(of: repeatedLongArray)
 
         XCTAssertLessThan(uniqueRatio, repeatedRatio)
         XCTAssertLessThan(repeatedRatio, repeatedLongRatio)
@@ -708,11 +711,11 @@ final class UnitTests: XCTestCase {
 
     func testCompressionRatioString() {
         let uniqueString = "This is a unique string"
-        let uniqueRatio = compressionRatio(of: uniqueString)
+        let uniqueRatio = TextUtilities.compressionRatio(of: uniqueString)
         let repeatedString = String(repeating: "Repeated text string", count: 5)
-        let repeatedRatio = compressionRatio(of: repeatedString)
+        let repeatedRatio = TextUtilities.compressionRatio(of: repeatedString)
         let repeatedLongString = String(repeating: "Longer repeated text string", count: 10)
-        let repeatedLongRatio = compressionRatio(of: repeatedLongString)
+        let repeatedLongRatio = TextUtilities.compressionRatio(of: repeatedLongString)
 
         XCTAssertLessThan(uniqueRatio, repeatedRatio)
         XCTAssertLessThan(repeatedRatio, repeatedLongRatio)
@@ -744,7 +747,7 @@ final class UnitTests: XCTestCase {
             "Failed to load the model"
         )
         textDecoder.tokenizer = try await XCTUnwrapAsync(
-            await loadTokenizer(for: .tiny),
+            await ModelUtilities.loadTokenizer(for: .tiny),
             "Failed to load the tokenizer"
         )
 
@@ -778,11 +781,11 @@ final class UnitTests: XCTestCase {
         let textDecoder = TextDecoder()
         let modelPath = try await URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
-        textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
+        textDecoder.tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny)
 
         let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.specialTokens.endToken, decodingOptions: decodingOptions)
 
-        let encoderInput = initMLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16, initialValue: FloatType(0))
+        let encoderInput = try MLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16, initialValue: FloatType(0))
         let inputs = try textDecoder.prepareDecoderInputs(withPrompt: [textDecoder.tokenizer!.specialTokens.startOfTranscriptToken])
         let decoderOutput = try await textDecoder.decodeText(from: encoderInput, using: inputs, sampler: tokenSampler, options: decodingOptions)
 
@@ -802,11 +805,11 @@ final class UnitTests: XCTestCase {
         let textDecoder = TextDecoder()
         let modelPath = try await URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
-        textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
+        textDecoder.tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny)
 
         let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.specialTokens.endToken, decodingOptions: decodingOptions)
 
-        let encoderInput = initMLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16, initialValue: FloatType(0))
+        let encoderInput = try MLMultiArray(shape: [1, 384, 1, 1500], dataType: .float16, initialValue: FloatType(0))
         let inputs = try textDecoder.prepareDecoderInputs(withPrompt: [textDecoder.tokenizer!.specialTokens.startOfTranscriptToken])
         let decoderOutput = try await textDecoder.decodeText(from: encoderInput, using: inputs, sampler: tokenSampler, options: decodingOptions)
 
@@ -886,11 +889,11 @@ final class UnitTests: XCTestCase {
         let tokenText = "<|startoftranscript|>"
 
         let textDecoder = TextDecoder()
-        textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
+        textDecoder.tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny)
         let encodedToken = try XCTUnwrap(textDecoder.tokenizer?.convertTokenToId(tokenText))
         let decodedToken = try XCTUnwrap(textDecoder.tokenizer?.decode(tokens: [encodedToken]))
 
-        textDecoder.tokenizer = try await loadTokenizer(for: .largev3)
+        textDecoder.tokenizer = try await ModelUtilities.loadTokenizer(for: .largev3)
         let encodedTokenLarge = try XCTUnwrap(textDecoder.tokenizer?.convertTokenToId(tokenText))
         let decodedTokenLarge = try XCTUnwrap(textDecoder.tokenizer?.decode(tokens: [encodedTokenLarge]))
 
@@ -905,11 +908,11 @@ final class UnitTests: XCTestCase {
         // This token index changes with v3
         let tokenTextShifted = "<|0.00|>"
 
-        textDecoder.tokenizer = try await loadTokenizer(for: .tiny)
+        textDecoder.tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny)
         let encodedTokenShifted = try XCTUnwrap(textDecoder.tokenizer?.convertTokenToId(tokenTextShifted))
         let decodedTokenShifted = try XCTUnwrap(textDecoder.tokenizer?.decode(tokens: [encodedTokenShifted]))
 
-        textDecoder.tokenizer = try await loadTokenizer(for: .largev3)
+        textDecoder.tokenizer = try await ModelUtilities.loadTokenizer(for: .largev3)
         let encodedTokenLargeShifted = try XCTUnwrap(textDecoder.tokenizer?.convertTokenToId(tokenTextShifted))
         let decodedTokenLargeShifted = try XCTUnwrap(textDecoder.tokenizer?.decode(tokens: [encodedTokenLargeShifted]))
 
@@ -924,7 +927,7 @@ final class UnitTests: XCTestCase {
     func testTokenizerOutput() async throws {
         let tokenInputs = [50364, 400, 370, 452, 7177, 6280, 1029, 406, 437, 428, 1941, 393, 360, 337, 291, 1029, 437, 291, 393, 360, 337, 428, 1941, 13, 50889]
 
-        let tokenizer = try await loadTokenizer(for: .largev3)
+        let tokenizer = try await ModelUtilities.loadTokenizer(for: .largev3)
         let decodedText = tokenizer.decode(tokens: tokenInputs)
 
         XCTAssertNotNil(decodedText)
@@ -959,7 +962,7 @@ final class UnitTests: XCTestCase {
     }
 
     func testSplitToWordTokens() async throws {
-        let tokenizer = try await loadTokenizer(for: .tiny)
+        let tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny)
 
         // Hello, world! This is a test, isn't it?
         let tokenIds = [50364, 2425, 11, 1002, 0, 50414, 50414, 639, 307, 257, 220, 31636, 11, 1943, 380, 309, 30, 50257]
@@ -976,7 +979,7 @@ final class UnitTests: XCTestCase {
     }
 
     func testSplitToWordTokensSpanish() async throws {
-        let tokenizer = try await loadTokenizer(for: .tiny)
+        let tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny)
 
         // ¡Hola Mundo! Esta es una prueba, ¿no?
         let tokenIds = [50363, 24364, 48529, 376, 6043, 0, 20547, 785, 2002, 48241, 11, 3841, 1771, 30, 50257]
@@ -993,7 +996,7 @@ final class UnitTests: XCTestCase {
     }
 
     func testSplitToWordTokensJapanese() async throws {
-        let tokenizer = try await loadTokenizer(for: .tiny)
+        let tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny)
 
         // こんにちは、世界！これはテストですよね？
         let tokenIds = [50364, 38088, 1231, 24486, 171, 120, 223, 25212, 22985, 40498, 4767, 30346, 171, 120, 253, 50257]
@@ -1814,6 +1817,24 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(activitySeekTimestamps.map(\.endTime), [2.2, 4.4, 7.6, 10.4, 11.0])
     }
 
+    func testVoiceActivityAsync() async throws {
+        let vad = EnergyVAD()
+
+        let emptyResult = try await vad.voiceActivityAsync(in: [])
+        XCTAssertTrue(emptyResult.isEmpty)
+
+        let audioFilePath = try XCTUnwrap(
+            Bundle.current(for: self).path(forResource: "jfk", ofType: "wav"),
+            "Audio file not found"
+        )
+        let audioBuffer = try AudioProcessor.loadAudio(fromPath: audioFilePath)
+        let audioArray = AudioProcessor.convertBufferToArray(buffer: audioBuffer)
+
+        let jfkVadAsyc = try await vad.voiceActivityAsync(in: audioArray)
+        let jfkVadSync = vad.voiceActivity(in: audioArray)
+        XCTAssertEqual(jfkVadAsyc, jfkVadSync)
+    }
+
     func testFindLongestSilence() throws {
         let vad = EnergyVAD()
 
@@ -2033,7 +2054,7 @@ final class UnitTests: XCTestCase {
             }
         }
 
-        let tokenizer = try await loadTokenizer(for: .tiny)
+        let tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny)
 
         let wordTokenIds = [400, 370, 452, 7177, 6280, 11, 1029, 406, 437, 428, 1941, 393, 360, 337, 291, 11, 1029, 437, 291, 393, 360, 337, 428, 1941, 13]
         let result = try SegmentSeeker().findAlignment(
@@ -2210,7 +2231,7 @@ final class UnitTests: XCTestCase {
         let sequence1 = [word1, word3]
         let sequence2 = [word2, word4]
 
-        let commonPrefix = findLongestCommonPrefix(sequence1, sequence2)
+        let commonPrefix = TranscriptionUtilities.findLongestCommonPrefix(sequence1, sequence2)
         XCTAssertEqual(commonPrefix.count, 2)
         XCTAssertEqual(commonPrefix[0].word, "hello")
         XCTAssertEqual(commonPrefix[1].word, "WORLD")
@@ -2219,7 +2240,7 @@ final class UnitTests: XCTestCase {
         let sequence3 = [word1, word3]
         let sequence4 = [word2, word4, WordTiming(word: "suffix", tokens: [5], start: 2, end: 3, probability: 1.0)]
 
-        let differentSuffix = findLongestDifferentSuffix(sequence3, sequence4)
+        let differentSuffix = TranscriptionUtilities.findLongestDifferentSuffix(sequence3, sequence4)
         XCTAssertEqual(differentSuffix.count, 1)
         XCTAssertEqual(differentSuffix[0].word, "suffix")
     }
@@ -2342,7 +2363,7 @@ final class UnitTests: XCTestCase {
             lastSpeechTimestamp: 0,
             constrainedMedianDuration: constrainedMedianDuration,
             maxDuration: maxDuration,
-            tokenizer: try! await loadTokenizer(for: .tiny)
+            tokenizer: try! await ModelUtilities.loadTokenizer(for: .tiny)
         )
 
         let updatedWords = updatedSegments.compactMap { $0.words }.flatMap { $0 }
@@ -2439,7 +2460,7 @@ final class UnitTests: XCTestCase {
             lastSpeechTimestamp: 0,
             constrainedMedianDuration: constrainedMedianDuration,
             maxDuration: maxDuration,
-            tokenizer: try! await loadTokenizer(for: .tiny)
+            tokenizer: try! await ModelUtilities.loadTokenizer(for: .tiny)
         )
 
         let updatedWords = updatedSegments.first!.words!
@@ -2515,7 +2536,7 @@ final class UnitTests: XCTestCase {
 
                     if let prevResult = prevResult {
                         prevWords = prevResult.allWords.filter { $0.start >= lastAgreedSeconds }
-                        let commonPrefix = findLongestCommonPrefix(prevWords, hypothesisWords)
+                        let commonPrefix = TranscriptionUtilities.findLongestCommonPrefix(prevWords, hypothesisWords)
                         Logging.info("[testStreamingTimestamps] Prev \"\((prevWords.map { $0.word }).joined())\"")
                         Logging.info("[testStreamingTimestamps] Next \"\((hypothesisWords.map { $0.word }).joined())\"")
                         Logging.info("[testStreamingTimestamps] Found common prefix \"\((commonPrefix.map { $0.word }).joined())\"")
@@ -2545,7 +2566,7 @@ final class UnitTests: XCTestCase {
         }
 
         // Accept the final hypothesis because it is the last of the available audio
-        let final = lastAgreedWords + findLongestDifferentSuffix(prevWords, hypothesisWords)
+        let final = lastAgreedWords + TranscriptionUtilities.findLongestDifferentSuffix(prevWords, hypothesisWords)
         confirmedWords.append(contentsOf: final)
 
         let finalWords = confirmedWords.map { $0.word }.joined()

@@ -57,6 +57,7 @@ public actor AudioStreamTranscriber {
         self.transcribeTask = TranscribeTask(
             currentTimings: TranscriptionTimings(),
             progress: Progress(),
+            audioProcessor: audioProcessor,
             audioEncoder: audioEncoder,
             featureExtractor: featureExtractor,
             segmentSeeker: segmentSeeker,
@@ -211,7 +212,7 @@ public actor AudioStreamTranscriber {
         let currentTokens = progress.tokens
         if currentTokens.count > compressionCheckWindow {
             let checkTokens: [Int] = currentTokens.suffix(compressionCheckWindow)
-            let compressionRatio = compressionRatio(of: checkTokens)
+            let compressionRatio = TextUtilities.compressionRatio(of: checkTokens)
             if compressionRatio > options.compressionRatioThreshold ?? 0.0 {
                 return false
             }
