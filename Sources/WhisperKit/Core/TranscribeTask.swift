@@ -14,12 +14,14 @@ final class TranscribeTask {
     private let segmentSeeker: any SegmentSeeking
     private let textDecoder: any TextDecoding
     private let tokenizer: any WhisperTokenizer
+    private let audioProcessor: any AudioProcessing
 
     public var segmentDiscoveryCallback: SegmentDiscoveryCallback?
 
     init(
         currentTimings: TranscriptionTimings,
         progress: Progress?,
+        audioProcessor: (any AudioProcessing)? = nil,
         audioEncoder: any AudioEncoding,
         featureExtractor: any FeatureExtracting,
         segmentSeeker: any SegmentSeeking,
@@ -28,6 +30,7 @@ final class TranscribeTask {
     ) {
         self.timings = currentTimings
         self.progress = progress ?? Progress()
+        self.audioProcessor = audioProcessor ?? AudioProcessor()
         self.audioEncoder = audioEncoder
         self.featureExtractor = featureExtractor
         self.segmentSeeker = segmentSeeker
@@ -70,31 +73,23 @@ final class TranscribeTask {
         // MARK: - Prefill KV Cache
 
         let prefillStartTime = CFAbsoluteTimeGetCurrent()
-        var prefilledCacheSize = 0
         if options.usePrefillPrompt {
-            let prefilledInputs = try await textDecoder.prefillDecoderInputs(decoderInputs, withOptions: options)
-            decoderInputs = prefilledInputs
-            prefilledCacheSize = decoderInputs.cacheLength[0].intValue
+            decoderInputs = try await textDecoder.prefillDecoderInputs(decoderInputs, withOptions: options)
         }
+        // Update cache size based on prefill
+        let prefilledCacheSize = decoderInputs.cacheLength[0].intValue
         let prefillTime = CFAbsoluteTimeGetCurrent() - prefillStartTime
         timings.prefill = prefillTime
-
-        // Setup masks based on prefill values
-        prefilledCacheSize += 1 // Add 1 for initial masked cache update
-        decoderInputs.kvCacheUpdateMask[prefilledCacheSize - 1] = 1.0
-        for i in 0..<prefilledCacheSize {
-            decoderInputs.decoderKeyPaddingMask[i] = 0.0
-        }
 
         Logging.debug("Prefill time: \(prefillTime)")
         Logging.debug("Prefill prompt: \(decoderInputs.initialPrompt.map { tokenizer.convertIdToToken($0) ?? "" })")
 
         // MARK: - Main decoder loop
 
-        var fallbackCount: Double = 0
+        var fallbackCount = 0
 
         // Process seek clips
-        let seekClips = prepareSeekClips(contentFrames: contentFrames, decodeOptions: options)
+        let seekClips = options.prepareSeekClips(contentFrames: contentFrames)
         Logging.debug("Decoding seek clips: \(seekClips)")
 
         let totalSeekDuration = seekClips.reduce(0) { $0 + ($1.end - $1.start) }
@@ -108,19 +103,21 @@ final class TranscribeTask {
 
             let previousSeekProgress = progress.completedUnitCount
 
-            let windowPadding = 16000 // prevent hallucinations at the end of the clip by stopping up to 1.0s early
+            // Prevent hallucinations at the end of the clip by stopping clip seek early
+            let windowPadding = Int(options.windowClipTime * Float(WhisperKit.sampleRate))
+            
             let windowSamples = featureExtractor.windowSamples ?? Constants.defaultWindowSamples
             while seek < seekClipEnd - windowPadding {
                 // calculate new encoder segment features
                 let timeOffset = Float(seek) / Float(WhisperKit.sampleRate)
                 let segmentSize = min(windowSamples, contentFrames - seek, seekClipEnd - seek)
                 let timeOffsetEnd = Float(seek + segmentSize) / Float(WhisperKit.sampleRate)
-                Logging.debug("Decoding Seek: \(seek) (\(formatTimestamp(timeOffset))s)")
-                Logging.debug("Decoding Window Size: \(segmentSize) (\(formatTimestamp(timeOffsetEnd - timeOffset))s)")
+                Logging.debug("Decoding Seek: \(seek) (\(Logging.formatTimestamp(timeOffset))s)")
+                Logging.debug("Decoding Window Size: \(segmentSize) (\(Logging.formatTimestamp(timeOffsetEnd - timeOffset))s)")
 
                 let audioProcessingStart = Date()
                 let clipAudioSamples = Array(audioArray[seek..<(seek + segmentSize)])
-                guard let audioSamples = AudioProcessor.padOrTrimAudio(fromArray: clipAudioSamples, startAt: 0, toLength: windowSamples) else {
+                guard let audioSamples = audioProcessor.padOrTrim(fromArray: clipAudioSamples, startAt: 0, toLength: windowSamples) else {
                     throw WhisperError.transcriptionFailed("Audio samples are nil")
                 }
                 let processTime = Date().timeIntervalSince(audioProcessingStart)
@@ -146,7 +143,7 @@ final class TranscribeTask {
                 timings.totalEncodingRuns += 1
 
                 // All features are computed, now we can decode
-                Logging.info("Decoding \(formatTimestamp(timeOffset))s - \(formatTimestamp(timeOffsetEnd))s")
+                Logging.info("Decoding \(Logging.formatTimestamp(timeOffset))s - \(Logging.formatTimestamp(timeOffsetEnd))s")
 
                 // Overload progress callback to include windowId
                 let decodingCallback: ((TranscriptionProgress) -> Bool?) = { [weak self] progress in
@@ -219,6 +216,12 @@ final class TranscribeTask {
                         }
                     }
                 }
+                
+                // Prevent seek from exceeding previousSeek + maxWindowSeek if provided
+                if let maxWindowSeek = options.maxWindowSeek {
+                    let maxSeekOffset = previousSeek + maxWindowSeek
+                    seek = min(seek, maxSeekOffset)
+                }
 
                 guard let currentSegments = currentSegments else {
                     // No current segment found, skip to next window
@@ -226,7 +229,7 @@ final class TranscribeTask {
                 }
 
                 if options.verbose {
-                    let lines = formatSegments(currentSegments)
+                    let lines = TranscriptionUtilities.formatSegments(currentSegments)
                     Logging.debug("Segments for window:")
                     for line in lines {
                         Logging.debug(line)
@@ -338,9 +341,9 @@ final class TranscribeTask {
 
                 if let fallback = decodingResult?.fallback, fallback.needsFallback {
                     // Reset decoder inputs for fallback
-                    fallbackCount = Double(i)
+                    fallbackCount = i
                     timings.decodingFallback += Date().timeIntervalSince(decodeWithFallbackStart)
-                    timings.totalDecodingFallbacks = fallbackCount
+                    timings.totalDecodingFallbacks = Double(fallbackCount)
                     decoderInputs.reset(
                         prefilledCacheSize: prefilledCacheSize,
                         maxTokenContext: decodeOptions?.sampleLength ?? Constants.maxTokenContext

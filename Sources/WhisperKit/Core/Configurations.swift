@@ -114,7 +114,9 @@ open class WhisperKitConfig {
 ///   - withoutTimestamps: Whether to include timestamps in the transcription result.
 ///   - wordTimestamps: Whether to include word-level timestamps in the transcription result.
 ///   - maxInitialTimestamp: Maximal initial timestamp.
+///   - maxWindowSeek: If provided, prevents the seek in samples from exceeding this value for each window
 ///   - clipTimestamps: Array of timestamps (in seconds) to split the audio into segments for transcription.
+///   - windowClipTime: Time in seconds to clip from the end of an audio window to help prevent hallucinations
 ///   - promptTokens: Array of token IDs to use as the conditioning prompt for the decoder. These are prepended to the prefill tokens.
 ///   - prefixTokens: Array of token IDs to use as the initial prefix for the decoder. These are appended to the prefill tokens.
 ///   - suppressBlank: If true, blank tokens will be suppressed during decoding.
@@ -141,7 +143,9 @@ public struct DecodingOptions: Codable {
     public var withoutTimestamps: Bool
     public var wordTimestamps: Bool
     public var maxInitialTimestamp: Float?
+    public var maxWindowSeek: Int?
     public var clipTimestamps: [Float]
+    public var windowClipTime: Float
     public var promptTokens: [Int]?
     public var prefixTokens: [Int]?
     public var suppressBlank: Bool
@@ -169,7 +173,9 @@ public struct DecodingOptions: Codable {
         withoutTimestamps: Bool = false,
         wordTimestamps: Bool = false,
         maxInitialTimestamp: Float? = nil,
+        maxWindowSeek: Int? = nil,
         clipTimestamps: [Float] = [],
+        windowClipTime: Float = 1.0,
         promptTokens: [Int]? = nil,
         prefixTokens: [Int]? = nil,
         suppressBlank: Bool = false,
@@ -196,7 +202,9 @@ public struct DecodingOptions: Codable {
         self.withoutTimestamps = withoutTimestamps
         self.wordTimestamps = wordTimestamps
         self.maxInitialTimestamp = maxInitialTimestamp
+        self.maxWindowSeek = maxWindowSeek
         self.clipTimestamps = clipTimestamps
+        self.windowClipTime = windowClipTime
         self.promptTokens = promptTokens
         self.prefixTokens = prefixTokens
         self.suppressBlank = suppressBlank

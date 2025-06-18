@@ -150,7 +150,7 @@ open class WhisperKit {
     public static func recommendedModels() -> ModelSupport {
         let deviceName = Self.deviceName()
         Logging.debug("Running on \(deviceName)")
-        return modelSupport(for: deviceName)
+        return ModelUtilities.modelSupport(for: deviceName)
     }
 
     public static func recommendedRemoteModels(
@@ -160,7 +160,7 @@ open class WhisperKit {
     ) async -> ModelSupport {
         let deviceName = Self.deviceName()
         let config = await Self.fetchModelSupportConfig(from: repo, downloadBase: downloadBase, token: token)
-        return modelSupport(for: deviceName, from: config)
+        return ModelUtilities.modelSupport(for: deviceName, from: config)
     }
 
     public static func fetchModelSupportConfig(
@@ -346,10 +346,10 @@ open class WhisperKit {
         Logging.debug("Loading models from \(path.path) with prewarmMode: \(prewarmMode)")
 
         // Find either mlmodelc or mlpackage models
-        let logmelUrl = detectModelURL(inFolder: path, named: "MelSpectrogram")
-        let encoderUrl = detectModelURL(inFolder: path, named: "AudioEncoder")
-        let decoderUrl = detectModelURL(inFolder: path, named: "TextDecoder")
-        let decoderPrefillUrl = detectModelURL(inFolder: path, named: "TextDecoderContextPrefill")
+        let logmelUrl = ModelUtilities.detectModelURL(inFolder: path, named: "MelSpectrogram")
+        let encoderUrl = ModelUtilities.detectModelURL(inFolder: path, named: "AudioEncoder")
+        let decoderUrl = ModelUtilities.detectModelURL(inFolder: path, named: "TextDecoder")
+        let decoderPrefillUrl = ModelUtilities.detectModelURL(inFolder: path, named: "TextDecoderContextPrefill")
 
         for item in [logmelUrl, encoderUrl, decoderUrl] {
             if !FileManager.default.fileExists(atPath: item.path) {
@@ -425,12 +425,12 @@ open class WhisperKit {
         guard let logitsDim = textDecoder.logitsSize, let encoderDim = audioEncoder.embedSize else {
             throw WhisperError.tokenizerUnavailable()
         }
-        textDecoder.isModelMultilingual = isModelMultilingual(logitsDim: logitsDim)
-        modelVariant = detectVariant(logitsDim: logitsDim, encoderDim: encoderDim)
+        textDecoder.isModelMultilingual = ModelUtilities.isModelMultilingual(logitsDim: logitsDim)
+        modelVariant = ModelUtilities.detectVariant(logitsDim: logitsDim, encoderDim: encoderDim)
         Logging.debug("Loading tokenizer for \(modelVariant)")
         let tokenizerLoadStart = CFAbsoluteTimeGetCurrent()
 
-        let tokenizer = try await loadTokenizer(
+        let tokenizer = try await ModelUtilities.loadTokenizer(
             for: modelVariant,
             tokenizerFolder: tokenizerFolder,
             useBackgroundSession: useBackgroundDownloadSession
@@ -514,11 +514,9 @@ open class WhisperKit {
 
         let options = DecodingOptions(verbose: Logging.shared.logLevel != .none)
         let decoderInputs = try textDecoder.prepareDecoderInputs(withPrompt: [tokenizer.specialTokens.startOfTranscriptToken])
-        decoderInputs.kvCacheUpdateMask[0] = 1.0
-        decoderInputs.decoderKeyPaddingMask[0] = 0.0
 
         // Detect language using up to the first 30 seconds
-        guard let audioSamples = AudioProcessor.padOrTrimAudio(
+        guard let audioSamples = audioProcessor.padOrTrim(
             fromArray: audioArray,
             startAt: 0,
             toLength: featureExtractor.windowSamples ?? Constants.defaultWindowSamples
@@ -805,7 +803,7 @@ open class WhisperKit {
                 let convertTime = Date().timeIntervalSince(convertAudioStart)
                 currentTimings.audioLoading = convertTime
                 Logging.debug("Audio loading and convert time: \(convertTime)")
-                logCurrentMemoryUsage("Audio Loading and Convert")
+                Logging.logCurrentMemoryUsage("Audio Loading and Convert")
             }
             return try AudioProcessor.loadAudioAsFloatArray(fromPath: audioPath, channelMode: audioInputConfig.channelMode)
         }
@@ -942,6 +940,7 @@ open class WhisperKit {
             let transcribeTask = TranscribeTask(
                 currentTimings: currentTimings,
                 progress: childProgress,
+                audioProcessor: audioProcessor,
                 audioEncoder: audioEncoder,
                 featureExtractor: featureExtractor,
                 segmentSeeker: segmentSeeker,

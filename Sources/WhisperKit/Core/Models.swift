@@ -339,7 +339,7 @@ public enum DecodingTask: Codable, CustomStringConvertible, CaseIterable {
     }
 }
 
-open class DecodingInputs {
+open class DecodingInputs: DecodingInputsType {
     public var initialPrompt: [Int]
     public var inputIds: MLMultiArray
     public var cacheLength: MLMultiArray
@@ -364,16 +364,16 @@ open class DecodingInputs {
         self.prefillValueCache = prefillValueCache
     }
 
-    func reset(prefilledCacheSize: Int, maxTokenContext: Int) {
+    public func reset(prefilledCacheSize: Int, maxTokenContext: Int) {
         // NOTE: Because we have a mask on the kvcache,
         // we can simply shift the masks without touching the data,
         // it will be overwritten by the new data without impact on the output
-        cacheLength[0] = NSNumber(value: prefilledCacheSize - 1)
+        cacheLength[0] = NSNumber(value: prefilledCacheSize)
 
         // Store token history and
         // Reset masks to prepare for next window
         for i in 0..<maxTokenContext {
-            if i <= prefilledCacheSize - 1 {
+            if i <= prefilledCacheSize {
                 // Inside overlap window
                 decoderKeyPaddingMask[i] = 0
                 kvCacheUpdateMask[i - 1] = 0
@@ -506,59 +506,6 @@ public struct DecodingResult {
     }
 }
 
-@frozen
-public enum WhisperError: Error, LocalizedError, Equatable {
-    case tokenizerUnavailable(String = "Tokenizer is unavailable")
-    case modelsUnavailable(String = "Models are unavailable")
-    case prefillFailed(String = "Prefill failed")
-    case audioProcessingFailed(String = "Audio processing failed")
-    case decodingLogitsFailed(String = "Unable to decode logits from the model output")
-    case segmentingFailed(String = "Creating segments failed")
-    case loadAudioFailed(String = "Load audio failed")
-    case prepareDecoderInputsFailed(String = "Prepare decoder inputs failed")
-    case transcriptionFailed(String = "Transcription failed")
-    case decodingFailed(String = "Decoding failed")
-    case microphoneUnavailable(String = "No available microphone to record or stream")
-
-    public var errorDescription: String? {
-        switch self {
-            case let .tokenizerUnavailable(message):
-                Logging.error(message)
-                return message
-            case let .modelsUnavailable(message):
-                Logging.error(message)
-                return message
-            case let .prefillFailed(message):
-                Logging.error(message)
-                return message
-            case let .audioProcessingFailed(message):
-                Logging.error(message)
-                return message
-            case let .decodingLogitsFailed(message):
-                Logging.error(message)
-                return message
-            case let .segmentingFailed(message):
-                Logging.error(message)
-                return message
-            case let .loadAudioFailed(message):
-                Logging.error(message)
-                return message
-            case let .prepareDecoderInputsFailed(message):
-                Logging.error(message)
-                return message
-            case let .transcriptionFailed(message):
-                Logging.error(message)
-                return message
-            case let .decodingFailed(message):
-                Logging.error(message)
-                return message
-            case let .microphoneUnavailable(message):
-                Logging.error(message)
-                return message
-        }
-    }
-}
-
 // Structs
 
 public struct TranscriptionResult: Codable {
@@ -587,7 +534,7 @@ public struct TranscriptionResult: Codable {
             let start = segment.start
             let end = segment.end
             let text = segment.text
-            let line = "[Segment \(i)] [\(formatTimestamp(start)) --> \(formatTimestamp(end))] \(text)"
+            let line = "[Segment \(i)] [\(Logging.formatTimestamp(start)) --> \(Logging.formatTimestamp(end))] \(text)"
             Logging.debug(line)
         }
     }
@@ -605,21 +552,21 @@ public struct TranscriptionResult: Codable {
         // NOTE: this is a relative value for percentage calculations
         let fullDecodingDuration = max(timings.decodingLoop, timings.fullPipeline) * 1000 // Convert to milliseconds
 
-        let audioLoadTime = formatTimeWithPercentage(timings.audioLoading, 1, fullDecodingDuration)
-        let audioProcTime = formatTimeWithPercentage(timings.audioProcessing, timings.totalAudioProcessingRuns, fullDecodingDuration)
-        let logmelsTime = formatTimeWithPercentage(timings.logmels, timings.totalLogmelRuns, fullDecodingDuration)
-        let encodingTime = formatTimeWithPercentage(timings.encoding, timings.totalEncodingRuns, fullDecodingDuration)
-        let decodingInitTime = formatTimeWithPercentage(timings.decodingInit, 1, fullDecodingDuration)
-        let prefillInfo = formatTimeWithPercentage(timings.prefill, 1, fullDecodingDuration)
-        let predictionsInfo = formatTimeWithPercentage(timings.decodingPredictions, totalLoops, fullDecodingDuration)
-        let filteringInfo = formatTimeWithPercentage(timings.decodingFiltering, totalLoops, fullDecodingDuration)
-        let samplingInfo = formatTimeWithPercentage(timings.decodingSampling, totalLoops, fullDecodingDuration)
-        let kvCachingInfo = formatTimeWithPercentage(timings.decodingKvCaching, timings.totalKVUpdateRuns, fullDecodingDuration)
-        let wordTimestampInfo = formatTimeWithPercentage(timings.decodingWordTimestamps, timings.totalTimestampAlignmentRuns, fullDecodingDuration)
-        let nonPredTimeInfo = formatTimeWithPercentage(timings.decodingNonPrediction, totalLoops, fullDecodingDuration)
-        let windowingInfo = formatTimeWithPercentage(timings.decodingWindowing - timings.decodingWordTimestamps, timings.totalDecodingWindows, fullDecodingDuration)
-        let fallbackInfo = formatTimeWithPercentage(timings.decodingFallback, timings.totalDecodingFallbacks, fullDecodingDuration)
-        let decodingLoopInfo = formatTimeWithPercentage(timings.decodingLoop, totalLoops, fullDecodingDuration)
+        let audioLoadTime = Logging.formatTimeWithPercentage(timings.audioLoading, 1, fullDecodingDuration)
+        let audioProcTime = Logging.formatTimeWithPercentage(timings.audioProcessing, timings.totalAudioProcessingRuns, fullDecodingDuration)
+        let logmelsTime = Logging.formatTimeWithPercentage(timings.logmels, timings.totalLogmelRuns, fullDecodingDuration)
+        let encodingTime = Logging.formatTimeWithPercentage(timings.encoding, timings.totalEncodingRuns, fullDecodingDuration)
+        let decodingInitTime = Logging.formatTimeWithPercentage(timings.decodingInit, 1, fullDecodingDuration)
+        let prefillInfo = Logging.formatTimeWithPercentage(timings.prefill, 1, fullDecodingDuration)
+        let predictionsInfo = Logging.formatTimeWithPercentage(timings.decodingPredictions, totalLoops, fullDecodingDuration)
+        let filteringInfo = Logging.formatTimeWithPercentage(timings.decodingFiltering, totalLoops, fullDecodingDuration)
+        let samplingInfo = Logging.formatTimeWithPercentage(timings.decodingSampling, totalLoops, fullDecodingDuration)
+        let kvCachingInfo = Logging.formatTimeWithPercentage(timings.decodingKvCaching, timings.totalKVUpdateRuns, fullDecodingDuration)
+        let wordTimestampInfo = Logging.formatTimeWithPercentage(timings.decodingWordTimestamps, timings.totalTimestampAlignmentRuns, fullDecodingDuration)
+        let nonPredTimeInfo = Logging.formatTimeWithPercentage(timings.decodingNonPrediction, totalLoops, fullDecodingDuration)
+        let windowingInfo = Logging.formatTimeWithPercentage(timings.decodingWindowing - timings.decodingWordTimestamps, timings.totalDecodingWindows, fullDecodingDuration)
+        let fallbackInfo = Logging.formatTimeWithPercentage(timings.decodingFallback, timings.totalDecodingFallbacks, fullDecodingDuration)
+        let decodingLoopInfo = Logging.formatTimeWithPercentage(timings.decodingLoop, totalLoops, fullDecodingDuration)
 
         // Logging
         Logging.info("""

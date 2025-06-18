@@ -58,7 +58,7 @@ struct TranscribeCLI: AsyncParsableCommand {
             print("\nStarting transcription process...")
         }
 
-        let resolvedAudioPaths = cliArguments.audioPath.map { resolveAbsolutePath($0) }
+        let resolvedAudioPaths = cliArguments.audioPath.map { FileManager.resolveAbsolutePath($0) }
         if cliArguments.verbose {
             print("\nResolved audio paths:")
             resolvedAudioPaths.forEach { print("  - \($0)") }
@@ -197,7 +197,7 @@ struct TranscribeCLI: AsyncParsableCommand {
 
         // Log timings for full transcription run
         if cliArguments.verbose {
-            let mergedResult = mergeTranscriptionResults(allSuccessfulResults)
+            let mergedResult = TranscriptionUtilities.mergeTranscriptionResults(allSuccessfulResults)
             mergedResult.logTimings()
             // Output tokensPerSecond, realTimeFactor, and speedFactor
             let timings = mergedResult.timings
@@ -210,7 +210,7 @@ struct TranscribeCLI: AsyncParsableCommand {
         for (audioPath, result) in zip(resolvedAudioPaths, transcribeResult) {
             do {
                 let partialResult = try result.get()
-                let mergedPartialResult = mergeTranscriptionResults(partialResult)
+                let mergedPartialResult = TranscriptionUtilities.mergeTranscriptionResults(partialResult)
                 processTranscriptionResult(audioPath: audioPath, transcribeResult: mergedPartialResult)
             } catch {
                 print("Error when transcribing \(audioPath): \(error)")
@@ -268,7 +268,7 @@ struct TranscribeCLI: AsyncParsableCommand {
         guard let audioPath = cliArguments.audioPath.first else {
             throw CocoaError.error(.fileNoSuchFile)
         }
-        let resolvedAudioPath = resolveAbsolutePath(audioPath)
+        let resolvedAudioPath = FileManager.resolveAbsolutePath(audioPath)
         guard FileManager.default.fileExists(atPath: resolvedAudioPath) else {
             throw CocoaError.error(.fileNoSuchFile)
         }
@@ -317,7 +317,7 @@ struct TranscribeCLI: AsyncParsableCommand {
 
                     if let prevResult = prevResult {
                         prevWords = prevResult.allWords.filter { $0.start >= lastAgreedSeconds }
-                        let commonPrefix = findLongestCommonPrefix(prevWords, hypothesisWords)
+                        let commonPrefix = TranscriptionUtilities.findLongestCommonPrefix(prevWords, hypothesisWords)
                         if cliArguments.verbose {
                             print("[whisperkit-cli] Prev \"\((prevWords.map { $0.word }).joined())\"")
                             print("[whisperkit-cli] Next \"\((hypothesisWords.map { $0.word }).joined())\"")
@@ -359,10 +359,10 @@ struct TranscribeCLI: AsyncParsableCommand {
             }
         }
 
-        let final = lastAgreedWords + findLongestDifferentSuffix(prevWords, hypothesisWords)
+        let final = lastAgreedWords + TranscriptionUtilities.findLongestDifferentSuffix(prevWords, hypothesisWords)
         confirmedWords.append(contentsOf: final)
 
-        let mergedResult = mergeTranscriptionResults(results, confirmedWords: confirmedWords)
+        let mergedResult = TranscriptionUtilities.mergeTranscriptionResults(results, confirmedWords: confirmedWords)
 
         processTranscriptionResult(audioPath: audioPath, transcribeResult: mergedResult)
     }
