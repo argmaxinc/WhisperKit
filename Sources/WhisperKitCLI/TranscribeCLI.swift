@@ -132,20 +132,44 @@ struct TranscribeCLI: AsyncParsableCommand {
 
         // Record the start time
         let startTime = Date()
-        var isTranscribing = true
+        
+        // Actor to manage shared state safely
+        actor ProgressState {
+            var isTranscribing = true
+            var emaEstimatedTotalTime: TimeInterval = 0
+            
+            func stopTranscribing() {
+                isTranscribing = false
+            }
+            
+            func updateEmaEstimatedTotalTime(_ newValue: TimeInterval, smoothingFactor: Double) {
+                if emaEstimatedTotalTime == 0 {
+                    emaEstimatedTotalTime = newValue
+                } else {
+                    emaEstimatedTotalTime = smoothingFactor * newValue + (1 - smoothingFactor) * emaEstimatedTotalTime
+                }
+            }
+            
+            func getEmaEstimatedTotalTime() -> TimeInterval {
+                return emaEstimatedTotalTime
+            }
+            
+            func getIsTranscribing() -> Bool {
+                return isTranscribing
+            }
+        }
+        
+        let progressState = ProgressState()
         var progressBarTask: Task<Void, Never>?
         
         if cliArguments.verbose {
             print("\nStarting transcription with progress tracking...")
 
-            // Variables for estimated time remaining
-            var estimatedTimeRemaining: TimeInterval = 0
-            var emaEstimatedTotalTime: TimeInterval = 0
             let smoothingFactor = 0.1 // For exponential moving average
 
             // Start the progress bar task
             progressBarTask = Task {
-                while isTranscribing {
+                while await progressState.getIsTranscribing() {
                     let progress = whisperKit.progress.fractionCompleted
                     let currentTime = Date()
                     let elapsedTime = currentTime.timeIntervalSince(startTime)
@@ -155,11 +179,8 @@ struct TranscribeCLI: AsyncParsableCommand {
                     if progress > 0.05 { // Start estimating after 5% progress
                         let currentEstimatedTotalTime = elapsedTime / progress
                         // Apply exponential moving average for smoothing
-                        if emaEstimatedTotalTime == 0 {
-                            emaEstimatedTotalTime = currentEstimatedTotalTime
-                        } else {
-                            emaEstimatedTotalTime = smoothingFactor * currentEstimatedTotalTime + (1 - smoothingFactor) * emaEstimatedTotalTime
-                        }
+                        await progressState.updateEmaEstimatedTotalTime(currentEstimatedTotalTime, smoothingFactor: smoothingFactor)
+                        let emaEstimatedTotalTime = await progressState.getEmaEstimatedTotalTime()
                         estimatedTimeRemaining = max(emaEstimatedTotalTime - elapsedTime, 0)
                     }
 
@@ -178,7 +199,7 @@ struct TranscribeCLI: AsyncParsableCommand {
 
         if cliArguments.verbose {
             // Indicate that transcription is done
-            isTranscribing = false
+            await progressState.stopTranscribing()
             // Wait for the progress bar task to finish
             await progressBarTask?.value
             
@@ -547,7 +568,7 @@ struct TranscribeCLI: AsyncParsableCommand {
 
         // Clear the current line and return to the beginning
         print("\r\u{001B}[K", terminator: "")
-        
+
         var statusLine = "[\(bar)] \(progressPercentage)%"
         statusLine += String(format: " | Elapsed Time: %.2f s", elapsedTime)
         statusLine += " | Remaining: \(estimatedTimeRemainingString)"
