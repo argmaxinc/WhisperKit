@@ -490,7 +490,7 @@ struct TranscribeCLI: AsyncParsableCommand {
             withoutTimestamps: cliArguments.withoutTimestamps,
             wordTimestamps: cliArguments.wordTimestamps || cliArguments.streamSimulated,
             clipTimestamps: cliArguments.clipTimestamps,
-            supressTokens: cliArguments.supressTokens,
+            suppressTokens: cliArguments.suppressTokens,
             compressionRatioThreshold: cliArguments.compressionRatioThreshold ?? 2.4,
             logProbThreshold: cliArguments.logprobThreshold ?? -1.0,
             firstTokenLogProbThreshold: cliArguments.firstTokenLogProbThreshold,
