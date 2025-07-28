@@ -419,6 +419,9 @@ struct TranscribeCLI: AsyncParsableCommand {
         let downloadTokenizerFolder: URL? =
             if let filePath = cliArguments.downloadTokenizerPath {
                 URL(filePath: filePath)
+            } else if let modelPath = cliArguments.modelPath {
+                // If no tokenizer path is provided, use the model path if it exists
+                URL(filePath: modelPath)
             } else {
                 nil
             }

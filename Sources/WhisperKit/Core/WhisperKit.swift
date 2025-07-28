@@ -440,7 +440,7 @@ open class WhisperKit {
 
             let tokenizer = try await ModelUtilities.loadTokenizer(
                 for: modelVariant,
-                tokenizerFolder: path.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent(),
+                tokenizerFolder: path,
                 useBackgroundSession: useBackgroundDownloadSession
             )
             currentTimings.tokenizerLoadTime = CFAbsoluteTimeGetCurrent() - tokenizerLoadStart
