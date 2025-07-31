@@ -1395,7 +1395,7 @@ final class UnitTests: XCTestCase {
 
     func testCallbackWithEarlyStopping() async throws {
         guard #available(macOS 15, iOS 18, watchOS 11, visionOS 2, *) else {
-            throw XCTSkip("Disabled on macOS 13 due to swift concurrency flakiness")
+            throw XCTSkip("Disabled on macOS 14 and below due to swift concurrency flakiness")
         }
         
         let callbackTestTask = Task(priority: .userInitiated) {
