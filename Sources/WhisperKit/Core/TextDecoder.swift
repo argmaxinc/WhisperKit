@@ -64,6 +64,7 @@ public protocol TextDecoding {
     var isModelMultilingual: Bool { get set }
     var supportsWordTimestamps: Bool { get }
     var logitsSize: Int? { get }
+    var logitsFilters: [any LogitsFiltering]? { get set }
     var kvCacheEmbedDim: Int? { get }
     var kvCacheMaxSequenceLength: Int? { get }
     var windowSize: Int? { get }
@@ -489,6 +490,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
     public var tokenizer: WhisperTokenizer?
     public var prefillData: WhisperMLModel?
     public var isModelMultilingual: Bool = false
+    public var logitsFilters: [any LogitsFiltering]? = []
     private let earlyStopActor = EarlyStopActor()
     private var languageLogitsFilter: LanguageLogitsFilter?
 
@@ -743,42 +745,13 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         // Single loop variables
         var timings = TranscriptionTimings()
         let prefilledIndex = decoderInputs.cacheLength[0].intValue
-        let intialPromptIndex = decoderInputs.initialPrompt.count
+        let initialPromptIndex = decoderInputs.initialPrompt.count
         var currentTokens: [Int] = decoderInputs.initialPrompt
         var nextToken: Int = decoderInputs.initialPrompt.last!
         var logProbs: [Float] = Array(repeating: 0, count: currentTokens.count)
 
         // Logits filters
-        var logitsFilters: [any LogitsFiltering] = []
-        if options.suppressBlank {
-            logitsFilters.append(
-                SuppressBlankFilter(
-                    specialTokens: tokenizer.specialTokens,
-                    sampleBegin: prefilledIndex
-                )
-            )
-        }
-
-        if !options.supressTokens.isEmpty {
-            logitsFilters.append(SuppressTokensFilter(suppressTokens: options.supressTokens))
-        }
-
-        if !options.withoutTimestamps {
-            let maxInitialTimestampIndex: Int? =
-                if let maxInitialTimestamp = options.maxInitialTimestamp {
-                    Int(maxInitialTimestamp / WhisperKit.secondsPerTimeToken)
-                } else {
-                    nil
-                }
-            logitsFilters.append(
-                TimestampRulesFilter(
-                    specialTokens: tokenizer.specialTokens,
-                    sampleBegin: intialPromptIndex,
-                    maxInitialTimestampIndex: maxInitialTimestampIndex,
-                    isModelMultilingual: isModelMultilingual
-                )
-            )
-        }
+        let logitsFilters = createLogitsFilters(options: options, prefilledIndex: prefilledIndex, initialPromptIndex: initialPromptIndex, tokenizer: tokenizer)
 
         // MARK: Main loop
 
@@ -792,12 +765,12 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         for tokenIndex in prefilledIndex..<loopCount {
             let loopStart = Date()
 
-            let isPrefill = tokenIndex < intialPromptIndex - 1 // Prefill stops at the last token of the initial prompt
-            let isLastPrefillToken = tokenIndex == intialPromptIndex - 1
+            let isPrefill = tokenIndex < initialPromptIndex - 1 // Prefill stops at the last token of the initial prompt
+            let isLastPrefillToken = tokenIndex == initialPromptIndex - 1
             let isFirstToken = tokenIndex == prefilledIndex
 
             // Check if current index is part of the initial prompt
-            if tokenIndex < intialPromptIndex {
+            if tokenIndex < initialPromptIndex {
                 let isTimestampToken = currentTokens[tokenIndex] >= tokenizer.specialTokens.timeTokenBegin
                 let modelPredictedTimestamp = nextToken >= tokenizer.specialTokens.timeTokenBegin
 
@@ -1072,5 +1045,49 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             fallback: decodingFallback
         )
         return decodingResult
+    }
+    
+    internal func createLogitsFilters(
+        options: DecodingOptions,
+        prefilledIndex: Int,
+        initialPromptIndex: Int,
+        tokenizer: WhisperTokenizer
+    ) -> [any LogitsFiltering] {
+        // Start with custom logits filters
+        var allFilters: [any LogitsFiltering] = logitsFilters ?? []
+
+        // Add built-in filters based on options
+        if options.suppressBlank {
+            allFilters.append(
+                SuppressBlankFilter(
+                    specialTokens: tokenizer.specialTokens,
+                    sampleBegin: prefilledIndex
+                )
+            )
+        }
+
+        if !options.supressTokens.isEmpty {
+            let filteredSupressTokens = options.supressTokens.filter { $0 < tokenizer.specialTokens.specialTokenBegin }
+            allFilters.append(SuppressTokensFilter(suppressTokens: filteredSupressTokens))
+        }
+
+        if !options.withoutTimestamps {
+            let maxInitialTimestampIndex: Int? =
+                if let maxInitialTimestamp = options.maxInitialTimestamp {
+                    Int(maxInitialTimestamp / WhisperKit.secondsPerTimeToken)
+                } else {
+                    nil
+                }
+            allFilters.append(
+                TimestampRulesFilter(
+                    specialTokens: tokenizer.specialTokens,
+                    sampleBegin: initialPromptIndex,
+                    maxInitialTimestampIndex: maxInitialTimestampIndex,
+                    isModelMultilingual: isModelMultilingual
+                )
+            )
+        }
+        
+        return allFilters
     }
 }

@@ -28,7 +28,6 @@ open class WhisperKit {
     public var featureExtractor: any FeatureExtracting
     public var audioEncoder: any AudioEncoding
     public var textDecoder: any TextDecoding
-    public var logitsFilters: [any LogitsFiltering]
     public var segmentSeeker: any SegmentSeeking
     public var voiceActivityDetector: VoiceActivityDetector?
 
@@ -58,10 +57,13 @@ open class WhisperKit {
         featureExtractor = config.featureExtractor ?? FeatureExtractor()
         audioEncoder = config.audioEncoder ?? AudioEncoder()
         textDecoder = config.textDecoder ?? TextDecoder()
-        logitsFilters = config.logitsFilters ?? []
+        if let logitsFilters = config.logitsFilters {
+            textDecoder.logitsFilters = logitsFilters
+        }
+        
         segmentSeeker = config.segmentSeeker ?? SegmentSeeker()
         voiceActivityDetector = config.voiceActivityDetector
-        tokenizerFolder = config.tokenizerFolder
+        tokenizerFolder = config.tokenizerFolder ?? config.downloadBase
         useBackgroundDownloadSession = config.useBackgroundDownloadSession
         currentTimings = TranscriptionTimings()
         Logging.shared.logLevel = config.verbose ? config.logLevel : .none
@@ -421,25 +423,32 @@ open class WhisperKit {
             return
         }
 
-        // Check model dimensions to assign appropriate tokenizer
-        guard let logitsDim = textDecoder.logitsSize, let encoderDim = audioEncoder.embedSize else {
-            throw WhisperError.tokenizerUnavailable()
+        // Only load tokenizer if not already set
+        if let tokenizer {
+            Logging.debug("Tokenizer already loaded, skipping tokenizer loading")
+            textDecoder.tokenizer = tokenizer
+        } else {
+            // Check model dimensions to assign appropriate tokenizer
+            guard let logitsDim = textDecoder.logitsSize, let encoderDim = audioEncoder.embedSize else {
+                throw WhisperError.tokenizerUnavailable()
+            }
+            textDecoder.isModelMultilingual = ModelUtilities.isModelMultilingual(logitsDim: logitsDim)
+            modelVariant = ModelUtilities.detectVariant(logitsDim: logitsDim, encoderDim: encoderDim)
+            
+            Logging.debug("Loading tokenizer for \(modelVariant)")
+            let tokenizerLoadStart = CFAbsoluteTimeGetCurrent()
+
+            let tokenizer = try await ModelUtilities.loadTokenizer(
+                for: modelVariant,
+                tokenizerFolder: path,
+                useBackgroundSession: useBackgroundDownloadSession
+            )
+            currentTimings.tokenizerLoadTime = CFAbsoluteTimeGetCurrent() - tokenizerLoadStart
+
+            self.tokenizer = tokenizer
+            textDecoder.tokenizer = tokenizer
+            Logging.debug("Loaded tokenizer in \(String(format: "%.2f", currentTimings.tokenizerLoadTime))s")
         }
-        textDecoder.isModelMultilingual = ModelUtilities.isModelMultilingual(logitsDim: logitsDim)
-        modelVariant = ModelUtilities.detectVariant(logitsDim: logitsDim, encoderDim: encoderDim)
-        Logging.debug("Loading tokenizer for \(modelVariant)")
-        let tokenizerLoadStart = CFAbsoluteTimeGetCurrent()
-
-        let tokenizer = try await ModelUtilities.loadTokenizer(
-            for: modelVariant,
-            tokenizerFolder: tokenizerFolder,
-            useBackgroundSession: useBackgroundDownloadSession
-        )
-        currentTimings.tokenizerLoadTime = CFAbsoluteTimeGetCurrent() - tokenizerLoadStart
-
-        self.tokenizer = tokenizer
-        textDecoder.tokenizer = tokenizer
-        Logging.debug("Loaded tokenizer in \(String(format: "%.2f", currentTimings.tokenizerLoadTime))s")
 
         modelState = .loaded
 

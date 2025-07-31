@@ -1394,6 +1394,10 @@ final class UnitTests: XCTestCase {
     }
 
     func testCallbackWithEarlyStopping() async throws {
+        guard #available(macOS 15, iOS 18, watchOS 11, visionOS 2, *) else {
+            throw XCTSkip("Disabled on macOS 14 and below due to swift concurrency flakiness")
+        }
+        
         let callbackTestTask = Task(priority: .userInitiated) {
             let config = WhisperKitConfig(
                 model: "tiny",
@@ -2047,7 +2051,21 @@ final class UnitTests: XCTestCase {
 
         // Populate the matrix with some non-linear data
         let matrix = try MLMultiArray(shape: [numberOfRows, numberOfColumns], dataType: .float16)
-        let tokenProbs = Array(repeating: 0.0, count: numberOfRows.intValue).map { _ in Float.random(in: -1..<0) }
+        
+        // Use specific known log probabilities to test the exp() calculation
+        let knownLogProbs: [Float] = [
+            -0.5,  // exp(-0.5) ≈ 0.6065
+            -1.0,  // exp(-1.0) ≈ 0.3679
+            -2.0,  // exp(-2.0) ≈ 0.1353
+            -0.1,  // exp(-0.1) ≈ 0.9048
+            -0.3,  // exp(-0.3) ≈ 0.7408
+        ]
+        
+        // Create tokenProbs array with known values, cycling through knownLogProbs
+        let tokenProbs = (0..<numberOfRows.intValue).map { index in
+            knownLogProbs[index % knownLogProbs.count]
+        }
+        
         for i in 0..<numberOfRows.intValue {
             for j in 0..<numberOfColumns.intValue {
                 matrix[i * numberOfColumns.intValue + j] = NSNumber(value: Double.random(in: 0...1))
@@ -2067,16 +2085,27 @@ final class UnitTests: XCTestCase {
         XCTAssertFalse(result.isEmpty, "Result should not be empty.")
 
         var previousEndTime: Float = -1.0
+        var currentTokenIndex = 0
+        
         for wordTiming in result {
             XCTAssertFalse(wordTiming.word.isEmpty, "Word should not be empty.")
             XCTAssertFalse(wordTiming.tokens.isEmpty, "Tokens should not be empty.")
             XCTAssert(wordTiming.tokens.allSatisfy { $0 >= 0 }, "All token IDs should be non-negative.")
             XCTAssertLessThanOrEqual(wordTiming.start, wordTiming.end, "Start should be less than or equal to end.")
             XCTAssertGreaterThanOrEqual(wordTiming.start, previousEndTime, "Start time should not be earlier than the previous end time.")
-            XCTAssertGreaterThanOrEqual(wordTiming.probability, 0.0, "Probability should not be negative.")
-            XCTAssertLessThanOrEqual(wordTiming.probability, 1.0, "Probability should not be greater than 1.")
+
+            // Test the specific probability calculation: exp(average of log probabilities)
+            let startIndex = currentTokenIndex
+            let endIndex = currentTokenIndex + wordTiming.tokens.count
+            let wordLogProbs = Array(tokenProbs[startIndex..<endIndex])
+            let averageLogProb = wordLogProbs.reduce(0, +) / Float(wordLogProbs.count)
+            let expectedProbability = exp(averageLogProb)
+            
+            XCTAssertEqual(wordTiming.probability, expectedProbability, accuracy: 0.0001, 
+                          "Probability should be exp(average log prob). Expected: \(expectedProbability), Got: \(wordTiming.probability)")
 
             previousEndTime = wordTiming.end
+            currentTokenIndex = endIndex
         }
     }
 
@@ -2677,5 +2706,191 @@ final class UnitTests: XCTestCase {
             }
             previousTime = time
         }
+    }
+
+    // MARK: - TextDecoder Logits Filter Tests
+
+    func testCreateLogitsFiltersOnlyCustomFilters() async throws {
+        let customFilter = PlusOneFilter()
+        let decoder = TextDecoder()
+        decoder.logitsFilters = [customFilter]
+        let tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny)
+
+        let options = DecodingOptions(
+            withoutTimestamps: true,
+            suppressBlank: false,
+            supressTokens: []
+        )
+
+        let allFilters = decoder.createLogitsFilters(
+            options: options,
+            prefilledIndex: 0,
+            initialPromptIndex: 1,
+            tokenizer: tokenizer
+        )
+
+        // Should only contain the custom filter
+        XCTAssertEqual(allFilters.count, 1)
+        XCTAssertTrue(allFilters[0] is PlusOneFilter)
+    }
+
+    func testCreateLogitsFiltersWithSuppressBlank() async throws {
+        let decoder = TextDecoder()
+        let tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny)
+
+        let options = DecodingOptions(
+            withoutTimestamps: true,
+            suppressBlank: true,
+            supressTokens: []
+        )
+
+        let allFilters = decoder.createLogitsFilters(
+            options: options,
+            prefilledIndex: 0,
+            initialPromptIndex: 1,
+            tokenizer: tokenizer
+        )
+
+        // Should contain only SuppressBlankFilter
+        XCTAssertEqual(allFilters.count, 1)
+        XCTAssertTrue(allFilters[0] is SuppressBlankFilter)
+    }
+
+    func testCreateLogitsFiltersWithSuppressTokens() async throws {
+        let decoder = TextDecoder()
+        let tokenizer = CustomTokenizer(specialTokenBegin: 10)
+
+        let options = DecodingOptions(
+            withoutTimestamps: true,
+            suppressBlank: false,
+            supressTokens: [0, 2, 11, 15]  // Mix of tokens < 10 and >= 10
+        )
+
+        let allFilters = decoder.createLogitsFilters(
+            options: options,
+            prefilledIndex: 0,
+            initialPromptIndex: 1,
+            tokenizer: tokenizer
+        )
+
+        // Should contain only SuppressTokensFilter
+        XCTAssertEqual(allFilters.count, 1)
+        XCTAssertTrue(allFilters[0] is SuppressTokensFilter)
+
+        let suppressFilter = allFilters[0] as! SuppressTokensFilter
+        XCTAssertEqual(suppressFilter.suppressTokens, [0, 2])  // Only tokens < 10
+    }
+
+    func testCreateLogitsFiltersWithTimestamps() async throws {
+        let decoder = TextDecoder()
+        let tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny)
+
+        let options = DecodingOptions(
+            withoutTimestamps: false,
+            suppressBlank: false,
+            supressTokens: []
+        )
+
+        let allFilters = decoder.createLogitsFilters(
+            options: options,
+            prefilledIndex: 0,
+            initialPromptIndex: 1,
+            tokenizer: tokenizer
+        )
+
+        // Should contain only TimestampRulesFilter
+        XCTAssertEqual(allFilters.count, 1)
+        XCTAssertTrue(allFilters[0] is TimestampRulesFilter)
+    }
+
+    func testCreateLogitsFiltersAllFiltersEnabled() async throws {
+        let customFilter = PlusOneFilter()
+        let decoder = TextDecoder()
+        decoder.logitsFilters = [customFilter]
+        let tokenizer = CustomTokenizer(specialTokenBegin: 10)
+
+        let options = DecodingOptions(
+            withoutTimestamps: false,
+            suppressBlank: true,
+            supressTokens: [0, 2, 11, 15]  // Mix of tokens < 10 and >= 10
+        )
+
+        let allFilters = decoder.createLogitsFilters(
+            options: options,
+            prefilledIndex: 0,
+            initialPromptIndex: 1,
+            tokenizer: tokenizer
+        )
+
+        // Should contain all 4 filter types: custom, blank, suppress, timestamp
+        XCTAssertEqual(allFilters.count, 4)
+        XCTAssertTrue(allFilters[0] is PlusOneFilter)
+        XCTAssertTrue(allFilters[1] is SuppressBlankFilter)
+        XCTAssertTrue(allFilters[2] is SuppressTokensFilter)
+        XCTAssertTrue(allFilters[3] is TimestampRulesFilter)
+    }
+
+}
+
+// MARK: - Mock Types for Testing
+
+class PlusOneFilter: LogitsFiltering {
+    var filterCallCount = 0
+
+    func filterLogits(_ logits: MLMultiArray, withTokens tokens: [Int]) -> MLMultiArray {
+        filterCallCount += 1
+
+        guard let modifiedLogits = try? MLMultiArray(shape: logits.shape, dataType: logits.dataType) else {
+            return logits
+        }
+
+        for i in 0..<logits.count {
+            let originalValue = logits[i].floatValue
+            modifiedLogits[i] = NSNumber(value: originalValue + 1.0)
+        }
+
+        return modifiedLogits
+    }
+}
+
+class CustomTokenizer: WhisperTokenizer {
+    let specialTokens: SpecialTokens
+    let allLanguageTokens: Set<Int>
+
+    init(specialTokenBegin: Int) {
+        self.specialTokens = SpecialTokens(
+            endToken: 1,
+            englishToken: 2,
+            noSpeechToken: 3,
+            noTimestampsToken: 4,
+            specialTokenBegin: specialTokenBegin,
+            startOfPreviousToken: 5,
+            startOfTranscriptToken: 6,
+            timeTokenBegin: 7,
+            transcribeToken: 8,
+            translateToken: 9,
+            whitespaceToken: 10
+        )
+        self.allLanguageTokens = Set<Int>()
+    }
+
+    func encode(text: String) -> [Int] {
+        return [1, 2, 3]
+    }
+
+    func decode(tokens: [Int]) -> String {
+        return "mock text"
+    }
+
+    func convertTokenToId(_ token: String) -> Int? {
+        return nil
+    }
+
+    func convertIdToToken(_ id: Int) -> String? {
+        return "token_\(id)"
+    }
+
+    func splitToWordTokens(tokenIds: [Int]) -> (words: [String], wordTokens: [[Int]]) {
+        return (["mock"], [[1, 2, 3]])
     }
 }

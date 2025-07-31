@@ -395,7 +395,7 @@ open class SegmentSeeker: SegmentSeeking {
                 tokens: wordTokenArray,
                 start: wordStartTime,
                 end: wordEndTime,
-                probability: pow(10, probability)
+                probability: exp(probability)
             )
             wordTimings.append(wordTiming)
         }

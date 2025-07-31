@@ -160,17 +160,17 @@ public struct TranscriptionUtilities {
     }
 }
 
-@available(*, deprecated, message: "Subject to removal in a future version. Use `TranscriptionSegment.formatSegments(_:withTimestamps:)` instead.")
+@available(*, deprecated, message: "Subject to removal in a future version. Use `TranscriptionUtilities.formatSegments(_:withTimestamps:)` instead.")
 public func formatSegments(_ segments: [TranscriptionSegment], withTimestamps: Bool = true) -> [String] {
     return TranscriptionUtilities.formatSegments(segments, withTimestamps: withTimestamps)
 }
 
-@available(*, deprecated, message: "Subject to removal in a future version. Use `TranscriptionSegment.findLongestCommonPrefix(_:_:)` instead.")
+@available(*, deprecated, message: "Subject to removal in a future version. Use `TranscriptionUtilities.findLongestCommonPrefix(_:_:)` instead.")
 public func findLongestCommonPrefix(_ words1: [WordTiming], _ words2: [WordTiming]) -> [WordTiming] {
     return TranscriptionUtilities.findLongestCommonPrefix(words1, words2)
 }
 
-@available(*, deprecated, message: "Subject to removal in a future version. Use `TranscriptionSegment.findLongestDifferentSuffix(_:_:)` instead.")
+@available(*, deprecated, message: "Subject to removal in a future version. Use `TranscriptionUtilities.findLongestDifferentSuffix(_:_:)` instead.")
 public func findLongestDifferentSuffix(_ words1: [WordTiming], _ words2: [WordTiming]) -> [WordTiming] {
     TranscriptionUtilities.findLongestDifferentSuffix(words1, words2)
 }
