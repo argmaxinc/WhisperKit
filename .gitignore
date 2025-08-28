@@ -25,6 +25,10 @@ Models
 **/*.m4a
 **/*.flac
 
+# Swift Client build artifacts
+Examples/ServeCLIClient/Swift/.build
+Examples/ServeCLIClient/Swift/.swiftpm
+
 ## Xcode
 # Build generated
 build/

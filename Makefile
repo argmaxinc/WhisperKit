@@ -1,4 +1,6 @@
-.PHONY: setup setup-huggingface-cli setup-model-repo download-models download-model build build-cli test clean-package-caches list-devices benchmark-connected-devices benchmark-device benchmark-devices extract-xcresult
+.PHONY: setup setup-huggingface-cli setup-model-repo download-models download-model build build-cli test \
+ 		clean-package-caches list-devices benchmark-connected-devices benchmark-device benchmark-devices \
+		extract-xcresult build-local-server generate-server generate-server-spec generate-server-code
 
 PIP_COMMAND := pip3
 PYTHON_COMMAND := python3
@@ -101,7 +103,6 @@ build-cli:
 	@echo "Building WhisperKit CLI..."
 	@swift build -c release --product whisperkit-cli
 
-
 test:
 	@echo "Running tests..."
 	@swift test -v
@@ -134,3 +135,24 @@ clean-package-caches:
 	@trash ~/Library/Developer/Xcode/DerivedData/WhisperKit* || true
 	@swift package purge-cache
 	@swift package reset
+
+build-local-server:
+	@echo "Building WhisperKit CLI with server support..."
+	@BUILD_ALL=1 swift build -c release --product whisperkit-cli
+
+generate-server:
+	@echo "Generating server OpenAPI spec and code..."
+	@cd scripts && uv run python3 generate_local_server_openapi.py --latest
+	@echo ""
+	@echo "=========================================="
+	@echo "Generating server code from OpenAPI spec..."
+	@echo "=========================================="
+	@BUILD_ALL=1 swift run swift-openapi-generator generate scripts/specs/localserver_openapi.yaml \
+		--output-directory Sources/WhisperKitCLI/Server/GeneratedSources \
+		--mode types \
+		--mode server
+	@echo ""
+	@echo "=========================================="
+	@echo "Server generation complete!"
+	@echo "=========================================="
+	@echo "Run 'BUILD_ALL=1 swift run whisperkit-cli serve' to start the server"

@@ -174,6 +174,125 @@ Which should print a transcription of the audio file. If you would like to strea
 swift run whisperkit-cli transcribe --model-path "Models/whisperkit-coreml/openai_whisper-large-v3" --stream
 ```
 
+### WhisperKit Local Server
+
+WhisperKit includes a local server that implements the OpenAI Audio API, allowing you to use existing OpenAI SDK clients or generate new ones. The server supports transcription and translation with streaming capabilities.
+
+#### Building the Server
+
+```bash
+# Build with server support
+make build-local-server
+
+# Or manually with the build flag
+BUILD_ALL=1 swift build --product whisperkit-cli
+```
+
+#### Starting the Server
+
+```bash
+# Start server with default settings
+BUILD_ALL=1 swift run whisperkit-cli serve
+
+# Custom host and port
+BUILD_ALL=1 swift run whisperkit-cli serve --host 0.0.0.0 --port 8080
+
+# With specific model and verbose logging
+BUILD_ALL=1 swift run whisperkit-cli serve --model tiny --verbose
+
+# See all configurable parameters
+BUILD_ALL=1 swift run whisperkit-cli serve --help
+```
+
+#### API Endpoints
+
+- **POST** `/v1/audio/transcriptions` - Transcribe audio to text
+- **POST** `/v1/audio/translations` - Translate audio to English
+
+#### Supported Parameters
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `file` | Audio file (wav, mp3, m4a, flac) | Required |
+| `model` | Model identifier | Server default |
+| `language` | Source language code | Auto-detect |
+| `prompt` | Text to guide transcription | None |
+| `response_format` | Output format (json, verbose_json) | verbose_json |
+| `temperature` | Sampling temperature (0.0-1.0) | 0.0 |
+| `timestamp_granularities[]` | Timing detail (word, segment) | segment |
+| `stream` | Enable streaming | false |
+
+#### Client Examples
+
+**Python Client (OpenAI SDK)**
+```bash
+cd Examples/ServeCLIClient/Python
+uv sync
+python whisperkit_client.py transcribe --file audio.wav --language en
+python whisperkit_client.py translate --file audio.wav
+```
+
+**Swift Client (Generated from OpenAPI Spec, see ServeCLIClient/Swift/updateClient.sh)**
+```bash
+cd Examples/ServeCLIClient/Swift
+swift run whisperkit-client transcribe audio.wav --language en
+swift run whisperkit-client translate audio.wav
+```
+
+**CurlClient (Shell Scripts)**
+```bash
+cd Examples/ServeCLIClient/Curl
+chmod +x *.sh
+./transcribe.sh audio.wav --language en
+./translate.sh audio.wav --language es
+./test.sh  # Run comprehensive test suite
+```
+
+#### Generating the API Specification
+
+The server's OpenAPI specification and code are generated from the official OpenAI API:
+
+```bash
+# Generate latest spec and server code
+make generate-server
+```
+
+#### Client Generation
+
+You can generate clients for any language using the OpenAPI specification, for example:
+
+```bash
+# Generate Python client
+swift run swift-openapi-generator generate scripts/specs/localserver_openapi.yaml \
+  --output-directory python-client \
+  --mode client \
+  --mode types
+
+# Generate TypeScript client
+npx @openapitools/openapi-generator-cli generate \
+  -i scripts/specs/localserver_openapi.yaml \
+  -g typescript-fetch \
+  -o typescript-client
+```
+
+#### API Limitations
+
+Compared to the official OpenAI API, the local server has these limitations:
+
+- **Response formats**: Only `json` and `verbose_json` supported (no plain text, SRT, VTT formats)
+- **Model selection**: Client must launch server with desired model via `--model` flag
+
+#### Fully Supported Features
+
+The local server fully supports these OpenAI API features:
+
+- **Include parameters**: `logprobs` parameter for detailed token-level log probabilities
+- **Streaming responses**: Server-Sent Events (SSE) for real-time transcription
+- **Timestamp granularities**: Both `word` and `segment` level timing
+- **Language detection**: Automatic language detection or manual specification
+- **Temperature control**: Sampling temperature for transcription randomness
+- **Prompt text**: Text guidance for transcription style and context
+
 ## Contributing & Roadmap
 
 Our goal is to make WhisperKit better and better over time and we'd love your help! Just search the code for "TODO" for a variety of features that are yet to be built. Please refer to our [contribution guidelines](CONTRIBUTING.md) for submitting issues, pull requests, and coding standards, where we also have a public roadmap of features we are looking forward to building in the future.

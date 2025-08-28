@@ -6,6 +6,14 @@ import Foundation
 
 let VERSION: String = "development"
 
+var subcommands: [ParsableCommand.Type] {
+#if BUILD_SERVER_CLI
+    [TranscribeCLI.self, ServeCLI.self]
+#else
+    [TranscribeCLI.self]
+#endif
+}
+
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 @main
 struct WhisperKitCLI: AsyncParsableCommand {
@@ -14,6 +22,6 @@ struct WhisperKitCLI: AsyncParsableCommand {
         abstract: "WhisperKit CLI",
         discussion: "Swift native speech recognition with Whisper for Apple Silicon",
         version: VERSION,
-        subcommands: [TranscribeCLI.self]
+        subcommands: subcommands
     )
 }
