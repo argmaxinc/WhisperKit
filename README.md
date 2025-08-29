@@ -39,6 +39,7 @@ WhisperKit is an [Argmax](https://www.takeargmax.com) framework for deploying st
   - [Model Selection](#model-selection)
   - [Generating Models](#generating-models)
   - [Swift CLI](#swift-cli)
+- [WhisperKit Local Server](#whisperkit-local-server)
 - [Contributing \& Roadmap](#contributing--roadmap)
 - [License](#license)
 - [Citation](#citation)
@@ -176,7 +177,10 @@ swift run whisperkit-cli transcribe --model-path "Models/whisperkit-coreml/opena
 
 ### WhisperKit Local Server
 
-WhisperKit includes a local server that implements the OpenAI Audio API, allowing you to use existing OpenAI SDK clients or generate new ones. The server supports transcription and translation with streaming capabilities.
+WhisperKit includes a local server that implements the OpenAI Audio API, allowing you to use existing OpenAI SDK clients or generate new ones. The server supports transcription and translation with **output streaming** capabilities (real-time transcription results as they're generated).
+
+> [!NOTE]
+> **For real-time transcription server with full-duplex streaming capabilities**, check out [WhisperKit Pro Local Server](https://www.argmaxinc.com/blog/argmax-local-server) which provides live audio streaming and real-time transcription for applications requiring continuous audio processing.
 
 #### Building the Server
 
@@ -230,6 +234,17 @@ cd Examples/ServeCLIClient/Python
 uv sync
 python whisperkit_client.py transcribe --file audio.wav --language en
 python whisperkit_client.py translate --file audio.wav
+```
+
+Quick Python example:
+```python
+from openai import OpenAI
+client = OpenAI(base_url="http://localhost:50060/v1")
+result = client.audio.transcriptions.create(
+    file=open("audio.wav", "rb"),
+    model="tiny"  # Model parameter is required
+)
+print(result.text)
 ```
 
 **Swift Client (Generated from OpenAPI Spec, see ServeCLIClient/Swift/updateClient.sh)**

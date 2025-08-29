@@ -71,3 +71,10 @@ fastlane/upload_folder
 !*.xcodeproj/xcshareddata/
 !*.xcworkspace/contents.xcworkspacedata
 /*.gcno
+
+# Swift build artifacts
+*.d
+*.o
+*.swiftdeps
+*.swiftmodule
+*.swiftdoc
