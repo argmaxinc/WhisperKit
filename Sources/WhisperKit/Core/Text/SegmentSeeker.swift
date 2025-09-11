@@ -285,11 +285,14 @@ open class SegmentSeeker: SegmentSeeking {
         prepended: String = Constants.defaultPrependPunctuations,
         appended: String = Constants.defaultAppendPunctuations
     ) -> [WordTiming] {
+        guard !alignment.isEmpty else {
+            return []
+        }
         var prependedAlignment = [WordTiming]()
         var appendedAlignment = [WordTiming]()
 
         // Include the first word if it's not a prepended punctuation
-        if !alignment.isEmpty && !prepended.contains(alignment[0].word.trimmingCharacters(in: .whitespaces)) {
+        if !prepended.contains(alignment[0].word.trimmingCharacters(in: .whitespaces)) {
             prependedAlignment.append(alignment[0])
         }
 
@@ -304,7 +307,11 @@ open class SegmentSeeker: SegmentSeeking {
             {
                 currentWord.word = previousWord.word + currentWord.word
                 currentWord.tokens = previousWord.tokens + currentWord.tokens
-                prependedAlignment[prependedAlignment.count - 1] = currentWord
+                if prependedAlignment.isEmpty {
+                    prependedAlignment.append(currentWord)
+                } else {
+                    prependedAlignment[prependedAlignment.count - 1] = currentWord
+                }
             } else {
                 prependedAlignment.append(currentWord)
             }

@@ -2449,7 +2449,16 @@ final class UnitTests: XCTestCase {
             currentTokenIndex = endIndex
         }
     }
-
+    
+    func testMergePunctuationsWithEmptyInput() {
+        let out = SegmentSeeker().mergePunctuations(
+            alignment: [],
+            prepended: Constants.defaultPrependPunctuations,
+            appended: Constants.defaultAppendPunctuations
+        )
+        XCTAssertTrue(out.isEmpty)
+    }
+    
     func testMergePunctuations() async {
         // Hello, world! This is a test, isn't it?
         let wordTimings = [
@@ -2544,6 +2553,41 @@ final class UnitTests: XCTestCase {
             XCTAssertEqual(mergedAlignmentTiming[i].start, expectedWordTimings[i].start, "Start time at index \(i) does not match")
             XCTAssertEqual(mergedAlignmentTiming[i].end, expectedWordTimings[i].end, "End time at index \(i) does not match")
             XCTAssertEqual(mergedAlignmentTiming[i].probability, expectedWordTimings[i].probability, "Probability at index \(i) does not match")
+        }
+    }
+    
+    func testMergePunctuationsSpanishStartWithPrepend() async {
+        // Input starts with " ¿"
+        // [" ¿", " Que", " pasa", " mundo", "?"]
+        let wordTimings = [
+            WordTiming(word: " ¿", tokens: [1201], start: 0, end: 1, probability: 1),
+            WordTiming(word: "Que", tokens: [1202], start: 1, end: 2, probability: 0.9),
+            WordTiming(word: " pasa", tokens: [1203], start: 2, end: 3, probability: 1),
+            WordTiming(word: " mundo", tokens: [1204], start: 3, end: 4, probability: 0.6),
+            WordTiming(word: "?", tokens: [1205], start: 4, end: 5, probability: 0.4),
+        ]
+        
+        let merged = SegmentSeeker().mergePunctuations(alignment: wordTimings)
+        
+        let expected = [
+            // Merge previous " ¿" into current " Que" → keep current's start/end (1,2)
+            // The 2nd WordTiming's probability is preserved
+            WordTiming(word: " ¿Que", tokens: [1201, 1202], start: 1, end: 2, probability: 0.9),
+            WordTiming(word: " pasa", tokens: [1203], start: 2, end: 3, probability: 1),
+            // Merge "?" into previous " mundo" → keep previous's start/end (3,4)
+            WordTiming(word: " mundo?", tokens: [1204, 1205], start: 3, end: 4, probability: 0.6),
+        ]
+        
+        // First, assert the counts are as expected (12 inputs → 2 merges → 10 outputs)
+        XCTAssertEqual(merged.count, expected.count, "Merged timings count does not match expected count")
+        
+        // Then, assert all fields match element-by-element
+        for i in 0..<expected.count {
+            XCTAssertEqual(merged[i].word, expected[i].word, "Word text at index \(i) does not match")
+            XCTAssertEqual(merged[i].tokens, expected[i].tokens, "Tokens at index \(i) do not match")
+            XCTAssertEqual(merged[i].start, expected[i].start, "Start time at index \(i) does not match")
+            XCTAssertEqual(merged[i].end, expected[i].end, "End time at index \(i) does not match")
+            XCTAssertEqual(merged[i].probability, expected[i].probability, "Probability at index \(i) does not match")
         }
     }
 
