@@ -14,7 +14,7 @@ struct TranscribeCLI: AsyncParsableCommand {
     )
 
     @OptionGroup
-    var cliArguments: CLIArguments
+    var cliArguments: TranscribeCLIArguments
 
     mutating func validate() throws {
         if let language = cliArguments.language {
@@ -91,7 +91,8 @@ struct TranscribeCLI: AsyncParsableCommand {
             print("Initializing models...")
         }
 
-        let whisperKit = try await setupWhisperKit()
+        let config = TranscribeCLIUtils.createWhisperKitConfig(from: cliArguments)
+        let whisperKit = try await WhisperKit(config)
 
         if cliArguments.verbose {
             print("\nModel initialization complete:")
@@ -103,7 +104,7 @@ struct TranscribeCLI: AsyncParsableCommand {
             print("  - Tokenizer load time: \(String(format: "%.2f", whisperKit.currentTimings.tokenizerLoadTime)) seconds")
         }
 
-        var options = decodingOptions(task: task)
+        var options = TranscribeCLIUtils.createDecodingOptions(from: cliArguments, task: task)
         if cliArguments.verbose {
             print("\nConfiguring decoding options...")
         }
@@ -245,7 +246,8 @@ struct TranscribeCLI: AsyncParsableCommand {
             print("Initializing models...")
         }
 
-        let whisperKit = try await setupWhisperKit()
+        let config = TranscribeCLIUtils.createWhisperKitConfig(from: cliArguments)
+        let whisperKit = try await WhisperKit(config)
         guard let tokenizer = whisperKit.tokenizer else {
             throw WhisperError.tokenizerUnavailable()
         }
@@ -254,7 +256,7 @@ struct TranscribeCLI: AsyncParsableCommand {
             print("Models initialized")
         }
 
-        let decodingOptions = decodingOptions(task: .transcribe)
+        let decodingOptions = TranscribeCLIUtils.createDecodingOptions(from: cliArguments, task: .transcribe)
 
         let audioStreamTranscriber = AudioStreamTranscriber(
             audioEncoder: whisperKit.audioEncoder,
@@ -299,7 +301,8 @@ struct TranscribeCLI: AsyncParsableCommand {
             print("Initializing models...")
         }
 
-        let whisperKit = try await setupWhisperKit()
+        let config = TranscribeCLIUtils.createWhisperKitConfig(from: cliArguments)
+        let whisperKit = try await WhisperKit(config)
 
         if cliArguments.verbose {
             print("Models initialized")
@@ -317,7 +320,7 @@ struct TranscribeCLI: AsyncParsableCommand {
         var lastAgreedWords: [WordTiming] = []
         var confirmedWords: [WordTiming] = []
 
-        let options = decodingOptions(task: .transcribe)
+        let options = TranscribeCLIUtils.createDecodingOptions(from: cliArguments, task: .transcribe)
 
         for seekSample in stride(from: 16000, to: audioArray.count, by: 16000) {
             let endSample = min(seekSample + 16000, audioArray.count)
@@ -388,120 +391,9 @@ struct TranscribeCLI: AsyncParsableCommand {
         processTranscriptionResult(audioPath: audioPath, transcribeResult: mergedResult)
     }
 
-    private func setupWhisperKit() async throws -> WhisperKit {
-        if cliArguments.verbose {
-            print("Setting up WhisperKit with compute options...")
-        }
 
-        var audioEncoderComputeUnits = cliArguments.audioEncoderComputeUnits.asMLComputeUnits
-        let textDecoderComputeUnits = cliArguments.textDecoderComputeUnits.asMLComputeUnits
 
-        // Use gpu for audio encoder on macOS below 14
-        if audioEncoderComputeUnits == .cpuAndNeuralEngine {
-            if #unavailable(macOS 14.0) {
-                audioEncoderComputeUnits = .cpuAndGPU
-                if cliArguments.verbose {
-                    print("macOS < 14.0 detected, switching audio encoder to CPU+GPU")
-                }
-            }
-        }
 
-        if cliArguments.verbose {
-            print("Audio Encoder compute units: \(audioEncoderComputeUnits)")
-            print("Text Decoder compute units: \(textDecoderComputeUnits)")
-        }
-
-        let computeOptions = ModelComputeOptions(
-            audioEncoderCompute: audioEncoderComputeUnits,
-            textDecoderCompute: textDecoderComputeUnits
-        )
-
-        let downloadTokenizerFolder: URL? =
-            if let filePath = cliArguments.downloadTokenizerPath {
-                URL(filePath: filePath)
-            } else if let modelPath = cliArguments.modelPath {
-                // If no tokenizer path is provided, use the model path if it exists
-                URL(filePath: modelPath)
-            } else {
-                nil
-            }
-
-        let downloadModelFolder: URL? =
-            if let filePath = cliArguments.downloadModelPath {
-                URL(filePath: filePath)
-            } else {
-                nil
-            }
-
-        let modelName: String? =
-            if let modelVariant = cliArguments.model {
-                cliArguments.modelPrefix + "*" + modelVariant
-            } else {
-                nil
-            }
-
-        if cliArguments.verbose {
-            print("Creating WhisperKit configuration...")
-        }
-
-        let config = WhisperKitConfig(model: modelName,
-                                      downloadBase: downloadModelFolder,
-                                      modelFolder: cliArguments.modelPath,
-                                      tokenizerFolder: downloadTokenizerFolder,
-                                      computeOptions: computeOptions,
-                                      verbose: cliArguments.verbose,
-                                      logLevel: .debug,
-                                      prewarm: false,
-                                      load: true,
-                                      useBackgroundDownloadSession: false)
-
-        if cliArguments.verbose {
-            print("Initializing WhisperKit with configuration...")
-        }
-
-        return try await WhisperKit(config)
-    }
-
-    private func decodingOptions(task: DecodingTask) -> DecodingOptions {
-        if cliArguments.verbose {
-            print("\nConfiguring decoding options:")
-            print("  - Task: \(task)")
-            print("  - Language: \(cliArguments.language ?? "auto")")
-            print("  - Temperature: \(cliArguments.temperature)")
-            print("  - Temperature increment on fallback: \(cliArguments.temperatureIncrementOnFallback)")
-            print("  - Temperature fallback count: \(cliArguments.temperatureFallbackCount)")
-            print("  - Top K: \(cliArguments.bestOf)")
-            print("  - Use prefill prompt: \(cliArguments.usePrefillPrompt || cliArguments.language != nil)")
-            print("  - Use prefill cache: \(cliArguments.usePrefillCache)")
-            print("  - Skip special tokens: \(cliArguments.skipSpecialTokens)")
-            print("  - Without timestamps: \(cliArguments.withoutTimestamps)")
-            print("  - Word timestamps: \(cliArguments.wordTimestamps || cliArguments.streamSimulated)")
-            print("  - Chunking strategy: \(cliArguments.chunkingStrategy)")
-        }
-
-        return DecodingOptions(
-            verbose: cliArguments.verbose,
-            task: task,
-            language: cliArguments.language,
-            temperature: cliArguments.temperature,
-            temperatureIncrementOnFallback: cliArguments.temperatureIncrementOnFallback,
-            temperatureFallbackCount: cliArguments.temperatureFallbackCount,
-            topK: cliArguments.bestOf,
-            usePrefillPrompt: cliArguments.usePrefillPrompt || cliArguments.language != nil,
-            usePrefillCache: cliArguments.usePrefillCache,
-            skipSpecialTokens: cliArguments.skipSpecialTokens,
-            withoutTimestamps: cliArguments.withoutTimestamps,
-            wordTimestamps: cliArguments.wordTimestamps || cliArguments.streamSimulated,
-            clipTimestamps: cliArguments.clipTimestamps,
-            supressTokens: cliArguments.supressTokens,
-            compressionRatioThreshold: cliArguments.compressionRatioThreshold ?? 2.4,
-            logProbThreshold: cliArguments.logprobThreshold ?? -1.0,
-            firstTokenLogProbThreshold: cliArguments.firstTokenLogProbThreshold,
-            noSpeechThreshold: cliArguments.noSpeechThreshold ?? 0.6,
-            concurrentWorkerCount: cliArguments.concurrentWorkerCount,
-            chunkingStrategy: ChunkingStrategy(rawValue: cliArguments.chunkingStrategy)
-        )
-    }
 
     private func processTranscriptionResult(
         audioPath: String,

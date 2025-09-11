@@ -50,6 +50,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: ${{ inputs.xcode-version || 'latest-stable' }}
@@ -67,6 +69,8 @@ jobs:
       - name: Install and discover destinations
         if: ${{ matrix.run-config['condition'] == true }}
         run: |
+          echo "Simulators on runner:"
+          xcrun simctl list
           if [[ "${{ matrix.run-config['name'] }}" != "macOS" ]]; then
             xcodebuild -downloadPlatform ${{ matrix.run-config['name'] }}
           fi

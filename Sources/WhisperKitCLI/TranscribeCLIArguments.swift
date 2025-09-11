@@ -3,7 +3,7 @@
 
 import ArgumentParser
 
-struct CLIArguments: ParsableArguments {
+struct TranscribeCLIArguments: ParsableArguments {
     @Option(help: "Paths to audio files")
     var audioPath = [String]()
 
