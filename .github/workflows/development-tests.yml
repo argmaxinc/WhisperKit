@@ -15,7 +15,7 @@ jobs:
     name: "Build and Test"
     uses: ./.github/workflows/unit-tests.yml
     with:
-      ios-version: "18.2"
+      ios-version: "18.6"
       ios-device: "iPhone 16"
       macos-runner: "macos-15"
 
