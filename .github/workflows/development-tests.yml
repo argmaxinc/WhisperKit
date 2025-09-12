@@ -17,6 +17,8 @@ jobs:
     with:
       ios-version: "18.6"
       ios-device: "iPhone 16"
+      watchos-version: "11.5"
+      visionos-version: "2.5"
       macos-runner: "macos-15"
 
   check-approvals:
@@ -49,14 +51,20 @@ jobs:
           - os: macos-13-xlarge
             ios-version: "17.2"
             ios-device: "iPhone 14"
+            watchos-version: "10.2"
+            visionos-version: "1.0"
             xcode-version: "15.2"
           - os: macos-14
             ios-version: "17.2"
             ios-device: "iPhone 15"
+            watchos-version: "10.2"
+            visionos-version: "1.0"
             xcode-version: "15.2"
     uses: ./.github/workflows/unit-tests.yml
     with:
       macos-runner: ${{ matrix.os }}
       ios-version: ${{ matrix.ios-version }}
       ios-device: ${{ matrix.ios-device }}
+      watchos-version: ${{ matrix.watchos-version }}
+      visionos-version: ${{ matrix.visionos-version }}
       xcode-version: ${{ matrix.xcode-version }}

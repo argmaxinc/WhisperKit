@@ -1279,6 +1279,7 @@ public protocol WhisperTokenizer {
 
 open class WhisperTokenizerWrapper: WhisperTokenizer {
     let tokenizer: any Tokenizer
+    let tokenizerFolder: URL?
     public let specialTokens: SpecialTokens
     public let allLanguageTokens: Set<Int>
 
@@ -1298,7 +1299,22 @@ open class WhisperTokenizerWrapper: WhisperTokenizer {
         tokenizer.convertIdToToken(id)
     }
 
-    init(tokenizer: any Tokenizer) {
+    /// Initializes a WhisperTokenizer wrapper with the provided tokenizer and optional folder location.
+    ///
+    /// This initializer sets up the tokenizer wrapper with special tokens and language token mappings
+    /// required for Whisper decoding. The tokenizer folder parameter is stored for reference
+    /// but does not affect the tokenizer's functionality.
+    ///
+    /// - Parameters:
+    ///   - tokenizer: The underlying tokenizer implementation that handles text encoding/decoding
+    ///   - tokenizerFolder: Optional URL representing the folder location where the tokenizer
+    ///     files are stored. This is kept for reference purposes only and does not influence
+    ///     tokenizer behavior or operations.
+    ///
+    /// - Note: Special tokens are automatically detected from the tokenizer vocabulary, with
+    ///   fallback to default values if tokens are not found. Language tokens are identified
+    ///   by matching the pattern `<|language|>` against the tokenizer's vocabulary.
+    init(tokenizer: any Tokenizer, at tokenizerFolder: URL? = nil) {
         let specialTokens = SpecialTokens(
             endToken: tokenizer.convertTokenToId("<|endoftext|>") ?? Self.defaultEndToken,
             englishToken: tokenizer.convertTokenToId("<|en|>") ?? Self.defaultEnglishToken,
@@ -1313,6 +1329,7 @@ open class WhisperTokenizerWrapper: WhisperTokenizer {
             whitespaceToken: tokenizer.convertTokenToId(" ") ?? Self.defaultWhitespaceToken
         )
         self.tokenizer = tokenizer
+        self.tokenizerFolder = tokenizerFolder
         self.specialTokens = specialTokens
         self.allLanguageTokens = Set(
             Constants.languages
@@ -1557,16 +1574,21 @@ public enum Constants {
     public static let defaultPrependPunctuations: String = "\"'“¡¿([{-"
     public static let defaultAppendPunctuations: String = "\"'.。,，!！?？:：”)]}、"
 
+    public static let defaultRemoteConfigName: String = "config.json"
+    public static let defaultRemoteEndpoint: String = "https://huggingface.co"
+
     public static let fallbackModelSupportConfig: ModelSupportConfig = {
         var config = ModelSupportConfig(
             repoName: "whisperkit-coreml-fallback",
-            repoVersion: "0.3",
+            repoVersion: "0.4",
             deviceSupports: [
                 DeviceSupport(
                     chips: "A12, A13, S9, S10",
                     identifiers: [
                         "iPhone11",
                         "iPhone12",
+                        "iPad12,1",
+                        "iPad12,2",
                         "Watch7",
                         "Watch8"
                     ],
@@ -1581,35 +1603,11 @@ public enum Constants {
                     )
                 ),
                 DeviceSupport(
-                    chips: "A14",
+                    chips: "A16, A17 Pro, A18",
                     identifiers: [
-                        "iPhone13",
-                        "iPad13,1",
-                        "iPad13,2",
-                        "iPad13,18",
-                        "iPad13,19"
-                    ],
-                    models: ModelSupport(
-                        default: "openai_whisper-base",
-                        supported: [
-                            "openai_whisper-tiny",
-                            "openai_whisper-tiny.en",
-                            "openai_whisper-base",
-                            "openai_whisper-base.en",
-                            "openai_whisper-small",
-                            "openai_whisper-small.en",
-                        ]
-                    )
-                ),
-                DeviceSupport(
-                    chips: "A15, A16, A17 Pro, A18",
-                    identifiers: [
-                        "iPhone14",
                         "iPhone15",
                         "iPhone16",
                         "iPhone17",
-                        "iPad14,1",
-                        "iPad14,2",
                         "iPad15,7",
                         "iPad15,8",
                         "iPad16,1",
@@ -1674,7 +1672,6 @@ public enum Constants {
                             "openai_whisper-large-v3_947MB",
                             "distil-whisper_distil-large-v3",
                             "distil-whisper_distil-large-v3_594MB",
-                            "openai_whisper-large-v3-v20240930",
                             "openai_whisper-large-v3-v20240930_626MB",
                         ]
                     )
@@ -1719,6 +1716,54 @@ public enum Constants {
                             "distil-whisper_distil-large-v3_turbo_600MB",
                             "openai_whisper-large-v3-v20240930",
                             "openai_whisper-large-v3-v20240930_turbo",
+                            "openai_whisper-large-v3-v20240930_626MB",
+                            "openai_whisper-large-v3-v20240930_turbo_632MB",
+                        ]
+                    )
+                ),
+                DeviceSupport(
+                    chips: "A14",
+                    identifiers: [
+                        "iPhone13",
+                        "iPad13,1",
+                        "iPad13,2",
+                        "iPad13,18",
+                        "iPad13,19"
+                    ],
+                    models: ModelSupport(
+                        default: "openai_whisper-base",
+                        supported: [
+                            "openai_whisper-tiny",
+                            "openai_whisper-tiny.en",
+                            "openai_whisper-base",
+                            "openai_whisper-base.en",
+                            "openai_whisper-small",
+                            "openai_whisper-small.en",
+                        ]
+                    )
+                ),
+                DeviceSupport(
+                    chips: "A15",
+                    identifiers: [
+                        "iPhone14",
+                        "iPad14,1",
+                        "iPad14,2"
+                    ],
+                    models: ModelSupport(
+                        default: "openai_whisper-base",
+                        supported: [
+                            "openai_whisper-tiny",
+                            "openai_whisper-tiny.en",
+                            "openai_whisper-base",
+                            "openai_whisper-base.en",
+                            "openai_whisper-small",
+                            "openai_whisper-small.en",
+                            "openai_whisper-large-v2_949MB",
+                            "openai_whisper-large-v2_turbo_955MB",
+                            "openai_whisper-large-v3_947MB",
+                            "openai_whisper-large-v3_turbo_954MB",
+                            "distil-whisper_distil-large-v3_594MB",
+                            "distil-whisper_distil-large-v3_turbo_600MB",
                             "openai_whisper-large-v3-v20240930_626MB",
                             "openai_whisper-large-v3-v20240930_turbo_632MB",
                         ]

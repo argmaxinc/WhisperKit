@@ -21,30 +21,40 @@ public struct ModelUtilities {
     public static func loadTokenizer(
         for pretrained: ModelVariant,
         tokenizerFolder: URL? = nil,
+        additionalSearchPaths: [URL] = [],
         useBackgroundSession: Bool = false
     ) async throws -> WhisperTokenizer {
         let tokenizerName = tokenizerNameForVariant(pretrained)
         let hubApi = HubApi(downloadBase: tokenizerFolder, useBackgroundSession: useBackgroundSession)
-
+        let hubTokenizerFolder = hubApi.localRepoLocation(HubApi.Repo(id: tokenizerName))
+        
         // Determine which local folder to use
         let localTokenizerFolder: URL? = {
-            // First try repo-based folder structure
-            let resolvedTokenizerFolder = hubApi.localRepoLocation(HubApi.Repo(id: tokenizerName))
-            let tokenizerConfigPath = resolvedTokenizerFolder.appendingPathComponent("tokenizer.json")
-            if FileManager.default.fileExists(atPath: tokenizerConfigPath.path) {
-                return resolvedTokenizerFolder
+            func hasTokenizer(in folder: URL) -> Bool {
+                let tokenizerPath = folder.appendingPathComponent("tokenizer.json")
+                let exists = FileManager.default.fileExists(atPath: tokenizerPath.path)
+                Logging.debug("Checking for local tokenizer at \(tokenizerPath.path) - \(exists ? "found" : "not found")")
+                return exists
             }
 
-            // Check if tokenizer exists at top level of tokenizerFolder, matching modelFolder behavior
-            if let exactTokenizerFolder = tokenizerFolder {
-                let tokenizerConfigPath = exactTokenizerFolder.appendingPathComponent("tokenizer.json")
-                if FileManager.default.fileExists(atPath: tokenizerConfigPath.path) {
-                    return exactTokenizerFolder
-                }
+            // Search in priority order:
+            // Hub-based folder structure
+            var searchPaths: [URL] = [hubTokenizerFolder]
+            // Top level of tokenizerFolder (if provided)
+            if let tokenizerFolder {
+                searchPaths.append(tokenizerFolder)
             }
+            // Additional search paths
+            searchPaths.append(contentsOf: additionalSearchPaths)
 
-            // If we didn't find a local folder, return nil
-            return nil
+            let foundPath = searchPaths.first(where: hasTokenizer)
+            if let found = foundPath {
+                Logging.debug("Found local tokenizer at \(found.path)")
+            } else {
+                Logging.debug("No tokenizer found in any local search paths")
+            }
+            
+            return foundPath
         }()
 
         // If we found a local folder with a tokenizer.json, try to load from it
@@ -55,7 +65,7 @@ public struct ModelUtilities {
                     let tokenizerData = try await localConfig.tokenizerData
                     let whisperTokenizer = try PreTrainedTokenizer(tokenizerConfig: tokenizerConfig, tokenizerData: tokenizerData)
                     Logging.debug("Loading tokenizer from \(localFolder.path)")
-                    return WhisperTokenizerWrapper(tokenizer: whisperTokenizer)
+                    return WhisperTokenizerWrapper(tokenizer: whisperTokenizer, at: localFolder)
                 } else {
                     // tokenizerConfig is nil, fall through to load from Hub
                     Logging.debug("Tokenizer configuration not found in local config")
@@ -67,12 +77,13 @@ public struct ModelUtilities {
         }
 
         // Fallback to downloading from the Hub if local loading is not possible or fails
-        Logging.debug("Downloading tokenizer from Hub")
+        Logging.debug("Downloading tokenizer from Hub at \(hubTokenizerFolder)")
         return try await WhisperTokenizerWrapper(
             tokenizer: AutoTokenizer.from(
                 pretrained: tokenizerName,
                 hubApi: hubApi
-            )
+            ),
+            at: hubTokenizerFolder
         )
     }
 
@@ -90,6 +101,49 @@ public struct ModelUtilities {
         }
 
         return modelURL
+    }
+    
+    /// Formats and sorts model file names based on model variants
+    /// 
+    /// Filters the provided model files to include only recognized model variants, removes path separators,
+    /// and sorts them according to the predefined model size order in `ModelVariant` enum.
+    /// 
+    /// - Parameter modelFiles: An array of model file paths to format and sort
+    /// - Returns: An array of formatted and sorted model names, with path separators removed
+    public static func formatModelFiles(_ modelFiles: [String]) -> [String] {
+        let modelFilters = ModelVariant.allCases.map { "\($0.description)\($0.description.contains("large") ? "" : "/")" } // Include quantized models for large
+        let modelVariants = modelFiles.map { $0.components(separatedBy: "/")[0] + "/" }
+        let filteredVariants = Set(modelVariants.filter { item in
+            let count = modelFilters.reduce(0) { count, filter in
+                let isContained = item.contains(filter) ? 1 : 0
+                return count + isContained
+            }
+            return count > 0
+        })
+
+        let availableModels = filteredVariants.map { variant -> String in
+            variant.trimmingFromEnd(character: "/", upto: 1)
+        }
+
+        // Sorting order based on enum
+        let sizeOrder = ModelVariant.allCases.map { $0.description }
+
+        let sortedModels = availableModels.sorted { firstModel, secondModel in
+            // Extract the base size without any additional qualifiers
+            let firstModelBase = sizeOrder.first(where: { firstModel.contains($0) }) ?? ""
+            let secondModelBase = sizeOrder.first(where: { secondModel.contains($0) }) ?? ""
+
+            if firstModelBase == secondModelBase {
+                // If base sizes are the same, sort alphabetically
+                return firstModel < secondModel
+            } else {
+                // Sort based on the size order
+                return sizeOrder.firstIndex(of: firstModelBase) ?? sizeOrder.count
+                    < sizeOrder.firstIndex(of: secondModelBase) ?? sizeOrder.count
+            }
+        }
+
+        return sortedModels
     }
 
     // MARK: Internal
@@ -179,7 +233,7 @@ public struct ModelUtilities {
 
     // MARK: Private
 
-    private static func tokenizerNameForVariant(_ variant: ModelVariant) -> String {
+    internal static func tokenizerNameForVariant(_ variant: ModelVariant) -> String {
         var tokenizerName: String
         switch variant {
             case .tiny:
@@ -236,4 +290,5 @@ public func modelSupport(for deviceName: String, from config: ModelSupportConfig
 @available(*, deprecated, message: "Subject to removal in a future version. Use `ModelUtilities.detectModelURL(inFolder:named:)` instead.")
 public func detectModelURL(inFolder path: URL, named modelName: String) -> URL {
     return ModelUtilities.detectModelURL(inFolder: path, named: modelName)
+    
 }
