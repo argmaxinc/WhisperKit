@@ -9,6 +9,9 @@ on:
 jobs:
   build-and-test:
     name: "Build and Test"
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}-build-and-test
+      cancel-in-progress: true
     uses: ./.github/workflows/unit-tests.yml
     with:
       ios-version: "18.6"
@@ -41,6 +44,9 @@ jobs:
     name: "Pre-merge Tests"
     needs: [check-approvals]
     if: needs.check-approvals.outputs.reviews == 'APPROVED' || github.event_name == 'workflow_dispatch'
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}-${{ matrix.os }}
+      cancel-in-progress: true
     strategy:
       matrix:
         include:

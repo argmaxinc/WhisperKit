@@ -26,9 +26,6 @@ jobs:
   unit-tests:
     name: "${{ matrix.run-config['name'] }} on ${{ inputs.macos-runner }}"
     runs-on: ${{ inputs.macos-runner }}
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}-${{ inputs.macos-runner }}
-      cancel-in-progress: true
     strategy:
       matrix:
         run-config:
