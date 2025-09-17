@@ -1785,7 +1785,7 @@ final class UnitTests: XCTestCase {
             // Assert that more tokens are returned in the callback with waiting
             XCTAssertGreaterThanOrEqual(tokenCountWithWait, 30, "Tokens for callback with wait should contain the full audio file")
 
-            #if os(watchOS) || os(iOS) // FIXME: Some OS ignore the priority here on github action runners for some reason
+            #if !os(macOS) // FIXME: Some OS ignore the priority here on github action runners for some reason
             XCTAssertGreaterThanOrEqual(tokenCountWithWait, tokenCountWithEarlyStop, "More tokens should be returned in the callback with waiting (early stop: \(tokenCountWithEarlyStop), with wait: \(tokenCountWithWait))")
             #else
             XCTAssertGreaterThan(tokenCountWithWait, tokenCountWithEarlyStop, "More tokens should be returned in the callback with waiting (early stop: \(tokenCountWithEarlyStop), with wait: \(tokenCountWithWait))")
