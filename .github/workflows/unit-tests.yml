@@ -26,6 +26,9 @@ jobs:
   unit-tests:
     name: "${{ matrix.run-config['name'] }} on ${{ inputs.macos-runner }}"
     runs-on: ${{ inputs.macos-runner }}
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}-${{ inputs.macos-runner }}
+      cancel-in-progress: true
     strategy:
       matrix:
         run-config:
@@ -53,7 +56,7 @@ jobs:
               clean-destination: "generic/platform=visionOS",
               test-destination: "platform=visionOS Simulator,OS=${{ inputs.visionos-version }},name=Apple Vision Pro",
             }
-    timeout-minutes: 30
+    timeout-minutes: ${{ matrix.run-config['name'] == 'visionOS' && 60 || 30 }}
     steps:
       - uses: actions/checkout@v4
         with:

@@ -2249,8 +2249,12 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(audioChunks.count, 3)
     }
 
-    #if !os(watchOS) // FIXME: These tests are flaky out on watchOS
+    #if !os(watchOS) // FIXME: These tests are flaky
     func testVADAudioChunkerAccuracy() async throws {
+        guard #available(macOS 15, iOS 18, watchOS 11, visionOS 2, *) else {
+            throw XCTSkip("Disabled on macOS 14 and below due to swift concurrency flakiness")
+        }
+        
         let options = DecodingOptions(temperatureFallbackCount: 0, chunkingStrategy: .vad)
 
         let chunkedResult = try await XCTUnwrapAsync(

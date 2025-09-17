@@ -6,10 +6,6 @@ on:
     types: [submitted]
   workflow_dispatch:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
-  cancel-in-progress: true
-
 jobs:
   build-and-test:
     name: "Build and Test"
