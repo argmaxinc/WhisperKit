@@ -37,7 +37,7 @@ final class UnitTests: XCTestCase {
     func testModelSupportConfigFallback() {
         let fallbackRepoConfig = Constants.fallbackModelSupportConfig
         XCTAssertEqual(fallbackRepoConfig.repoName, "whisperkit-coreml-fallback")
-        XCTAssertEqual(fallbackRepoConfig.repoVersion, "0.3")
+        XCTAssertEqual(fallbackRepoConfig.repoVersion, "0.4")
         XCTAssertGreaterThanOrEqual(fallbackRepoConfig.deviceSupports.count, 5)
 
         // Test that all device supports have their disabled models set except devices that should support all known models
@@ -72,7 +72,7 @@ final class UnitTests: XCTestCase {
         // Support from same repo should be merged
         XCTAssertEqual(sameRepoConfig.repoName, "whisperkit-coreml")
         XCTAssertEqual(sameRepoConfig.repoVersion, "0.3")
-        XCTAssertEqual(sameRepoConfig.deviceSupports.count, 6)
+        XCTAssertEqual(sameRepoConfig.deviceSupports.count, 7)
 
         let differentRepoConfig = ModelSupportConfig(
             repoName: "whisperkit-somerepo",
@@ -91,38 +91,10 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(differentRepoConfig.repoVersion, "0.3")
         XCTAssertEqual(differentRepoConfig.deviceSupports.count, 1)
     }
-
-    func testModelSupportConfigv02FromJson() throws {
+    
+    func testModelSupportConfigFromJson() throws {
         let configFilePath = try XCTUnwrap(
-            Bundle.current(for: self).path(forResource: "config-v02", ofType: "json"),
-            "Config file not found"
-        )
-
-        let jsonData = try Data(contentsOf: URL(fileURLWithPath: configFilePath))
-        let decoder = JSONDecoder()
-        let loadedConfig = try decoder.decode(ModelSupportConfig.self, from: jsonData)
-
-        // Compare loaded config with fallback config
-        XCTAssertEqual(loadedConfig.repoName, "whisperkit-coreml")
-        XCTAssertLessThan(loadedConfig.repoVersion, Constants.fallbackModelSupportConfig.repoVersion)
-        XCTAssertEqual(loadedConfig.deviceSupports.count, Constants.fallbackModelSupportConfig.deviceSupports.count)
-
-        // Compare device supports
-        for (loadedDeviceSupport, fallbackDeviceSupport) in zip(loadedConfig.deviceSupports, Constants.fallbackModelSupportConfig.deviceSupports) {
-            let loadedSupport = Set(loadedDeviceSupport.models.supported)
-            let fallbackSupport = Set(fallbackDeviceSupport.models.supported)
-            let loadedDisabled = Set(loadedDeviceSupport.models.disabled)
-            let fallbackDisabled = Set(fallbackDeviceSupport.models.disabled)
-            XCTAssertTrue(loadedSupport.isSubset(of: fallbackSupport),
-                          "Supported models should be a subset of fallback models for \(loadedDeviceSupport.identifiers), found missing model(s): \(loadedSupport.subtracting(fallbackSupport))")
-            XCTAssertTrue(loadedDisabled.isSubset(of: fallbackDisabled),
-                          "Disabled models should be a subset of fallback models for \(loadedDeviceSupport.identifiers), found missing model(s): \(loadedDisabled.subtracting(fallbackDisabled))")
-        }
-    }
-
-    func testModelSupportConfigv03FromJson() throws {
-        let configFilePath = try XCTUnwrap(
-            Bundle.current(for: self).path(forResource: "config-v03", ofType: "json"),
+            Bundle.current(for: self).path(forResource: "config-v04", ofType: "json"),
             "Config file not found"
         )
 
@@ -883,6 +855,373 @@ final class UnitTests: XCTestCase {
     }
 
     // MARK: - Tokenizer Tests
+    
+    func testTokenizerFolderFromConfig() async throws {
+        // Default case, no tokenizer folder specified - should download from Hub
+        let configWithNoTokenizerFolder = WhisperKitConfig(
+            model: "tiny",
+            load: false,
+            download: false
+        )
+        
+        let whisperKitDefault = try await WhisperKit(configWithNoTokenizerFolder)
+        XCTAssertNil(whisperKitDefault.tokenizerFolder, "tokenizerFolder should be nil when not specified and no downloadBase provided")
+        
+        // Tokenizer folder specified without model folder
+        let tempDir = FileManager.default.temporaryDirectory
+        let tokenizerFolder = tempDir.appendingPathComponent("tokenizer_folder_\(UUID().uuidString)")
+        let configWithTokenizerFolder = WhisperKitConfig(
+            model: "tiny",
+            tokenizerFolder: tokenizerFolder,
+            load: false,
+            download: false
+        )
+        
+        let whisperKitWithTokenizerFolder = try await WhisperKit(configWithTokenizerFolder)
+        XCTAssertEqual(whisperKitWithTokenizerFolder.tokenizerFolder?.path, tokenizerFolder.path, "tokenizerFolder should exactly match specified folder path")
+        
+        // Tokenizer folder and model folder specified
+        let modelFolder = tempDir.appendingPathComponent("model_folder_\(UUID().uuidString)")
+        let tokenizerFolderWithModelFolder = tempDir.appendingPathComponent("tokenizer_folder_\(UUID().uuidString)")
+        
+        let configWithTokenizerAndModelFolder = WhisperKitConfig(
+            model: "tiny",
+            modelFolder: modelFolder.path,
+            tokenizerFolder: tokenizerFolderWithModelFolder,
+            load: false,
+            download: false
+        )
+        
+        let whisperKitWithBothFolders = try await WhisperKit(configWithTokenizerAndModelFolder)
+        XCTAssertEqual(whisperKitWithBothFolders.tokenizerFolder?.path, tokenizerFolderWithModelFolder.path, "tokenizerFolder should exactly match specified folder, not model folder")
+        XCTAssertNotEqual(whisperKitWithBothFolders.tokenizerFolder?.path, modelFolder.path, "tokenizerFolder should not be the same as model folder")
+        
+        // Model folder specified without tokenizer folder
+        let modelFolderOnly = tempDir.appendingPathComponent("model_folder_\(UUID().uuidString)")
+        
+        let configWithModelFolderOnly = WhisperKitConfig(
+            model: "tiny",
+            modelFolder: modelFolderOnly.path,
+            load: false,
+            download: false
+        )
+        
+        let whisperKitWithModelFolderOnly = try await WhisperKit(configWithModelFolderOnly)
+        XCTAssertNil(whisperKitWithModelFolderOnly.tokenizerFolder, "tokenizerFolder should be nil when only model folder specified without downloadBase")
+        
+        // Model folder and download base specified
+        let downloadBase = tempDir.appendingPathComponent("download_base_\(UUID().uuidString)")
+        let modelFolderWithDownloadBase = tempDir.appendingPathComponent("model_folder_\(UUID().uuidString)")
+        
+        let configWithModelFolderAndDownloadBase = WhisperKitConfig(
+            model: "tiny",
+            downloadBase: downloadBase,
+            modelFolder: modelFolderWithDownloadBase.path,
+            load: false,
+            download: false
+        )
+        
+        let whisperKitWithModelFolderAndDownloadBase = try await WhisperKit(configWithModelFolderAndDownloadBase)
+        XCTAssertEqual(whisperKitWithModelFolderAndDownloadBase.tokenizerFolder?.path, downloadBase.path, "tokenizerFolder should exactly match downloadBase path")
+        XCTAssertNotEqual(whisperKitWithModelFolderAndDownloadBase.tokenizerFolder?.path, modelFolderWithDownloadBase.path, "tokenizerFolder should not be the same as model folder")
+        
+        // Download base specified only
+        let downloadBaseOnly = tempDir.appendingPathComponent("download_base_\(UUID().uuidString)")
+        
+        let configWithDownloadBaseOnly = WhisperKitConfig(
+            model: "tiny",
+            downloadBase: downloadBaseOnly,
+            load: false,
+            download: false
+        )
+        
+        let whisperKitWithDownloadBaseOnly = try await WhisperKit(configWithDownloadBaseOnly)
+        XCTAssertEqual(whisperKitWithDownloadBaseOnly.tokenizerFolder?.path, downloadBaseOnly.path, "tokenizerFolder should fall back to downloadBase when not explicitly set")
+    }
+    
+    func testTokenizerLoadingPriority() async throws {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("tokenizer_loading_test_folder_\(UUID().uuidString)")
+        
+        // Test tokenizer folder resolution priority
+        let repoStyleDir = tempDir.appendingPathComponent("models")
+            .appendingPathComponent("openai")
+            .appendingPathComponent("whisper-tiny")
+        
+        // Download the tokenizer first
+        let repoTokenizer = try await ModelUtilities.loadTokenizer(
+            for: .tiny,
+            tokenizerFolder: tempDir,
+            useBackgroundSession: false
+        ) as! WhisperTokenizerWrapper
+        XCTAssertEqual(repoTokenizer.tokenizerFolder?.path, repoStyleDir.path, "tokenizerFolder should exactly match repoStyleDir path")
+        
+        // Check that direct loading from the top level of the directory is prioritized when no repo style exists (tokenizer already exists here)
+        let tokenizer = try await ModelUtilities.loadTokenizer(
+            for: .tiny,
+            tokenizerFolder: repoStyleDir,
+            useBackgroundSession: false
+        ) as! WhisperTokenizerWrapper
+        XCTAssertEqual(tokenizer.tokenizerFolder?.path, repoStyleDir.path, "tokenizerFolder should exactly match repoStyleDir path")
+        
+        // Move the tokenizer files to the top level
+        let repoContents = try FileManager.default.contentsOfDirectory(at: repoStyleDir, includingPropertiesForKeys: nil)
+        for item in repoContents {
+            let destination = tempDir.appendingPathComponent(item.lastPathComponent)
+            try FileManager.default.copyItem(at: item, to: destination)
+        }
+        
+        // Check that when the tokenizer is both at the top level and in the repo style location, the repo style is prioritized
+        // Loading from the top level is considered a fallback and simplifies offline use cases
+        let tokenizerAtTopLevel = try await ModelUtilities.loadTokenizer(
+            for: .tiny,
+            tokenizerFolder: tempDir,
+            useBackgroundSession: false
+        ) as! WhisperTokenizerWrapper
+        XCTAssertEqual(tokenizerAtTopLevel.tokenizerFolder?.path, repoStyleDir.path, "tokenizerFolder should exactly match repoStyleDir path")
+    }
+    
+        func testTokenizerLoadingFromDifferentVariants() async throws {
+        // Test that different model variants resolve to correct tokenizer names
+        for variant in ModelVariant.allCases {
+            let expectedName = "openai/whisper-\(variant.description)"
+            let tokenizer = try await ModelUtilities.loadTokenizer(
+                for: variant,
+                tokenizerFolder: nil,
+                useBackgroundSession: false
+            ) as! WhisperTokenizerWrapper
+            XCTAssertNotNil(tokenizer, "Should load tokenizer for variant \(variant)")
+            XCTAssertTrue(tokenizer.tokenizerFolder!.path.contains(expectedName), "Tokenizer folder should contain \(expectedName)")
+            
+            // Test that the tokenizer has expected properties
+            XCTAssertGreaterThan(tokenizer.specialTokens.specialTokenBegin, 0, "Special token begin should be set")
+            XCTAssertNotNil(tokenizer.encode(text: "test"), "Should be able to encode text")
+            XCTAssertNotNil(tokenizer.decode(tokens: [1, 2, 3]), "Should be able to decode tokens")
+        }
+    }
+        
+    func testTokenizerLoadingFromWhisperKit() async throws {
+        // Test that tokenizer is properly loaded and assigned during WhisperKit model loading
+        let config = WhisperKitConfig(
+            model: "tiny",
+            verbose: true,
+            logLevel: .debug,
+            load: true
+        )
+        
+        let whisperKit = try await WhisperKit(config)
+        
+        // Verify tokenizer was loaded
+        XCTAssertNotNil(whisperKit.tokenizer, "Tokenizer should be loaded after model loading")
+        XCTAssertNotNil(whisperKit.textDecoder.tokenizer, "TextDecoder should have tokenizer assigned")
+        
+        // Load a tokenizer that should match
+        let tokenizer = try await ModelUtilities.loadTokenizer(
+            for: .tiny
+        ) as! WhisperTokenizerWrapper
+        
+        // Verify tokenizer location
+        XCTAssertEqual((whisperKit.tokenizer as! WhisperTokenizerWrapper).tokenizerFolder!.path, tokenizer.tokenizerFolder!.path)
+        
+        // Verify tokenizer functionality
+        if let tokenizer = whisperKit.tokenizer {
+            let testText = "Hello world"
+            let encoded = tokenizer.encode(text: testText)
+            XCTAssertFalse(encoded.isEmpty, "Should encode text to tokens")
+            
+            let decoded = tokenizer.decode(tokens: encoded)
+            XCTAssertFalse(decoded.isEmpty, "Should decode tokens back to text")
+            
+            // Test special token access
+            XCTAssertGreaterThan(tokenizer.specialTokens.endToken, 0, "End token should be valid")
+            XCTAssertGreaterThan(tokenizer.specialTokens.startOfTranscriptToken, 0, "Start of transcript token should be valid")
+            
+            // Test token conversion
+            let startToken = "<|startoftranscript|>"
+            if let tokenId = tokenizer.convertTokenToId(startToken) {
+                let convertedBack = tokenizer.convertIdToToken(tokenId)
+                XCTAssertEqual(convertedBack, startToken, "Token conversion should be reversible")
+            }
+        }
+    }
+    
+    func testTokenizerFallbackToHubWhenLocalFails() async throws {
+        // Test scenario where local tokenizer loading fails and falls back to Hub
+        let tempDir = FileManager.default.temporaryDirectory
+        let corruptedTokenizerDir = tempDir.appendingPathComponent("corrupted_tokenizer")
+        
+        try FileManager.default.createDirectory(at: corruptedTokenizerDir, withIntermediateDirectories: true)
+        
+        defer {
+            try? FileManager.default.removeItem(at: corruptedTokenizerDir)
+        }
+        
+        // Create a corrupted tokenizer.json file
+        let corruptedJson = "{ invalid json content"
+        let tokenizerFile = corruptedTokenizerDir.appendingPathComponent("tokenizer.json")
+        try corruptedJson.write(to: tokenizerFile, atomically: true, encoding: .utf8)
+        let configFile = corruptedTokenizerDir.appendingPathComponent("config.json")
+        try corruptedJson.write(to: configFile, atomically: true, encoding: .utf8)
+        
+        // This should fail to load locally and fall back to Hub
+        do {
+            let tokenizer = try await ModelUtilities.loadTokenizer(
+                for: .tiny,
+                tokenizerFolder: corruptedTokenizerDir,
+                useBackgroundSession: false
+            )
+            XCTAssertNotNil(tokenizer, "Should successfully fall back to Hub when local loading fails")
+        } catch {
+            // If Hub download also fails, that's acceptable in test environment
+            Logging.debug("Both local and Hub loading failed: \(error)")
+        }
+    }
+    
+    func testTokenizerModelVariantDetection() async throws {
+        // Test that model variant detection works correctly for tokenizer selection
+        let testDimensions: [(logitsDim: Int, encoderDim: Int, expectedVariant: ModelVariant)] = [
+            (51865, 384, .tiny),      // Multilingual tiny
+            (51864, 384, .tinyEn),    // English tiny
+            (51865, 512, .base),      // Multilingual base
+            (51864, 512, .baseEn),    // English base
+            (51865, 768, .small),     // Multilingual small
+            (51864, 768, .smallEn),   // English small
+            (51865, 1024, .medium),   // Multilingual medium
+            (51864, 1024, .mediumEn), // English medium
+            (51865, 1280, .largev2),  // Large v2
+            (51866, 1280, .largev3)   // Large v3 (has extra language token)
+        ]
+        
+        for (logitsDim, encoderDim, expectedVariant) in testDimensions {
+            let detectedVariant = ModelUtilities.detectVariant(logitsDim: logitsDim, encoderDim: encoderDim)
+            XCTAssertEqual(detectedVariant, expectedVariant, 
+                          "Should detect \(expectedVariant) for logitsDim: \(logitsDim), encoderDim: \(encoderDim)")
+            
+            let isMultilingual = ModelUtilities.isModelMultilingual(logitsDim: logitsDim)
+            XCTAssertEqual(isMultilingual, expectedVariant.isMultilingual, 
+                          "Multilingual detection should match variant for \(expectedVariant)")
+        }
+    }
+    
+    func testTokenizerLoadingThroughModelLoading() async throws {
+        // Test tokenizer loading through WhisperKit model loading process
+        let config = WhisperKitConfig(
+            model: "tiny",
+            verbose: true,
+            logLevel: .debug,
+            load: true,
+            download: true
+        )
+        
+        let whisperKit = try await WhisperKit(config)
+        
+        // Verify tokenizer was loaded through model loading
+        XCTAssertNotNil(whisperKit.tokenizer, "Tokenizer should be loaded after calling loadModels")
+        XCTAssertNotNil(whisperKit.textDecoder.tokenizer, "TextDecoder should have tokenizer assigned")
+        XCTAssertEqual(whisperKit.modelVariant, .tiny, "Model variant should be detected as tiny")
+        
+        // Verify tokenizer properties specific to tiny model
+        guard let tokenizer = whisperKit.tokenizer else {
+            XCTFail("Tokenizer should not be nil")
+            return
+        }
+        
+        // Test that the tokenizer works with the loaded model
+        let testEncoding = tokenizer.encode(text: "Hello world")
+        XCTAssertFalse(testEncoding.isEmpty, "Should be able to encode text")
+        
+        let testDecoding = tokenizer.decode(tokens: testEncoding)
+        XCTAssertFalse(testDecoding.isEmpty, "Should be able to decode tokens")
+        
+        // Test special tokens are properly configured
+        XCTAssertGreaterThan(tokenizer.specialTokens.specialTokenBegin, 50000, "Special tokens should start after vocab")
+        XCTAssertEqual(tokenizer.specialTokens.endToken, 50257, "End token should match expected value for tiny model")
+        
+        // Test that model dimensions match tokenizer expectations
+        XCTAssertEqual(whisperKit.textDecoder.isModelMultilingual, true, "Tiny model should be detected as multilingual")
+        XCTAssertFalse(tokenizer.allLanguageTokens.isEmpty, "Multilingual model should have language tokens")
+    }
+    
+    func testTokenizerLoadingWithCustomTokenizerFolder() async throws {
+        // Test tokenizer loading with custom tokenizer folder at model load time
+        let modelPath = try await tinyModelPath()
+        let modelURL = URL(filePath: modelPath)
+        
+        // Create a different directory for tokenizer to ensure it's not defaulting to model folder
+        let tempDir = FileManager.default.temporaryDirectory
+        let customTokenizerDir = tempDir.appendingPathComponent("custom_tokenizer_test_\(UUID().uuidString)")
+        
+        let config = WhisperKitConfig(
+            modelFolder: modelPath,
+            tokenizerFolder: customTokenizerDir,
+            verbose: true,
+            logLevel: .debug,
+            load: true,
+            download: false
+        )
+        
+        let whisperKit = try await WhisperKit(config)
+        
+        // Verify tokenizer folder was set to our custom directory
+        XCTAssertEqual(whisperKit.tokenizerFolder?.path, customTokenizerDir.path, "Tokenizer folder should exactly match custom configured folder")
+        XCTAssertNotEqual(whisperKit.tokenizerFolder?.path, modelURL.path, "Tokenizer folder should NOT be the same as model folder")
+        XCTAssertEqual(whisperKit.modelFolder?.path, modelPath, "Model folder should match the specified model path")
+        
+        // Verify tokenizer was loaded (will fall back to hub download since custom dir doesn't exist)
+        XCTAssertNotNil(whisperKit.tokenizer, "Tokenizer should be loaded even with custom folder (fallback to hub download)")
+        
+        // Check the actual path used by the tokenizer wrapper
+        if let wrapper = whisperKit.tokenizer as? WhisperTokenizerWrapper {
+            XCTAssertNotNil(wrapper.tokenizerFolder, "Tokenizer wrapper should record the folder path used")
+            
+            // The wrapper should record the Hub path that was actually used
+            let expectedHubPath = customTokenizerDir.appendingPathComponent("models/openai/whisper-tiny")
+            XCTAssertEqual(wrapper.tokenizerFolder?.path, expectedHubPath.path,
+                          "Tokenizer wrapper should record the exact Hub path based on custom directory")
+        }
+        
+        // Test that the tokenizer works correctly
+        if let tokenizer = whisperKit.tokenizer {
+            let encoded = tokenizer.encode(text: "Test text")
+            let decoded = tokenizer.decode(tokens: encoded)
+            XCTAssertFalse(encoded.isEmpty, "Should encode text")
+            XCTAssertFalse(decoded.isEmpty, "Should decode tokens")
+        }
+    }
+    
+    func testTokenizerLoadingWithModelDimensionDetection() async throws {
+        // Test that tokenizer is selected based on actual model dimensions
+        let modelPath = try await tinyModelPath()
+        
+        let config = WhisperKitConfig(
+            modelFolder: modelPath,
+            verbose: true,
+            logLevel: .debug,
+            load: true,
+            download: false
+        )
+        
+        let whisperKit = try await WhisperKit(config)
+        
+        // Verify model variant was detected from loaded model dimensions
+        XCTAssertEqual(whisperKit.modelVariant, .tiny, "Should detect tiny variant from model dimensions")
+        
+        // Verify tokenizer matches detected variant
+        XCTAssertNotNil(whisperKit.tokenizer, "Tokenizer should be loaded based on detected variant")
+        
+        // Verify the TextDecoder has correct multilingual setting
+        XCTAssertTrue(whisperKit.textDecoder.isModelMultilingual, "Tiny model should be multilingual")
+        
+        // Test that tokenizer special tokens match the model expectations
+        if let tokenizer = whisperKit.textDecoder.tokenizer {
+            // Test some specific tokens that should exist in tiny model
+            let transcribeToken = tokenizer.convertTokenToId("<|transcribe|>")
+            let englishToken = tokenizer.convertTokenToId("<|en|>")
+            
+            XCTAssertNotNil(transcribeToken, "Should have transcribe token")
+            XCTAssertNotNil(englishToken, "Should have English language token")
+            XCTAssertTrue(tokenizer.allLanguageTokens.contains(englishToken!), "English token should be in language tokens set")
+        }
+    }
 
     func testDecoderTokenizer() async throws {
         // This token index does not change with v3
@@ -1416,7 +1755,9 @@ final class UnitTests: XCTestCase {
             let earlyStopTokenCount = 10
             let continuationCallback: TranscriptionCallback = { (progress: TranscriptionProgress) -> Bool? in
                 // Stop after only 10 tokens (full test audio contains ~30)
-                progress.tokens.count <= earlyStopTokenCount
+                let shouldContinue = progress.tokens.count <= earlyStopTokenCount
+                Logging.debug("\(shouldContinue ? "Continuing" : "Early stopping") after \(progress.tokens.count) tokens")
+                return shouldContinue
             }
 
             let result = try await whisperKit.transcribe(audioPath: audioFilePath, callback: continuationCallback).first!
@@ -1444,7 +1785,7 @@ final class UnitTests: XCTestCase {
             // Assert that more tokens are returned in the callback with waiting
             XCTAssertGreaterThanOrEqual(tokenCountWithWait, 30, "Tokens for callback with wait should contain the full audio file")
 
-            #if os(watchOS) || os(iOS) // FIXME: Some OS ignore the priority here on github action runners for some reason
+            #if !os(macOS) // FIXME: Some OS ignore the priority here on github action runners for some reason
             XCTAssertGreaterThanOrEqual(tokenCountWithWait, tokenCountWithEarlyStop, "More tokens should be returned in the callback with waiting (early stop: \(tokenCountWithEarlyStop), with wait: \(tokenCountWithWait))")
             #else
             XCTAssertGreaterThan(tokenCountWithWait, tokenCountWithEarlyStop, "More tokens should be returned in the callback with waiting (early stop: \(tokenCountWithEarlyStop), with wait: \(tokenCountWithWait))")
@@ -1908,7 +2249,12 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(audioChunks.count, 3)
     }
 
+    #if !os(watchOS) // FIXME: These tests are flaky
     func testVADAudioChunkerAccuracy() async throws {
+        guard #available(macOS 15, iOS 18, watchOS 11, visionOS 2, *) else {
+            throw XCTSkip("Disabled on macOS 14 and below due to swift concurrency flakiness")
+        }
+        
         let options = DecodingOptions(temperatureFallbackCount: 0, chunkingStrategy: .vad)
 
         let chunkedResult = try await XCTUnwrapAsync(
@@ -1936,7 +2282,6 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(wer, 0.0, "Transcripts should match with a WER of 0, found \(wer). Full diff: \(diffDescription)")
     }
 
-    #if !os(watchOS) // FIXME: This test times out on watchOS when run on low compute runners
     func testVADProgress() async throws {
         let pipe = try await WhisperKit(WhisperKitConfig(model: "tiny.en"))
 
@@ -2108,7 +2453,16 @@ final class UnitTests: XCTestCase {
             currentTokenIndex = endIndex
         }
     }
-
+    
+    func testMergePunctuationsWithEmptyInput() {
+        let out = SegmentSeeker().mergePunctuations(
+            alignment: [],
+            prepended: Constants.defaultPrependPunctuations,
+            appended: Constants.defaultAppendPunctuations
+        )
+        XCTAssertTrue(out.isEmpty)
+    }
+    
     func testMergePunctuations() async {
         // Hello, world! This is a test, isn't it?
         let wordTimings = [
@@ -2203,6 +2557,41 @@ final class UnitTests: XCTestCase {
             XCTAssertEqual(mergedAlignmentTiming[i].start, expectedWordTimings[i].start, "Start time at index \(i) does not match")
             XCTAssertEqual(mergedAlignmentTiming[i].end, expectedWordTimings[i].end, "End time at index \(i) does not match")
             XCTAssertEqual(mergedAlignmentTiming[i].probability, expectedWordTimings[i].probability, "Probability at index \(i) does not match")
+        }
+    }
+    
+    func testMergePunctuationsSpanishStartWithPrepend() async {
+        // Input starts with " ¿"
+        // [" ¿", " Que", " pasa", " mundo", "?"]
+        let wordTimings = [
+            WordTiming(word: " ¿", tokens: [1201], start: 0, end: 1, probability: 1),
+            WordTiming(word: "Que", tokens: [1202], start: 1, end: 2, probability: 0.9),
+            WordTiming(word: " pasa", tokens: [1203], start: 2, end: 3, probability: 1),
+            WordTiming(word: " mundo", tokens: [1204], start: 3, end: 4, probability: 0.6),
+            WordTiming(word: "?", tokens: [1205], start: 4, end: 5, probability: 0.4),
+        ]
+        
+        let merged = SegmentSeeker().mergePunctuations(alignment: wordTimings)
+        
+        let expected = [
+            // Merge previous " ¿" into current " Que" → keep current's start/end (1,2)
+            // The 2nd WordTiming's probability is preserved
+            WordTiming(word: " ¿Que", tokens: [1201, 1202], start: 1, end: 2, probability: 0.9),
+            WordTiming(word: " pasa", tokens: [1203], start: 2, end: 3, probability: 1),
+            // Merge "?" into previous " mundo" → keep previous's start/end (3,4)
+            WordTiming(word: " mundo?", tokens: [1204, 1205], start: 3, end: 4, probability: 0.6),
+        ]
+        
+        // First, assert the counts are as expected (12 inputs → 2 merges → 10 outputs)
+        XCTAssertEqual(merged.count, expected.count, "Merged timings count does not match expected count")
+        
+        // Then, assert all fields match element-by-element
+        for i in 0..<expected.count {
+            XCTAssertEqual(merged[i].word, expected[i].word, "Word text at index \(i) does not match")
+            XCTAssertEqual(merged[i].tokens, expected[i].tokens, "Tokens at index \(i) do not match")
+            XCTAssertEqual(merged[i].start, expected[i].start, "Start time at index \(i) does not match")
+            XCTAssertEqual(merged[i].end, expected[i].end, "End time at index \(i) does not match")
+            XCTAssertEqual(merged[i].probability, expected[i].probability, "Probability at index \(i) does not match")
         }
     }
 

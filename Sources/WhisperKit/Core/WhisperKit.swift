@@ -21,7 +21,12 @@ open class WhisperKit {
 
     public var modelCompute: ModelComputeOptions
     public var audioInputConfig: AudioInputConfig
-    public var tokenizer: WhisperTokenizer?
+    public var tokenizer: WhisperTokenizer? {
+        didSet {
+            // Always sync the tokenizer to the text decoder when set
+            textDecoder.tokenizer = tokenizer
+        }
+    }
 
     /// Protocols
     public var audioProcessor: any AudioProcessing
@@ -158,30 +163,53 @@ open class WhisperKit {
     public static func recommendedRemoteModels(
         from repo: String = "argmaxinc/whisperkit-coreml",
         downloadBase: URL? = nil,
-        token: String? = nil
+        token: String? = nil,
+        remoteConfigName: String = Constants.defaultRemoteConfigName,
+        endpoint: String = Constants.defaultRemoteEndpoint
     ) async -> ModelSupport {
         let deviceName = Self.deviceName()
-        let config = await Self.fetchModelSupportConfig(from: repo, downloadBase: downloadBase, token: token)
+        let config = await Self.fetchModelSupportConfig(
+            from: repo,
+            downloadBase: downloadBase,
+            token: token,
+            remoteConfigName: remoteConfigName,
+            endpoint: endpoint
+        )
         return ModelUtilities.modelSupport(for: deviceName, from: config)
     }
 
     public static func fetchModelSupportConfig(
         from repo: String = "argmaxinc/whisperkit-coreml",
         downloadBase: URL? = nil,
-        token: String? = nil
+        token: String? = nil,
+        remoteConfigName: String = Constants.defaultRemoteConfigName,
+        endpoint: String = Constants.defaultRemoteEndpoint
     ) async -> ModelSupportConfig {
-        let hubApi = HubApi(downloadBase: downloadBase, hfToken: token)
+        let hubApi = HubApi(downloadBase: downloadBase, hfToken: token, endpoint: endpoint)
         var modelSupportConfig = Constants.fallbackModelSupportConfig
 
         do {
-            // Try to decode config.json into ModelSupportConfig
-            let configUrl = try await hubApi.snapshot(from: repo, matching: "config*")
+            // Try to decode config file into ModelSupportConfig
+            Logging.debug("Searching for config file matching \"\(remoteConfigName)\" in \(repo)")
+            let files = try await hubApi.getFilenames(from: repo, matching: remoteConfigName)
+            if files.count > 1 {
+                Logging.info("Multiple config files found (\(files.count)): \(files). Using first matching file: \(files.first ?? "none")")
+            } else if files.isEmpty {
+                // Early return for missing remote config
+                Logging.info("No config files found matching \"\(remoteConfigName)\" in \(repo), using fallback")
+                return modelSupportConfig
+            }
+            
+            // Use the first file in the list, or default to Constants.defaultRemoteConfigName
+            let configFileName = files.first ?? Constants.defaultRemoteConfigName
+            
+            let configUrl = try await hubApi.snapshot(from: repo, matching: configFileName)
             let decoder = JSONDecoder()
-            let jsonData = try Data(contentsOf: configUrl.appendingPathComponent("config.json"))
+            let jsonData = try Data(contentsOf: configUrl.appendingPathComponent(configFileName))
             modelSupportConfig = try decoder.decode(ModelSupportConfig.self, from: jsonData)
         } catch {
             // Allow this to fail gracefully as it uses fallback config by default
-            Logging.error(error)
+            Logging.error("Fetch model support config failed with error: \(error)")
         }
 
         return modelSupportConfig
@@ -191,9 +219,17 @@ open class WhisperKit {
         from repo: String = "argmaxinc/whisperkit-coreml",
         matching: [String] = ["*"],
         downloadBase: URL? = nil,
-        token: String? = nil
+        token: String? = nil,
+        remoteConfigName: String = Constants.defaultRemoteConfigName,
+        endpoint: String = Constants.defaultRemoteEndpoint
     ) async throws -> [String] {
-        let modelSupportConfig = await fetchModelSupportConfig(from: repo, downloadBase: downloadBase, token: token)
+        let modelSupportConfig = await fetchModelSupportConfig(
+            from: repo,
+            downloadBase: downloadBase,
+            token: token,
+            remoteConfigName: remoteConfigName,
+            endpoint: endpoint
+        )
         let supportedModels = modelSupportConfig.modelSupport().supported
         var filteredSupportSet: Set<String> = []
         for glob in matching {
@@ -201,43 +237,7 @@ open class WhisperKit {
         }
         let filteredSupport = Array(filteredSupportSet)
 
-        return formatModelFiles(filteredSupport)
-    }
-
-    public static func formatModelFiles(_ modelFiles: [String]) -> [String] {
-        let modelFilters = ModelVariant.allCases.map { "\($0.description)\($0.description.contains("large") ? "" : "/")" } // Include quantized models for large
-        let modelVariants = modelFiles.map { $0.components(separatedBy: "/")[0] + "/" }
-        let filteredVariants = Set(modelVariants.filter { item in
-            let count = modelFilters.reduce(0) { count, filter in
-                let isContained = item.contains(filter) ? 1 : 0
-                return count + isContained
-            }
-            return count > 0
-        })
-
-        let availableModels = filteredVariants.map { variant -> String in
-            variant.trimmingFromEnd(character: "/", upto: 1)
-        }
-
-        // Sorting order based on enum
-        let sizeOrder = ModelVariant.allCases.map { $0.description }
-
-        let sortedModels = availableModels.sorted { firstModel, secondModel in
-            // Extract the base size without any additional qualifiers
-            let firstModelBase = sizeOrder.first(where: { firstModel.contains($0) }) ?? ""
-            let secondModelBase = sizeOrder.first(where: { secondModel.contains($0) }) ?? ""
-
-            if firstModelBase == secondModelBase {
-                // If base sizes are the same, sort alphabetically
-                return firstModel < secondModel
-            } else {
-                // Sort based on the size order
-                return sizeOrder.firstIndex(of: firstModelBase) ?? sizeOrder.count
-                    < sizeOrder.firstIndex(of: secondModelBase) ?? sizeOrder.count
-            }
-        }
-
-        return sortedModels
+        return ModelUtilities.formatModelFiles(filteredSupport)
     }
 
     public static func download(
@@ -246,11 +246,12 @@ open class WhisperKit {
         useBackgroundSession: Bool = false,
         from repo: String = "argmaxinc/whisperkit-coreml",
         token: String? = nil,
+        endpoint: String = Constants.defaultRemoteEndpoint,
         progressCallback: ((Progress) -> Void)? = nil
     ) async throws -> URL {
-        let hubApi = HubApi(downloadBase: downloadBase, hfToken: token, useBackgroundSession: useBackgroundSession)
+        let hubApi = HubApi(downloadBase: downloadBase, hfToken: token, endpoint: endpoint, useBackgroundSession: useBackgroundSession)
         let repo = Hub.Repo(id: repo, type: .models)
-        let modelSearchPath = "*\(variant.description)/*"
+        var modelSearchPath = "*\(variant.description)/*"
         do {
             Logging.debug("Searching for models matching \"\(modelSearchPath)\" in \(repo)")
             let modelFiles = try await hubApi.getFilenames(from: repo, matching: [modelSearchPath])
@@ -261,11 +262,12 @@ open class WhisperKit {
             if uniquePaths.count == 1 {
                 variantPath = uniquePaths.first
             } else {
-                // If the model name search returns more than one unique model folder, then prepend the default "openai" prefix from whisperkittools to disambiguate
+                // If the model name search returns more than one unique model folder,
+                // then prepend the default "openai" prefix from whisperkittools to disambiguate
                 Logging.debug("Multiple models found matching \"\(modelSearchPath)\"")
-                let adjustedModelSearchPath = "*openai*\(variant.description)/*"
-                Logging.debug("Searching for models matching \"\(adjustedModelSearchPath)\" in \(repo)")
-                let adjustedModelFiles = try await hubApi.getFilenames(from: repo, matching: [adjustedModelSearchPath])
+                modelSearchPath = "*openai*\(variant.description)/*"
+                Logging.debug("Searching for models matching \"\(modelSearchPath)\" in \(repo)")
+                let adjustedModelFiles = try await hubApi.getFilenames(from: repo, matching: [modelSearchPath])
                 uniquePaths = Set(adjustedModelFiles.map { $0.components(separatedBy: "/").first! })
 
                 if uniquePaths.count == 1 {
@@ -275,7 +277,9 @@ open class WhisperKit {
 
             guard let variantPath else {
                 // If there is still ambiguity, throw an error
-                throw WhisperError.modelsUnavailable("Multiple models found matching \"\(modelSearchPath)\"")
+                throw WhisperError.modelsUnavailable(
+                    "\(uniquePaths.count > 1 ? "Multiple" : "No") models found matching \"\(modelSearchPath)\" in \(repo)"
+                )
             }
 
             Logging.debug("Downloading model \(variantPath)...")
@@ -301,7 +305,9 @@ open class WhisperKit {
         modelRepo: String?,
         modelToken: String? = nil,
         modelFolder: String?,
-        download: Bool
+        download: Bool,
+        remoteConfigName: String = Constants.defaultRemoteConfigName,
+        endpoint: String = Constants.defaultRemoteEndpoint
     ) async throws {
         // If a local model folder is provided, use it; otherwise, download the model
         if let folder = modelFolder {
@@ -309,8 +315,21 @@ open class WhisperKit {
         } else if download {
             // Determine the model variant to use
             let repo = modelRepo ?? "argmaxinc/whisperkit-coreml"
-            let modelSupport = await WhisperKit.recommendedRemoteModels(from: repo, downloadBase: downloadBase)
-            let modelVariant = model ?? modelSupport.default
+            let modelVariant: String
+            if let model {
+                // Model is specified, skip remote config check
+                modelVariant = model
+            } else {
+                // Model not specified, fetch remote config to get the recommended default
+                let modelSupport = await WhisperKit.recommendedRemoteModels(
+                    from: repo,
+                    downloadBase: downloadBase,
+                    token: modelToken,
+                    remoteConfigName: remoteConfigName,
+                    endpoint: endpoint
+                )
+                modelVariant = modelSupport.default
+            }
 
             do {
                 self.modelFolder = try await Self.download(
@@ -318,7 +337,8 @@ open class WhisperKit {
                     downloadBase: downloadBase,
                     useBackgroundSession: useBackgroundDownloadSession,
                     from: repo,
-                    token: modelToken
+                    token: modelToken,
+                    endpoint: endpoint
                 )
             } catch {
                 // Handle errors related to model downloading
@@ -423,38 +443,56 @@ open class WhisperKit {
             return
         }
 
-        // Only load tokenizer if not already set
-        if let tokenizer {
-            Logging.debug("Tokenizer already loaded, skipping tokenizer loading")
-            textDecoder.tokenizer = tokenizer
-        } else {
-            // Check model dimensions to assign appropriate tokenizer
-            guard let logitsDim = textDecoder.logitsSize, let encoderDim = audioEncoder.embedSize else {
-                throw WhisperError.tokenizerUnavailable()
-            }
-            textDecoder.isModelMultilingual = ModelUtilities.isModelMultilingual(logitsDim: logitsDim)
-            modelVariant = ModelUtilities.detectVariant(logitsDim: logitsDim, encoderDim: encoderDim)
-            
-            Logging.debug("Loading tokenizer for \(modelVariant)")
-            let tokenizerLoadStart = CFAbsoluteTimeGetCurrent()
-
-            let tokenizer = try await ModelUtilities.loadTokenizer(
-                for: modelVariant,
-                tokenizerFolder: path,
-                useBackgroundSession: useBackgroundDownloadSession
-            )
-            currentTimings.tokenizerLoadTime = CFAbsoluteTimeGetCurrent() - tokenizerLoadStart
-
-            self.tokenizer = tokenizer
-            textDecoder.tokenizer = tokenizer
-            Logging.debug("Loaded tokenizer in \(String(format: "%.2f", currentTimings.tokenizerLoadTime))s")
-        }
+        try await loadTokenizerIfNeeded()
 
         modelState = .loaded
 
         currentTimings.modelLoading = CFAbsoluteTimeGetCurrent() - modelLoadStart + currentTimings.prewarmLoadTime
 
         Logging.info("Loaded models for whisper size: \(modelVariant) in \(String(format: "%.2f", currentTimings.modelLoading))s")
+    }
+
+    open func loadTokenizerIfNeeded() async throws {
+        // Loading not needed if tokenizer is non-nil
+        guard tokenizer == nil else {
+            Logging.debug("Tokenizer already exists on WhisperKit, skipping load")
+            return
+        }
+
+        // Load new tokenizer if able to detect variant, otherwise throw
+        guard let logitsDim = textDecoder.logitsSize, let encoderDim = audioEncoder.embedSize else {
+            throw WhisperError.tokenizerUnavailable()
+        }
+
+        textDecoder.isModelMultilingual = ModelUtilities.isModelMultilingual(logitsDim: logitsDim)
+        modelVariant = ModelUtilities.detectVariant(logitsDim: logitsDim, encoderDim: encoderDim)
+
+        Logging.debug("Loading tokenizer for \(modelVariant)")
+        let tokenizerLoadStart = CFAbsoluteTimeGetCurrent()
+
+        // Search model folder for tokenizer if it is bundled with the model
+        let additionalSearchPaths: [URL]
+        if let modelFolder {
+            // TODO: remove hub path in future version, retained as additional search path for backward compatibility
+            let hubTokenizerFolderFromModel = HubApi(downloadBase: modelFolder).localRepoLocation(
+                HubApi.Repo(id: ModelUtilities.tokenizerNameForVariant(modelVariant))
+            )
+
+            additionalSearchPaths = [modelFolder] + [hubTokenizerFolderFromModel]
+        } else {
+            additionalSearchPaths = []
+        }
+        
+        let tokenizer = try await ModelUtilities.loadTokenizer(
+            for: modelVariant,
+            tokenizerFolder: tokenizerFolder,
+            additionalSearchPaths: additionalSearchPaths,
+            useBackgroundSession: useBackgroundDownloadSession
+        )
+        currentTimings.tokenizerLoadTime = CFAbsoluteTimeGetCurrent() - tokenizerLoadStart
+
+        self.tokenizer = tokenizer
+        Logging.debug("Loaded tokenizer in \(String(format: "%.2f", currentTimings.tokenizerLoadTime))s")
     }
 
     open func unloadModels() async {

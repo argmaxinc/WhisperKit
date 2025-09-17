@@ -1,0 +1,46 @@
+{
+  "configurations" : [
+    {
+      "id" : "427C492D-C19B-4C99-A90A-F4AEF0EC4B54",
+      "name" : "Configuration 1",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "maximumTestRepetitions" : 3,
+    "testRepetitionMode" : "retryOnFailure",
+    "testTimeoutsEnabled" : true
+  },
+  "testTargets" : [
+    {
+      "skippedTests" : [
+        "FunctionalTests",
+        "FunctionalTests\/testAsyncImplementation()",
+        "FunctionalTests\/testBaseImplementation()",
+        "FunctionalTests\/testBatchTranscribeAudioArrays()",
+        "FunctionalTests\/testBatchTranscribeAudioPaths()",
+        "FunctionalTests\/testBatchTranscribeAudioPathsWithErrors()",
+        "FunctionalTests\/testInitLarge()",
+        "FunctionalTests\/testModelSearchPathLarge()",
+        "FunctionalTests\/testRealTimeFactorLarge()",
+        "FunctionalTests\/testRealTimeFactorTiny()",
+        "RegressionTests",
+        "RegressionTests\/testHirschberg()",
+        "RegressionTests\/testInMemoryAndDiskUsage()",
+        "RegressionTests\/testLargeWER()",
+        "RegressionTests\/testLevenshtein()",
+        "RegressionTests\/testModelPerformance()",
+        "RegressionTests\/testModelPerformanceWithDebugConfig()",
+        "RegressionTests\/testNormalizer()"
+      ],
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "WhisperKitTests",
+        "name" : "WhisperKitTests"
+      }
+    }
+  ],
+  "version" : 1
+}

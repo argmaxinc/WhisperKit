@@ -9,6 +9,12 @@ on:
       ios-device:
         required: true
         type: string
+      watchos-version:
+        required: true
+        type: string
+      visionos-version:
+          required: true
+          type: string
       macos-runner:
         required: true
         type: string
@@ -39,15 +45,15 @@ jobs:
               name: "watchOS",
               condition: "${{ inputs.macos-runner == 'macos-15' }}",
               clean-destination: "generic/platform=watchOS",
-              test-destination: "platform=watchOS Simulator,name=Apple Watch Ultra 2 (49mm)",
+              test-destination: "platform=watchOS Simulator,OS=${{ inputs.watchos-version }},name=Apple Watch Ultra 2 (49mm)",
             }
           - {
               name: "visionOS",
               condition: "${{ inputs.macos-runner == 'macos-15' }}",
               clean-destination: "generic/platform=visionOS",
-              test-destination: "platform=visionOS Simulator,name=Apple Vision Pro",
+              test-destination: "platform=visionOS Simulator,OS=${{ inputs.visionos-version }},name=Apple Vision Pro",
             }
-    timeout-minutes: 30
+    timeout-minutes: ${{ matrix.run-config['name'] == 'visionOS' && 60 || 30 }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -77,7 +83,7 @@ jobs:
           echo "Runtimes for testing:"
           xcrun simctl list runtimes
           echo "Destinations for testing:"
-          xcodebuild test-without-building -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -showdestinations
+          xcodebuild test-without-building -testPlan UnitTestsPlan -scheme whisperkit-Package -showdestinations
       - name: Boot Simulator and Wait
         if: ${{ matrix.run-config['condition'] == true }} && ${{ matrix.run-config['name'] != 'macOS' }} && ${{ inputs.macos-runner == 'macos-15' }}
         # Slower runners require some time to fully boot the simulator
@@ -92,7 +98,7 @@ jobs:
         run: |
           set -o pipefail
           xcodebuild clean build-for-testing -scheme whisperkit-Package -destination '${{ matrix.run-config['clean-destination'] }}' | xcpretty
-          xcodebuild test -only-testing WhisperKitTests/UnitTests -scheme whisperkit-Package -destination '${{ matrix.run-config['test-destination'] }}'
+          xcodebuild test -testPlan UnitTestsPlan -scheme whisperkit-Package -destination '${{ matrix.run-config['test-destination'] }}'
       - name: Upload Test Results
         if: failure()
         uses: actions/upload-artifact@v4
