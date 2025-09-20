@@ -4,7 +4,7 @@
 import ArgumentParser
 import Foundation
 
-let VERSION: String = "development"
+let VERSION: String = "v0.14.0"
 
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 var subcommands: [ParsableCommand.Type] {
