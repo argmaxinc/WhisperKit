@@ -14,7 +14,7 @@ public typealias DeviceID = String
 #endif
 public typealias ChannelMode = AudioInputConfig.ChannelMode
 
-public struct AudioDevice: Identifiable, Hashable {
+public struct AudioDevice: Identifiable, Hashable, Sendable {
     public let id: DeviceID
     public let name: String
 
@@ -25,9 +25,9 @@ public struct AudioDevice: Identifiable, Hashable {
 }
 
 /// Configuration for audio input including device selection and channel processing options.
-public struct AudioInputConfig {
+public struct AudioInputConfig: Sendable {
     /// Specifies how to handle audio channels when processing multi-channel audio.
-    public enum ChannelMode: Hashable, Codable {
+    public enum ChannelMode: Hashable, Codable, Sendable {
         /// Selects a single specific channel by index.
         /// - Parameter index: The zero-based index of the channel to use.
         ///                    0 selects the first channel, 1 selects the second, etc.
