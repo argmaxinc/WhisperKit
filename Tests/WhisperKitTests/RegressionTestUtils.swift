@@ -20,7 +20,6 @@ import WatchKit
 
 // MARK: RegressionStats
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 class RegressionStats: JSONCodable {
     let testInfo: TestInfo
     let memoryStats: MemoryStats
@@ -159,7 +158,6 @@ class Stats: JSONCodable {
 
 // MARK: StaticAttributes
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 class StaticAttributes: Codable {
     let osVersion: String
     let isLowPowerMode: String
@@ -265,7 +263,6 @@ extension Data {
 
 // MARK: - SystemMemoryChecker
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 class AppMemoryChecker: NSObject {
     static func getMemoryUsed() -> UInt64 {
         // The `TASK_VM_INFO_COUNT` and `TASK_VM_INFO_REV1_COUNT` macros are too
@@ -292,7 +289,6 @@ class AppMemoryChecker: NSObject {
     }
 }
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 class SystemMemoryCheckerAdvanced: NSObject {
     static func getMemoryUsage() -> SystemMemoryUsage {
         // Get total and available memory using host_statistics64
@@ -487,7 +483,6 @@ private extension MLComputeUnits {
     }
 }
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 actor TranscriptionTestState {
     private var aggregatedCount: Double = 0
     private var cumulativeTokenCount: Double = 0

@@ -57,7 +57,6 @@ public protocol DecodingInputsType {
     func reset(prefilledCacheSize: Int, maxTokenContext: Int)
 }
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public protocol TextDecoding {
     var tokenizer: WhisperTokenizer? { get set }
     var prefillData: WhisperMLModel? { get set }
@@ -131,7 +130,6 @@ public protocol TextDecoding {
     )
 }
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public extension TextDecoding {
     @available(*, deprecated, message: "Subject to removal in a future version. Use `decodeText(from:using:sampler:options:callback:) async throws -> DecodingResult` instead.")
     func decodeText(
@@ -484,7 +482,6 @@ public class TextDecoderContextPrefill: WhisperMLModel {
     public var model: MLModel?
 }
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 open class TextDecoder: TextDecoding, WhisperMLModel {
     public var model: MLModel?
     public var tokenizer: WhisperTokenizer?

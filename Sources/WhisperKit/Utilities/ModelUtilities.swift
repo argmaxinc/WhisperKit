@@ -11,7 +11,6 @@ public struct ModelUtilities {
 
     // MARK: Public
 
-    @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
     public static func modelSupport(for deviceName: String, from config: ModelSupportConfig? = nil) -> ModelSupport {
         let config = config ?? Constants.fallbackModelSupportConfig
         let modelSupport = config.modelSupport(for: deviceName)
@@ -274,14 +273,12 @@ public func loadTokenizer(
 }
 
 @available(*, deprecated, message: "Subject to removal in a future version. Use ModelUtilities.modelSupport(for:from:) -> ModelSupport instead.")
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public func modelSupport(for deviceName: String, from config: ModelSupportConfig? = nil) -> ModelSupport {
     return ModelUtilities.modelSupport(for: deviceName, from: config)
 }
 
 @available(*, deprecated, message: "Subject to removal in a future version. Use ModelUtilities.modelSupport(for:from:) -> ModelSupport instead.")
 @_disfavoredOverload
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public func modelSupport(for deviceName: String, from config: ModelSupportConfig? = nil) -> (default: String, disabled: [String]) {
     let modelSupport = ModelUtilities.modelSupport(for: deviceName, from: config)
     return (modelSupport.default, modelSupport.disabled)

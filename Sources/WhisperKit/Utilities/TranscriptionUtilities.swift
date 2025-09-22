@@ -52,7 +52,6 @@ public struct TranscriptionUtilities {
     ///   - segment: The transcription segment to update
     ///   - seekTime: The time offset to add to all timings
     /// - Returns: Updated transcription segment with adjusted timings
-    @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
     public static func updateSegmentTimings(segment: TranscriptionSegment, seekTime: Float) -> TranscriptionSegment {
         var updatedSegment = segment
         let seekOffsetIndex = Int(seekTime * Float(WhisperKit.sampleRate))
@@ -74,7 +73,6 @@ public struct TranscriptionUtilities {
     ///   - results: Array of transcription results to merge
     ///   - confirmedWords: Optional array of confirmed word timings to use instead of merging text
     /// - Returns: A single merged transcription result
-    @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
     public static func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirmedWords: [WordTiming]? = nil) -> TranscriptionResult {
         var mergedText = ""
         if let words = confirmedWords {
@@ -176,13 +174,11 @@ public func findLongestDifferentSuffix(_ words1: [WordTiming], _ words2: [WordTi
 }
 
 @available(*, deprecated, message: "Subject to removal in a future version. Use `TranscriptionUtilities.mergeTranscriptionResults(_:confirmedWords:)` instead.")
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirmedWords: [WordTiming]? = nil) -> TranscriptionResult {
     return TranscriptionUtilities.mergeTranscriptionResults(results, confirmedWords: confirmedWords)
 }
 
 @available(*, deprecated, message: "Subject to removal in a future version. Use `TranscriptionUtilities.updateSegmentTimings(segment:seekTime:)` instead.")
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public func updateSegmentTimings(segment: TranscriptionSegment, seekTime: Float) -> TranscriptionSegment {
     return TranscriptionUtilities.updateSegmentTimings(segment: segment, seekTime: seekTime)
 }

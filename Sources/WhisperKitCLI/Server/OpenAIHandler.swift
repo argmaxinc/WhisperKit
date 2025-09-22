@@ -7,7 +7,6 @@ import OpenAPIRuntime
 import OpenAPIVapor
 @preconcurrency import WhisperKit
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 struct OpenAIHandler: APIProtocol {
     let whisperKit: WhisperKit
     private let logger: Logger
