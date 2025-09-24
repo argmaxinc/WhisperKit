@@ -56,8 +56,6 @@ jobs:
     timeout-minutes: ${{ matrix.run-config['name'] == 'visionOS' && 60 || 30 }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: ${{ inputs.xcode-version || 'latest-stable' }}
