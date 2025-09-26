@@ -127,7 +127,7 @@ open class WhisperKitConfig {
 ///   - noSpeechThreshold: If the no speech probability is higher than this value AND the average log
 ///                        probability over sampled tokens is below `logProbThreshold`, consider the segment as silent.
 @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
-public struct DecodingOptions: Codable {
+public struct DecodingOptions: Codable, Sendable {
     public var verbose: Bool
     public var task: DecodingTask
     public var language: String?
