@@ -5,7 +5,6 @@ import CoreML
 import WhisperKit
 import XCTest
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 final class FunctionalTests: XCTestCase {
     func testInitLarge() async throws {
         try await XCTAssertNoThrowAsync(

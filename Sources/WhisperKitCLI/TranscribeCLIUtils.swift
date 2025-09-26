@@ -5,7 +5,6 @@ import Foundation
 import CoreML
 @preconcurrency import WhisperKit
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 internal class TranscribeCLIUtils {
     
     /// Creates WhisperKit configuration from CLI arguments

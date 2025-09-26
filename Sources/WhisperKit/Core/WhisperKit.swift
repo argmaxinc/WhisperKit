@@ -9,7 +9,6 @@ import Hub
 import TensorUtils
 import Tokenizers
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 open class WhisperKit {
     /// Models
     public private(set) var modelVariant: ModelVariant = .tiny

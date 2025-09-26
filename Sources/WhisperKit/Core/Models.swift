@@ -134,7 +134,6 @@ public enum ModelState: CustomStringConvertible {
     }
 }
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public struct ModelComputeOptions: Sendable {
     public var melCompute: MLComputeUnits
     public var audioEncoderCompute: MLComputeUnits
@@ -252,7 +251,6 @@ public struct ModelSupportConfig: Codable, Sendable {
         computeDisabledModels()
     }
 
-    @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
     public func modelSupport(for deviceIdentifier: String = WhisperKit.deviceName()) -> ModelSupport {
         // Find the support with the longest matching identifier prefix
         // i.e. `iPad13,16` should match exact `iPad13,16` instead of first prefix like `iPad13,1`
@@ -409,7 +407,6 @@ public enum ChunkingStrategy: String, Codable, CaseIterable {
     case vad
 }
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public struct DecodingFallback: Sendable {
     public var needsFallback: Bool
     public var fallbackReason: String
@@ -420,7 +417,6 @@ public struct DecodingFallback: Sendable {
     }
 }
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public extension DecodingFallback {
     init?(
         options: DecodingOptions,
@@ -447,7 +443,6 @@ public extension DecodingFallback {
     }
 }
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public struct DecodingResult {
     public var language: String
     public var languageProbs: [String: Float]
@@ -900,7 +895,6 @@ public class MelSpectrogramInput: MLFeatureProvider {
 }
 
 /// Model Prediction Output Type
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class MelSpectrogramOutput: MLFeatureProvider {
     /// Source provided by CoreML
     private let provider: MLFeatureProvider
@@ -937,7 +931,6 @@ public class MelSpectrogramOutput: MLFeatureProvider {
 // MARK: AudioEncoder
 
 /// Model Prediction Input Type
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class AudioEncoderInput: MLFeatureProvider {
     /// melspectrogram_features as 1 × {80,128} × 1 × 3000 4-dimensional array of floats
     public var melspectrogram_features: MLMultiArray
@@ -963,7 +956,6 @@ public class AudioEncoderInput: MLFeatureProvider {
 }
 
 /// Model Prediction Output Type
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class AudioEncoderOutput: MLFeatureProvider {
     /// Source provided by CoreML
     private let provider: MLFeatureProvider
@@ -1000,7 +992,6 @@ public class AudioEncoderOutput: MLFeatureProvider {
 // MARK: TextDecoder
 
 /// Model Prediction Input Type
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class TextDecoderInput: MLFeatureProvider {
     /// input_ids as 1 element vector of 32-bit integers
     public var input_ids: MLMultiArray
@@ -1068,7 +1059,6 @@ public class TextDecoderInput: MLFeatureProvider {
 }
 
 /// Model Prediction Output Type
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class TextDecoderOutput: MLFeatureProvider {
     /// Source provided by CoreML
     private let provider: MLFeatureProvider
@@ -1175,7 +1165,6 @@ public class TextDecoderCachePrefillInput: MLFeatureProvider {
 }
 
 /// Model Prediction Output Type
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public class TextDecoderCachePrefillOutput: MLFeatureProvider {
     /// Source provided by CoreML
     private let provider: MLFeatureProvider

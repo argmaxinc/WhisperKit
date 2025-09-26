@@ -6,7 +6,6 @@ import Foundation
 
 let VERSION: String = "development"
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 var subcommands: [ParsableCommand.Type] {
 #if BUILD_SERVER_CLI
     [TranscribeCLI.self, ServeCLI.self]
@@ -15,7 +14,6 @@ var subcommands: [ParsableCommand.Type] {
 #endif
 }
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 @main
 struct WhisperKitCLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(

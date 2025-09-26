@@ -10,7 +10,6 @@ public extension Array where Element == TranscriptionSegment {
     }
 }
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public extension WhisperKit {
     static var isRunningOnSimulator: Bool {
         #if targetEnvironment(simulator)
@@ -56,7 +55,6 @@ public extension String {
 // MARK: CoreML
 
 public extension MLMultiArray {
-    @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
     convenience init(shape: [NSNumber], dataType: MLMultiArrayDataType, initialValue: Any) throws {
         switch dataType {
         case .float16:
@@ -300,7 +298,6 @@ public func resolveAbsolutePath(_ inputPath: String) -> String {
 
 
 @available(*, deprecated, message: "Subject to removal in a future version. Use `ModelUtilities.formatModelFiles(_:)` instead.")
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public extension WhisperKit {
     static func formatModelFiles(_ modelFiles: [String]) -> [String] {
         return ModelUtilities.formatModelFiles(modelFiles)

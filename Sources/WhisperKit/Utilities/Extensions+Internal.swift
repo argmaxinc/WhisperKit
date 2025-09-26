@@ -131,7 +131,6 @@ extension AudioProcessing {
     }
 }
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 extension DecodingOptions {
     func prepareSeekClips(contentFrames: Int) -> [(start: Int, end: Int)] {
         var seekPoints: [Int] = clipTimestamps.map { Int(round($0 * Float(WhisperKit.sampleRate))) }

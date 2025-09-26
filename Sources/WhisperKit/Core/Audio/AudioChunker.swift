@@ -6,12 +6,10 @@ import AVFoundation
 import Foundation
 
 /// Responsible for chunking audio into smaller pieces
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public protocol AudioChunking {
     func chunkAll(audioArray: [Float], maxChunkLength: Int, decodeOptions: DecodingOptions?) async throws -> [AudioChunk]
 }
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public extension AudioChunking {
     func updateSeekOffsetsForResults(
         chunkedResults: [Result<[TranscriptionResult], Swift.Error>],
@@ -42,7 +40,6 @@ public extension AudioChunking {
 }
 
 /// A audio chunker that splits audio into smaller pieces based on voice activity detection
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 open class VADAudioChunker: AudioChunking {
     /// prevent hallucinations at the end of the clip by stopping up to 1.0s early
     private let windowPadding: Int

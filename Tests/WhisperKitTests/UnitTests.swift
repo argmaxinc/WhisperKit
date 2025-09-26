@@ -10,7 +10,6 @@ import Tokenizers
 @testable import WhisperKit
 import XCTest
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 final class UnitTests: XCTestCase {
     override func setUp() async throws {
         Logging.shared.logLevel = .debug

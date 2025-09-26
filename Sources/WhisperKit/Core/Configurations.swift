@@ -4,7 +4,6 @@
 import Foundation
 
 /// Configuration to initialize WhisperKit
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 open class WhisperKitConfig {
     /// Name for whisper model to use
     public var model: String?
@@ -126,7 +125,6 @@ open class WhisperKitConfig {
 ///   - firstTokenLogProbThreshold: If the log probability over the first sampled token is below this value, treat as failed.
 ///   - noSpeechThreshold: If the no speech probability is higher than this value AND the average log
 ///                        probability over sampled tokens is below `logProbThreshold`, consider the segment as silent.
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public struct DecodingOptions: Codable, Sendable {
     public var verbose: Bool
     public var task: DecodingTask

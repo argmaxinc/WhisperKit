@@ -123,7 +123,6 @@ public extension AudioProcessing {
     /// Loads and converts audio data from a specified file paths.
     /// - Parameter audioPaths: The file paths of the audio files.
     /// - Returns: `AVAudioPCMBuffer` containing the audio data.
-    @available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
     static func loadAudioAsync(fromPath audioFilePath: String) async throws -> AVAudioPCMBuffer {
         return try await Task {
             try AudioProcessor.loadAudio(fromPath: audioFilePath)
@@ -191,7 +190,6 @@ public extension AudioProcessing {
     }
 }
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 open class AudioProcessor: NSObject, AudioProcessing {
     private var lastInputDevice: DeviceID?
     public var audioEngine: AVAudioEngine?
@@ -886,7 +884,6 @@ open class AudioProcessor: NSObject, AudioProcessing {
 
 // MARK: - Streaming
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public extension AudioProcessor {
     /// We have a new buffer, process and store it.
     /// NOTE: Assumes audio is 16khz mono

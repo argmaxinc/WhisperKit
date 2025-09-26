@@ -16,7 +16,6 @@ public protocol FeatureExtracting {
     func logMelSpectrogram(fromAudio inputAudio: any AudioProcessorOutputType) async throws -> (any FeatureExtractorOutputType)?
 }
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 open class FeatureExtractor: FeatureExtracting, WhisperMLModel {
     public var model: MLModel?
 

@@ -6,7 +6,6 @@ import CoreML
 import Foundation
 import WhisperKit
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 struct TranscribeCLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "transcribe",

@@ -77,7 +77,6 @@ func XCTAssertNoThrowAsync(
 
 // MARK: Helpers
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 extension Bundle {
     static func current(for classObject: AnyObject? = nil) -> Bundle {
         #if SWIFT_PACKAGE
@@ -93,7 +92,6 @@ extension Bundle {
     }
 }
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 extension FileManager {
     func allocatedSizeOfDirectory(at url: URL) throws -> Int64 {
         guard let enumerator = enumerator(at: url, includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey]) else {
@@ -109,7 +107,6 @@ extension FileManager {
     }
 }
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 extension MLMultiArray {
     /// Create `MLMultiArray` of shape [1, 1, arr.count] and fill up the last
     /// dimension with with values from arr.
@@ -137,7 +134,6 @@ extension MLMultiArray {
     }
 }
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 extension XCTestCase {
     func transcribe(
         with variant: ModelVariant,
