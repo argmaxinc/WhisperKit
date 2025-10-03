@@ -5,7 +5,6 @@ import Foundation
 
 /// A base class for Voice Activity Detection (VAD), used to identify and separate segments of audio that contain human speech from those that do not.
 /// Subclasses must implement the `voiceActivity(in:)` method to provide specific voice activity detection functionality.
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 open class VoiceActivityDetector {
     /// The sample rate of the audio signal, in samples per second.
     public let sampleRate: Int

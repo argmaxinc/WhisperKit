@@ -4,7 +4,6 @@
 import Foundation
 
 /// An actor that provides thread-safe early stopping functionality using UUIDs as keys
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public actor EarlyStopActor {
     private var shouldStop = [UUID: Bool]()
 

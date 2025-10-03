@@ -26,7 +26,6 @@ public struct SamplingResult: Sendable {
     }
 }
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 open class GreedyTokenSampler: TokenSampling {
     public var temperature: FloatType
     public var eotToken: Int

@@ -6,7 +6,6 @@ import CoreML
 import Foundation
 import Tokenizers
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 public protocol SegmentSeeking {
     func findSeekPointAndSegments(
         decodingResult: DecodingResult,
@@ -34,7 +33,6 @@ public protocol SegmentSeeking {
     ) throws -> [TranscriptionSegment]?
 }
 
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 open class SegmentSeeker: SegmentSeeking {
     public init() {}
 

@@ -5,7 +5,6 @@ import CoreML
 import Foundation
 
 /// Responsible for transcribing audio chunk to text using the provided models and configurations.
-@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
 final class TranscribeTask {
     private var timings: TranscriptionTimings
     private let progress: Progress
