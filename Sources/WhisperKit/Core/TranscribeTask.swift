@@ -5,19 +5,20 @@ import CoreML
 import Foundation
 
 /// Responsible for transcribing audio chunk to text using the provided models and configurations.
-final class TranscribeTask {
+@available(macOS 13, iOS 16, watchOS 10, visionOS 1, *)
+open class TranscribeTask {
     private var timings: TranscriptionTimings
     private let progress: Progress
     private let audioEncoder: any AudioEncoding
     private let featureExtractor: any FeatureExtracting
     private let segmentSeeker: any SegmentSeeking
     private let textDecoder: any TextDecoding
-    private let tokenizer: any WhisperTokenizer
     private let audioProcessor: any AudioProcessing
 
+    public private(set) var tokenizer: any WhisperTokenizer
     public var segmentDiscoveryCallback: SegmentDiscoveryCallback?
 
-    init(
+    public init(
         currentTimings: TranscriptionTimings,
         progress: Progress?,
         audioProcessor: (any AudioProcessing)? = nil,
@@ -37,7 +38,23 @@ final class TranscribeTask {
         self.tokenizer = tokenizer
     }
 
-    func run(
+    /// Hook for subclasses to launch work that can run alongside the main decoder pipeline.
+    open func windowPreprocess(
+        for paddedAudio: any AudioProcessorOutputType,
+        seek: Int,
+        segmentSize: Int
+    ) async {}
+
+    /// Hook for subclasses to finalize side work and optionally replace the segments for the current window.
+    open func windowPostProcess(
+        seek: Int,
+        segmentSize: Int,
+        originalSegments: [TranscriptionSegment]
+    ) async -> [TranscriptionSegment] {
+        originalSegments
+    }
+
+    public func run(
         audioArray: [Float],
         decodeOptions: DecodingOptions? = nil,
         callback: TranscriptionCallback = nil
@@ -61,7 +78,6 @@ final class TranscribeTask {
         // These accumulate across windows
         var allSegments: [TranscriptionSegment] = []
         var allTokens: [Int] = []
-        var transcription = ""
 
         let startDecoderInit = CFAbsoluteTimeGetCurrent()
         var decoderInputs = try textDecoder.prepareDecoderInputs(withPrompt: [tokenizer.specialTokens.startOfTranscriptToken])
@@ -107,6 +123,7 @@ final class TranscribeTask {
             
             let windowSamples = featureExtractor.windowSamples ?? Constants.defaultWindowSamples
             while seek < seekClipEnd - windowPadding {
+                let windowSeek = seek
                 // calculate new encoder segment features
                 let timeOffset = Float(seek) / Float(WhisperKit.sampleRate)
                 let segmentSize = min(windowSamples, contentFrames - seek, seekClipEnd - seek)
@@ -119,6 +136,7 @@ final class TranscribeTask {
                 guard let audioSamples = audioProcessor.padOrTrim(fromArray: clipAudioSamples, startAt: 0, toLength: windowSamples) else {
                     throw WhisperError.transcriptionFailed("Audio samples are nil")
                 }
+                await windowPreprocess(for: audioSamples, seek: windowSeek, segmentSize: segmentSize)
                 let processTime = Date().timeIntervalSince(audioProcessingStart)
                 timings.audioProcessing += processTime
                 timings.totalAudioProcessingRuns += 1
@@ -222,24 +240,30 @@ final class TranscribeTask {
                     seek = min(seek, maxSeekOffset)
                 }
 
-                guard let currentSegments = currentSegments else {
+                guard let currentSegments else {
                     // No current segment found, skip to next window
                     continue
                 }
 
+                let processedSegments = await windowPostProcess(
+                    seek: windowSeek,
+                    segmentSize: segmentSize,
+                    originalSegments: currentSegments
+                )
+
                 if options.verbose {
-                    let lines = TranscriptionUtilities.formatSegments(currentSegments)
+                    let lines = TranscriptionUtilities.formatSegments(processedSegments)
                     Logging.debug("Segments for window:")
                     for line in lines {
                         Logging.debug(line)
                     }
                 }
 
-                segmentDiscoveryCallback?(currentSegments)
+                segmentDiscoveryCallback?(processedSegments)
 
                 // add them to the `allSegments` list
-                allSegments.append(contentsOf: currentSegments)
-                let allCurrentTokens = currentSegments.flatMap { $0.tokens }
+                allSegments.append(contentsOf: processedSegments)
+                let allCurrentTokens = processedSegments.flatMap { $0.tokens }
                 allTokens.append(contentsOf: allCurrentTokens)
 
                 timings.decodingWindowing += Date().timeIntervalSince(windowingStart)
@@ -364,8 +388,23 @@ final class TranscribeTask {
         timings.decodingLoop = CFAbsoluteTimeGetCurrent() - startDecodeLoopTime
         timings.fullPipeline = CFAbsoluteTimeGetCurrent() - timings.pipelineStart
 
-        let wordTokens = allTokens.filter { $0 < tokenizer.specialTokens.specialTokenBegin }
-        transcription = tokenizer.decode(tokens: wordTokens).trimmingCharacters(in: .whitespaces)
+        let transcriptionResult = finalizeTranscriptionResult(
+            tokens: allTokens,
+            segments: allSegments,
+            language: detectedLanguage,
+            timings: timings
+        )
+        return transcriptionResult
+    }
+    
+    open func finalizeTranscriptionResult(
+        tokens: [Int],
+        segments allSegments: [TranscriptionSegment],
+        language detectedLanguage: String?,
+        timings: TranscriptionTimings
+    ) -> TranscriptionResult {
+        let wordTokens = tokens.filter { $0 < tokenizer.specialTokens.specialTokenBegin }
+        let transcription = tokenizer.decode(tokens: wordTokens).trimmingCharacters(in: .whitespaces)
         return TranscriptionResult(
             text: transcription,
             segments: allSegments,

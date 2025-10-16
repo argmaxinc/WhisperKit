@@ -6,7 +6,6 @@ import AVFoundation
 import CoreML
 import Foundation
 import Hub
-import TensorUtils
 import Tokenizers
 
 open class WhisperKit {
@@ -957,6 +956,29 @@ open class WhisperKit {
         return transcribeResults
     }
 
+    /// Setup the `TranscribeTask` used for decoding. Subclasses may override to provide custom behavior.
+    open func setupTranscribeTask(
+        currentTimings: TranscriptionTimings,
+        progress: Progress,
+        audioProcessor: any AudioProcessing,
+        audioEncoder: any AudioEncoding,
+        featureExtractor: any FeatureExtracting,
+        segmentSeeker: any SegmentSeeking,
+        textDecoder: any TextDecoding,
+        tokenizer: any WhisperTokenizer
+    ) -> TranscribeTask {
+        TranscribeTask(
+            currentTimings: currentTimings,
+            progress: progress,
+            audioProcessor: audioProcessor,
+            audioEncoder: audioEncoder,
+            featureExtractor: featureExtractor,
+            segmentSeeker: segmentSeeker,
+            textDecoder: textDecoder,
+            tokenizer: tokenizer
+        )
+    }
+
     /// Runs the transcription task on a single audio sample array asynchronously with custom segment callback.
     /// - Returns: An array of `TranscriptionResult`.
     /// - Throws: An error if the transcription fails or if the tokenizer is unavailable.
@@ -983,7 +1005,7 @@ open class WhisperKit {
             progress.totalUnitCount = max(1, progress.totalUnitCount)
             progress.addChild(childProgress, withPendingUnitCount: 1)
 
-            let transcribeTask = TranscribeTask(
+            let transcribeTask = setupTranscribeTask(
                 currentTimings: currentTimings,
                 progress: childProgress,
                 audioProcessor: audioProcessor,
