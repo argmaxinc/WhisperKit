@@ -355,8 +355,8 @@ public extension TextDecoding {
         {
             // Prefilling kv cache data requires non-nil task and language tokens, set defaults if not provided
             // Task tokens are remapped to 0->transcribe and 1->translate for the prefill lookup table
-            let task = MLMultiArray.from([taskToken == tokenizer.specialTokens.transcribeToken ? 0 : 1])
-            let lang = MLMultiArray.from([languageToken])
+            let task = try MLMultiArray.from([taskToken == tokenizer.specialTokens.transcribeToken ? 0 : 1])
+            let lang = try MLMultiArray.from([languageToken])
             guard let prefillOutput = try await self.prefillKVCache(withTask: task, andLanguage: lang) else {
                 Logging.error("Unable to prefill cache")
                 return prefilledDecoderInputs
