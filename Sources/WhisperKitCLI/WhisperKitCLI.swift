@@ -4,7 +4,7 @@
 import ArgumentParser
 import Foundation
 
-let VERSION: String = "development"
+let VERSION: String = "v0.14.1"
 
 var subcommands: [ParsableCommand.Type] {
 #if BUILD_SERVER_CLI
