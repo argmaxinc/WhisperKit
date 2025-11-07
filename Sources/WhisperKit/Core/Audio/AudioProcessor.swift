@@ -96,6 +96,13 @@ public protocol AudioProcessing {
     /// Starts recording audio from the specified input device, resetting the previous state
     func startRecordingLive(inputDeviceID: DeviceID?, callback: (([Float]) -> Void)?) throws
 
+    /// Starts live audio recording and provides an async stream of audio samples.
+    ///
+    /// - Parameter inputDeviceID: The device ID of the input audio device to use for recording.
+    ///   This parameter is only valid on macOS; iOS always uses the default input device.
+    /// - Returns: A tuple containing the async stream of audio sample buffers and the stream's continuation.
+    func startStreamingRecordingLive(inputDeviceID: DeviceID?) -> (AsyncThrowingStream<[Float], Error>, AsyncThrowingStream<[Float], Error>.Continuation)
+
     /// Pause recording
     func pauseRecording()
 
@@ -128,9 +135,13 @@ public extension AudioProcessing {
             try AudioProcessor.loadAudio(fromPath: audioFilePath)
         }.value
     }
-
+    
     func startRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)?) throws {
         try startRecordingLive(inputDeviceID: inputDeviceID, callback: callback)
+    }
+    
+    func startStreamingRecordingLive(inputDeviceID: DeviceID? = nil) -> (AsyncThrowingStream<[Float], Error>, AsyncThrowingStream<[Float], Error>.Continuation) {
+        return startStreamingRecordingLive(inputDeviceID: inputDeviceID)
     }
 
     func resumeRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)?) throws {
@@ -1021,6 +1032,28 @@ public extension AudioProcessor {
         audioBufferCallback = callback
 
         lastInputDevice = inputDeviceID
+    }
+
+    /// Starts live audio recording and returns an async stream that yields sample buffers.
+    /// Recording stops automatically when the stream terminates.
+    func startStreamingRecordingLive(inputDeviceID: DeviceID? = nil) -> (AsyncThrowingStream<[Float], Error>, AsyncThrowingStream<[Float], Error>.Continuation) {
+        let (stream, continuation) = AsyncThrowingStream<[Float], Error>.makeStream(bufferingPolicy: .unbounded)
+        
+        continuation.onTermination = { [weak self] _ in
+            guard let self = self else { return }
+            self.audioBufferCallback = nil
+            self.stopRecording()
+        }
+        
+        do {
+            try self.startRecordingLive(inputDeviceID: inputDeviceID) { @Sendable floats in
+                continuation.yield(floats)
+            }
+        } catch {
+            continuation.finish(throwing: error)
+        }
+
+        return (stream, continuation)
     }
 
     func resumeRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)? = nil) throws {
