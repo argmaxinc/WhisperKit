@@ -501,14 +501,17 @@ public struct DecodingResult {
     }
 }
 
-// Structs
-
-public struct TranscriptionResult: Codable, Sendable {
-    public var text: String
-    public var segments: [TranscriptionSegment]
-    public var language: String
-    public var timings: TranscriptionTimings
-    public var seekTime: Float?
+/// Reference-type container for transcription output.
+/// The stored properties stay thread-safe because each one uses
+/// `TranscriptionPropertyLock`, so reads/writes hop through a private `NSLock`
+/// before the value is accessed, making this shared `@unchecked Sendable` class
+/// safe to hand across concurrent contexts.
+open class TranscriptionResult: Codable, @unchecked Sendable {
+    @TranscriptionPropertyLock public var text: String
+    @TranscriptionPropertyLock public var segments: [TranscriptionSegment]
+    @TranscriptionPropertyLock public var language: String
+    @TranscriptionPropertyLock public var timings: TranscriptionTimings
+    @TranscriptionPropertyLock public var seekTime: Float?
 
     public init(
         text: String,
@@ -600,11 +603,37 @@ public struct TranscriptionResult: Codable, Sendable {
     }
 }
 
+/// Value-type equivalent of `TranscriptionResult` without property locking.
+public struct TranscriptionResultStruct: Codable, Sendable {
+    public var text: String
+    public var segments: [TranscriptionSegment]
+    public var language: String
+    public var timings: TranscriptionTimings
+    public var seekTime: Float?
+
+    public init(
+        text: String,
+        segments: [TranscriptionSegment],
+        language: String,
+        timings: TranscriptionTimings,
+        seekTime: Float? = nil
+    ) {
+        self.text = text
+        self.segments = segments
+        self.language = language
+        self.timings = timings
+        self.seekTime = seekTime
+    }
+}
+
+
 public extension TranscriptionResult {
     var allWords: [WordTiming] {
         return segments.compactMap { $0.words }.flatMap { $0 }
     }
 }
+
+// Structs
 
 public struct TranscriptionSegment: Hashable, Codable, Sendable {
     public var id: Int
