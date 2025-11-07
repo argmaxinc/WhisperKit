@@ -43,13 +43,13 @@ jobs:
             }
           - {
               name: "watchOS",
-              condition: "${{ inputs.macos-runner == 'macos-15' }}",
+              condition: "${{ inputs.macos-runner == 'macos-26' }}",
               clean-destination: "generic/platform=watchOS",
-              test-destination: "platform=watchOS Simulator,OS=${{ inputs.watchos-version }},name=Apple Watch Ultra 2 (49mm)",
+              test-destination: "platform=watchOS Simulator,OS=${{ inputs.watchos-version }},name=Apple Watch Ultra 3 (49mm)",
             }
           - {
               name: "visionOS",
-              condition: "${{ inputs.macos-runner == 'macos-15' }}",
+              condition: "${{ inputs.macos-runner == 'macos-26' }}",
               clean-destination: "generic/platform=visionOS",
               test-destination: "platform=visionOS Simulator,OS=${{ inputs.visionos-version }},name=Apple Vision Pro",
             }
@@ -83,7 +83,7 @@ jobs:
           echo "Destinations for testing:"
           xcodebuild test-without-building -testPlan UnitTestsPlan -scheme whisperkit-Package -showdestinations
       - name: Boot Simulator and Wait
-        if: ${{ matrix.run-config['condition'] == true }} && ${{ matrix.run-config['name'] != 'macOS' }} && ${{ inputs.macos-runner == 'macos-15' }}
+        if: ${{ matrix.run-config['condition'] == true }} && ${{ matrix.run-config['name'] != 'macOS' }} && ${{ inputs.macos-runner == 'macos-26' }}
         # Slower runners require some time to fully boot the simulator
         # Parse the simulator name from the destination string, boot it, and wait
         run: |
