@@ -67,6 +67,9 @@ struct TranscribeCLIArguments: ParsableArguments {
     @Flag(help: "Add timestamps for each word in the output")
     var wordTimestamps: Bool = false
 
+    @Flag(help: "Enable speaker diarization and annotate outputs with speaker information")
+    var diarize: Bool = false
+
     @Option(help: "Force prefix text when decoding")
     var prefix: String?
 

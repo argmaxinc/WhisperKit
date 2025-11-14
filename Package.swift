@@ -8,7 +8,7 @@ let package = Package(
     name: "whisperkit",
     platforms: [
         .iOS(.v16),
-        .macOS(.v13),
+        .macOS(.v14),
         .watchOS(.v10),
         .visionOS(.v1)
     ],
@@ -25,6 +25,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/huggingface/swift-transformers.git", .upToNextMinor(from: "0.1.8")),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
+        .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.7.7"),
     ] + (isServerEnabled() ? [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.115.1"),
         .package(url: "https://github.com/apple/swift-openapi-generator", from: "1.10.2"),
@@ -56,6 +57,7 @@ let package = Package(
             dependencies: [
                 "WhisperKit",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "FluidAudio", package: "FluidAudio"),
             ] + (isServerEnabled() ? [
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),

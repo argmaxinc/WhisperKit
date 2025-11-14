@@ -40,6 +40,19 @@ struct TranscribeCLI: AsyncParsableCommand {
         if ChunkingStrategy(rawValue: cliArguments.chunkingStrategy) == nil {
             throw ValidationError("Wrong chunking strategy \"\(cliArguments.chunkingStrategy)\", valid strategies: \(ChunkingStrategy.allCases.map { $0.rawValue })")
         }
+
+        if cliArguments.diarize {
+#if !canImport(FluidAudio)
+            throw ValidationError("--diarize requires FluidAudio support, which is unavailable in this build.")
+#else
+            if cliArguments.stream || cliArguments.streamSimulated {
+                throw ValidationError("--diarize is only supported for offline transcription mode.")
+            }
+            if #unavailable(macOS 14.0) {
+                throw ValidationError("--diarize requires macOS 14.0 or newer.")
+            }
+#endif
+        }
     }
 
     mutating func run() async throws {
@@ -107,6 +120,27 @@ struct TranscribeCLI: AsyncParsableCommand {
         if cliArguments.verbose {
             print("\nConfiguring decoding options...")
         }
+
+        if cliArguments.diarize && !options.wordTimestamps {
+            options.wordTimestamps = true
+            if cliArguments.verbose {
+                print("Enabling word timestamps for diarization support.")
+            }
+        }
+
+#if canImport(FluidAudio)
+        var diarizationService: DiarizationService?
+        if cliArguments.diarize {
+            if #available(macOS 14.0, *) {
+                if cliArguments.verbose {
+                    print("\nInitializing diarization pipeline...")
+                }
+                let service = DiarizationService(verbose: cliArguments.verbose)
+                try await service.prepareModelsIfNeeded()
+                diarizationService = service
+            }
+        }
+#endif
 
         if let promptText = cliArguments.prompt, promptText.count > 0, let tokenizer = whisperKit.tokenizer {
             if cliArguments.verbose {
@@ -232,7 +266,25 @@ struct TranscribeCLI: AsyncParsableCommand {
             do {
                 let partialResult = try result.get()
                 let mergedPartialResult = TranscriptionUtilities.mergeTranscriptionResults(partialResult)
-                processTranscriptionResult(audioPath: audioPath, transcribeResult: mergedPartialResult)
+                var diarizedPayload: DiarizedTranscriptionPayload?
+#if canImport(FluidAudio)
+                if cliArguments.diarize,
+                   let service = diarizationService {
+                    do {
+                        diarizedPayload = try await service.diarize(
+                            audioPath: audioPath,
+                            transcription: mergedPartialResult
+                        )
+                    } catch {
+                        print("Diarization failed for \(audioPath): \(error)")
+                    }
+                }
+#endif
+                processTranscriptionResult(
+                    audioPath: audioPath,
+                    transcribeResult: mergedPartialResult,
+                    diarizedResult: diarizedPayload
+                )
             } catch {
                 print("Error when transcribing \(audioPath): \(error)")
             }
@@ -396,7 +448,8 @@ struct TranscribeCLI: AsyncParsableCommand {
 
     private func processTranscriptionResult(
         audioPath: String,
-        transcribeResult: TranscriptionResult?
+        transcribeResult: TranscriptionResult?,
+        diarizedResult: DiarizedTranscriptionPayload? = nil
     ) {
         if cliArguments.verbose {
             print("\nProcessing transcription result for: \(audioPath)")
@@ -428,14 +481,30 @@ struct TranscribeCLI: AsyncParsableCommand {
             }
 
             // Write JSON for all metadata
-            let jsonReportWriter = WriteJSON(outputDir: cliArguments.reportPath)
-            let savedJsonReport = jsonReportWriter.write(result: result, to: audioFileName)
-            if cliArguments.verbose {
-                switch savedJsonReport {
-                    case let .success(reportPath):
-                        print("\n\nSaved JSON Report: \n\n\(reportPath)\n")
-                    case let .failure(error):
-                        print("\n\nCouldn't save report: \(error)\n")
+            if cliArguments.diarize, let diarizedResult {
+                let diarizedWriter = DiarizedJSONWriter(outputDir: cliArguments.reportPath)
+                let savedJsonReport = diarizedWriter.write(payload: diarizedResult, to: audioFileName)
+                if cliArguments.verbose {
+                    switch savedJsonReport {
+                        case let .success(reportPath):
+                            print("\n\nSaved diarized JSON Report: \n\n\(reportPath)\n")
+                        case let .failure(error):
+                            print("\n\nCouldn't save diarized report: \(error)\n")
+                    }
+                }
+            } else {
+                if cliArguments.diarize && diarizedResult == nil {
+                    print("Warning: Diarization output unavailable, falling back to standard JSON report.")
+                }
+                let jsonReportWriter = WriteJSON(outputDir: cliArguments.reportPath)
+                let savedJsonReport = jsonReportWriter.write(result: result, to: audioFileName)
+                if cliArguments.verbose {
+                    switch savedJsonReport {
+                        case let .success(reportPath):
+                            print("\n\nSaved JSON Report: \n\n\(reportPath)\n")
+                        case let .failure(error):
+                            print("\n\nCouldn't save report: \(error)\n")
+                    }
                 }
             }
         }
