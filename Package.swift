@@ -1,4 +1,4 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 6.2
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -30,7 +30,6 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-openapi-generator", from: "1.10.2"),
         .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.8.2"),
         .package(url: "https://github.com/swift-server/swift-openapi-vapor", from: "1.0.1"),
-
     ] : []),
     targets: [
         .target(
@@ -67,7 +66,7 @@ let package = Package(
             swiftSettings: (isServerEnabled() ? [.define("BUILD_SERVER_CLI")] : [])
         )
     ],
-    swiftLanguageVersions: [.v5]
+    swiftLanguageModes: [.v5]
 )
 
 func isServerEnabled() -> Bool {
