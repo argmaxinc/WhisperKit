@@ -47,6 +47,7 @@ open class WhisperKit {
     public var modelFolder: URL?
     public var tokenizerFolder: URL?
     public private(set) var useBackgroundDownloadSession: Bool
+    public private(set) var endpoint: String
 
     /// Callbacks
     public var segmentDiscoveryCallback: SegmentDiscoveryCallback?
@@ -68,6 +69,7 @@ open class WhisperKit {
         voiceActivityDetector = config.voiceActivityDetector
         tokenizerFolder = config.tokenizerFolder ?? config.downloadBase
         useBackgroundDownloadSession = config.useBackgroundDownloadSession
+        endpoint = config.endpoint
         currentTimings = TranscriptionTimings()
         Logging.shared.logLevel = config.verbose ? config.logLevel : .none
 
@@ -77,7 +79,8 @@ open class WhisperKit {
             modelRepo: config.modelRepo,
             modelToken: config.modelToken,
             modelFolder: config.modelFolder,
-            download: config.download
+            download: config.download,
+            endpoint: config.endpoint
         )
 
         if let prewarm = config.prewarm, prewarm {
@@ -110,12 +113,14 @@ open class WhisperKit {
         prewarm: Bool? = nil,
         load: Bool? = nil,
         download: Bool = true,
-        useBackgroundDownloadSession: Bool = false
+        useBackgroundDownloadSession: Bool = false,
+        endpoint: String = Constants.defaultRemoteEndpoint
     ) async throws {
         let config = WhisperKitConfig(
             model: model,
             downloadBase: downloadBase,
             modelRepo: modelRepo,
+            endpoint: endpoint,
             modelFolder: modelFolder,
             tokenizerFolder: tokenizerFolder,
             computeOptions: computeOptions,
@@ -305,7 +310,7 @@ open class WhisperKit {
         modelFolder: String?,
         download: Bool,
         remoteConfigName: String = Constants.defaultRemoteConfigName,
-        endpoint: String = Constants.defaultRemoteEndpoint
+        endpoint: String
     ) async throws {
         // If a local model folder is provided, use it; otherwise, download the model
         if let folder = modelFolder {
@@ -485,7 +490,8 @@ open class WhisperKit {
             for: modelVariant,
             tokenizerFolder: tokenizerFolder,
             additionalSearchPaths: additionalSearchPaths,
-            useBackgroundSession: useBackgroundDownloadSession
+            useBackgroundSession: useBackgroundDownloadSession,
+            endpoint: self.endpoint
         )
         currentTimings.tokenizerLoadTime = CFAbsoluteTimeGetCurrent() - tokenizerLoadStart
 

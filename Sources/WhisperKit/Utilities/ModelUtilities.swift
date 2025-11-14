@@ -21,10 +21,11 @@ public struct ModelUtilities {
         for pretrained: ModelVariant,
         tokenizerFolder: URL? = nil,
         additionalSearchPaths: [URL] = [],
-        useBackgroundSession: Bool = false
+        useBackgroundSession: Bool = false,
+        endpoint: String = Constants.defaultRemoteEndpoint
     ) async throws -> WhisperTokenizer {
         let tokenizerName = tokenizerNameForVariant(pretrained)
-        let hubApi = HubApi(downloadBase: tokenizerFolder, useBackgroundSession: useBackgroundSession)
+        let hubApi = HubApi(downloadBase: tokenizerFolder, endpoint: endpoint, useBackgroundSession: useBackgroundSession)
         let hubTokenizerFolder = hubApi.localRepoLocation(HubApi.Repo(id: tokenizerName))
         
         // Determine which local folder to use
