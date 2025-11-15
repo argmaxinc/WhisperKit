@@ -4,6 +4,11 @@
 import PackageDescription
 import Foundation
 
+let approachableConcurrencySettings: [SwiftSetting] = [
+    .enableUpcomingFeature("InferIsolatedConformances"),
+    .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
+]
+
 let package = Package(
     name: "whisperkit",
     platforms: [
@@ -37,7 +42,8 @@ let package = Package(
             dependencies: [
                 .product(name: "Hub", package: "swift-transformers"),
                 .product(name: "Tokenizers", package: "swift-transformers"),
-            ]
+            ],
+            swiftSettings: approachableConcurrencySettings
         ),
         .testTarget(
             name: "WhisperKitTests",
@@ -49,7 +55,8 @@ let package = Package(
             path: "Tests",
             resources: [
                 .process("WhisperKitTests/Resources"),
-            ]
+            ],
+            swiftSettings: approachableConcurrencySettings
         ),
         .executableTarget(
             name: "WhisperKitCLI",
@@ -63,7 +70,7 @@ let package = Package(
             ] : []),
             path: "Sources/WhisperKitCLI",
             exclude: (isServerEnabled() ? [] : ["Server"]),
-            swiftSettings: (isServerEnabled() ? [.define("BUILD_SERVER_CLI")] : [])
+            swiftSettings: approachableConcurrencySettings + (isServerEnabled() ? [.define("BUILD_SERVER_CLI")] : [])
         )
     ],
     swiftLanguageModes: [.v5]
