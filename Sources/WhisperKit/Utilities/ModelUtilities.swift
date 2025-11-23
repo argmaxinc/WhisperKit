@@ -5,10 +5,7 @@ import CoreML
 import Hub
 import Tokenizers
 
-public struct ModelUtilities {
-
-    private init() {}
-
+public enum ModelUtilities: Sendable {
     // MARK: Public
 
     public static func modelSupport(for deviceName: String, from config: ModelSupportConfig? = nil) -> ModelSupport {
@@ -207,22 +204,6 @@ public struct ModelUtilities {
     }
 
     static func getModelOutputDimention(_ model: MLModel?, named: String, position: Int) -> Int? {
-        guard let inputDescription = model?.modelDescription.outputDescriptionsByName[named] else { return nil }
-        guard inputDescription.type == .multiArray else { return nil }
-        guard let shapeConstraint = inputDescription.multiArrayConstraint else { return nil }
-        let shape = shapeConstraint.shape.map { $0.intValue }
-        return shape[position]
-    }
-
-    func getModelInputDimention(_ model: MLModel?, named: String, position: Int) -> Int? {
-        guard let inputDescription = model?.modelDescription.inputDescriptionsByName[named] else { return nil }
-        guard inputDescription.type == .multiArray else { return nil }
-        guard let shapeConstraint = inputDescription.multiArrayConstraint else { return nil }
-        let shape = shapeConstraint.shape.map { $0.intValue }
-        return shape[position]
-    }
-
-    func getModelOutputDimention(_ model: MLModel?, named: String, position: Int) -> Int? {
         guard let inputDescription = model?.modelDescription.outputDescriptionsByName[named] else { return nil }
         guard inputDescription.type == .multiArray else { return nil }
         guard let shapeConstraint = inputDescription.multiArrayConstraint else { return nil }

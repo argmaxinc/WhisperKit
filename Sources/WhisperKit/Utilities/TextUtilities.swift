@@ -4,10 +4,7 @@
 import Foundation
 
 /// A utility struct providing text compression and analysis functionality
-public struct TextUtilities {
-
-    private init() {}
-
+public enum TextUtilities: Sendable {
     /// Calculates the compression ratio of an array of text tokens using zlib compression
     /// - Parameter textTokens: Array of integer tokens to compress
     /// - Returns: The compression ratio (original size / compressed size). Returns infinity if compression fails

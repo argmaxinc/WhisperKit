@@ -50,7 +50,7 @@ public extension WhisperMLModel {
 // MARK: - Whisper Models
 
 @frozen
-public enum ModelVariant: CustomStringConvertible, CaseIterable {
+public enum ModelVariant: CustomStringConvertible, CaseIterable, Sendable {
     case tiny
     case tinyEn
     case base
@@ -102,7 +102,7 @@ public enum ModelVariant: CustomStringConvertible, CaseIterable {
 }
 
 @frozen
-public enum ModelState: CustomStringConvertible {
+public enum ModelState: CustomStringConvertible, Sendable {
     case unloading
     case unloaded
     case loading
@@ -402,7 +402,7 @@ public struct DecodingCache {
 }
 
 @frozen
-public enum ChunkingStrategy: String, Codable, CaseIterable {
+public enum ChunkingStrategy: String, Codable, CaseIterable, Sendable {
     case none
     case vad
 }
@@ -743,7 +743,7 @@ public typealias TranscriptionStateCallback = (_ state: TranscriptionState) -> V
 
 /// Represents the different states of the transcription process.
 @frozen
-public enum TranscriptionState: CustomStringConvertible {
+public enum TranscriptionState: CustomStringConvertible, Sendable {
     /// The audio is being converted to the required format for transcription
     case convertingAudio
 
