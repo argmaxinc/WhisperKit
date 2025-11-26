@@ -4,7 +4,7 @@
 import Foundation
 
 @frozen
-public enum WhisperError: Error, LocalizedError, Equatable {
+public enum WhisperError: Error, LocalizedError, Equatable, Sendable {
     case tokenizerUnavailable(String = "Tokenizer is unavailable")
     case modelsUnavailable(String = "Models are unavailable")
     case prefillFailed(String = "Prefill failed")

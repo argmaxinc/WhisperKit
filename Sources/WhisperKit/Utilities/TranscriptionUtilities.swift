@@ -2,10 +2,7 @@
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
 /// A utility struct providing transcription-related functionality for processing and manipulating transcription results
-public struct TranscriptionUtilities {
-
-    private init() {}
-
+public enum TranscriptionUtilities: Sendable {
     // MARK: Public
 
     /// Formats transcription segments into an array of strings, optionally including timestamps
