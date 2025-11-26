@@ -138,7 +138,7 @@ extension XCTestCase {
     func transcribe(
         with variant: ModelVariant,
         options: DecodingOptions,
-        callback: TranscriptionCallback = nil,
+        callback: TranscriptionCallback? = nil,
         audioFile: String = "jfk.wav",
         file: StaticString = #file,
         line: UInt = #line
