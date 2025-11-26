@@ -14,12 +14,12 @@ jobs:
       cancel-in-progress: true
     uses: ./.github/workflows/unit-tests.yml
     with:
-      ios-version: "26.1"
+      ios-version: "26.0.1"
       ios-device: "iPhone 17"
-      watchos-version: "26.1"
-      visionos-version: "26.1"
+      watchos-version: "26.0"
+      visionos-version: "26.0"
       macos-runner: "macos-26"
-      xcode-version: "latest-stable"
+      xcode-version: "26.0"
 
   check-approvals:
     runs-on: ubuntu-latest
