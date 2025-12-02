@@ -3,13 +3,15 @@
 
 import OSLog
 
-public enum Logging: Sendable {
+@frozen
+public enum Logging {
 
     // MARK: - Helper Types
 
     public typealias LoggingCallback = @Sendable (_ message: String) -> Void
 
-    public enum LogLevel: Int, Sendable, Comparable {
+    @frozen
+    public enum LogLevel: Int, Comparable {
         case debug = 1
         case info = 2
         case error = 3
