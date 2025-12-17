@@ -83,14 +83,23 @@ public enum Logging {
 
     // MARK: - Convenience
 
+    /// Logs a debug message asynchronously (fire-and-forget).
+    /// - Warning: This method does not await logging completion.
+    /// Log messages may be dropped if the program terminates before logging completes.
     public static func debug(_ message: String) {
         dispatch(level: .debug, message)
     }
 
+    /// Logs a info message asynchronously (fire-and-forget).
+    /// - Warning: This method does not await logging completion.
+    /// Log messages may be dropped if the program terminates before logging completes.
     public static func info(_ message: String) {
         dispatch(level: .info, message)
     }
-    
+
+    /// Logs a error message asynchronously (fire-and-forget).
+    /// - Warning: This method does not await logging completion.
+    /// Log messages may be dropped if the program terminates before logging completes.
     public static func error(_ message: String) {
         dispatch(level: .error, message)
     }
