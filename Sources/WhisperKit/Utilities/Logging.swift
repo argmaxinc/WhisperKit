@@ -105,7 +105,7 @@ public enum Logging {
     }
 
     private static func dispatch(level: LogLevel, _ message: String) {
-        Task(priority: .utility) {
+        Task(priority: .high) {
             await engine.log(level: level, message: message)
         }
     }
