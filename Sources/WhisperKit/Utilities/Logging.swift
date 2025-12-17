@@ -31,7 +31,7 @@ public enum Logging {
         }
     }
 
-    private actor Engine {
+    private actor LoggingActor {
         var level: LogLevel
         var callback: LoggingCallback?
         private let logger: Logger
@@ -66,7 +66,7 @@ public enum Logging {
 
     // MARK: - Properties
 
-    private static let engine = Engine()
+    private static let engine = LoggingActor()
 
     public static func isLoggingEnabled() async -> Bool {
         let level = await engine.level
