@@ -517,10 +517,17 @@ open class WhisperKit {
     }
 
     /// Pass in your own logging callback here
+    /// - Note: This method dispatches the update on a high priority task.
+    @available(*, deprecated, message: "Subject to removal in a future version. Use `updateLoggingCallback(_ callback:) async` instead.")
     open func loggingCallback(_ callback: Logging.LoggingCallback?) {
-        Task(priority: .utility) {
+        Task(priority: .high) {
             await Logging.updateCallback(callback)
         }
+    }
+
+    /// Pass in your own logging callback here
+    open func updateLoggingCallback(_ callback: Logging.LoggingCallback?) async {
+        await Logging.updateCallback(callback)
     }
 
     // MARK: - Detect language
