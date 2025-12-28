@@ -10,6 +10,18 @@ public enum Logging {
 
     public typealias LoggingCallback = @Sendable (_ message: String) -> Void
 
+    /// Represents the severity threshold for emitting log messages.
+    ///
+    /// The `LogLevel` controls which messages are allowed to be logged. Messages are
+    /// emitted when their severity is greater than or equal to the globally configured
+    /// log level. For example, if the global level is set to `.info`, then `.info` and
+    /// `.error` messages will be logged, while `.debug` messages will be suppressed.
+    ///
+    /// Ordering (from least to most severe):
+    /// - `.debug` (1): Verbose diagnostic information useful during development.
+    /// - `.info`  (2): High-level informational messages about app flow or state.
+    /// - `.error` (3): Errors and failures that require attention.
+    /// - `.none`  (4): Disables all logging.
     @frozen
     public enum LogLevel: Int, Comparable {
         case debug = 1
@@ -36,6 +48,10 @@ public enum Logging {
         var callback: LoggingCallback?
         private let logger: Logger
 
+        var isLoggingEnabled: Bool {
+            level != .none
+        }
+
         init(level: LogLevel = .none, callback: LoggingCallback? = nil) {
             self.level = level
             self.callback = callback
@@ -54,7 +70,7 @@ public enum Logging {
         }
 
         func log(level: LogLevel, message: String) {
-            guard self.level != .none, self.level <= level else { return }
+            guard isLoggingEnabled(for: level) else { return }
 
             if let callback {
                 callback(message)
@@ -62,23 +78,54 @@ public enum Logging {
                 logger.log(level: level.osLogType, "\(message, privacy: .public)")
             }
         }
+
+        func isLoggingEnabled(for level: LogLevel) -> Bool {
+            self.level != .none && self.level <= level
+        }
     }
 
     // MARK: - Properties
 
-    private static let engine = LoggingActor()
+    private static let loggingActor = LoggingActor()
 
-    public static func isLoggingEnabled() async -> Bool {
-        let level = await engine.level
-        return level != .none
+    /// A Boolean value indicating whether logging is currently enabled.
+    ///
+    /// This property reflects the global logging state managed by the internal logging actor.
+    /// When `true`, log messages at or above the configured `LogLevel` may be emitted either
+    /// to the system logger or to a custom callback if one has been provided. When `false`
+    /// (i.e., when the log level is `.none`), all logging is suppressed.
+    ///
+    /// Accessing this property is asynchronous because it queries state stored within an actor,
+    /// ensuring thread-safe reads across concurrency domains.
+    ///
+    /// - Returns: `true` if logging is enabled for any level other than `.none`; otherwise, `false`.
+    /// - Note: The effective behavior also depends on the current `LogLevel` (see `updateLogLevel(_:)`)
+    ///   and any registered `LoggingCallback` (see `updateCallback(_:)`).
+    public static var isLoggingEnabled: Bool {
+        get async { await loggingActor.isLoggingEnabled }
     }
 
+    /// Updates the global logging level used by the logging system.
+    ///
+    /// This method communicates with an internal actor to safely mutate the shared
+    /// logging state across concurrency domains. The effective logging behavior is
+    /// determined by the value you provide:
+    /// - `.debug`: Enables all logs (debug, info, error).
+    /// - `.info`: Enables info and error logs; suppresses debug logs.
+    /// - `.error`: Enables only error logs.
+    /// - `.none`: Disables all logging.
+    ///
+    /// - Important: Because this operation crosses an actor boundary, it is asynchronous
+    ///   and must be awaited from async contexts.
+    ///
+    /// - Parameter level: The new `LogLevel` to apply globally.
+    /// - SeeAlso: `updateCallback(_:)`, `isLoggingEnabled`, `isLoggingEnabled(for:)`
     public static func updateLogLevel(_ level: LogLevel) async {
-        await engine.updateLogLevel(level)
+        await loggingActor.updateLogLevel(level)
     }
 
     public static func updateCallback(_ callback: LoggingCallback?) async {
-        await engine.updateCallback(callback)
+        await loggingActor.updateCallback(callback)
     }
 
     // MARK: - Convenience
@@ -104,9 +151,27 @@ public enum Logging {
         dispatch(level: .error, message)
     }
 
+    /// Returns a Boolean value that indicates whether logging is currently enabled for a specific log level.
+    /// 
+    /// This method safely queries the internal logging actor to determine if messages at the given
+    /// `level` would be emitted under the current configuration. Logging is considered enabled for
+    /// the provided level when:
+    /// - The global log level is not `.none`, and
+    /// - The global log level is less than or equal to the provided `level` (i.e., the message’s
+    ///   severity meets or exceeds the configured threshold).
+    ///
+    /// Because this check crosses an actor boundary, the API is asynchronous and must be awaited.
+    ///
+    /// - Parameter level: The `LogLevel` to evaluate (e.g., `.debug`, `.info`, `.error`).
+    /// - Returns: `true` if messages at the specified level would be logged; otherwise, `false`.
+    /// - SeeAlso: `updateLogLevel(_:)`, `isLoggingEnabled`, `debug(_:)`, `info(_:)`, `error(_:)`
+    public static func isLoggingEnabled(for level: LogLevel) async -> Bool {
+        await loggingActor.isLoggingEnabled(for: level)
+    }
+
     private static func dispatch(level: LogLevel, _ message: String) {
         Task(priority: .high) {
-            await engine.log(level: level, message: message)
+            await loggingActor.log(level: level, message: message)
         }
     }
 }

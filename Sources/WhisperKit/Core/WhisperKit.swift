@@ -566,7 +566,7 @@ open class WhisperKit {
             throw WhisperError.tokenizerUnavailable()
         }
 
-        let options = DecodingOptions(verbose: await Logging.isLoggingEnabled())
+        let options = DecodingOptions(verbose: await Logging.isLoggingEnabled)
         let decoderInputs = try textDecoder.prepareDecoderInputs(withPrompt: [tokenizer.specialTokens.startOfTranscriptToken])
 
         // Detect language using up to the first 30 seconds

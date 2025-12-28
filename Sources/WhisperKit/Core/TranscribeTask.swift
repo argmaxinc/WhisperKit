@@ -66,7 +66,7 @@ open class TranscribeTask {
         Logging.debug("Starting pipeline at: \(Date())")
 
         var options = decodeOptions ?? DecodingOptions()
-        options.verbose = await Logging.isLoggingEnabled()
+        options.verbose = await Logging.isLoggingEnabled
 
         var detectedLanguage: String?
 
