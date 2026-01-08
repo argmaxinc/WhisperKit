@@ -176,6 +176,25 @@ public enum Logging {
     }
 }
 
+// MARK: - Convenience Extension
+
+public extension Logging {
+    static func debug(_ items: Any..., separator: String = " ", terminator: String = "\n") {
+        let message = items.map { "\($0)" }.joined(separator: separator)
+        debug(message)
+    }
+
+    static func info(_ items: Any..., separator: String = " ", terminator: String = "\n") {
+        let message = items.map { "\($0)" }.joined(separator: separator)
+        info(message)
+    }
+
+    static func error(_ items: Any..., separator: String = " ", terminator: String = "\n") {
+        let message = items.map { "\($0)" }.joined(separator: separator)
+        error(message)
+    }
+}
+
 // MARK: - Memory Usage
 
 public extension Logging {
