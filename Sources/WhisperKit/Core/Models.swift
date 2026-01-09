@@ -29,11 +29,9 @@ public protocol WhisperMLModel: AnyObject {
 
 public extension WhisperMLModel {
     func loadModel(at modelPath: URL, computeUnits: MLComputeUnits, prewarmMode: Bool = false) async throws {
-        let loadedModel = try await Task {
-            let modelConfig = MLModelConfiguration()
-            modelConfig.computeUnits = computeUnits
-            return try await MLModel.load(contentsOf: modelPath, configuration: modelConfig)
-        }.value
+        let modelConfig = MLModelConfiguration()
+        modelConfig.computeUnits = computeUnits
+        let loadedModel = try await MLModel.load(contentsOf: modelPath, configuration: modelConfig)
 
         model = prewarmMode ? nil : loadedModel
     }
