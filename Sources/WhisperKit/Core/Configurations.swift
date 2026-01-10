@@ -38,6 +38,31 @@ open class WhisperKitConfig {
     public var logLevel: Logging.LogLevel
 
     /// Enable model prewarming
+    /// 
+    /// What does "prewarm" mean and when should it be enabled?
+    /// 
+    /// WhisperKit uses Apple Core ML models that are downloaded as device-agnostic
+    /// model files (*.mlmodelc). These models need to be "specialized" to a user's
+    /// device chip before it can be used. Core ML "specializes" a model automatically
+    /// during the first time the models are being loaded. The resulting "specialized"
+    /// model files are cached on-disk by Core ML (not by Argmax) outside the app bundle.
+    /// This cache is maintained by Apple and is evicted after every OS update and if
+    /// the models are not used for extended periods of time. Unfortunately, Apple does
+    /// not yet provide a third-party API to check whether the cache will be hit or is
+    /// evicted. Hence, Argmax built a defensive "prewarm" option to ensure that each
+    /// model gets loaded sequentially and unloaded immediately to trigger specialization if necessary.
+    /// 
+    /// **Trade-offs**
+    /// - **Pro** — The peak memory usage during compilation is reduced because
+    ///   only one model is kept in memory at any given point. Otherwise, the
+    ///   peak memory will bloat to all model weights combined plus the peak
+    ///   compilation memory (higher than model weights). 
+    /// - **Con** — The load time will be multiplied by 2 (usually <1s when cache is hit)
+    ///   because of the load-unload-load pattern when the specialized model file cache is
+    ///   actually hit and prewarm does not trigger specialization
+    ///
+    /// Enable `prewarm` when you want to minimize your peak memory impact throughout your app's lifecycle
+    /// Disable `prewarm` if you can not take a 2x increase in load time 
     public var prewarm: Bool?
     /// Load models if available
     public var load: Bool?

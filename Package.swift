@@ -23,7 +23,7 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/huggingface/swift-transformers.git", .upToNextMinor(from: "0.1.8")),
+        .package(url: "https://github.com/huggingface/swift-transformers.git", .upToNextMinor(from: "1.1.2")),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
     ] + (isServerEnabled() ? [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.115.1"),
@@ -36,19 +36,20 @@ let package = Package(
         .target(
             name: "WhisperKit",
             dependencies: [
-                .product(name: "Transformers", package: "swift-transformers"),
+                .product(name: "Hub", package: "swift-transformers"),
+                .product(name: "Tokenizers", package: "swift-transformers"),
             ]
         ),
         .testTarget(
             name: "WhisperKitTests",
             dependencies: [
                 "WhisperKit",
-                .product(name: "Transformers", package: "swift-transformers"),
+                .product(name: "Hub", package: "swift-transformers"),
+                .product(name: "Tokenizers", package: "swift-transformers"),
             ],
             path: "Tests",
             resources: [
                 .process("WhisperKitTests/Resources"),
-                .copy("Models/whisperkit-coreml"),
             ]
         ),
         .executableTarget(
@@ -64,9 +65,9 @@ let package = Package(
             path: "Sources/WhisperKitCLI",
             exclude: (isServerEnabled() ? [] : ["Server"]),
             swiftSettings: (isServerEnabled() ? [.define("BUILD_SERVER_CLI")] : [])
-
         )
-    ]
+    ],
+    swiftLanguageVersions: [.v5]
 )
 
 func isServerEnabled() -> Bool {

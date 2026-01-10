@@ -57,15 +57,15 @@ public extension String {
 public extension MLMultiArray {
     convenience init(shape: [NSNumber], dataType: MLMultiArrayDataType, initialValue: Any) throws {
         switch dataType {
-        case .float16:
-            // IOSurface-backed arrays are implicitly float16. They can
-            // reduce buffer copies for some OS:compute unit combinations.
-            guard let pixelBuffer = Self.pixelBuffer(for: shape) else {
-                throw WhisperError.initializationError("MLMultiArray: Failed to initialize PixelBuffer")
-            }
-            self.init(pixelBuffer: pixelBuffer, shape: shape)
-        default:
-            try self.init(shape: shape, dataType: dataType)
+            case .float16:
+                // IOSurface-backed arrays are implicitly float16. They can
+                // reduce buffer copies for some OS:compute unit combinations.
+                guard let pixelBuffer = Self.pixelBuffer(for: shape) else {
+                    throw WhisperError.initializationError("MLMultiArray: Failed to initialize PixelBuffer")
+                }
+                self.init(pixelBuffer: pixelBuffer, shape: shape)
+            default:
+                try self.init(shape: shape, dataType: dataType)
         }
 
         switch dataType {
@@ -303,3 +303,4 @@ public extension WhisperKit {
         return ModelUtilities.formatModelFiles(modelFiles)
     }
 }
+
