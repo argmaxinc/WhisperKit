@@ -11,6 +11,8 @@ import Tokenizers
 import XCTest
 
 final class UnitTests: XCTestCase {
+    let endpoint = Constants.defaultRemoteEndpoint
+    
     override func setUp() async throws {
         Logging.shared.logLevel = .debug
     }
@@ -718,7 +720,7 @@ final class UnitTests: XCTestCase {
             "Failed to load the model"
         )
         textDecoder.tokenizer = try await XCTUnwrapAsync(
-            await ModelUtilities.loadTokenizer(for: .tiny),
+            await ModelUtilities.loadTokenizer(for: .tiny, endpoint: endpoint),
             "Failed to load the tokenizer"
         )
 
@@ -752,7 +754,7 @@ final class UnitTests: XCTestCase {
         let textDecoder = TextDecoder()
         let modelPath = try await URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
-        textDecoder.tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny)
+        textDecoder.tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny, endpoint: endpoint)
 
         let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.specialTokens.endToken, decodingOptions: decodingOptions)
 
@@ -776,7 +778,7 @@ final class UnitTests: XCTestCase {
         let textDecoder = TextDecoder()
         let modelPath = try await URL(filePath: tinyModelPath()).appending(path: "TextDecoder.mlmodelc")
         try await textDecoder.loadModel(at: modelPath, computeUnits: ModelComputeOptions().textDecoderCompute)
-        textDecoder.tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny)
+        textDecoder.tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny, endpoint: endpoint)
 
         let tokenSampler = GreedyTokenSampler(temperature: 0, eotToken: textDecoder.tokenizer!.specialTokens.endToken, decodingOptions: decodingOptions)
 
@@ -950,7 +952,8 @@ final class UnitTests: XCTestCase {
         let repoTokenizer = try await ModelUtilities.loadTokenizer(
             for: .tiny,
             tokenizerFolder: tempDir,
-            useBackgroundSession: false
+            useBackgroundSession: false,
+            endpoint: endpoint
         ) as! WhisperTokenizerWrapper
         XCTAssertEqual(repoTokenizer.tokenizerFolder?.path, repoStyleDir.path, "tokenizerFolder should exactly match repoStyleDir path")
         
@@ -958,7 +961,8 @@ final class UnitTests: XCTestCase {
         let tokenizer = try await ModelUtilities.loadTokenizer(
             for: .tiny,
             tokenizerFolder: repoStyleDir,
-            useBackgroundSession: false
+            useBackgroundSession: false,
+            endpoint: endpoint
         ) as! WhisperTokenizerWrapper
         XCTAssertEqual(tokenizer.tokenizerFolder?.path, repoStyleDir.path, "tokenizerFolder should exactly match repoStyleDir path")
         
@@ -974,7 +978,8 @@ final class UnitTests: XCTestCase {
         let tokenizerAtTopLevel = try await ModelUtilities.loadTokenizer(
             for: .tiny,
             tokenizerFolder: tempDir,
-            useBackgroundSession: false
+            useBackgroundSession: false,
+            endpoint: endpoint
         ) as! WhisperTokenizerWrapper
         XCTAssertEqual(tokenizerAtTopLevel.tokenizerFolder?.path, repoStyleDir.path, "tokenizerFolder should exactly match repoStyleDir path")
     }
@@ -986,7 +991,8 @@ final class UnitTests: XCTestCase {
             let tokenizer = try await ModelUtilities.loadTokenizer(
                 for: variant,
                 tokenizerFolder: nil,
-                useBackgroundSession: false
+                useBackgroundSession: false,
+                endpoint: endpoint
             ) as! WhisperTokenizerWrapper
             XCTAssertNotNil(tokenizer, "Should load tokenizer for variant \(variant)")
             XCTAssertTrue(tokenizer.tokenizerFolder!.path.contains(expectedName), "Tokenizer folder should contain \(expectedName)")
@@ -1015,7 +1021,8 @@ final class UnitTests: XCTestCase {
         
         // Load a tokenizer that should match
         let tokenizer = try await ModelUtilities.loadTokenizer(
-            for: .tiny
+            for: .tiny,
+            endpoint: endpoint
         ) as! WhisperTokenizerWrapper
         
         // Verify tokenizer location
@@ -1066,7 +1073,8 @@ final class UnitTests: XCTestCase {
             let tokenizer = try await ModelUtilities.loadTokenizer(
                 for: .tiny,
                 tokenizerFolder: corruptedTokenizerDir,
-                useBackgroundSession: false
+                useBackgroundSession: false,
+                endpoint: endpoint
             )
             XCTAssertNotNil(tokenizer, "Should successfully fall back to Hub when local loading fails")
         } catch {
@@ -1227,11 +1235,11 @@ final class UnitTests: XCTestCase {
         let tokenText = "<|startoftranscript|>"
 
         let textDecoder = TextDecoder()
-        textDecoder.tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny)
+        textDecoder.tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny, endpoint: endpoint)
         let encodedToken = try XCTUnwrap(textDecoder.tokenizer?.convertTokenToId(tokenText))
         let decodedToken = try XCTUnwrap(textDecoder.tokenizer?.decode(tokens: [encodedToken]))
 
-        textDecoder.tokenizer = try await ModelUtilities.loadTokenizer(for: .largev3)
+        textDecoder.tokenizer = try await ModelUtilities.loadTokenizer(for: .largev3, endpoint: endpoint)
         let encodedTokenLarge = try XCTUnwrap(textDecoder.tokenizer?.convertTokenToId(tokenText))
         let decodedTokenLarge = try XCTUnwrap(textDecoder.tokenizer?.decode(tokens: [encodedTokenLarge]))
 
@@ -1246,11 +1254,11 @@ final class UnitTests: XCTestCase {
         // This token index changes with v3
         let tokenTextShifted = "<|0.00|>"
 
-        textDecoder.tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny)
+        textDecoder.tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny, endpoint: endpoint)
         let encodedTokenShifted = try XCTUnwrap(textDecoder.tokenizer?.convertTokenToId(tokenTextShifted))
         let decodedTokenShifted = try XCTUnwrap(textDecoder.tokenizer?.decode(tokens: [encodedTokenShifted]))
 
-        textDecoder.tokenizer = try await ModelUtilities.loadTokenizer(for: .largev3)
+        textDecoder.tokenizer = try await ModelUtilities.loadTokenizer(for: .largev3, endpoint: endpoint)
         let encodedTokenLargeShifted = try XCTUnwrap(textDecoder.tokenizer?.convertTokenToId(tokenTextShifted))
         let decodedTokenLargeShifted = try XCTUnwrap(textDecoder.tokenizer?.decode(tokens: [encodedTokenLargeShifted]))
 
@@ -1265,7 +1273,7 @@ final class UnitTests: XCTestCase {
     func testTokenizerOutput() async throws {
         let tokenInputs = [50364, 400, 370, 452, 7177, 6280, 1029, 406, 437, 428, 1941, 393, 360, 337, 291, 1029, 437, 291, 393, 360, 337, 428, 1941, 13, 50889]
 
-        let tokenizer = try await ModelUtilities.loadTokenizer(for: .largev3)
+        let tokenizer = try await ModelUtilities.loadTokenizer(for: .largev3, endpoint: endpoint)
         let decodedText = tokenizer.decode(tokens: tokenInputs)
 
         XCTAssertNotNil(decodedText)
@@ -1300,7 +1308,7 @@ final class UnitTests: XCTestCase {
     }
 
     func testSplitToWordTokens() async throws {
-        let tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny)
+        let tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny, endpoint: endpoint)
 
         // Hello, world! This is a test, isn't it?
         let tokenIds = [50364, 2425, 11, 1002, 0, 50414, 50414, 639, 307, 257, 220, 31636, 11, 1943, 380, 309, 30, 50257]
@@ -1317,7 +1325,7 @@ final class UnitTests: XCTestCase {
     }
 
     func testSplitToWordTokensSpanish() async throws {
-        let tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny)
+        let tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny, endpoint: endpoint)
 
         // ¡Hola Mundo! Esta es una prueba, ¿no?
         let tokenIds = [50363, 24364, 48529, 376, 6043, 0, 20547, 785, 2002, 48241, 11, 3841, 1771, 30, 50257]
@@ -1334,7 +1342,7 @@ final class UnitTests: XCTestCase {
     }
 
     func testSplitToWordTokensJapanese() async throws {
-        let tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny)
+        let tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny, endpoint: endpoint)
 
         // こんにちは、世界！これはテストですよね？
         let tokenIds = [50364, 38088, 1231, 24486, 171, 120, 223, 25212, 22985, 40498, 4767, 30346, 171, 120, 253, 50257]
@@ -2416,7 +2424,7 @@ final class UnitTests: XCTestCase {
             }
         }
 
-        let tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny)
+        let tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny, endpoint: endpoint)
 
         let wordTokenIds = [400, 370, 452, 7177, 6280, 11, 1029, 406, 437, 428, 1941, 393, 360, 337, 291, 11, 1029, 437, 291, 393, 360, 337, 428, 1941, 13]
         let result = try SegmentSeeker().findAlignment(
@@ -2780,7 +2788,7 @@ final class UnitTests: XCTestCase {
             lastSpeechTimestamp: 0,
             constrainedMedianDuration: constrainedMedianDuration,
             maxDuration: maxDuration,
-            tokenizer: try! await ModelUtilities.loadTokenizer(for: .tiny)
+            tokenizer: try! await ModelUtilities.loadTokenizer(for: .tiny, endpoint: endpoint)
         )
 
         let updatedWords = updatedSegments.compactMap { $0.words }.flatMap { $0 }
@@ -2877,7 +2885,7 @@ final class UnitTests: XCTestCase {
             lastSpeechTimestamp: 0,
             constrainedMedianDuration: constrainedMedianDuration,
             maxDuration: maxDuration,
-            tokenizer: try! await ModelUtilities.loadTokenizer(for: .tiny)
+            tokenizer: try! await ModelUtilities.loadTokenizer(for: .tiny, endpoint: endpoint)
         )
 
         let updatedWords = updatedSegments.first!.words!
@@ -3102,7 +3110,7 @@ final class UnitTests: XCTestCase {
         let customFilter = PlusOneFilter()
         let decoder = TextDecoder()
         decoder.logitsFilters = [customFilter]
-        let tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny)
+        let tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny, endpoint: endpoint)
 
         let options = DecodingOptions(
             withoutTimestamps: true,
@@ -3124,7 +3132,7 @@ final class UnitTests: XCTestCase {
 
     func testCreateLogitsFiltersWithSuppressBlank() async throws {
         let decoder = TextDecoder()
-        let tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny)
+        let tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny, endpoint: endpoint)
 
         let options = DecodingOptions(
             withoutTimestamps: true,
@@ -3171,7 +3179,7 @@ final class UnitTests: XCTestCase {
 
     func testCreateLogitsFiltersWithTimestamps() async throws {
         let decoder = TextDecoder()
-        let tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny)
+        let tokenizer = try await ModelUtilities.loadTokenizer(for: .tiny, endpoint: endpoint)
 
         let options = DecodingOptions(
             withoutTimestamps: false,

@@ -21,7 +21,8 @@ public struct ModelUtilities {
         for pretrained: ModelVariant,
         tokenizerFolder: URL? = nil,
         additionalSearchPaths: [URL] = [],
-        useBackgroundSession: Bool = false
+        useBackgroundSession: Bool = false,
+        endpoint: String
     ) async throws -> WhisperTokenizer {
         let tokenizerName = tokenizerNameForVariant(pretrained)
         let hubApi = HubApi(downloadBase: tokenizerFolder, useBackgroundSession: useBackgroundSession)
@@ -267,9 +268,10 @@ public struct ModelUtilities {
 public func loadTokenizer(
     for pretrained: ModelVariant,
     tokenizerFolder: URL? = nil,
-    useBackgroundSession: Bool = false
+    useBackgroundSession: Bool = false,
+    endpoint: String
 ) async throws -> WhisperTokenizer {
-    return try await ModelUtilities.loadTokenizer(for: pretrained, tokenizerFolder: tokenizerFolder, useBackgroundSession: useBackgroundSession)
+    return try await ModelUtilities.loadTokenizer(for: pretrained, tokenizerFolder: tokenizerFolder, useBackgroundSession: useBackgroundSession, endpoint: endpoint)
 }
 
 @available(*, deprecated, message: "Subject to removal in a future version. Use ModelUtilities.modelSupport(for:from:) -> ModelSupport instead.")
