@@ -88,6 +88,18 @@ public enum Logging {
 
     private static let loggingActor = LoggingActor()
 
+    /// The current global logging level.
+    ///
+    /// Accessing this property is asynchronous because it reads state managed by an internal
+    /// actor to ensure thread-safe access across concurrency domains.
+    ///
+    /// - Returns: The currently configured `LogLevel`.
+    public static var logLevel: LogLevel {
+        get async {
+            await loggingActor.level
+        }
+    }
+
     /// A Boolean value indicating whether logging is currently enabled.
     ///
     /// This property reflects the global logging state managed by the internal logging actor.
@@ -124,8 +136,51 @@ public enum Logging {
         await loggingActor.updateLogLevel(level)
     }
 
+    /// Updates the global logging level without requiring an async context (fire-and-forget).
+    ///
+    /// This convenience overload schedules the level update on the internal logging actor
+    /// without blocking the caller. Use this when you need to change the log level from
+    /// synchronous code paths. If you need to guarantee the update has completed before
+    /// proceeding, prefer the async variant `updateLogLevel(_:)`.
+    ///
+    /// - Parameter level: The new `LogLevel` to apply globally.
+    public static func updateLogLevel(_ level: LogLevel) {
+        Task(priority: .userInitiated) {
+            await loggingActor.updateLogLevel(level)
+        }
+    }
+
+    /// Updates the global logging callback used to handle emitted log messages.
+    ///
+    /// By default, messages are sent to the system logger (OSLog). Providing a custom
+    /// callback allows you to intercept and route log output elsewhere (e.g., to a UI,
+    /// file, or analytics pipeline). Pass `nil` to remove any previously set callback
+    /// and revert to system logging.
+    ///
+    /// This method is asynchronous because it safely updates shared logging state
+    /// managed by an internal actor.
+    ///
+    /// - Parameter callback: A closure that receives each log message as a `String`,
+    ///   or `nil` to clear the custom callback.
+    /// - Important: The callback is invoked on an actor-isolated context; ensure the
+    ///   closure is `@Sendable` and avoid long-running or blocking work inside it.
+    /// - SeeAlso: `updateCallback(_:)` (non-async), `updateLogLevel(_:)`, `isLoggingEnabled`
     public static func updateCallback(_ callback: LoggingCallback?) async {
         await loggingActor.updateCallback(callback)
+    }
+
+    /// Updates the logging callback without requiring an async context (fire-and-forget).
+    ///
+    /// This convenience overload schedules the callback update on the internal logging actor
+    /// without blocking the caller. Use this from synchronous code paths. If you need to
+    /// guarantee the update has completed before proceeding, prefer the async variant
+    /// `updateCallback(_:)`.
+    ///
+    /// - Parameter callback: The new `LoggingCallback` to apply globally, or `nil` to remove it.
+    public static func updateCallback(_ callback: LoggingCallback?) {
+        Task(priority: .userInitiated) {
+            await loggingActor.updateCallback(callback)
+        }
     }
 
     // MARK: - Convenience
