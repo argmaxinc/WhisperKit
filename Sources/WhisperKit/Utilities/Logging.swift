@@ -137,7 +137,7 @@ public enum Logging {
         dispatch(level: .debug, message)
     }
 
-    /// Logs a info message asynchronously (fire-and-forget).
+    /// Logs an info message asynchronously (fire-and-forget).
     /// - Warning: This method does not await logging completion.
     /// Log messages may be dropped if the program terminates before logging completes.
     public static func info(_ message: String) {
