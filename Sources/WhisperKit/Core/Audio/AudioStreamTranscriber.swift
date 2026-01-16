@@ -17,7 +17,10 @@ public extension AudioStreamTranscriber {
     }
 }
 
-public typealias AudioStreamTranscriberCallback = (AudioStreamTranscriber.State, AudioStreamTranscriber.State) -> Void
+public typealias AudioStreamTranscriberCallback = @Sendable (
+    AudioStreamTranscriber.State,
+    AudioStreamTranscriber.State
+) -> Void
 
 /// Responsible for streaming audio from the microphone, processing it, and transcribing it in real-time.
 public actor AudioStreamTranscriber {

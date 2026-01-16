@@ -685,12 +685,11 @@ public struct TranscriptionProgress: Sendable {
 /// A callback that provides transcription segments as they are discovered.
 /// - Parameters:
 ///   - segments: An array of `TranscriptionSegment` objects representing the transcribed segments
-public typealias SegmentDiscoveryCallback = (_ segments: [TranscriptionSegment]) -> Void
+public typealias SegmentDiscoveryCallback = @Sendable (_ segments: [TranscriptionSegment]) -> Void
 
-/// A callback that reports changes in the model's state.
 /// A callback that reports changes in the transcription process.
 /// - Parameter state: The current `TranscriptionState` of the transcription process
-public typealias TranscriptionStateCallback = (_ state: TranscriptionState) -> Void
+public typealias TranscriptionStateCallback = @Sendable (_ state: TranscriptionState) -> Void
 
 /// Represents the different states of the transcription process.
 @frozen
@@ -727,7 +726,7 @@ public enum TranscriptionState: CustomStringConvertible {
 ///   - `false`: Stop the transcription process early.
 ///   - `nil`: Continue the transcription process (equivalent to returning `true`).
 /// - Note: This callback should be lightweight and return as quickly as possible to avoid extra decoding loops
-public typealias TranscriptionCallback = ((TranscriptionProgress) -> Bool?)?
+public typealias TranscriptionCallback = @Sendable (TranscriptionProgress) -> Bool?
 
 public struct TranscriptionTimings: Codable, Sendable {
     public var pipelineStart: CFAbsoluteTime

@@ -91,7 +91,7 @@ public protocol TextDecoding {
         using decoderInputs: any DecodingInputsType,
         sampler tokenSampler: TokenSampling,
         options decoderOptions: DecodingOptions,
-        callback: ((TranscriptionProgress) -> Bool?)?
+        callback: TranscriptionCallback?
     ) async throws -> DecodingResult
 
     @available(*, deprecated, message: "Subject to removal in a future version. Use `decodeText(from:using:sampler:options:callback:) async throws -> DecodingResult` instead.")
@@ -101,7 +101,7 @@ public protocol TextDecoding {
         using decoderInputs: DecodingInputs,
         sampler tokenSampler: TokenSampling,
         options decoderOptions: DecodingOptions,
-        callback: ((TranscriptionProgress) -> Bool?)?
+        callback: TranscriptionCallback?
     ) async throws -> [DecodingResult]
 
     func detectLanguage(
@@ -138,7 +138,7 @@ public extension TextDecoding {
         using decoderInputs: DecodingInputs,
         sampler tokenSampler: TokenSampling,
         options decoderOptions: DecodingOptions,
-        callback: ((TranscriptionProgress) -> Bool?)?
+        callback: TranscriptionCallback?
     ) async throws -> [DecodingResult] {
         let result: DecodingResult = try await decodeText(
             from: encoderOutput,
@@ -156,7 +156,7 @@ public extension TextDecoding {
         using decoderInputs: any DecodingInputsType,
         sampler tokenSampler: TokenSampling,
         options decoderOptions: DecodingOptions,
-        callback: ((TranscriptionProgress) -> Bool?)?
+        callback: TranscriptionCallback?
     ) async throws -> DecodingResult {
         let result: DecodingResult = try await decodeText(
             from: encoderOutput,
@@ -174,7 +174,7 @@ public extension TextDecoding {
         using decoderInputs: DecodingInputs,
         sampler tokenSampler: TokenSampling,
         options decoderOptions: DecodingOptions,
-        callback: ((TranscriptionProgress) -> Bool?)?
+        callback: TranscriptionCallback?
     ) async throws -> DecodingResult {
         let result: DecodingResult = try await decodeText(
             from: encoderOutput,
@@ -733,7 +733,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         using decoderInputs: any DecodingInputsType,
         sampler tokenSampler: TokenSampling,
         options: DecodingOptions,
-        callback: TranscriptionCallback = nil
+        callback: TranscriptionCallback? = nil
     ) async throws -> DecodingResult {
         guard let tokenizer else {
             // Tokenizer required for decoding

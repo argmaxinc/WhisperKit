@@ -57,7 +57,7 @@ open class TranscribeTask {
     public func run(
         audioArray: [Float],
         decodeOptions: DecodingOptions? = nil,
-        callback: TranscriptionCallback = nil
+        callback: TranscriptionCallback? = nil
     ) async throws -> TranscriptionResult {
         let interval = Logging.beginSignpost("TranscribeAudio", signposter: Logging.TranscribeTask.signposter)
         defer { Logging.endSignpost("TranscribeAudio", interval: interval, signposter: Logging.TranscribeTask.signposter) }
@@ -163,7 +163,7 @@ open class TranscribeTask {
                 Logging.info("Decoding \(Logging.formatTimestamp(timeOffset))s - \(Logging.formatTimestamp(timeOffsetEnd))s")
 
                 // Overload progress callback to include windowId
-                let decodingCallback: ((TranscriptionProgress) -> Bool?) = { [weak self] progress in
+                let decodingCallback: TranscriptionCallback = { [weak self] progress in
                     guard let self = self, let callback = callback else { return nil }
                     var windowProgress = progress
                     windowProgress.windowId = Int(self.timings.totalDecodingWindows - self.timings.totalDecodingFallbacks)
@@ -289,7 +289,7 @@ open class TranscribeTask {
         func decodeWithFallback(
             encoderSegment encoderOutput: any AudioEncoderOutputType,
             decodingOptions options: DecodingOptions,
-            callback: TranscriptionCallback = nil
+            callback: TranscriptionCallback? = nil
         ) async throws -> DecodingResult {
             let interval = Logging.beginSignpost("Decode", signposter: Logging.TranscribeTask.signposter)
             defer { Logging.endSignpost("Decode", interval: interval, signposter: Logging.TranscribeTask.signposter) }

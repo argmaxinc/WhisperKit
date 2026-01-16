@@ -599,7 +599,7 @@ open class WhisperKit {
     open func transcribe(
         audioPaths: [String],
         decodeOptions: DecodingOptions? = nil,
-        callback: TranscriptionCallback = nil
+        callback: TranscriptionCallback? = nil
     ) async -> [[TranscriptionResult]?] {
         let transcribeResults = await transcribeWithResults(
             audioPaths: audioPaths,
@@ -624,7 +624,7 @@ open class WhisperKit {
     open func transcribeWithResults(
         audioPaths: [String],
         decodeOptions: DecodingOptions? = nil,
-        callback: TranscriptionCallback = nil
+        callback: TranscriptionCallback? = nil
     ) async -> [Result<[TranscriptionResult], Swift.Error>] {
         transcriptionStateCallback?(.convertingAudio)
 
@@ -679,7 +679,7 @@ open class WhisperKit {
     open func transcribe(
         audioArrays: [[Float]],
         decodeOptions: DecodingOptions? = nil,
-        callback: TranscriptionCallback = nil
+        callback: TranscriptionCallback? = nil
     ) async -> [[TranscriptionResult]?] {
         let transcribeResults = await transcribeWithResults(
             audioArrays: audioArrays,
@@ -705,7 +705,7 @@ open class WhisperKit {
     open func transcribeWithResults(
         audioArrays: [[Float]],
         decodeOptions: DecodingOptions? = nil,
-        callback: TranscriptionCallback = nil
+        callback: TranscriptionCallback? = nil
     ) async -> [Result<[TranscriptionResult], Swift.Error>] {
         // Create an array of decoding options with the same value for each audio array
         let decodeOptionsArray = Array(repeating: decodeOptions, count: audioArrays.count)
@@ -729,7 +729,7 @@ open class WhisperKit {
         audioArrays: [[Float]],
         decodeOptionsArray: [DecodingOptions?] = [nil],
         seekOffsets: [Int]? = nil,
-        callback: TranscriptionCallback = nil
+        callback: TranscriptionCallback? = nil
     ) async -> [Result<[TranscriptionResult], Swift.Error>] {
         var result = [Result<[TranscriptionResult], Swift.Error>]()
 
@@ -755,7 +755,7 @@ open class WhisperKit {
             let partialResult = await withTaskGroup(of: [(index: Int, result: Result<[TranscriptionResult], Swift.Error>)].self) { taskGroup -> [Result<[TranscriptionResult], Swift.Error>] in
                 for (audioIndex, audioArray) in audioArrayBatch.enumerated() {
                     // Setup callback to keep track of batches and chunks
-                    let batchedAudioCallback: ((TranscriptionProgress) -> Bool?) = { progress in
+                    let batchedAudioCallback: TranscriptionCallback = { progress in
                         var batchedProgress = progress
                         batchedProgress.windowId = audioIndex + batchIndex * audioArrayBatch.count
                         return callback?(batchedProgress)
@@ -824,7 +824,7 @@ open class WhisperKit {
     open func transcribe(
         audioPath: String,
         decodeOptions: DecodingOptions? = nil,
-        callback: TranscriptionCallback = nil
+        callback: TranscriptionCallback? = nil
     ) async throws -> TranscriptionResult? {
         let result: [TranscriptionResult] = try await transcribe(audioPath: audioPath, decodeOptions: decodeOptions, callback: callback)
         return result.first
@@ -840,7 +840,7 @@ open class WhisperKit {
     open func transcribe(
         audioPath: String,
         decodeOptions: DecodingOptions? = nil,
-        callback: TranscriptionCallback = nil
+        callback: TranscriptionCallback? = nil
     ) async throws -> [TranscriptionResult] {
         transcriptionStateCallback?(.convertingAudio)
 
@@ -879,7 +879,7 @@ open class WhisperKit {
     open func transcribe(
         audioArray: [Float],
         decodeOptions: DecodingOptions? = nil,
-        callback: TranscriptionCallback = nil
+        callback: TranscriptionCallback? = nil
     ) async throws -> TranscriptionResult? {
         let result: [TranscriptionResult] = try await transcribe(audioArray: audioArray, decodeOptions: decodeOptions, callback: callback)
         return result.first
@@ -896,7 +896,7 @@ open class WhisperKit {
     open func transcribe(
         audioArray: [Float],
         decodeOptions: DecodingOptions? = nil,
-        callback: TranscriptionCallback = nil,
+        callback: TranscriptionCallback? = nil,
         segmentCallback: SegmentDiscoveryCallback? = nil
     ) async throws -> [TranscriptionResult] {
         var transcribeResults = [TranscriptionResult]()
@@ -988,7 +988,7 @@ open class WhisperKit {
     open func runTranscribeTask(
         audioArray: [Float],
         decodeOptions: DecodingOptions? = nil,
-        callback: TranscriptionCallback = nil,
+        callback: TranscriptionCallback? = nil,
         segmentCallback: SegmentDiscoveryCallback? = nil
     ) async throws -> [TranscriptionResult] {
         if modelState != .loaded {
