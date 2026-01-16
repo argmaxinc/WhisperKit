@@ -145,7 +145,7 @@ public enum Logging {
     ///
     /// - Parameter level: The new `LogLevel` to apply globally.
     public static func updateLogLevel(_ level: LogLevel) {
-        Task(priority: .userInitiated) {
+        Task(priority: .high) {
             await loggingActor.updateLogLevel(level)
         }
     }
@@ -178,7 +178,7 @@ public enum Logging {
     ///
     /// - Parameter callback: The new `LoggingCallback` to apply globally, or `nil` to remove it.
     public static func updateCallback(_ callback: LoggingCallback?) {
-        Task(priority: .userInitiated) {
+        Task(priority: .high) {
             await loggingActor.updateCallback(callback)
         }
     }
