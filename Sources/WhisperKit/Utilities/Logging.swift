@@ -144,7 +144,7 @@ public enum Logging {
         dispatch(level: .info, message)
     }
 
-    /// Logs a error message asynchronously (fire-and-forget).
+    /// Logs an error message asynchronously (fire-and-forget).
     /// - Warning: This method does not await logging completion.
     /// Log messages may be dropped if the program terminates before logging completes.
     public static func error(_ message: String) {
