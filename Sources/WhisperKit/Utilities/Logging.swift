@@ -180,17 +180,17 @@ public enum Logging {
 
 public extension Logging {
     static func debug(_ items: Any..., separator: String = " ", terminator: String = "\n") {
-        let message = items.map { "\($0)" }.joined(separator: separator)
+        let message = items.map { "\($0)" }.joined(separator: separator) + terminator
         debug(message)
     }
 
     static func info(_ items: Any..., separator: String = " ", terminator: String = "\n") {
-        let message = items.map { "\($0)" }.joined(separator: separator)
+        let message = items.map { "\($0)" }.joined(separator: separator) + terminator
         info(message)
     }
 
     static func error(_ items: Any..., separator: String = " ", terminator: String = "\n") {
-        let message = items.map { "\($0)" }.joined(separator: separator)
+        let message = items.map { "\($0)" }.joined(separator: separator) + terminator
         error(message)
     }
 }
