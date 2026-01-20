@@ -22,7 +22,7 @@ public struct ModelUtilities {
         tokenizerFolder: URL? = nil,
         additionalSearchPaths: [URL] = [],
         useBackgroundSession: Bool = false,
-        endpoint: String
+        endpoint: String = Constants.defaultRemoteEndpoint
     ) async throws -> WhisperTokenizer {
         let tokenizerName = tokenizerNameForVariant(pretrained)
         let hubApi = HubApi(downloadBase: tokenizerFolder, useBackgroundSession: useBackgroundSession)
