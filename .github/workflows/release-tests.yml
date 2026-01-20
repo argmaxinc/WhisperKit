@@ -11,7 +11,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-15.6
+          - os: macos-15
             ios-version: "18.5"
             ios-device: "iPhone 16"
             watchos-version: "11.5"
