@@ -13,6 +13,8 @@ open class WhisperKitConfig {
     public var modelRepo: String?
     /// Token for downloading models from repo (if required)
     public var modelToken: String?
+    /// Endpoint for downloading models and tokenizers
+    public var endpoint: String
 
     /// Folder to store models
     public var modelFolder: String?
@@ -50,6 +52,7 @@ open class WhisperKitConfig {
                 downloadBase: URL? = nil,
                 modelRepo: String? = nil,
                 modelToken: String? = nil,
+                endpoint: String = Constants.defaultRemoteEndpoint,
                 modelFolder: String? = nil,
                 tokenizerFolder: URL? = nil,
                 computeOptions: ModelComputeOptions? = nil,
@@ -72,6 +75,7 @@ open class WhisperKitConfig {
         self.downloadBase = downloadBase
         self.modelRepo = modelRepo
         self.modelToken = modelToken
+        self.endpoint = endpoint
         self.modelFolder = modelFolder
         self.tokenizerFolder = tokenizerFolder
         self.computeOptions = computeOptions
