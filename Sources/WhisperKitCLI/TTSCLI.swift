@@ -125,7 +125,7 @@ struct TTSCLI: AsyncParsableCommand {
 
     func run() async throws {
         if verbose {
-            Logging.shared.loggingCallback = {
+            await Logging.updateCallback {
                 print("[TTSKit] \($0)")
             }
         }

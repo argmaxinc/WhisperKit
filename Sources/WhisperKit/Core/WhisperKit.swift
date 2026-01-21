@@ -70,7 +70,7 @@ open class WhisperKit {
         tokenizerFolder = config.tokenizerFolder ?? config.downloadBase
         useBackgroundDownloadSession = config.useBackgroundDownloadSession
         currentTimings = TranscriptionTimings()
-        Logging.shared.logLevel = config.verbose ? config.logLevel : .none
+        await Logging.updateLogLevel(config.verbose ? config.logLevel : .none)
 
         try await setupModels(
             model: config.model,
@@ -285,7 +285,7 @@ open class WhisperKit {
 
             Logging.debug("Downloading model \(variantPath)...")
             let modelFolder = try await hubApi.snapshot(from: repo, matching: [modelSearchPath]) { progress in
-                Logging.debug(progress)
+                Logging.debug(progress.debugDescription)
                 if let callback = progressCallback {
                     callback(progress)
                 }
@@ -294,7 +294,7 @@ open class WhisperKit {
             let modelFolderName = modelFolder.appending(path: variantPath)
             return modelFolderName
         } catch {
-            Logging.debug(error)
+            Logging.debug(error.localizedDescription)
             throw error
         }
     }
@@ -520,8 +520,17 @@ open class WhisperKit {
     }
 
     /// Pass in your own logging callback here
+    /// - Note: This method dispatches the update on a high priority task.
+    @available(*, deprecated, message: "Subject to removal in a future version. Use `updateLoggingCallback(_ callback:) async` instead.")
     open func loggingCallback(_ callback: Logging.LoggingCallback?) {
-        Logging.shared.loggingCallback = callback
+        Task(priority: .high) {
+            await Logging.updateCallback(callback)
+        }
+    }
+
+    /// Pass in your own logging callback here
+    open func updateLoggingCallback(_ callback: Logging.LoggingCallback?) async {
+        await Logging.updateCallback(callback)
     }
 
     // MARK: - Detect language
@@ -560,7 +569,7 @@ open class WhisperKit {
             throw WhisperError.tokenizerUnavailable()
         }
 
-        let options = DecodingOptions(verbose: Logging.shared.logLevel != .none)
+        let options = DecodingOptions(verbose: await Logging.isLoggingEnabled)
         let decoderInputs = try textDecoder.prepareDecoderInputs(withPrompt: [tokenizer.specialTokens.startOfTranscriptToken])
 
         // Detect language using up to the first 30 seconds

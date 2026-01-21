@@ -666,7 +666,7 @@ class RegressionTests: XCTestCase {
         let monitorTask = Task {
             while true {
                 let remainingMemory = SystemMemoryCheckerAdvanced.getMemoryUsage().totalAvailableGB
-                Logging.debug(remainingMemory, "GB of memory left")
+                Logging.debug("\(remainingMemory) GB of memory left")
 
                 if remainingMemory <= 0.1 { // Cancel with 100MB remaining
                     Logging.debug("Cancelling due to oom")
@@ -712,7 +712,7 @@ class RegressionTests: XCTestCase {
             initializationTask.cancel()
             monitorTask.cancel()
             timeoutTask.cancel()
-            Logging.debug(error)
+            Logging.debug(error.localizedDescription)
             throw error
         }
     }
