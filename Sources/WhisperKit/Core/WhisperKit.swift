@@ -768,9 +768,10 @@ open class WhisperKit {
                     }
 
                     // Setup segment callback to track chunk seek positions for segment discovery
+                    let batchSize = audioArrayBatch.count
                     let batchedSegmentCallback: SegmentDiscoveryCallback? = if let seekOffsets {
                         { [segmentDiscoveryCallback] segments in
-                            let windowId = audioIndex + batchIndex * audioArrayBatch.count
+                            let windowId = audioIndex + batchIndex * batchSize
                             let seekOffset = seekOffsets[windowId]
                             var adjustedSegments = segments
                             for i in 0..<adjustedSegments.count {
