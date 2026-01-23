@@ -760,15 +760,16 @@ open class WhisperKit {
             // Use withTaskGroup to manage concurrent transcription tasks
             let partialResult = await withTaskGroup(of: [(index: Int, result: Result<[TranscriptionResult], Swift.Error>)].self) { taskGroup -> [Result<[TranscriptionResult], Swift.Error>] in
                 for (audioIndex, audioArray) in audioArrayBatch.enumerated() {
+                    let batchSize = audioArrayBatch.count
+
                     // Setup callback to keep track of batches and chunks
                     let batchedAudioCallback: TranscriptionCallback = { progress in
                         var batchedProgress = progress
-                        batchedProgress.windowId = audioIndex + batchIndex * audioArrayBatch.count
+                        batchedProgress.windowId = audioIndex + batchIndex * batchSize
                         return callback?(batchedProgress)
                     }
 
                     // Setup segment callback to track chunk seek positions for segment discovery
-                    let batchSize = audioArrayBatch.count
                     let batchedSegmentCallback: SegmentDiscoveryCallback? = if let seekOffsets {
                         { [segmentDiscoveryCallback] segments in
                             let windowId = audioIndex + batchIndex * batchSize
