@@ -197,7 +197,7 @@ public actor AudioStreamTranscriber {
         options.clipTimestamps = [state.lastConfirmedSegmentEndSeconds]
         let checkWindow = compressionCheckWindow
         return try await transcribeTask
-            .run(audioArray: samples, decodeOptions: options) { [weak self, options] progress in
+            .run(audioArray: samples, decodeOptions: options) { [options] progress in
             Task { [weak self] in
                 await self?.onProgressCallback(progress)
             }
