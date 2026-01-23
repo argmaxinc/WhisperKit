@@ -920,12 +920,11 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
 
                 // Call the callback if it is provided on a background thread
                 if let callback = callback {
-                    Task.detached(priority: .low) { [weak self] in
-                        guard let self = self else { return }
+                    Task.detached(priority: .low) { [earlyStopActor] in
                         let shouldContinue = callback(result)
                         if let shouldContinue = shouldContinue, !shouldContinue, !isPrefill {
                             Logging.debug("Early stopping")
-                            await self.earlyStopActor.set(true, for: windowUUID)
+                            await earlyStopActor.set(true, for: windowUUID)
                         }
                     }
                 }

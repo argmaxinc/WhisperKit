@@ -245,7 +245,7 @@ open class WhisperKit {
         from repo: String = "argmaxinc/whisperkit-coreml",
         token: String? = nil,
         endpoint: String = Constants.defaultRemoteEndpoint,
-        progressCallback: ((Progress) -> Void)? = nil
+        progressCallback: (@Sendable (Progress) -> Void)? = nil
     ) async throws -> URL {
         let hubApi = HubApi(downloadBase: downloadBase, hfToken: token, endpoint: endpoint, useBackgroundSession: useBackgroundSession)
         let repo = Hub.Repo(id: repo, type: .models)
@@ -769,14 +769,14 @@ open class WhisperKit {
 
                     // Setup segment callback to track chunk seek positions for segment discovery
                     let batchedSegmentCallback: SegmentDiscoveryCallback? = if let seekOffsets {
-                        { segments in
+                        { [segmentDiscoveryCallback] segments in
                             let windowId = audioIndex + batchIndex * audioArrayBatch.count
                             let seekOffset = seekOffsets[windowId]
                             var adjustedSegments = segments
                             for i in 0..<adjustedSegments.count {
                                 adjustedSegments[i].seek += Int(seekOffset)
                             }
-                            self.segmentDiscoveryCallback?(adjustedSegments)
+                            segmentDiscoveryCallback?(adjustedSegments)
                         }
                     } else {
                         self.segmentDiscoveryCallback
@@ -792,7 +792,7 @@ open class WhisperKit {
                                 audioArray: audioArray,
                                 decodeOptions: batchedDecodeOptions,
                                 callback: batchedAudioCallback,
-                                segmentCallback: batchedSegmentCallback ?? self.segmentDiscoveryCallback
+                                segmentCallback: batchedSegmentCallback
                             )
                             // Return the successful transcription result with its index
                             return [(index: audioIndex, result: .success(transcribeResult))]
