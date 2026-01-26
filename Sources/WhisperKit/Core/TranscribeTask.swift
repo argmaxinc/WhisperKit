@@ -177,7 +177,6 @@ open class TranscribeTask {
                     decodingOptions: options,
                     decoderInputs: &decoderInputs,
                     detectedLanguage: &detectedLanguage,
-                    fallbackCount: &fallbackCount,
                     prefilledCacheSize: prefilledCacheSize,
                     callback: decodingCallback
                 )
@@ -329,7 +328,6 @@ open class TranscribeTask {
         decodingOptions options: DecodingOptions,
         decoderInputs: inout any DecodingInputsType,
         detectedLanguage: inout String?,
-        fallbackCount: inout Int,
         prefilledCacheSize: Int,
         callback: TranscriptionCallback? = nil
     ) async throws -> DecodingResult {
@@ -406,14 +404,13 @@ open class TranscribeTask {
 
             if let fallback = decodingResult?.fallback, fallback.needsFallback {
                 // Reset decoder inputs for fallback
-                fallbackCount = i
                 timings.decodingFallback += Date().timeIntervalSince(decodeWithFallbackStart)
-                timings.totalDecodingFallbacks = Double(fallbackCount)
+                timings.totalDecodingFallbacks = Double(i)
                 decoderInputs.reset(
                     prefilledCacheSize: prefilledCacheSize,
                     maxTokenContext: options.sampleLength
                 )
-                Logging.info("Fallback #\(fallbackCount + 1) (\(fallback.fallbackReason))")
+                Logging.info("Fallback #\(i + 1) (\(fallback.fallbackReason))")
             } else {
                 break
             }
