@@ -245,7 +245,7 @@ open class WhisperKit {
         from repo: String = "argmaxinc/whisperkit-coreml",
         token: String? = nil,
         endpoint: String = Constants.defaultRemoteEndpoint,
-        progressCallback: (@Sendable (Progress) -> Void)? = nil
+        progressCallback: ProgressCallback? = nil
     ) async throws -> URL {
         let hubApi = HubApi(downloadBase: downloadBase, hfToken: token, endpoint: endpoint, useBackgroundSession: useBackgroundSession)
         let repo = Hub.Repo(id: repo, type: .models)
