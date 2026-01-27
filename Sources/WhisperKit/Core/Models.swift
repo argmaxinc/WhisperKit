@@ -7,6 +7,7 @@ import CoreML
 import Hub
 import NaturalLanguage
 import Tokenizers
+
 // MARK: - CoreML
 
 public protocol WhisperMLModel: AnyObject {
