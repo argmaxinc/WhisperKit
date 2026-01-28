@@ -692,6 +692,25 @@ public typealias SegmentDiscoveryCallback = @Sendable (_ segments: [Transcriptio
 /// - Parameter state: The current `TranscriptionState` of the transcription process
 public typealias TranscriptionStateCallback = @Sendable (_ state: TranscriptionState) -> Void
 
+
+/// A callback that reports incremental updates about the progress of a long‑running operation.
+///
+/// WhisperKit uses this closure to surface progress for tasks such as downloading model assets.
+/// The closure is annotated `@Sendable` and may be invoked from a background thread.
+///
+/// - Parameter progress: A Foundation `Progress` instance describing the current state of the task.
+///
+/// - Important: This callback can be called on any thread. If you update UI, hop to the main actor:
+///   `await MainActor.run { ... }`.
+///
+/// - Note: Keep the work performed inside this callback minimal to avoid slowing the underlying
+///   operation. The closure may be invoked many times and typically finishes with
+///   `fractionCompleted == 1.0` when the operation completes (or fewer times if it is cancelled
+///   or fails).
+///
+/// - SeeAlso: `ModelStateCallback`, `TranscriptionStateCallback`, `TranscriptionCallback`
+public typealias ProgressCallback = @Sendable (Progress) -> Void
+
 /// Represents the different states of the transcription process.
 @frozen
 public enum TranscriptionState: CustomStringConvertible {

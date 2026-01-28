@@ -248,7 +248,7 @@ open class WhisperKit {
         from repo: String = "argmaxinc/whisperkit-coreml",
         token: String? = nil,
         endpoint: String = Constants.defaultRemoteEndpoint,
-        progressCallback: ((Progress) -> Void)? = nil
+        progressCallback: ProgressCallback? = nil
     ) async throws -> URL {
         let hubApi = HubApi(downloadBase: downloadBase, hfToken: token, endpoint: endpoint, useBackgroundSession: useBackgroundSession)
         let repo = Hub.Repo(id: repo, type: .models)
@@ -763,23 +763,25 @@ open class WhisperKit {
             // Use withTaskGroup to manage concurrent transcription tasks
             let partialResult = await withTaskGroup(of: [(index: Int, result: Result<[TranscriptionResult], Swift.Error>)].self) { taskGroup -> [Result<[TranscriptionResult], Swift.Error>] in
                 for (audioIndex, audioArray) in audioArrayBatch.enumerated() {
+                    let batchSize = audioArrayBatch.count
+
                     // Setup callback to keep track of batches and chunks
                     let batchedAudioCallback: TranscriptionCallback = { progress in
                         var batchedProgress = progress
-                        batchedProgress.windowId = audioIndex + batchIndex * audioArrayBatch.count
+                        batchedProgress.windowId = audioIndex + batchIndex * batchSize
                         return callback?(batchedProgress)
                     }
 
                     // Setup segment callback to track chunk seek positions for segment discovery
                     let batchedSegmentCallback: SegmentDiscoveryCallback? = if let seekOffsets {
-                        { segments in
-                            let windowId = audioIndex + batchIndex * audioArrayBatch.count
+                        { [segmentDiscoveryCallback] segments in
+                            let windowId = audioIndex + batchIndex * batchSize
                             let seekOffset = seekOffsets[windowId]
                             var adjustedSegments = segments
                             for i in 0..<adjustedSegments.count {
                                 adjustedSegments[i].seek += Int(seekOffset)
                             }
-                            self.segmentDiscoveryCallback?(adjustedSegments)
+                            segmentDiscoveryCallback?(adjustedSegments)
                         }
                     } else {
                         self.segmentDiscoveryCallback
@@ -795,7 +797,7 @@ open class WhisperKit {
                                 audioArray: audioArray,
                                 decodeOptions: batchedDecodeOptions,
                                 callback: batchedAudioCallback,
-                                segmentCallback: batchedSegmentCallback ?? self.segmentDiscoveryCallback
+                                segmentCallback: batchedSegmentCallback
                             )
                             // Return the successful transcription result with its index
                             return [(index: audioIndex, result: .success(transcribeResult))]
