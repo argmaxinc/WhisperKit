@@ -1,6 +1,7 @@
 //  For licensing see accompanying LICENSE.md file.
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
+import ArgmaxCore
 import CoreML
 import Hub
 import Tokenizers
@@ -87,19 +88,7 @@ public struct ModelUtilities {
     }
 
     public static func detectModelURL(inFolder path: URL, named modelName: String) -> URL {
-        let compiledUrl = path.appending(path: "\(modelName).mlmodelc")
-        let packageUrl = path.appending(path: "\(modelName).mlpackage/Data/com.apple.CoreML/model.mlmodel")
-
-        let compiledModelExists: Bool = FileManager.default.fileExists(atPath: compiledUrl.path)
-        let packageModelExists: Bool = FileManager.default.fileExists(atPath: packageUrl.path)
-
-        // Swap to mlpackage only if the following is true: we found the mlmodel within the mlpackage, and we did not find a .mlmodelc
-        var modelURL = compiledUrl
-        if packageModelExists && !compiledModelExists {
-            modelURL = packageUrl
-        }
-
-        return modelURL
+        return ArgmaxCore.detectModelURL(inFolder: path, named: modelName)
     }
     
     /// Formats and sorts model file names based on model variants
@@ -199,35 +188,19 @@ public struct ModelUtilities {
     }
 
     static func getModelInputDimention(_ model: MLModel?, named: String, position: Int) -> Int? {
-        guard let inputDescription = model?.modelDescription.inputDescriptionsByName[named] else { return nil }
-        guard inputDescription.type == .multiArray else { return nil }
-        guard let shapeConstraint = inputDescription.multiArrayConstraint else { return nil }
-        let shape = shapeConstraint.shape.map { $0.intValue }
-        return shape[position]
+        return modelInputDim(model, named: named, position: position)
     }
 
     static func getModelOutputDimention(_ model: MLModel?, named: String, position: Int) -> Int? {
-        guard let inputDescription = model?.modelDescription.outputDescriptionsByName[named] else { return nil }
-        guard inputDescription.type == .multiArray else { return nil }
-        guard let shapeConstraint = inputDescription.multiArrayConstraint else { return nil }
-        let shape = shapeConstraint.shape.map { $0.intValue }
-        return shape[position]
+        return modelOutputDim(model, named: named, position: position)
     }
 
     func getModelInputDimention(_ model: MLModel?, named: String, position: Int) -> Int? {
-        guard let inputDescription = model?.modelDescription.inputDescriptionsByName[named] else { return nil }
-        guard inputDescription.type == .multiArray else { return nil }
-        guard let shapeConstraint = inputDescription.multiArrayConstraint else { return nil }
-        let shape = shapeConstraint.shape.map { $0.intValue }
-        return shape[position]
+        return ArgmaxCore.modelInputDim(model, named: named, position: position)
     }
 
     func getModelOutputDimention(_ model: MLModel?, named: String, position: Int) -> Int? {
-        guard let inputDescription = model?.modelDescription.outputDescriptionsByName[named] else { return nil }
-        guard inputDescription.type == .multiArray else { return nil }
-        guard let shapeConstraint = inputDescription.multiArrayConstraint else { return nil }
-        let shape = shapeConstraint.shape.map { $0.intValue }
-        return shape[position]
+        return ArgmaxCore.modelOutputDim(model, named: named, position: position)
     }
 
     // MARK: Private

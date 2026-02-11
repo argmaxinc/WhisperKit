@@ -7,17 +7,7 @@ import CoreML
 import Hub
 import NaturalLanguage
 import Tokenizers
-
-#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
-public typealias FloatType = Float16
-#else
-public typealias FloatType = Float
-#endif
-
-#if (os(macOS) || targetEnvironment(macCatalyst)) && arch(arm64) && compiler(<6)
-extension Float16: BNNSScalar {}
-extension Float16: MLShapedArrayScalar {}
-#endif
+@_exported import ArgmaxCore
 
 // MARK: - CoreML
 

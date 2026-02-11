@@ -8,9 +8,9 @@ let VERSION: String = "development"
 
 var subcommands: [ParsableCommand.Type] {
 #if BUILD_SERVER_CLI
-    [TranscribeCLI.self, ServeCLI.self]
+    [TranscribeCLI.self, TTSCLI.self, ServeCLI.self]
 #else
-    [TranscribeCLI.self]
+    [TranscribeCLI.self, TTSCLI.self]
 #endif
 }
 

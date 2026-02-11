@@ -39,7 +39,27 @@ WhisperKit is an [Argmax](https://www.takeargmax.com) framework for deploying st
   - [Model Selection](#model-selection)
   - [Generating Models](#generating-models)
   - [Swift CLI](#swift-cli)
-- [WhisperKit Local Server](#whisperkit-local-server)
+  - [WhisperKit Local Server](#whisperkit-local-server)
+    - [Building the Server](#building-the-server)
+    - [Starting the Server](#starting-the-server)
+    - [API Endpoints](#api-endpoints)
+    - [Supported Parameters](#supported-parameters)
+    - [Client Examples](#client-examples)
+    - [Generating the API Specification](#generating-the-api-specification)
+    - [Client Generation](#client-generation)
+    - [API Limitations](#api-limitations)
+    - [Fully Supported Features](#fully-supported-features)
+- [TTSKit](#ttskit)
+  - [Quick Example](#quick-example-1)
+  - [Model Selection](#model-selection-1)
+    - [Custom Voices](#custom-voices)
+    - [Real-Time Streaming Playback](#real-time-streaming-playback)
+  - [Generation Options](#generation-options)
+    - [Style Instructions (1.7B only)](#style-instructions-17b-only)
+  - [Saving Audio](#saving-audio)
+  - [Progress Callbacks](#progress-callbacks)
+  - [Swift CLI](#swift-cli-1)
+  - [Demo App](#demo-app)
 - [Contributing \& Roadmap](#contributing--roadmap)
 - [License](#license)
 - [Citation](#citation)
@@ -48,12 +68,12 @@ WhisperKit is an [Argmax](https://www.takeargmax.com) framework for deploying st
 
 ### Swift Package Manager
 
-WhisperKit can be integrated into your Swift project using the Swift Package Manager.
+WhisperKit and TTSKit are separate library products in the same Swift package. Add the package once and pick the products you need.
 
 ### Prerequisites
 
 - macOS 14.0 or later.
-- Xcode 15.0 or later.
+- Xcode 16.0 or later.
 
 ### Xcode Steps
 
@@ -61,11 +81,11 @@ WhisperKit can be integrated into your Swift project using the Swift Package Man
 2. Navigate to `File` > `Add Package Dependencies...`.
 3. Enter the package repository URL: `https://github.com/argmaxinc/whisperkit`.
 4. Choose the version range or specific version.
-5. Click `Finish` to add WhisperKit to your project.
+5. When prompted to choose library products, select **WhisperKit**, **TTSKit**, or both.
 
 ### Package.swift
 
-If you're using WhisperKit as part of a swift package, you can include it in your Package.swift dependencies as follows:
+If you're using WhisperKit or TTSKit as part of a swift package, you can include it in your Package.swift dependencies as follows:
 
 ```swift
 dependencies: [
@@ -73,12 +93,15 @@ dependencies: [
 ],
 ```
 
-Then add `WhisperKit` as a dependency for your target:
+Then add the products you need as target dependencies:
 
 ```swift
 .target(
     name: "YourApp",
-    dependencies: ["WhisperKit"]
+    dependencies: [
+        "WhisperKit", // speech-to-text
+        "TTSKit",     // text-to-speech
+    ]
 ),
 ```
 
@@ -307,6 +330,156 @@ The local server fully supports these OpenAI API features:
 - **Language detection**: Automatic language detection or manual specification
 - **Temperature control**: Sampling temperature for transcription randomness
 - **Prompt text**: Text guidance for transcription style and context
+
+## TTSKit
+
+TTSKit is an on-device text-to-speech framework built on Core ML. It runs [Qwen3 TTS](https://github.com/QwenLM/Qwen3-TTS) models entirely on Apple silicon with real-time streaming playback, no server required.
+
+- macOS 15.0 or later.
+- iOS 18.0 or later.
+
+### Quick Example
+
+This example demonstrates how to generate speech from text:
+
+```swift
+import TTSKit
+
+Task {
+    let tts = try await TTSKit()
+    let result = try await tts.generateSpeech(text: "Hello from TTSKit!")
+    print("Generated \(result.audioDuration)s of audio at \(result.sampleRate)Hz")
+}
+```
+
+`TTSKit()` automatically downloads the default 0.6B model on first run, loads the tokenizer and six CoreML models concurrently, and is ready to generate.
+
+### Model Selection
+
+TTSKit ships two model sizes. You can select the model by passing a preset to `TTSKitConfig`:
+
+```swift
+// Fast, runs on all platforms (~500 MB download)
+let tts = try await TTSKit(TTSKitConfig(model: .qwen3TTS_0_6b))
+
+// Higher quality, macOS only (~1.5 GB download, supports style instructions)
+let tts = try await TTSKit(TTSKitConfig(model: .qwen3TTS_1_7b))
+```
+
+Models are hosted on [HuggingFace](https://huggingface.co/argmaxinc/ttskit-coreml) and cached locally after the first download.
+
+#### Custom Voices
+
+You can choose from 9 built-in voices and 10 languages:
+
+```swift
+let result = try await tts.generateSpeech(
+    text: "こんにちは世界",
+    speaker: .onoAnna,
+    language: .japanese
+)
+```
+
+**Voices:** Ryan, Aiden, Ono Anna, Sohee, Eric, Dylan, Serena, Vivian, Uncle Fu
+
+**Languages:** English, Chinese, Japanese, Korean, German, French, Russian, Portuguese, Spanish, Italian
+
+#### Real-Time Streaming Playback
+
+`playSpeech` streams audio to the device speakers frame-by-frame as it is generated:
+
+```swift
+try await tts.playSpeech(text: "This starts playing before generation finishes.")
+```
+
+You can control how much audio is buffered before playback begins. The default `.auto` strategy measures the first generation step and pre-buffers just enough to avoid underruns:
+
+```swift
+try await tts.playSpeech(
+    text: "Long passage...",
+    playbackStrategy: .auto
+)
+```
+
+Other strategies include `.stream` (immediate, no buffer), `.buffered(seconds:)` (fixed pre-buffer), and `.generateFirst` (generate all audio first, then play).
+
+### Generation Options
+
+You can customize sampling, chunking, and concurrency via `TTSGenerationOptions`:
+
+```swift
+// Defaults recommended by Qwen
+var options = TTSGenerationOptions()
+options.temperature = 0.9
+options.topK = 50
+options.repetitionPenalty = 1.05
+options.maxNewTokens = 245
+
+// Long text is automatically split at sentence boundaries
+options.chunkingStrategy = .sentence
+options.concurrentWorkerCount = nil  // nil = unlimited concurrency across chunks
+
+let result = try await tts.generateSpeech(text: longArticle, options: options)
+```
+
+#### Style Instructions (1.7B only)
+
+The 1.7B model accepts a natural-language style instruction that controls prosody:
+
+```swift
+var options = TTSGenerationOptions()
+options.instruction = "Speak slowly and warmly, like a storyteller."
+
+let result = try await tts.generateSpeech(
+    text: "Once upon a time...",
+    speaker: .ryan,
+    options: options
+)
+```
+
+### Saving Audio
+
+Generated audio can be saved to WAV or M4A:
+
+```swift
+let result = try await tts.generateSpeech(text: "Save me!")
+
+// Save as WAV
+try TTSAudioOutput.saveAudio(result.audio, to: URL(fileURLWithPath: "output.wav"))
+
+// Save as M4A (AAC) with optional metadata
+try await TTSAudioOutput.saveAudioAsM4A(result.audio, to: URL(fileURLWithPath: "output.m4a"))
+```
+
+### Progress Callbacks
+
+You can receive per-step progress during generation. Return `false` from the callback to cancel early:
+
+```swift
+let result = try await tts.generateSpeech(text: "Hello!") { progress in
+    print("Audio chunk: \(progress.audio.count) samples")
+    if let stepTime = progress.stepTime {
+        print("First step took \(stepTime)s")
+    }
+    return true  // return false to cancel
+}
+```
+
+### Swift CLI
+
+The TTS command is available through the same `whisperkit-cli` tool. You can generate speech and optionally play it back in real time:
+
+```bash
+swift run whisperkit-cli tts --text "Hello from the command line" --play
+swift run whisperkit-cli tts --text "Save to file" --output-path output.wav
+swift run whisperkit-cli tts --text "日本語テスト" --speaker ono-anna --language japanese
+swift run whisperkit-cli tts --text-file article.txt --model 1.7b --instruction "Read cheerfully"
+swift run whisperkit-cli tts --help
+```
+
+### Demo App
+
+The [SpeakAX](Examples/TTS/SpeakAX/) example app showcases real-time streaming, model management, waveform visualization, and generation history on macOS and iOS. See the [SpeakAX README](Examples/TTS/SpeakAX/README.md) for build instructions.
 
 ## Contributing & Roadmap
 

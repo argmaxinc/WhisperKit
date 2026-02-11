@@ -4,72 +4,11 @@
 import AVFoundation
 import CoreML
 
-extension MLMultiArray {
-    /// All values will be stored in the last dimension of the MLMultiArray (default is dims=1)
-    static func from(_ array: [Int], dims: Int = 1) throws -> MLMultiArray {
-        var shape = Array(repeating: 1, count: dims)
-        shape[shape.count - 1] = array.count
-        /// Examples:
-        /// dims=1 : [arr.count]
-        /// dims=2 : [1, arr.count]
-        ///
-        let output = try MLMultiArray(shape: shape as [NSNumber], dataType: .int32)
-        let pointer = UnsafeMutablePointer<Int32>(OpaquePointer(output.dataPointer))
-        for (i, item) in array.enumerated() {
-            pointer[i] = Int32(item)
-        }
-        return output
-    }
-}
-
-extension Array {
-    func batched(into size: Int) -> [[Element]] {
-        return stride(from: 0, to: count, by: size).map {
-            Array(self[$0..<Swift.min($0 + size, count)])
-        }
-    }
-}
-
 extension Array where Element == Result<[TranscriptionResult], Swift.Error> {
     /// Convenience method to convert the `Result` object into an array of optional arrays of `TranscriptionResult`.
     /// - Returns: An array of optional arrays containing `TranscriptionResult`.
     func toOptionalArrays() -> [[TranscriptionResult]?] {
         return self.map { try? $0.get() }
-    }
-}
-
-extension Array where Element: Hashable {
-    /// Returns an array with duplicates removed, preserving the original order.
-    var orderedSet: [Element] {
-        var seen = Set<Element>()
-        return self.filter { element in
-            if seen.contains(element) {
-                return false
-            } else {
-                seen.insert(element)
-                return true
-            }
-        }
-    }
-}
-
-extension String {
-    /// Reference: https://github.com/huggingface/swift-transformers/blob/94610577e4af9bbc267060af1e25e977604dd796/Sources/Tokenizers/Decoder.swift#L267-L275
-    func trimmingFromEnd(character: Character = " ", upto: Int) -> String {
-        var result = self
-        var trimmed = 0
-        while trimmed < upto && result.last == character {
-            result.removeLast()
-            trimmed += 1
-        }
-        return result
-    }
-}
-
-extension [String] {
-    /// Reference: https://github.com/huggingface/swift-transformers/blob/94610577e4af9bbc267060af1e25e977604dd796/Sources/Hub/HubApi.swift#L983-L987
-    func matching(glob: String) -> [String] {
-        filter { fnmatch(glob, $0, 0) == 0 }
     }
 }
 

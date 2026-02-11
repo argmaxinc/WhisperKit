@@ -53,11 +53,11 @@ open class WhisperKitConfig {
     /// model gets loaded sequentially and unloaded immediately to trigger specialization if necessary.
     /// 
     /// **Trade-offs**
-    /// - **Pro** — The peak memory usage during compilation is reduced because
+    /// - **Pro** - The peak memory usage during compilation is reduced because
     ///   only one model is kept in memory at any given point. Otherwise, the
     ///   peak memory will bloat to all model weights combined plus the peak
     ///   compilation memory (higher than model weights). 
-    /// - **Con** — The load time will be multiplied by 2 (usually <1s when cache is hit)
+    /// - **Con** - The load time will be multiplied by 2 (usually <1s when cache is hit)
     ///   because of the load-unload-load pattern when the specialized model file cache is
     ///   actually hit and prewarm does not trigger specialization
     ///
