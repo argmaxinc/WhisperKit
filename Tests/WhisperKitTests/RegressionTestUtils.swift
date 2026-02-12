@@ -159,23 +159,6 @@ struct MemoryStats: Stats {
         self.units = units
         self.totalNumberOfMeasurements = totalNumberOfMeasurements
     }
-
-    init(from decoder: any Decoder) throws {
-        fatalError("init(from:) has not been implemented")
-    }
-
-    /// Implement the encode(to:) method
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(preTranscribeMemory, forKey: .preTranscribeMemory)
-        try container.encode(postTranscribeMemory, forKey: .postTranscribeMemory)
-    }
-
-    /// Coding keys for MemoryStats properties
-    enum CodingKeys: String, CodingKey {
-        case preTranscribeMemory
-        case postTranscribeMemory
-    }
 }
 
 struct TestMeasurement: JSONCodable {
@@ -237,6 +220,7 @@ enum SystemMemoryCheckerAdvanced {
         var stats = vm_statistics64()
         var count = mach_msg_type_number_t(MemoryLayout.size(ofValue: stats) / MemoryLayout<integer_t>.size)
         let hostPort = mach_host_self()
+        defer { _ = mach_port_deallocate(mach_task_self_, hostPort) }
         let result = withUnsafeMutablePointer(to: &stats) { statsPtr -> kern_return_t in
             statsPtr.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { intPtr in
                 host_statistics64(hostPort, HOST_VM_INFO64, intPtr, &count)
@@ -248,7 +232,7 @@ enum SystemMemoryCheckerAdvanced {
         }
 
         var rawPageSize: vm_size_t = 0
-        let kernelResult = host_page_size(mach_host_self(), &rawPageSize)
+        let kernelResult = host_page_size(hostPort, &rawPageSize)
 
         guard kernelResult == KERN_SUCCESS else { return SystemMemoryUsage.zero }
 
