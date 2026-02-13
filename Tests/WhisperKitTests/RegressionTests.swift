@@ -138,15 +138,7 @@ class RegressionTests: XCTestCase {
         for (i, config) in testMatrix.enumerated() {
             do {
                 Logging.debug("Running test \(i + 1)/\(testMatrix.count) for \(config.model) with \(config.dataset) on \(device) using encoder compute: \(config.modelComputeOptions.audioEncoderCompute.description) and decoder compute: \(config.modelComputeOptions.textDecoderCompute.description)")
-                let expectation = XCTestExpectation(description: "Download test audio files for \(config.dataset) dataset")
-                downloadTestData(forDataset: config.dataset) { success in
-                    if success {
-                        expectation.fulfill()
-                    } else {
-                        XCTFail("Downloading audio file for testing failed")
-                    }
-                }
-                await fulfillment(of: [expectation], timeout: 300)
+                try await downloadTestData(forDataset: config.dataset)
                 let attachmentName = try await testAndMeasureModelPerformance(config: config, device: device)
                 attachments[config.dataset] = attachmentName
                 try await Task.sleep(nanoseconds: 1_000_000_000)
@@ -433,19 +425,11 @@ class RegressionTests: XCTestCase {
 
     // MARK: - Helper Methods
 
-    private func downloadTestDataIfNeeded() {
+    private func downloadTestDataIfNeeded() async throws {
         guard audioFileURLs == nil || metadataURL == nil || testWERURLs == nil else { return }
 
         for dataset in datasets {
-            let expectation = XCTestExpectation(description: "Download test audio files for \(dataset) dataset")
-            downloadTestData(forDataset: dataset) { success in
-                if success {
-                    expectation.fulfill()
-                } else {
-                    XCTFail("Downloading audio file for testing failed")
-                }
-            }
-            wait(for: [expectation], timeout: 300)
+            try await downloadTestData(forDataset: dataset)
         }
     }
 
@@ -474,38 +458,29 @@ class RegressionTests: XCTestCase {
         return regressionTestConfigMatrix
     }
 
-    private func downloadTestData(forDataset dataset: String, completion: @escaping (Bool) -> Void) {
-        Task {
-            do {
-                Logging.debug("Available models: \(modelsToTest)")
+    private func downloadTestData(forDataset dataset: String) async throws {
+        Logging.debug("Available models: \(modelsToTest)")
 
-                let testDatasetRepo = Hub.Repo(id: datasetRepo, type: .datasets)
-                let tempPath = FileManager.default.temporaryDirectory
-                let downloadBase = tempPath.appending(component: "huggingface")
-                let hubApi = HubApi(downloadBase: downloadBase)
-                let repoURL = try await hubApi.snapshot(from: testDatasetRepo, matching: ["\(dataset)/*"]) { progress in
-                    Logging.debug("Downloading \(dataset) dataset: \(progress)")
-                }.appending(path: dataset)
+        let testDatasetRepo = Hub.Repo(id: datasetRepo, type: .datasets)
+        let tempPath = FileManager.default.temporaryDirectory
+        let downloadBase = tempPath.appending(component: "huggingface")
+        let hubApi = HubApi(downloadBase: downloadBase)
+        let repoURL = try await hubApi.snapshot(from: testDatasetRepo, matching: ["\(dataset)/*"]) { progress in
+            Logging.debug("Downloading \(dataset) dataset: \(progress)")
+        }.appending(path: dataset)
 
-                let downloadedFiles = try FileManager.default.contentsOfDirectory(atPath: repoURL.path())
-                var audioFileURLs: [URL] = []
-                for file in downloadedFiles {
-                    if file.hasSuffix(".mp3") {
-                        audioFileURLs.append(repoURL.appending(component: file))
-                    } else if file.hasSuffix(".json") {
-                        self.metadataURL = repoURL.appending(component: file)
-                    }
-                }
-                self.audioFileURLs = audioFileURLs
-
-                Logging.debug("Downloaded \(audioFileURLs.count) audio files.")
-
-                completion(true)
-            } catch {
-                XCTFail("Async setup failed with error: \(error)")
-                completion(false)
+        let downloadedFiles = try FileManager.default.contentsOfDirectory(atPath: repoURL.path())
+        var audioFileURLs: [URL] = []
+        for file in downloadedFiles {
+            if file.hasSuffix(".mp3") {
+                audioFileURLs.append(repoURL.appending(component: file))
+            } else if file.hasSuffix(".json") {
+                self.metadataURL = repoURL.appending(component: file)
             }
         }
+        self.audioFileURLs = audioFileURLs
+
+        Logging.debug("Downloaded \(audioFileURLs.count) audio files.")
     }
 
     private func getTranscript(filename: String) -> String? {
