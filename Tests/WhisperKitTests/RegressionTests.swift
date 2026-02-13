@@ -241,7 +241,7 @@ class RegressionTests: XCTestCase {
             latencyStats: latencyStats
         )
 
-        let callback = { (result: TranscriptionProgress) -> Bool in
+        let callback: TranscriptionCallback = { result in
             Task {
                 await testState.update(with: result)
             }
@@ -631,7 +631,11 @@ class RegressionTests: XCTestCase {
         return Double(modelSize / (1024 * 1024)) // Convert to MB
     }
 
-    public func initWhisperKitTask(testConfig config: TestConfig, verbose: Bool, logLevel: Logging.LogLevel) -> Task<WhisperKit, Error> {
+    public func initWhisperKitTask(
+        testConfig config: TestConfig,
+        verbose: Bool,
+        logLevel: Logging.LogLevel
+    ) -> Task<WhisperKit, Error> {
         // Create the initialization task
         let initializationTask = Task { () -> WhisperKit in
             let whisperKit = try await WhisperKit(WhisperKitConfig(
