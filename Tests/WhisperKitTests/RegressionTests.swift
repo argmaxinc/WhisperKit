@@ -606,27 +606,23 @@ class RegressionTests: XCTestCase {
         return Double(modelSize / (1024 * 1024)) // Convert to MB
     }
 
-    public func initWhisperKitTask(
+    private static func initWhisperKit(
         testConfig config: TestConfig,
         verbose: Bool,
         logLevel: Logging.LogLevel
-    ) -> Task<WhisperKit, Error> {
-        // Create the initialization task
-        let initializationTask = Task { () -> WhisperKit in
-            let whisperKit = try await WhisperKit(WhisperKitConfig(
-                model: config.model,
-                modelRepo: config.modelRepo,
-                modelToken: Self.getModelToken(),
-                computeOptions: config.modelComputeOptions,
-                verbose: verbose,
-                logLevel: logLevel,
-                prewarm: true,
-                load: true
-            ))
-            try Task.checkCancellation()
-            return whisperKit
-        }
-        return initializationTask
+    ) async throws -> WhisperKit {
+        let whisperKit = try await WhisperKit(WhisperKitConfig(
+            model: config.model,
+            modelRepo: config.modelRepo,
+            modelToken: Self.getModelToken(),
+            computeOptions: config.modelComputeOptions,
+            verbose: verbose,
+            logLevel: logLevel,
+            prewarm: true,
+            load: true
+        ))
+        try Task.checkCancellation()
+        return whisperKit
     }
 
     func createWithMemoryCheck(
@@ -634,65 +630,88 @@ class RegressionTests: XCTestCase {
         verbose: Bool,
         logLevel: Logging.LogLevel
     ) async throws -> WhisperKit {
-        // Create the initialization task
-        let initializationTask = initWhisperKitTask(
-            testConfig: testConfig,
-            verbose: verbose,
-            logLevel: logLevel
-        )
-
-        // Start the memory monitoring task
-        let monitorTask = Task {
-            while true {
-                let remainingMemory = SystemMemoryCheckerAdvanced.getMemoryUsage().totalAvailableGB
-                Logging.debug("\(remainingMemory) GB of memory left")
-
-                if remainingMemory <= 0.1 { // Cancel with 100MB remaining
-                    Logging.debug("Cancelling due to oom")
-                    // Cancel the initialization task
-                    initializationTask.cancel()
-
-                    // Throw an error to stop the monitor task
-                    throw WhisperError.modelsUnavailable("Memory limit exceeded during initialization")
+        return try await withThrowingTaskGroup(of: InitializationResult.self) { group in
+            group.addTask {
+                do {
+                    let whisperKit = try await Self.initWhisperKit(
+                        testConfig: testConfig,
+                        verbose: verbose,
+                        logLevel: logLevel
+                    )
+                    return .completed(WhisperKitWrapper(whisperKit))
+                } catch {
+                    return .failed(error.localizedDescription)
                 }
-
-                try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
             }
-        }
 
-        // Create a timeout task
-        let timeoutTask = Task {
-            try await Task.sleep(nanoseconds: 300_000_000_000) // 5 minutes
-            initializationTask.cancel()
-            monitorTask.cancel()
-            Logging.debug("Cancelling due to timeout")
-            throw WhisperError.modelsUnavailable("Initialization timed out")
-        }
+            group.addTask {
+                while !Task.isCancelled {
+                    let remainingMemory = SystemMemoryCheckerAdvanced.getMemoryUsage().totalAvailableGB
+                    Logging.debug("\(remainingMemory) GB of memory left")
 
-        do {
-            // Use withTaskCancellationHandler to ensure proper cleanup
-            return try await withTaskCancellationHandler(
-                operation: {
-                    // Await the initialization task
-                    let whisperKit = try await initializationTask.value
+                    if remainingMemory <= 0.1 { // Cancel with 100MB remaining
+                        Logging.debug("Cancelling due to oom")
+                        return .outOfMemory
+                    }
 
-                    // Cancel the monitor tasks after successful initialization
-                    monitorTask.cancel()
-                    timeoutTask.cancel()
-                    return whisperKit
-                },
-                onCancel: {
-                    initializationTask.cancel()
-                    monitorTask.cancel()
-                    timeoutTask.cancel()
+                    do {
+                        try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                    } catch {
+                        return .cancelled
+                    }
                 }
-            )
-        } catch {
-            initializationTask.cancel()
-            monitorTask.cancel()
-            timeoutTask.cancel()
-            Logging.debug(error.localizedDescription)
-            throw error
+                return .cancelled
+            }
+
+            group.addTask {
+                do {
+                    try await Task.sleep(nanoseconds: 300_000_000_000) // 5 minutes
+                } catch {
+                    return .cancelled
+                }
+
+                Logging.debug("Cancelling due to timeout")
+                return .timedOut
+            }
+
+            if let signal = try await group.next() {
+                switch signal {
+                    case .completed(let wrapper):
+                        group.cancelAll()
+                        return wrapper.whisperKit
+                    case .failed(let errorDescription):
+                        group.cancelAll()
+                        throw WhisperError.modelsUnavailable(errorDescription)
+                    case .outOfMemory:
+                        group.cancelAll()
+                        throw WhisperError.modelsUnavailable("Memory limit exceeded during initialization")
+                    case .timedOut:
+                        group.cancelAll()
+                        throw WhisperError.modelsUnavailable("Initialization timed out")
+                    case .cancelled:
+                        group.cancelAll()
+                        throw WhisperError.modelsUnavailable("Initialization was cancelled")
+                }
+            }
+            throw WhisperError.modelsUnavailable("Initialization failed without a completion result")
         }
     }
+}
+
+// MARK: - Helper Types
+
+private final class WhisperKitWrapper: @unchecked Sendable {
+    let whisperKit: WhisperKit
+
+    init(_ whisperKit: WhisperKit) {
+        self.whisperKit = whisperKit
+    }
+}
+
+private enum InitializationResult: Sendable {
+    case completed(WhisperKitWrapper)
+    case failed(String)
+    case outOfMemory
+    case timedOut
+    case cancelled
 }
