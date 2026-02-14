@@ -14,6 +14,16 @@ enum TestError: Error {
     case missingDirectory(String)
 }
 
+/// Stores only a weak reference for teardown leak assertions.
+/// `XCTestCase.addTeardownBlock` uses a sending closure, so this wrapper must be Sendable.
+private final class LeakRefWrapper: @unchecked Sendable {
+    weak var object: AnyObject?
+
+    init(object: AnyObject) {
+        self.object = object
+    }
+}
+
 @discardableResult
 func XCTUnwrapAsync<T>(
     _ expression: @autoclosure () async throws -> T,
@@ -227,8 +237,9 @@ extension XCTestCase {
     }
 
     func trackForMemoryLeaks(on instance: AnyObject, file: StaticString = #filePath, line: UInt = #line) {
-        addTeardownBlock { [weak instance] in
-            XCTAssertNil(instance, "Detected potential memory leak", file: file, line: line)
+        let wrapper = LeakRefWrapper(object: instance)
+        addTeardownBlock { [wrapper, file, line] in
+            XCTAssertNil(wrapper.object, "Detected potential memory leak", file: file, line: line)
         }
     }
 
