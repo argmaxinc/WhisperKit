@@ -251,7 +251,12 @@ private extension FunctionalTests {
 
             let waitResult = XCTWaiter.wait(for: [done], timeout: timeout)
             guard waitResult == .completed else {
+                // Cancel the in-flight task and then wait briefly for it to finish
+                // so that work from this iteration does not overlap with the next one.
                 task.cancel()
+
+                // Give the cancelled task a short grace period to clean up.
+                _ = XCTWaiter.wait(for: [done], timeout: 5)
                 XCTFail("Timed out waiting for measured async operation (\(waitResult))")
                 return
             }
