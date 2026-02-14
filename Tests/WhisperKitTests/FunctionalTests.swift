@@ -57,7 +57,7 @@ final class FunctionalTests: XCTestCase {
         measureAsync(
             metrics: metrics,
             options: measureOptions
-        ) {
+        ) { [transcriptionRunner, audioFilePath] in
             try await transcriptionRunner.transcribe(audioPath: audioFilePath)
         } assertion: { result in
             XCTAssertGreaterThan(result.text.count, 0)
