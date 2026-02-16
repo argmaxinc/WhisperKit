@@ -228,17 +228,11 @@ open class AudioProcessor: NSObject, AudioProcessing, @unchecked Sendable {
         }
     }
     public var audioSamples: ContiguousArray<Float> {
-        get {
-            stateLock.withLock {
-                audioSamplesStorage
-            }
-        }
-        set {
-            stateLock.withLock {
-                audioSamplesStorage = newValue
-            }
+        stateLock.withLock {
+            audioSamplesStorage
         }
     }
+
     public var audioEnergy: [(rel: Float, avg: Float, max: Float, min: Float)] {
         get {
             stateLock.withLock {
@@ -264,9 +258,10 @@ open class AudioProcessor: NSObject, AudioProcessing, @unchecked Sendable {
         }
     }
     public var relativeEnergy: [Float] {
-        stateLock.withLock {
-            audioEnergyStorage.map { $0.rel }
+        let energySnapshot = stateLock.withLock {
+            audioEnergyStorage
         }
+        return energySnapshot.map { $0.rel }
     }
 
     public private(set) var isInputSuppressed: Bool {
@@ -1006,9 +1001,10 @@ public extension AudioProcessor {
         stateLock.withLock {
             audioSamplesStorage.append(contentsOf: buffer)
 
-            // Find the lowest average energy of the last 20 buffers ~2 seconds
+            // Find the lowest average energy of the last 20 buffers ~2 seconds.
             let minAvgEnergy = audioEnergyStorage.suffix(20).reduce(Float.infinity) { min($0, $1.avg) }
-            let relativeEnergy = Self.calculateRelativeEnergy(of: buffer, relativeTo: minAvgEnergy)
+            let referenceEnergy = minAvgEnergy.isFinite ? minAvgEnergy : nil
+            let relativeEnergy = Self.calculateRelativeEnergy(of: buffer, relativeTo: referenceEnergy)
 
             // Update energy for buffers with valid data
             newEnergy = (relativeEnergy, signalEnergy.avg, signalEnergy.max, signalEnergy.min)
@@ -1171,9 +1167,15 @@ public extension AudioProcessor {
     func resumeRecordingLive(inputDeviceID: DeviceID? = nil, callback: (([Float]) -> Void)? = nil) throws {
         try? setupAudioSessionForDevice()
 
-        if stateLock.withLock({ inputDeviceID == lastInputDeviceStorage }) {
-            let engine = stateLock.withLock { audioEngineStorage }
-            try engine?.start()
+        let engine = stateLock.withLock { () -> AVAudioEngine? in
+            guard inputDeviceID == lastInputDeviceStorage else {
+                return nil
+            }
+            return audioEngineStorage
+        }
+
+        if let engine {
+            try engine.start()
         } else {
             let engine = try setupEngine(inputDeviceID: inputDeviceID)
             stateLock.withLock {
