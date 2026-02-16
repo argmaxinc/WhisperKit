@@ -100,13 +100,19 @@ public extension MLMultiArray {
     ///  - index: The index of the element
     ///  - strides: The precomputed strides of the multi-array, if not provided, it will be computed. It's a performance optimization to avoid recomputing the strides every time when accessing the multi-array with multiple indexes.
     @inline(__always)
-    func linearOffset(for index: [NSNumber], strides strideInts: [Int]? = nil) -> Int {
+    func linearOffset(for index: [Int], strides strideInts: [Int]? = nil) -> Int {
         var linearOffset = 0
         let strideInts = strideInts ?? strides.map { $0.intValue }
         for (dimension, stride) in zip(index, strideInts) {
-            linearOffset += dimension.intValue * stride
+            linearOffset += dimension * stride
         }
         return linearOffset
+    }
+
+    @available(*, deprecated, message: "Use linearOffset(for: [Int], strides:) instead.")
+    @inline(__always)
+    func linearOffset(for index: [NSNumber], strides strideInts: [Int]? = nil) -> Int {
+        linearOffset(for: index.map(\.intValue), strides: strideInts)
     }
 
     func fillLastDimension(indexes: Range<Int>, with value: FloatType) {
@@ -118,13 +124,18 @@ public extension MLMultiArray {
         }
     }
 
-    func fill<Value>(indexes: [[NSNumber]], with value: Value) {
+    func fill<Value>(indexes: [[Int]], with value: Value) {
         let pointer = UnsafeMutablePointer<Value>(OpaquePointer(dataPointer))
         let strideInts = strides.map { $0.intValue }
         for index in indexes {
             let linearOffset = linearOffset(for: index, strides: strideInts)
             pointer[linearOffset] = value
         }
+    }
+
+    @available(*, deprecated, message: "Use fill(indexes: [[Int]], with:) instead.")
+    func fill<Value>(indexes: [[NSNumber]], with value: Value) {
+        fill(indexes: indexes.map { $0.map(\.intValue) }, with: value)
     }
 
     private class func pixelBuffer(for shape: [NSNumber]) -> CVPixelBuffer? {
@@ -303,4 +314,3 @@ public extension WhisperKit {
         return ModelUtilities.formatModelFiles(modelFiles)
     }
 }
-

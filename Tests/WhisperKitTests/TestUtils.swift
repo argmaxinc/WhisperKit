@@ -114,7 +114,7 @@ extension MLMultiArray {
         let logits = try MLMultiArray(shape: [1, 1, arr.count] as [NSNumber], dataType: .float16)
         let ptr = UnsafeMutablePointer<FloatType>(OpaquePointer(logits.dataPointer))
         for (index, value) in arr.enumerated() {
-            let linearOffset = logits.linearOffset(for: [0, 0, index as NSNumber])
+            let linearOffset = logits.linearOffset(for: [0, 0, index])
             ptr[linearOffset] = value
         }
         return logits
@@ -123,11 +123,11 @@ extension MLMultiArray {
     /// Get the data from `MLMultiArray` for given dimension
     func data(for dimension: Int) -> [FloatType] {
         let count = shape[dimension].intValue
-        let indexes = stride(from: 0, to: count, by: 1).map { [0, 0, $0 as NSNumber] }
+        let indexes = stride(from: 0, to: count, by: 1).map { [0, 0, $0] }
         var result = [FloatType]()
         let ptr = UnsafeMutablePointer<FloatType>(OpaquePointer(dataPointer))
         for index in indexes {
-            let linearOffset = linearOffset(for: index as [NSNumber])
+            let linearOffset = linearOffset(for: index)
             result.append(ptr[linearOffset])
         }
         return result
