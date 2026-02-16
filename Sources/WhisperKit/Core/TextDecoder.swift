@@ -680,7 +680,10 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         // MARK: Non-inference
 
         // Update predicted token as current
-        let logits = languageLogitsFilter.filterLogits(decoderOutput.logits!, withTokens: currentTokens)
+        guard let decoderLogits = decoderOutput.logits else {
+            throw WhisperError.decodingLogitsFailed("Language detection failed: decoder output logits are nil")
+        }
+        let logits = languageLogitsFilter.filterLogits(decoderLogits, withTokens: currentTokens)
 
         // MARK: Sampling
 
@@ -744,7 +747,10 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         let prefilledIndex = decoderInputs.cacheLength[0].intValue
         let initialPromptIndex = decoderInputs.initialPrompt.count
         var currentTokens: [Int] = decoderInputs.initialPrompt
-        var nextToken: Int = decoderInputs.initialPrompt.last!
+        guard let lastPromptToken = decoderInputs.initialPrompt.last else {
+            throw WhisperError.decodingFailed("Initial prompt is empty, cannot begin decoding")
+        }
+        var nextToken: Int = lastPromptToken
         var logProbs: [Float] = Array(repeating: 0, count: currentTokens.count)
 
         // Logits filters
@@ -826,7 +832,10 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             let nonInferenceStartTime = Date()
 
             // Update predicted token as current
-            var logits = decoderOutput.logits!
+            guard let decoderOutputLogits = decoderOutput.logits else {
+                throw WhisperError.decodingLogitsFailed("Decoder output logits are nil during token decoding")
+            }
+            var logits = decoderOutputLogits
             for filter in logitsFilters {
                 logits = filter.filterLogits(logits, withTokens: currentTokens)
             }
