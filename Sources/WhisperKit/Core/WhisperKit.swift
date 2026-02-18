@@ -698,9 +698,9 @@ open class WhisperKit {
 
     /// Transcribes multiple audio arrays asynchronously and returns the results as an array of `Result` objects.
     ///
-    /// This method processes the provided audio arrays by dividing them into batches based on the concurrent worker count
-    /// specified in `decodeOptions`, if any. The transcription is performed concurrently on these chunks, and the results
-    /// are aggregated and returned in the original order.
+    /// This method processes the provided audio arrays using a worker pool based on the concurrent worker count
+    /// specified in `decodeOptions`, if any. The transcription is performed concurrently and the results are aggregated in
+    /// the original order.
     ///
     /// - Parameters:
     ///   - audioArrays: An array of arrays, each containing audio sample data to be transcribed.
@@ -737,7 +737,29 @@ open class WhisperKit {
         seekOffsets: [Int]? = nil,
         callback: TranscriptionCallback? = nil
     ) async -> [Result<[TranscriptionResult], Swift.Error>] {
-        var result = [Result<[TranscriptionResult], Swift.Error>]()
+        return await transcribeWithOptions(
+            audioArrays: audioArrays,
+            decodeOptionsArray: decodeOptionsArray,
+            seekOffsets: seekOffsets,
+            callback: callback,
+            parentProgress: nil
+        )
+    }
+    
+    private func transcribeWithOptions(
+        audioArrays: [[Float]],
+        decodeOptionsArray: [DecodingOptions?],
+        seekOffsets: [Int]?,
+        callback: TranscriptionCallback?,
+        parentProgress: Progress?
+    ) async -> [Result<[TranscriptionResult], Swift.Error>] {
+        if modelState != .loaded {
+            do {
+                try await loadModels()
+            } catch {
+                return [.failure(error)]
+            }
+        }
 
         guard audioArrays.count == decodeOptionsArray.count else {
             return [.failure(WhisperError.transcriptionFailed("The number of audio arrays and decoding options must be balanced."))]
@@ -748,81 +770,179 @@ open class WhisperKit {
                 return [.failure(WhisperError.transcriptionFailed("The number of audio arrays and seek offset indexes must be balanced."))]
             }
         }
+        
+        guard !audioArrays.isEmpty else {
+            return []
+        }
 
-        // Determine the number of concurrent workers from decodeOptions based on the maximum value or default to 0
+        // Determine the number of concurrent workers from decodeOptions based on the maximum value or default to 0.
         let concurrentWorkerCount = decodeOptionsArray.map { $0?.concurrentWorkerCount ?? 0 }.max() ?? 0
+        let requestedWorkerCount: Int
+        if concurrentWorkerCount == 0 {
+            // Auto mode: bound isolated workers to CPU count to avoid loading one model pipeline per input.
+            let autoWorkerCount = max(1, ProcessInfo.processInfo.activeProcessorCount)
+            requestedWorkerCount = min(audioArrays.count, autoWorkerCount)
+        } else {
+            requestedWorkerCount = min(concurrentWorkerCount, audioArrays.count)
+        }
+        let batchProgress = parentProgress ?? Progress(totalUnitCount: Int64(audioArrays.count))
+        batchProgress.totalUnitCount = max(batchProgress.totalUnitCount, Int64(audioArrays.count))
+        defer {
+            batchProgress.completedUnitCount = batchProgress.totalUnitCount
+        }
+        
+        if requestedWorkerCount > 1 {
+            let workers = createSharedTranscriptionWorkers(count: requestedWorkerCount)
+            guard !workers.isEmpty else {
+                return await transcribeSequentially(
+                    audioArrays: audioArrays,
+                    decodeOptionsArray: decodeOptionsArray,
+                    seekOffsets: seekOffsets,
+                    callback: callback,
+                    batchProgress: batchProgress
+                )
+            }
 
-        // Chunk the audio arrays based on the number of concurrent workers
-        // If concurrentWorkerCount is 0, all audio arrays are processed in one batch
-        let batchedAudioArrays = concurrentWorkerCount == 0 ? [audioArrays] : audioArrays.batched(into: concurrentWorkerCount)
+            let defaultSegmentDiscoveryCallback = self.segmentDiscoveryCallback
 
-        for (batchIndex, audioArrayBatch) in batchedAudioArrays.enumerated() {
-            // Use withTaskGroup to manage concurrent transcription tasks
-            let partialResult = await withTaskGroup(of: [(index: Int, result: Result<[TranscriptionResult], Swift.Error>)].self) { taskGroup -> [Result<[TranscriptionResult], Swift.Error>] in
-                for (audioIndex, audioArray) in audioArrayBatch.enumerated() {
-                    let batchSize = audioArrayBatch.count
-
+            let indexedResults = await withTaskGroup(of: (index: Int, result: Result<[TranscriptionResult], Swift.Error>).self) { taskGroup in
+                for (audioIndex, audioArray) in audioArrays.enumerated() {
+                    let childProgress = Progress(totalUnitCount: 1)
+                    batchProgress.addChild(childProgress, withPendingUnitCount: 1)
+                    
                     // Setup callback to keep track of batches and chunks
-                    let batchedAudioCallback: TranscriptionCallback = { progress in
-                        var batchedProgress = progress
-                        batchedProgress.windowId = audioIndex + batchIndex * batchSize
-                        return callback?(batchedProgress)
+                    let indexedAudioCallback: TranscriptionCallback = { progress in
+                        var indexedProgress = progress
+                        indexedProgress.windowId = audioIndex
+                        return callback?(indexedProgress)
                     }
 
                     // Setup segment callback to track chunk seek positions for segment discovery
-                    let batchedSegmentCallback: SegmentDiscoveryCallback? = if let seekOffsets {
+                    let indexedSegmentCallback: SegmentDiscoveryCallback? = if let seekOffsets {
                         { [segmentDiscoveryCallback] segments in
-                            let windowId = audioIndex + batchIndex * batchSize
-                            let seekOffset = seekOffsets[windowId]
+                            let seekOffset = seekOffsets[audioIndex]
                             var adjustedSegments = segments
                             for i in 0..<adjustedSegments.count {
-                                adjustedSegments[i].seek += Int(seekOffset)
+                                adjustedSegments[i].seek += seekOffset
                             }
                             segmentDiscoveryCallback?(adjustedSegments)
                         }
                     } else {
-                        self.segmentDiscoveryCallback
+                        defaultSegmentDiscoveryCallback
                     }
 
-                    // Setup decoding options for the current audio array
-                    let batchedDecodeOptions = decodeOptionsArray[audioIndex]
-
-                    // Add a new task to the task group for each audio array
+                    let worker = workers[audioIndex % workers.count]
+                    let decodeOptions = decodeOptionsArray[audioIndex]
+                    
                     taskGroup.addTask {
-                        do {
-                            let transcribeResult: [TranscriptionResult] = try await self.transcribe(
-                                audioArray: audioArray,
-                                decodeOptions: batchedDecodeOptions,
-                                callback: batchedAudioCallback,
-                                segmentCallback: batchedSegmentCallback
-                            )
-                            // Return the successful transcription result with its index
-                            return [(index: audioIndex, result: .success(transcribeResult))]
-                        } catch {
-                            // Return the failure result with its index in case of an error
-                            return [(index: audioIndex, result: .failure(error))]
-                        }
+                        await worker.transcribe(
+                            index: audioIndex,
+                            audioArray: audioArray,
+                            decodeOptions: decodeOptions,
+                            callback: indexedAudioCallback,
+                            segmentCallback: indexedSegmentCallback,
+                            progress: childProgress
+                        )
                     }
                 }
 
-                // Collect results from all completed tasks in the task group
                 var batchResult = [(index: Int, result: Result<[TranscriptionResult], Swift.Error>)]()
+                batchResult.reserveCapacity(audioArrays.count)
                 for await result in taskGroup {
-                    batchResult.append(contentsOf: result)
+                    batchResult.append(result)
                 }
-
-                // Sort the results by index to maintain the original order (they may not be in order due to concurrency)
-                batchResult.sort(by: { $0.index < $1.index })
-
-                // Map the sorted batch results to a simple array of results
-                return batchResult.map { $0.result }
+                return batchResult
             }
 
-            // Append the results of each batch to the final result array
-            result.append(contentsOf: partialResult)
+            return indexedResults
+                .sorted(by: { $0.index < $1.index })
+                .map { $0.result }
         }
-
+        
+        return await transcribeSequentially(
+            audioArrays: audioArrays,
+            decodeOptionsArray: decodeOptionsArray,
+            seekOffsets: seekOffsets,
+            callback: callback,
+            batchProgress: batchProgress
+        )
+    }
+    
+    private func transcribeSequentially(
+        audioArrays: [[Float]],
+        decodeOptionsArray: [DecodingOptions?],
+        seekOffsets: [Int]?,
+        callback: TranscriptionCallback?,
+        batchProgress: Progress
+    ) async -> [Result<[TranscriptionResult], Swift.Error>] {
+        let defaultSegmentDiscoveryCallback = self.segmentDiscoveryCallback
+        var result = [Result<[TranscriptionResult], Swift.Error>]()
+        result.reserveCapacity(audioArrays.count)
+        
+        for (audioIndex, audioArray) in audioArrays.enumerated() {
+            let childProgress = Progress(totalUnitCount: 1)
+            batchProgress.addChild(childProgress, withPendingUnitCount: 1)
+            
+            let indexedAudioCallback: TranscriptionCallback = { progress in
+                var indexedProgress = progress
+                indexedProgress.windowId = audioIndex
+                return callback?(indexedProgress)
+            }
+            
+            let indexedSegmentCallback: SegmentDiscoveryCallback? = if let seekOffsets {
+                { [segmentDiscoveryCallback] segments in
+                    let seekOffset = seekOffsets[audioIndex]
+                    var adjustedSegments = segments
+                    for i in 0..<adjustedSegments.count {
+                        adjustedSegments[i].seek += seekOffset
+                    }
+                    segmentDiscoveryCallback?(adjustedSegments)
+                }
+            } else {
+                defaultSegmentDiscoveryCallback
+            }
+            
+            do {
+                var decodeOptions = decodeOptionsArray[audioIndex]
+                decodeOptions?.concurrentWorkerCount = 1
+                
+                let transcribeResult: [TranscriptionResult] = try await transcribe(
+                    audioArray: audioArray,
+                    decodeOptions: decodeOptions,
+                    callback: indexedAudioCallback,
+                    segmentCallback: indexedSegmentCallback,
+                    rootProgress: childProgress
+                )
+                result.append(.success(transcribeResult))
+            } catch {
+                childProgress.completedUnitCount = childProgress.totalUnitCount
+                result.append(.failure(error))
+            }
+        }
+        
         return result
+    }
+    
+    private func createSharedTranscriptionWorkers(count: Int) -> [WhisperKitTranscriptionWorker] {
+        guard count > 0 else {
+            return []
+        }
+        guard let tokenizer else {
+            return []
+        }
+        let dependencies = SharedTranscribeTaskDependencies(
+            currentTimings: currentTimings,
+            audioProcessor: audioProcessor,
+            audioEncoder: audioEncoder,
+            featureExtractor: featureExtractor,
+            segmentSeeker: segmentSeeker,
+            textDecoder: textDecoder,
+            tokenizer: tokenizer,
+            voiceActivityDetector: voiceActivityDetector
+        )
+        return (0..<count).map { _ in
+            WhisperKitTranscriptionWorker(dependencies: dependencies)
+        }
     }
 
     // MARK: - Transcribe single audio file
@@ -907,6 +1027,22 @@ open class WhisperKit {
         callback: TranscriptionCallback? = nil,
         segmentCallback: SegmentDiscoveryCallback? = nil
     ) async throws -> [TranscriptionResult] {
+        return try await transcribe(
+            audioArray: audioArray,
+            decodeOptions: decodeOptions,
+            callback: callback,
+            segmentCallback: segmentCallback,
+            rootProgress: progress
+        )
+    }
+    
+    fileprivate func transcribe(
+        audioArray: [Float],
+        decodeOptions: DecodingOptions?,
+        callback: TranscriptionCallback?,
+        segmentCallback: SegmentDiscoveryCallback?,
+        rootProgress: Progress
+    ) async throws -> [TranscriptionResult] {
         var transcribeResults = [TranscriptionResult]()
 
         // Determine if the audio array requires chunking
@@ -924,7 +1060,7 @@ open class WhisperKit {
 
                 Logging.debug("Found \(audioChunks.count) VAD chunks")
 
-                progress.totalUnitCount = max(progress.totalUnitCount, Int64(audioChunks.count))
+                rootProgress.totalUnitCount = max(rootProgress.totalUnitCount, Int64(audioChunks.count))
 
                 // Reset the seek times since we've already chunked the audio
                 var chunkedOptions = decodeOptions
@@ -936,7 +1072,8 @@ open class WhisperKit {
                     audioArrays: audioChunks.map { $0.audioSamples },
                     decodeOptionsArray: chunkedDecodeOptions,
                     seekOffsets: audioChunks.map { $0.seekOffsetIndex },
-                    callback: callback
+                    callback: callback,
+                    parentProgress: rootProgress
                 )
 
                 // Update the seek offsets based on the audio chunks
@@ -952,7 +1089,9 @@ open class WhisperKit {
                     audioArray: audioArray,
                     decodeOptions: decodeOptions,
                     callback: callback,
-                    segmentCallback: segmentCallback ?? self.segmentDiscoveryCallback
+                    segmentCallback: segmentCallback ?? self.segmentDiscoveryCallback,
+                    rootProgress: rootProgress,
+                    resetSharedProgressOnCompletion: rootProgress === progress
                 )
         }
 
@@ -999,6 +1138,24 @@ open class WhisperKit {
         callback: TranscriptionCallback? = nil,
         segmentCallback: SegmentDiscoveryCallback? = nil
     ) async throws -> [TranscriptionResult] {
+        return try await runTranscribeTask(
+            audioArray: audioArray,
+            decodeOptions: decodeOptions,
+            callback: callback,
+            segmentCallback: segmentCallback,
+            rootProgress: progress,
+            resetSharedProgressOnCompletion: true
+        )
+    }
+    
+    private func runTranscribeTask(
+        audioArray: [Float],
+        decodeOptions: DecodingOptions? = nil,
+        callback: TranscriptionCallback? = nil,
+        segmentCallback: SegmentDiscoveryCallback? = nil,
+        rootProgress: Progress,
+        resetSharedProgressOnCompletion: Bool
+    ) async throws -> [TranscriptionResult] {
         if modelState != .loaded {
             try await loadModels()
         }
@@ -1013,9 +1170,8 @@ open class WhisperKit {
 
             let childProgress = Progress()
             // Total can be set elsewhere, here ensures it is at least 1
-            progress.totalUnitCount = max(1, progress.totalUnitCount)
-            progress.addChild(childProgress, withPendingUnitCount: 1)
-
+            rootProgress.totalUnitCount = max(1, rootProgress.totalUnitCount)
+            rootProgress.addChild(childProgress, withPendingUnitCount: 1)
             let transcribeTask = setupTranscribeTask(
                 currentTimings: currentTimings,
                 progress: childProgress,
@@ -1039,7 +1195,7 @@ open class WhisperKit {
                 transcribeTaskResult.logTimings()
             }
 
-            if progress.isFinished {
+            if resetSharedProgressOnCompletion, progress.isFinished {
                 // Reset progress if it is completed
                 progress = Progress()
             }
@@ -1047,11 +1203,189 @@ open class WhisperKit {
             return [transcribeTaskResult]
         } catch {
             // Handle cancellation
-            if error is CancellationError {
+            if resetSharedProgressOnCompletion, error is CancellationError {
                 // Reset progress when cancelled
                 progress = Progress()
             }
             throw error
         }
+    }
+}
+
+private actor WhisperKitTranscriptionWorker {
+    private let dependencies: SharedTranscribeTaskDependencies
+    private var transcribeTask: TranscribeTask?
+    
+    init(dependencies: SharedTranscribeTaskDependencies) {
+        self.dependencies = dependencies
+    }
+    
+    func transcribe(
+        index: Int,
+        audioArray: [Float],
+        decodeOptions: DecodingOptions?,
+        callback: TranscriptionCallback?,
+        segmentCallback: SegmentDiscoveryCallback?,
+        progress: Progress
+    ) async -> (index: Int, result: Result<[TranscriptionResult], Swift.Error>) {
+        defer {
+            progress.totalUnitCount = max(1, progress.totalUnitCount)
+            progress.completedUnitCount = progress.totalUnitCount
+        }
+        
+        do {
+            let transcribeResult = try await transcribe(
+                audioArray: audioArray,
+                decodeOptions: decodeOptions,
+                callback: callback,
+                segmentCallback: segmentCallback,
+                progress: progress
+            )
+            return (index: index, result: .success(transcribeResult))
+        } catch {
+            return (index: index, result: .failure(error))
+        }
+    }
+    
+    private func transcribe(
+        audioArray: [Float],
+        decodeOptions: DecodingOptions?,
+        callback: TranscriptionCallback?,
+        segmentCallback: SegmentDiscoveryCallback?,
+        progress: Progress
+    ) async throws -> [TranscriptionResult] {
+        let windowSamples = dependencies.featureExtractor.windowSamples ?? Constants.defaultWindowSamples
+        let isChunkable = audioArray.count > windowSamples
+        
+        switch (isChunkable, decodeOptions?.chunkingStrategy) {
+            case (true, .vad):
+                let vad = dependencies.voiceActivityDetector ?? EnergyVAD()
+                let chunker = VADAudioChunker(vad: vad)
+                let audioChunks: [AudioChunk] = try await chunker.chunkAll(
+                    audioArray: audioArray,
+                    maxChunkLength: windowSamples,
+                    decodeOptions: decodeOptions
+                )
+                
+                progress.totalUnitCount = max(progress.totalUnitCount, Int64(audioChunks.count))
+                
+                var chunkedOptions = decodeOptions
+                chunkedOptions?.clipTimestamps = []
+                
+                var chunkedResults = [Result<[TranscriptionResult], Swift.Error>]()
+                chunkedResults.reserveCapacity(audioChunks.count)
+                
+                for audioChunk in audioChunks {
+                    let chunkProgress = Progress(totalUnitCount: 1)
+                    progress.addChild(chunkProgress, withPendingUnitCount: 1)
+                    
+                    let chunkSegmentCallback: SegmentDiscoveryCallback? = if let segmentCallback {
+                        { segments in
+                            var adjustedSegments = segments
+                            for i in 0..<adjustedSegments.count {
+                                adjustedSegments[i].seek += audioChunk.seekOffsetIndex
+                            }
+                            segmentCallback(adjustedSegments)
+                        }
+                    } else {
+                        nil
+                    }
+                    
+                    do {
+                        let chunkResult = try await runTranscribeTask(
+                            audioArray: audioChunk.audioSamples,
+                            decodeOptions: chunkedOptions,
+                            callback: callback,
+                            segmentCallback: chunkSegmentCallback,
+                            progress: chunkProgress
+                        )
+                        chunkedResults.append(.success(chunkResult))
+                    } catch {
+                        chunkProgress.completedUnitCount = chunkProgress.totalUnitCount
+                        chunkedResults.append(.failure(error))
+                    }
+                }
+                
+                return chunker.updateSeekOffsetsForResults(
+                    chunkedResults: chunkedResults,
+                    audioChunks: audioChunks
+                )
+            default:
+                return try await runTranscribeTask(
+                    audioArray: audioArray,
+                    decodeOptions: decodeOptions,
+                    callback: callback,
+                    segmentCallback: segmentCallback,
+                    progress: progress
+                )
+        }
+    }
+    
+    private func runTranscribeTask(
+        audioArray: [Float],
+        decodeOptions: DecodingOptions?,
+        callback: TranscriptionCallback?,
+        segmentCallback: SegmentDiscoveryCallback?,
+        progress: Progress
+    ) async throws -> [TranscriptionResult] {
+        let workerTask = dependencies.makeTranscribeTask(progress: progress)
+        transcribeTask = workerTask
+        workerTask.segmentDiscoveryCallback = segmentCallback
+        
+        let transcribeTaskResult = try await workerTask.run(
+            audioArray: audioArray,
+            decodeOptions: decodeOptions,
+            callback: callback
+        )
+        
+        if let decodeOptions, decodeOptions.verbose {
+            transcribeTaskResult.logTimings()
+        }
+        
+        return [transcribeTaskResult]
+    }
+}
+
+private final class SharedTranscribeTaskDependencies: @unchecked Sendable {
+    let currentTimings: TranscriptionTimings
+    let audioProcessor: any AudioProcessing
+    let audioEncoder: any AudioEncoding
+    let featureExtractor: any FeatureExtracting
+    let segmentSeeker: any SegmentSeeking
+    let textDecoder: any TextDecoding
+    let tokenizer: any WhisperTokenizer
+    let voiceActivityDetector: VoiceActivityDetector?
+    
+    init(
+        currentTimings: TranscriptionTimings,
+        audioProcessor: any AudioProcessing,
+        audioEncoder: any AudioEncoding,
+        featureExtractor: any FeatureExtracting,
+        segmentSeeker: any SegmentSeeking,
+        textDecoder: any TextDecoding,
+        tokenizer: any WhisperTokenizer,
+        voiceActivityDetector: VoiceActivityDetector?
+    ) {
+        self.currentTimings = currentTimings
+        self.audioProcessor = audioProcessor
+        self.audioEncoder = audioEncoder
+        self.featureExtractor = featureExtractor
+        self.segmentSeeker = segmentSeeker
+        self.textDecoder = textDecoder
+        self.tokenizer = tokenizer
+        self.voiceActivityDetector = voiceActivityDetector
+    }
+    
+    func makeTranscribeTask(progress: Progress) -> TranscribeTask {
+        return TranscribeTask(
+            currentTimings: currentTimings,
+            progress: progress,
+            audioProcessor: audioProcessor,
+            audioEncoder: audioEncoder,
+            featureExtractor: featureExtractor,
+            segmentSeeker: segmentSeeker,
+            textDecoder: textDecoder,
+            tokenizer: tokenizer
+        )
     }
 }
