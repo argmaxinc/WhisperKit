@@ -5,7 +5,6 @@ import Foundation
 
 actor TranscriptionWorker {
     private let dependencies: TranscribeTaskDependencies
-    private var transcribeTask: TranscribeTask?
 
     init(dependencies: TranscribeTaskDependencies) {
         self.dependencies = dependencies
@@ -120,7 +119,6 @@ actor TranscriptionWorker {
         progress: Progress
     ) async throws -> [TranscriptionResult] {
         let workerTask = dependencies.makeTranscribeTask(progress: progress)
-        transcribeTask = workerTask
         workerTask.segmentDiscoveryCallback = segmentCallback
 
         let transcribeTaskResult = try await workerTask.run(

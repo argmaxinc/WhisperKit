@@ -795,94 +795,67 @@ open class WhisperKit {
         }
         let batchProgress = parentProgress ?? Progress(totalUnitCount: Int64(audioArrays.count))
         batchProgress.totalUnitCount = max(batchProgress.totalUnitCount, Int64(audioArrays.count))
-        defer {
-            batchProgress.completedUnitCount = batchProgress.totalUnitCount
-        }
         
         if requestedWorkerCount > 1 {
             let workers = createSharedTranscriptionWorkers(count: requestedWorkerCount)
-            guard !workers.isEmpty else {
-                return await transcribeSequentially(
-                    audioArrays: audioArrays,
-                    decodeOptionsArray: decodeOptionsArray,
-                    seekOffsets: seekOffsets,
-                    callback: callback,
-                    batchProgress: batchProgress
-                )
-            }
+            if !workers.isEmpty {
+                let defaultSegmentDiscoveryCallback = self.segmentDiscoveryCallback
 
-            let defaultSegmentDiscoveryCallback = self.segmentDiscoveryCallback
-
-            let indexedResults = await withTaskGroup(of: (index: Int, result: Result<[TranscriptionResult], Swift.Error>).self) { taskGroup in
-                for (audioIndex, audioArray) in audioArrays.enumerated() {
-                    let childProgress = Progress(totalUnitCount: 1)
-                    batchProgress.addChild(childProgress, withPendingUnitCount: 1)
-                    
-                    // Setup callback to keep track of batches and chunks
-                    let indexedAudioCallback: TranscriptionCallback = { progress in
-                        var indexedProgress = progress
-                        indexedProgress.windowId = audioIndex
-                        return callback?(indexedProgress)
-                    }
-
-                    // Setup segment callback to track chunk seek positions for segment discovery
-                    let indexedSegmentCallback: SegmentDiscoveryCallback? = if let seekOffsets {
-                        { [segmentDiscoveryCallback] segments in
-                            let seekOffset = seekOffsets[audioIndex]
-                            var adjustedSegments = segments
-                            for i in 0..<adjustedSegments.count {
-                                adjustedSegments[i].seek += seekOffset
-                            }
-                            segmentDiscoveryCallback?(adjustedSegments)
+                let indexedResults = await withTaskGroup(of: (index: Int, result: Result<[TranscriptionResult], Swift.Error>).self) { taskGroup in
+                    for (audioIndex, audioArray) in audioArrays.enumerated() {
+                        let childProgress = Progress(totalUnitCount: 1)
+                        batchProgress.addChild(childProgress, withPendingUnitCount: 1)
+                        
+                        // Setup callback to keep track of batches and chunks
+                        let indexedAudioCallback: TranscriptionCallback = { progress in
+                            var indexedProgress = progress
+                            indexedProgress.windowId = audioIndex
+                            return callback?(indexedProgress)
                         }
-                    } else {
-                        defaultSegmentDiscoveryCallback
+
+                        // Setup segment callback to track chunk seek positions for segment discovery
+                        let indexedSegmentCallback: SegmentDiscoveryCallback? = if let seekOffsets {
+                            { [segmentDiscoveryCallback] segments in
+                                let seekOffset = seekOffsets[audioIndex]
+                                var adjustedSegments = segments
+                                for i in 0..<adjustedSegments.count {
+                                    adjustedSegments[i].seek += seekOffset
+                                }
+                                segmentDiscoveryCallback?(adjustedSegments)
+                            }
+                        } else {
+                            defaultSegmentDiscoveryCallback
+                        }
+
+                        let worker = workers[audioIndex % workers.count]
+                        let decodeOptions = decodeOptionsArray[audioIndex]
+                        
+                        taskGroup.addTask {
+                            await worker.transcribe(
+                                index: audioIndex,
+                                audioArray: audioArray,
+                                decodeOptions: decodeOptions,
+                                callback: indexedAudioCallback,
+                                segmentCallback: indexedSegmentCallback,
+                                progress: childProgress
+                            )
+                        }
                     }
 
-                    let worker = workers[audioIndex % workers.count]
-                    let decodeOptions = decodeOptionsArray[audioIndex]
-                    
-                    taskGroup.addTask {
-                        await worker.transcribe(
-                            index: audioIndex,
-                            audioArray: audioArray,
-                            decodeOptions: decodeOptions,
-                            callback: indexedAudioCallback,
-                            segmentCallback: indexedSegmentCallback,
-                            progress: childProgress
-                        )
+                    var batchResult = [(index: Int, result: Result<[TranscriptionResult], Swift.Error>)]()
+                    batchResult.reserveCapacity(audioArrays.count)
+                    for await result in taskGroup {
+                        batchResult.append(result)
                     }
+                    return batchResult
                 }
 
-                var batchResult = [(index: Int, result: Result<[TranscriptionResult], Swift.Error>)]()
-                batchResult.reserveCapacity(audioArrays.count)
-                for await result in taskGroup {
-                    batchResult.append(result)
-                }
-                return batchResult
+                return indexedResults
+                    .sorted(by: { $0.index < $1.index })
+                    .map { $0.result }
             }
-
-            return indexedResults
-                .sorted(by: { $0.index < $1.index })
-                .map { $0.result }
         }
         
-        return await transcribeSequentially(
-            audioArrays: audioArrays,
-            decodeOptionsArray: decodeOptionsArray,
-            seekOffsets: seekOffsets,
-            callback: callback,
-            batchProgress: batchProgress
-        )
-    }
-    
-    private func transcribeSequentially(
-        audioArrays: [[Float]],
-        decodeOptionsArray: [DecodingOptions?],
-        seekOffsets: [Int]?,
-        callback: TranscriptionCallback?,
-        batchProgress: Progress
-    ) async -> [Result<[TranscriptionResult], Swift.Error>] {
         let defaultSegmentDiscoveryCallback = self.segmentDiscoveryCallback
         var result = [Result<[TranscriptionResult], Swift.Error>]()
         result.reserveCapacity(audioArrays.count)
@@ -933,9 +906,11 @@ open class WhisperKit {
     
     private func createSharedTranscriptionWorkers(count: Int) -> [TranscriptionWorker] {
         guard count > 0 else {
+            Logging.info("Worker pool creation skipped because requested worker count is \(count); falling back to sequential transcription for this batch.")
             return []
         }
         guard let tokenizer else {
+            Logging.info("Tokenizer unavailable for worker pool creation; falling back to sequential transcription for this batch.")
             return []
         }
         let dependencies = TranscribeTaskDependencies(
