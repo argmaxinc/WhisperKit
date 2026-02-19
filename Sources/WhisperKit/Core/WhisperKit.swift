@@ -746,6 +746,10 @@ open class WhisperKit {
         )
     }
     
+    /// Internal batch transcription entry point.
+    ///
+    /// - Parameter parentProgress: If `nil`, creates a new batch-local `Progress` root (default public behavior).
+    ///   If non-`nil`, attaches each batch/chunk as children of that existing parent (used by recursive chunking paths).
     private func transcribeWithOptions(
         audioArrays: [[Float]],
         decodeOptionsArray: [DecodingOptions?],
