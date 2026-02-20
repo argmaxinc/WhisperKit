@@ -216,7 +216,7 @@ open class WhisperKit: @unchecked Sendable {
         _transcriptionStateCallback = nil
 
         if let logitsFilters = config.logitsFilters {
-            textDecoder.logitsFilters = logitsFilters
+            _textDecoder.logitsFilters = logitsFilters
         }
 
         await Logging.updateLogLevel(config.verbose ? config.logLevel : .none)
