@@ -57,4 +57,3 @@ public extension WhisperKit {
         return ModelUtilities.formatModelFiles(modelFiles)
     }
 }
-
