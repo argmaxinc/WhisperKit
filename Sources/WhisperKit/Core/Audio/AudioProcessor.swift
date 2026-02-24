@@ -2,7 +2,7 @@
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
 import Accelerate
-import AVFoundation
+@preconcurrency import AVFoundation
 import CoreAudio
 import CoreML
 

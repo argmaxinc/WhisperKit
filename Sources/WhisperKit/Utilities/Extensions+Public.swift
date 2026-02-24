@@ -2,7 +2,8 @@
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
 import AVFoundation
-import CoreML
+// TODO: Should be able to remove `@preconcurrency` once we drop support for iOS 16, macOS 14.
+@preconcurrency import CoreML
 
 public extension Array where Element == TranscriptionSegment {
     func contains(segment: TranscriptionSegment) -> Bool {
