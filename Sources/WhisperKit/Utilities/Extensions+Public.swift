@@ -2,7 +2,7 @@
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
 import AVFoundation
-// TODO: Should be able to remove `@preconcurrency` once we drop support for iOS 16, macOS 14.
+// TODO: Should be able to remove `@preconcurrency` once we drop support for iOS 16 and macOS 13.
 @preconcurrency import CoreML
 
 public extension Array where Element == TranscriptionSegment {
