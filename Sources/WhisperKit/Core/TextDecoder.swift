@@ -687,7 +687,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
 
         let samplingStartTime = Date()
 
-        let sampleResult = tokenSampler.update(tokens: currentTokens, logits: logits, logProbs: logProbs)
+        let sampleResult = await tokenSampler.update(tokens: currentTokens, logits: logits, logProbs: logProbs)
 
         nextToken = sampleResult.tokens.last!
         logProbs = sampleResult.logProbs
@@ -839,7 +839,7 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
 
             let samplingStartTime = Date()
 
-            let sampleResult = tokenSampler.update(tokens: currentTokens, logits: logits, logProbs: logProbs)
+            let sampleResult = await tokenSampler.update(tokens: currentTokens, logits: logits, logProbs: logProbs)
 
             nextToken = sampleResult.tokens.last!
             let nextTokenLogProb = sampleResult.logProbs.last!
