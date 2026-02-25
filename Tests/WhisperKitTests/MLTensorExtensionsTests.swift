@@ -29,8 +29,9 @@ final class MLTensorExtensionsTests: XCTestCase {
         let tensor = MLTensor(MLShapedArray<FloatType>(scalars: expected, shape: [3]))
 
         let result = await tensor.toFloatArray()
+        let expectedFloats: [Float] = expected.map { Float($0) }
 
-        assertEqual(result, expected.map(Float.init), accuracy: 0.0001)
+        assertEqual(result, expectedFloats, accuracy: 0.0001)
     }
 
     func testAsFloatArraySupportsInt32Tensor() async {
@@ -47,10 +48,12 @@ final class MLTensorExtensionsTests: XCTestCase {
 
         let result = await tensor.toMLMultiArray()
         let shapedArray = MLShapedArray<FloatType>(result)
+        let resultFloats: [Float] = shapedArray.scalars.map { Float($0) }
+        let expectedFloats: [Float] = expected.map { Float($0) }
 
         XCTAssertEqual(result.shape, [3])
         XCTAssertEqual(shapedArray.scalars.count, expected.count)
-        assertEqual(shapedArray.scalars.map(Float.init), expected.map(Float.init), accuracy: 0.0001)
+        assertEqual(resultFloats, expectedFloats, accuracy: 0.0001)
     }
 
     func testAsMLMultiArrayRoundTripsInt32Tensor() async {
