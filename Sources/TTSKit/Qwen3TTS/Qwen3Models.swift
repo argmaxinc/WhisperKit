@@ -21,9 +21,9 @@ public enum Qwen3TTSConstants {
     public static let codecPAD: Int32 = 2148
     public static let codecBOS: Int32 = 2149
     public static let codecEOS: Int32 = 2150
-    public static let codecTHINK: Int32 = 2154
-    public static let codecTHINK_BOS: Int32 = 2156
-    public static let codecTHINK_EOS: Int32 = 2157
+    public static let codecThink: Int32 = 2154
+    public static let codecThinkBos: Int32 = 2156
+    public static let codecThinkEos: Int32 = 2157
 
     // MARK: Text track special tokens
 
@@ -32,10 +32,8 @@ public enum Qwen3TTSConstants {
 
     // MARK: Vocabulary sizes
 
-    /// Vocabulary size for the multi-code decoder heads (codes 1–15).
+    /// Vocabulary size for the multi-code decoder heads (codes 1-15).
     public static let codecVocabSize: Int = 2048
-    /// Vocabulary size for code-0 (2048 codec tokens + 1024 special tokens).
-    public static let codec0VocabSize: Int = 3072
 
     // MARK: Audio format
 
@@ -64,9 +62,11 @@ public enum Qwen3TTSConstants {
     public static let defaultTokenizerRepo = "Qwen/Qwen3-0.6B"
     /// HuggingFace repo hosting the pre-compiled CoreML TTS models.
     public static let defaultModelRepo = "argmaxinc/ttskit-coreml"
+    /// Default HuggingFace Hub endpoint. Override to point at a mirror or on-premise instance.
+    public static let defaultEndpoint = "https://huggingface.co"
     /// Intermediate subdirectory inside the model repo grouping all Qwen3 TTS components.
     public static let modelFamilyDir = "qwen3_tts"
-    /// Default model version directory, equivalent to `TTSModelPreset.qwen3TTS_0_6b.versionDir`.
+    /// Default model version directory, equivalent to `TTSModelPreset.qwen3TTS_0_6B.versionDir`.
     /// Provided as a stable exported constant; `TTSKitConfig` uses the preset's value directly.
     public static let defaultVersionDir = "12hz-0.6b-customvoice"
 
@@ -75,8 +75,8 @@ public enum Qwen3TTSConstants {
     /// Codec-0 token IDs suppressed during sampling: [2048, 3072) except EOS (2150).
     public static let suppressTokenIds: Set<Int> = {
         var ids = Set<Int>()
-        for i in 2048..<3072 where i != Int(Qwen3TTSConstants.codecEOS) {
-            ids.insert(i)
+        for tokenId in 2048..<3072 where tokenId != Int(Qwen3TTSConstants.codecEOS) {
+            ids.insert(tokenId)
         }
         return ids
     }()
@@ -86,7 +86,10 @@ public enum Qwen3TTSConstants {
 
 /// Qwen3 TTS speaker voices with their corresponding codec token IDs.
 public enum Qwen3Speaker: String, CaseIterable, Sendable {
-    case ryan, aiden, onoAnna = "ono-anna", sohee, eric, dylan, serena, vivian, uncleFu = "uncle-fu"
+    case ryan, aiden
+    case onoAnna = "ono-anna"
+    case sohee, eric, dylan, serena, vivian
+    case uncleFu = "uncle-fu"
 
     public var tokenID: Int32 {
         switch self {

@@ -4,33 +4,6 @@
 import CoreML
 import Foundation
 
-// MARK: - Model loading protocol
-
-/// Shared lifecycle contract for all CoreML-backed TTS model components.
-///
-/// Adding this to a component protocol (e.g. `TextProjecting: TTSModelLoading`) lets
-/// `TTSKit` call `loadModel` and `unloadModel` through the protocol type without knowing
-/// the concrete class.
-// TODO: move section to ArgmaxCore with agnostic naming; generic for any CoreML model
-public protocol TTSModelLoading {
-    /// Load the CoreML model bundle at `url` using the specified compute units.
-    ///
-    /// When `prewarmMode` is `true` the model is compiled on-device and then immediately
-    /// discarded. This serializes compilation to cap peak memory before the final
-    /// concurrent load (see `TTSKit.prewarmModels()`).
-    func loadModel(at url: URL, computeUnits: MLComputeUnits, prewarmMode: Bool) async throws
-
-    /// Release the loaded model weights from memory.
-    func unloadModel()
-}
-
-public extension TTSModelLoading {
-    /// Convenience overload - loads with `prewarmMode: false`.
-    func loadModel(at url: URL, computeUnits: MLComputeUnits) async throws {
-        try await loadModel(at: url, computeUnits: computeUnits, prewarmMode: false)
-    }
-}
-
 // MARK: - Compute Options
 
 /// Per-component CoreML compute unit configuration.
@@ -38,7 +11,7 @@ public extension TTSModelLoading {
 /// Used by `TTSKitConfig` to specify which hardware accelerators each model component
 /// should use. This struct is model-agnostic; any backend with multiple CoreML components
 /// that need different compute targets can adopt it.
-public struct TTSComputeOptions: Sendable {
+public struct ComputeOptions: Sendable {
     /// Compute units for embedding lookup models (TextProjector, CodeEmbedder, MultiCodeEmbedder).
     /// Defaults to CPU-only since these are simple table lookups with minimal compute.
     public var embedderComputeUnits: MLComputeUnits

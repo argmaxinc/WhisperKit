@@ -13,7 +13,8 @@ open class WhisperKitConfig {
     public var modelRepo: String?
     /// Token for downloading models from repo (if required)
     public var modelToken: String?
-
+    /// HuggingFace Hub compatible endpoint URL
+    public var modelEndpoint: String?
     /// Folder to store models
     public var modelFolder: String?
     /// Folder to store tokenizers
@@ -75,6 +76,7 @@ open class WhisperKitConfig {
                 downloadBase: URL? = nil,
                 modelRepo: String? = nil,
                 modelToken: String? = nil,
+                modelEndpoint: String? = nil,
                 modelFolder: String? = nil,
                 tokenizerFolder: URL? = nil,
                 computeOptions: ModelComputeOptions? = nil,
@@ -97,6 +99,7 @@ open class WhisperKitConfig {
         self.downloadBase = downloadBase
         self.modelRepo = modelRepo
         self.modelToken = modelToken
+        self.modelEndpoint = modelEndpoint
         self.modelFolder = modelFolder
         self.tokenizerFolder = tokenizerFolder
         self.computeOptions = computeOptions

@@ -77,7 +77,8 @@ open class WhisperKit {
             modelRepo: config.modelRepo,
             modelToken: config.modelToken,
             modelFolder: config.modelFolder,
-            download: config.download
+            download: config.download,
+            endpoint: config.modelEndpoint ?? Constants.defaultRemoteEndpoint
         )
 
         if let prewarm = config.prewarm, prewarm {
@@ -173,6 +174,7 @@ open class WhisperKit {
             remoteConfigName: remoteConfigName,
             endpoint: endpoint
         )
+        
         return ModelUtilities.modelSupport(for: deviceName, from: config)
     }
 

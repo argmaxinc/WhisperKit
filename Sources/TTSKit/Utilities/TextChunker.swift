@@ -6,10 +6,10 @@ import Tokenizers
 
 /// Strategy for splitting long text into chunks.
 @frozen
-public enum TTSChunkingStrategy: String, Codable, CaseIterable, Sendable {
+public enum TextChunkingStrategy: String, Codable, CaseIterable, Sendable {
     /// No chunking, generate the full text in a single pass.
     case none
-    /// Split at sentence boundaries using TTSTextChunker.
+    /// Split at sentence boundaries using TextChunker.
     case sentence
 }
 
@@ -24,9 +24,9 @@ public enum TTSChunkingStrategy: String, Codable, CaseIterable, Sendable {
 ///
 /// `defaultTargetChunkSize` / `defaultMinChunkSize` are the single source of truth for
 /// these defaults - all other call sites (TTSGenerationOptions, SpeakAX) reference them.
-public struct TTSTextChunker {
+public struct TextChunker {
     /// Default target chunk size (tokens).
-    public static let defaultTargetChunkSize: Int = 50
+    public static let defaultTargetChunkSize: Int = 42
 
     /// Default minimum chunk size (tokens).
     public static let defaultMinChunkSize: Int = 10
@@ -43,8 +43,8 @@ public struct TTSTextChunker {
     private let decodeTokens: ([Int]) -> String
 
     public init(
-        targetChunkSize: Int = TTSTextChunker.defaultTargetChunkSize,
-        minChunkSize: Int = TTSTextChunker.defaultMinChunkSize,
+        targetChunkSize: Int = TextChunker.defaultTargetChunkSize,
+        minChunkSize: Int = TextChunker.defaultMinChunkSize,
         tokenizer: any Tokenizer
     ) {
         self.targetChunkSize = targetChunkSize
@@ -56,8 +56,8 @@ public struct TTSTextChunker {
     /// Internal init for testing - accepts raw encode/decode functions so tests
     /// don't need a heavyweight `Tokenizer` conformance.
     init(
-        targetChunkSize: Int = TTSTextChunker.defaultTargetChunkSize,
-        minChunkSize: Int = TTSTextChunker.defaultMinChunkSize,
+        targetChunkSize: Int = TextChunker.defaultTargetChunkSize,
+        minChunkSize: Int = TextChunker.defaultMinChunkSize,
         encode: @escaping (String) -> [Int],
         decode: @escaping ([Int]) -> String
     ) {
@@ -98,7 +98,7 @@ public struct TTSTextChunker {
             let windowText = decodeTokens(window)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
 
-            let accepted = lastBoundary(in: windowText) ?? windowText
+            let accepted = windowText.lastNaturalBoundary(minTokenCount: minChunkSize, encode: encodeText) ?? windowText
 
             if !accepted.isEmpty {
                 chunks.append(accepted)
@@ -111,32 +111,5 @@ public struct TTSTextChunker {
         }
 
         return chunks
-    }
-
-    // TODO: move to ArgmaxCore and share with WhisperKit
-    /// Finds the last natural boundary (sentence → clause → word) in the string.
-    /// Returns the text up to and including that boundary, or `nil` if none found.
-    private func lastBoundary(in text: String) -> String? {
-        let sentenceEnders: [Character] = [".", "!", "?", "\n"]
-        let clauseEnders: [Character] = [",", ";", ":", "-", "–"]
-
-        for enders in [sentenceEnders, clauseEnders] {
-            if let idx = text.lastIndex(where: { enders.contains($0) }) {
-                let candidate = String(text[...idx]).trimmingCharacters(in: .whitespacesAndNewlines)
-                if encodeText(candidate).count >= minChunkSize {
-                    return candidate
-                }
-            }
-        }
-
-        // Word boundary fallback
-        if let idx = text.lastIndex(of: " ") {
-            let candidate = String(text[..<idx]).trimmingCharacters(in: .whitespacesAndNewlines)
-            if encodeText(candidate).count >= minChunkSize {
-                return candidate
-            }
-        }
-
-        return nil
     }
 }

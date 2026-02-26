@@ -6,11 +6,9 @@ import CoreML
 import Hub
 import Tokenizers
 
-public struct ModelUtilities {
+extension ModelUtilities {
 
-    private init() {}
-
-    // MARK: Public
+    // MARK: - WhisperKit Model Support
 
     public static func modelSupport(for deviceName: String, from config: ModelSupportConfig? = nil) -> ModelSupport {
         let config = config ?? Constants.fallbackModelSupportConfig
@@ -85,10 +83,6 @@ public struct ModelUtilities {
             ),
             at: hubTokenizerFolder
         )
-    }
-
-    public static func detectModelURL(inFolder path: URL, named modelName: String) -> URL {
-        return ArgmaxCore.detectModelURL(inFolder: path, named: modelName)
     }
     
     /// Formats and sorts model file names based on model variants
@@ -186,24 +180,6 @@ public struct ModelUtilities {
 
         return modelVariant
     }
-
-    static func getModelInputDimention(_ model: MLModel?, named: String, position: Int) -> Int? {
-        return modelInputDim(model, named: named, position: position)
-    }
-
-    static func getModelOutputDimention(_ model: MLModel?, named: String, position: Int) -> Int? {
-        return modelOutputDim(model, named: named, position: position)
-    }
-
-    func getModelInputDimention(_ model: MLModel?, named: String, position: Int) -> Int? {
-        return ArgmaxCore.modelInputDim(model, named: named, position: position)
-    }
-
-    func getModelOutputDimention(_ model: MLModel?, named: String, position: Int) -> Int? {
-        return ArgmaxCore.modelOutputDim(model, named: named, position: position)
-    }
-
-    // MARK: Private
 
     internal static func tokenizerNameForVariant(_ variant: ModelVariant) -> String {
         var tokenizerName: String

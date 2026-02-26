@@ -4,8 +4,7 @@
 import SwiftUI
 import TTSKit
 
-/// Sheet for configuring TTSGenerationOptions.
-/// Mirrors the advanced settings pattern from WhisperAX's advancedSettingsView / settingsForm.
+/// Sheet for configuring GenerationOptions.
 struct GenerationSettingsView: View {
     @Environment(ViewModel.self) private var viewModel
     @Environment(\.dismiss) private var dismiss
@@ -137,11 +136,11 @@ struct GenerationSettingsView: View {
             Section("Concurrency") {
                 sliderRow(
                     label: "Concurrent Workers",
-                    info: "How many chunks to generate in parallel. 0 = unlimited (fastest for batch). 1 = sequential (best for streaming playback). Higher values increase memory usage.",
+                    info: "How many chunks to generate in parallel. 0 = all chunks at once (fastest). 1 = sequential (best for streaming playback).",
                     value: $vm.concurrentWorkerCount,
                     range: 0...16,
                     step: 1,
-                    display: Int(vm.concurrentWorkerCount) == 0 ? "Max" : Int(vm.concurrentWorkerCount).formatted()
+                    display: vm.concurrentWorkerCount == 0 ? "Max" : Int(vm.concurrentWorkerCount).formatted()
                 )
             }
 

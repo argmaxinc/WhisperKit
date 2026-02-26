@@ -65,6 +65,39 @@ extension Array where Element: Hashable {
 // MARK: - String
 
 extension String {
+    /// Returns the text up to and including the last natural boundary in the string.
+    ///
+    /// Boundaries are tested in priority order: sentence enders (. ! ? \n), clause
+    /// enders (, ; : - –), then word boundaries (space). A candidate is only accepted
+    /// when its encoded token count reaches `minTokenCount`.
+    ///
+    /// - Parameters:
+    ///   - minTokenCount: Minimum number of tokens the candidate must contain.
+    ///   - encode: Closure that tokenizes a string and returns its token IDs.
+    /// - Returns: The trimmed substring up to the last qualifying boundary, or `nil`.
+    public func lastNaturalBoundary(minTokenCount: Int, encode: (String) -> [Int]) -> String? {
+        let sentenceEnders: [Character] = [".", "!", "?", "\n"]
+        let clauseEnders: [Character] = [",", ";", ":", "-", "–"]
+
+        for enders in [sentenceEnders, clauseEnders] {
+            if let idx = lastIndex(where: { enders.contains($0) }) {
+                let candidate = String(self[...idx]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if encode(candidate).count >= minTokenCount {
+                    return candidate
+                }
+            }
+        }
+
+        if let idx = lastIndex(of: " ") {
+            let candidate = String(self[..<idx]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if encode(candidate).count >= minTokenCount {
+                return candidate
+            }
+        }
+
+        return nil
+    }
+
     /// Trims up to `upto` occurrences of `character` from the end of the string.
     public func trimmingFromEnd(character: Character = " ", upto: Int) -> String {
         var result = self

@@ -4,6 +4,17 @@
 import Foundation
 import os.lock
 
+// MARK: - Concurrency Utilities
+
+public struct ConcurrencyUtilities {
+    private init() {}
+
+    /// Number of active processors on this device.
+    public static var activeProcessorCount: Int {
+        ProcessInfo.processInfo.activeProcessorCount
+    }
+}
+
 // MARK: - Unfair Lock
 
 /// Thin wrapper around `os_unfair_lock` that exposes a Swift-friendly

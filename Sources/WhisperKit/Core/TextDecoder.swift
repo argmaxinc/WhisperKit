@@ -2,6 +2,7 @@
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
 import Accelerate
+import ArgmaxCore
 import CoreML
 import Tokenizers
 

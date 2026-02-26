@@ -68,6 +68,20 @@ open class Logging {
 }
 
 public extension Logging {
+    /// Format a timing entry as a human-readable string with per-run average and percentage.
+    ///
+    /// Output format: `  123.45 ms /    100 runs (   1.23 ms/run) 45.67%`
+    ///
+    /// - Parameters:
+    ///   - time: Duration in seconds.
+    ///   - runs: Number of calls / iterations (used for per-run average).
+    ///   - fullPipelineDuration: Total pipeline duration in **milliseconds** (for percentage).
+    static func formatTimeWithPercentage(_ time: Double, _ runs: Double, _ fullPipelineDuration: Double) -> String {
+        let percentage = (time * 1000 / fullPipelineDuration) * 100
+        let runTime = runs > 0 ? time * 1000 / Double(runs) : 0
+        return String(format: "%8.2f ms / %6.0f runs (%8.2f ms/run) %5.2f%%", time * 1000, runs, runTime, percentage)
+    }
+
     static func logCurrentMemoryUsage(_ message: String) {
         let memoryUsage = getMemoryUsage()
         Logging.debug("\(message) - Memory usage: \(memoryUsage) MB")

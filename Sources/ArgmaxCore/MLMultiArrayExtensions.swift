@@ -40,13 +40,16 @@ public extension MLMultiArray {
                     let typedPointer = dataPointer.bindMemory(to: Int32.self, capacity: count)
                     typedPointer.initialize(repeating: value, count: count)
                 }
+            #if compiler(>=6.2)
             case .int8:
-                if let value = initialValue as? Int8 {
+                if #available(macOS 26.0, iOS 26.0, watchOS 26.0, visionOS 26.0, tvOS 26.0, *),
+                   let value = initialValue as? Int8 {
                     let typedPointer = dataPointer.bindMemory(to: Int8.self, capacity: count)
                     typedPointer.initialize(repeating: value, count: count)
                 }
+            #endif
             @unknown default:
-                fatalError("Unsupported data type")
+                break
         }
     }
 

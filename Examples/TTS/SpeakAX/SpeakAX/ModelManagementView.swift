@@ -106,7 +106,7 @@ struct ModelManagementView: View {
     private var modelPicker: some View {
         @Bindable var vm = viewModel
         return Picker("Model", selection: $vm.selectedPreset) {
-            ForEach(TTSModelPreset.allCases, id: \.self) { preset in
+            ForEach(TTSModelVariant.allCases, id: \.self) { preset in
                 HStack {
                     let downloaded = vm.localModelPaths[preset] != nil
                     Image(systemName: downloaded ? "checkmark.circle" : "arrow.down.circle.dotted")

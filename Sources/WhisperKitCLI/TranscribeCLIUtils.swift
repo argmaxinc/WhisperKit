@@ -31,6 +31,7 @@ internal class TranscribeCLIUtils {
         return WhisperKitConfig(
             model: modelName,
             downloadBase: downloadModelFolder,
+            modelEndpoint: arguments.endpoint,
             modelFolder: arguments.modelPath,
             tokenizerFolder: downloadTokenizerFolder,
             computeOptions: computeOptions,

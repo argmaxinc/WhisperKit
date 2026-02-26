@@ -51,10 +51,5 @@ extension Logging {
         return String(format: "%.2f", timestamp)
     }
 
-    static func formatTimeWithPercentage(_ time: Double, _ runs: Double, _ fullPipelineDuration: Double) -> String {
-        let percentage = (time * 1000 / fullPipelineDuration) * 100
-        let runTime = runs > 0 ? time * 1000 / Double(runs) : 0
-        let formattedString = String(format: "%8.2f ms / %6.0f runs (%8.2f ms/run) %5.2f%%", time * 1000, runs, runTime, percentage)
-        return formattedString
-    }
+// formatTimeWithPercentage is defined in ArgmaxCore/Logging.swift and re-exported here.
 }

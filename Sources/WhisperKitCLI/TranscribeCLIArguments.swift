@@ -25,6 +25,9 @@ struct TranscribeCLIArguments: ParsableArguments {
     @Option(help: "Path to save the downloaded tokenizer files")
     var downloadTokenizerPath: String?
 
+    @Option(name: .long, help: "HuggingFace Hub compatible endpoint URL")
+    var endpoint: String?
+
     @Option(help: "Compute units for audio encoder model with {all,cpuOnly,cpuAndGPU,cpuAndNeuralEngine,random}")
     var audioEncoderComputeUnits: ComputeUnits = .cpuAndNeuralEngine
 

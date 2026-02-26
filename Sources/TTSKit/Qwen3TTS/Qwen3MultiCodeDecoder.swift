@@ -1,56 +1,28 @@
 //  For licensing see accompanying LICENSE.md file.
 //  Copyright © 2026 Argmax, Inc. All rights reserved.
 
+import ArgmaxCore
 import CoreML
 import Foundation
 
-// MARK: - Multi-Code Decoder Output
+// MARK: - Supporting Types
 
-public struct MultiCodeDecoderOutput {
-    public let allLogits: MLMultiArray // [1, 15, 2048]
-    public let keyCacheUpdates: MLMultiArray
-    public let valueCacheUpdates: MLMultiArray
+/// Update and padding masks for a single MLTensor decode step.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, visionOS 2.0, *)
+struct MLTensorMasks {
+    let updateMask: MLTensor
+    let paddingMask: MLTensor
 }
 
-// MARK: - Multi-Code Decoder Protocol
-
-/// Generates codec-1..15 tokens for a single RVQ frame given hidden states and codec-0 embedding.
-public protocol MultiCodeDecoding: TTSModelLoading {
-    var model: MLModel? { get }
-    var isStateful: Bool { get }
-
-    // MARK: - Cache geometry (read after loadModel)
-
-    var kvCacheEmbedDim: Int { get }
-    var kvCacheMaxSequenceLength: Int { get }
-    var codecVocabSize: Int { get }
-
-    // MARK: - Decoding
-
-    func decode(inputEmbeds: MLMultiArray, cache: TTSKVCache, state: Any?) throws -> MultiCodeDecoderOutput
-    func makeState() -> Any?
-
-    /// Generate codes 1–15 for one RVQ frame given the hidden states from the CodeDecoder
-    /// and the embedding of code-0. Returns all 15 codes and their timings.
-    func generateMultiCodes(
-        hiddenStates: EmbedBuffer,
-        code0Embed: EmbedBuffer,
-        multiCodeEmbedder: any MultiCodeEmbedding,
-        sampler: any TTSTokenSampling,
-        options: TTSGenerationOptions
-    ) throws -> MultiCodeGenerationResult
-}
-
-public extension MultiCodeDecoding {
-    #if canImport(CoreML.MLState)
-    /// Accepts a pre-composed MLTensor as input embeds, materializing it into an MLMultiArray
-    /// before forwarding to the standard decode path.
-    @available(macOS 15.0, iOS 18.0, watchOS 11.0, visionOS 2.0, *)
-    func decode(inputEmbedsTensor: MLTensor, cache: TTSKVCache, state: Any?) throws -> MultiCodeDecoderOutput {
-        let arr = inputEmbedsTensor.asMLMultiArray()
-        return try decode(inputEmbeds: arr, cache: cache, state: state)
-    }
-    #endif
+/// Result of a single MLTensor prediction step, including the updated KV cache.
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, visionOS 2.0, *)
+struct MLTensorStepResult {
+    let outputs: [String: MLTensor]
+    let keyCache: MLTensor
+    let valueCache: MLTensor
+    let cachePosition: Int32
+    let predictionTime: TimeInterval
+    let cacheUpdateTime: TimeInterval
 }
 
 // MARK: - Implementation
@@ -59,9 +31,9 @@ public extension MultiCodeDecoding {
 ///
 /// Thread safety: mutable state (`model`, dimension properties) is set once during
 /// `loadModel()` and read-only thereafter. `MLModel.prediction()` is thread-safe.
-/// Per-frame `MLState` is created via `makeState()` and managed locally within
-/// `generateMultiCodes()`, never stored on this shared instance.
-public class TTSMultiCodeDecoder: MultiCodeDecoding, @unchecked Sendable {
+/// Per-call state is created locally within `generateMultiCodes()` and never stored
+/// on this shared instance.
+public class Qwen3MultiCodeDecoder: MultiCodeDecoding, @unchecked Sendable {
     public var model: MLModel?
 
     /// KV cache embedding dimension, detected from model at load time
@@ -84,17 +56,24 @@ public class TTSMultiCodeDecoder: MultiCodeDecoding, @unchecked Sendable {
         self.model = loaded
 
         // Detect dimensions from model description
-        if let dim = modelOutputDim(model, named: "key_cache_updates", position: 1) {
+        if let dim = ModelUtilities.getModelOutputDimension(model, named: "key_cache_updates", position: 1) {
             self.kvCacheEmbedDim = dim
         }
-        if let seq = modelInputDim(model, named: "key_padding_mask", position: 1) {
+        if let seq = ModelUtilities.getModelInputDimension(model, named: "key_padding_mask", position: 1) {
             self.kvCacheMaxSequenceLength = seq
         }
         // all_logits output shape: [1, 15, codecVocabSize]
-        if let vocab = modelOutputDim(model, named: "all_logits", position: 2) {
+        if let vocab = ModelUtilities.getModelOutputDimension(model, named: "all_logits", position: 2) {
             self.codecVocabSize = vocab
         }
+        // input_embeds shape: [1, embedDim, 1, 1]
+        if let embedDim = ModelUtilities.getModelInputDimension(model, named: "input_embeds", position: 1) {
+            self.inputEmbedDim = embedDim
+        }
     }
+
+    /// Embedding dimension for `input_embeds`, detected from the model at load time.
+    public private(set) var inputEmbedDim: Int = Qwen3TTSConstants.embedDim
 
     public var isStateful: Bool {
         guard let model else { return false }
@@ -114,16 +93,48 @@ public class TTSMultiCodeDecoder: MultiCodeDecoding, @unchecked Sendable {
         return nil
     }
 
-    public func decode(inputEmbeds: MLMultiArray, cache: TTSKVCache, state: Any? = nil) throws -> MultiCodeDecoderOutput {
+    /// Pre-initialize the ANE pipeline by running dummy predictions before the first
+    /// real generation step. Without this, the first `generateMultiCodes` call per
+    /// generation is ~7x slower than steady state due to lazy ANE pipeline setup.
+    ///
+    /// Run concurrently with CodeDecoder prefill so there is no net TTFB cost.
+    /// Replicates the exact loop pattern used in `generateMultiCodes` (4 passes
+    /// × 16 predictions each) to match what the ANE needs to pipeline.
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, visionOS 2.0, *)
+    public func prewarmInference() async throws {
+        guard let model else { return }
+        let sequenceLength = kvCacheMaxSequenceLength
+        let dummyInput = MLTensor(zeros: [1, inputEmbedDim, 1, 1], scalarType: FloatType.self)
+        for _ in 0..<4 {
+            var keyCache = MLTensor(zeros: [1, kvCacheEmbedDim, 1, sequenceLength], scalarType: FloatType.self)
+            var valueCache = MLTensor(zeros: [1, kvCacheEmbedDim, 1, sequenceLength], scalarType: FloatType.self)
+            var cachePosition: Int32 = 0
+            for _ in 0..<16 {
+                let stepResult = try await predictMLTensorStep(
+                    inputEmbeds: dummyInput, model: model,
+                    keyCache: keyCache, valueCache: valueCache,
+                    cachePosition: cachePosition, sequenceLength: sequenceLength
+                )
+                keyCache = stepResult.keyCache
+                valueCache = stepResult.valueCache
+                cachePosition = stepResult.cachePosition
+            }
+        }
+    }
+
+    public func decode(inputEmbeds: any EmbedInputType, cache: KVCache, state: Any? = nil) async throws -> MultiCodeDecoderOutput {
         guard let model else {
             throw TTSError.generationFailed("MultiCodeDecoder model not loaded")
         }
+        guard let array = inputEmbeds as? MLMultiArray else {
+            throw TTSError.generationFailed("MultiCodeDecoder: unsupported embed input type \(type(of: inputEmbeds))")
+        }
 
         var dict: [String: MLFeatureValue] = try [
-            "input_embeds": MLFeatureValue(multiArray: inputEmbeds),
+            "input_embeds": MLFeatureValue(multiArray: array),
             "cache_length": MLFeatureValue(multiArray: cache.makeCacheLengthArray()),
             "kv_cache_update_mask": MLFeatureValue(multiArray: cache.kvCacheUpdateMask),
-            "key_padding_mask": MLFeatureValue(multiArray: cache.keyPaddingMask),
+            "key_padding_mask": MLFeatureValue(multiArray: cache.keyPaddingMask)
         ]
 
         // Only pass external KV cache for non-stateful models
@@ -136,133 +147,315 @@ public class TTSMultiCodeDecoder: MultiCodeDecoding, @unchecked Sendable {
 
         let output: MLFeatureProvider
         if #available(macOS 15.0, iOS 18.0, watchOS 11.0, visionOS 2.0, *), let mlState = state as? MLState {
-            // TODO: use direct mltensor input instead of features
-            output = try model.prediction(from: input, using: mlState)
+            output = try await model.asyncPrediction(from: input, using: mlState)
         } else {
-            output = try model.prediction(from: input)
+            output = try await model.asyncPrediction(from: input)
         }
 
-        let keyCacheUpdates = output.featureValue(for: "key_cache_updates")!.multiArrayValue!
-        let valueCacheUpdates = output.featureValue(for: "value_cache_updates")!.multiArrayValue!
+        guard let keyCacheUpdates = output.featureValue(for: "key_cache_updates")?.multiArrayValue,
+            let valueCacheUpdates = output.featureValue(for: "value_cache_updates")?.multiArrayValue
+        else {
+            throw TTSError.generationFailed("MultiCodeDecoder: missing key/value cache update arrays")
+        }
 
-        // Stateful cache update
         if #available(macOS 15.0, iOS 18.0, watchOS 11.0, visionOS 2.0, *), let mlState = state as? MLState, isStateful {
-            let position = Int(cache.cacheLength)
-            updateStateCache(
+            KVCache.updateStateCache(
                 state: mlState,
                 keyCacheUpdates: keyCacheUpdates,
                 valueCacheUpdates: valueCacheUpdates,
-                position: position
+                position: Int(cache.cacheLength)
             )
         }
 
+        guard let allLogitsArray = output.featureValue(for: "all_logits")?.multiArrayValue else {
+            throw TTSError.generationFailed("MultiCodeDecoder: missing all_logits array")
+        }
         return MultiCodeDecoderOutput(
-            allLogits: output.featureValue(for: "all_logits")!.multiArrayValue!, // TODO: dont force unwrap
+            allLogits: allLogitsArray,
             keyCacheUpdates: keyCacheUpdates,
             valueCacheUpdates: valueCacheUpdates
         )
     }
 
-    /// Generate codes 1-15 for a single RVQ frame.
+    /// Pure MLTensor path - cache lives as tensors, updated via element-wise masking.
+    /// No MLMultiArray round-trip: prediction takes/returns MLTensor, cache updates
+    /// are lazy tensor ops, and only the logits are materialized (by the sampler).
+    /// Build the update mask and padding mask tensors for a given cache position.
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, visionOS 2.0, *)
+    func buildMasks(position: Int, sequenceLength: Int) -> MLTensorMasks {
+        var updateData = [FloatType](repeating: 0, count: sequenceLength)
+        var paddingData = [FloatType](repeating: -10000, count: sequenceLength)
+        if position < sequenceLength { updateData[position] = 1 }
+        for index in 0...min(position, sequenceLength - 1) {
+            paddingData[index] = 0
+        }
+        return MLTensorMasks(
+            updateMask: MLTensor(shape: [1, sequenceLength], scalars: updateData),
+            paddingMask: MLTensor(shape: [1, sequenceLength], scalars: paddingData)
+        )
+    }
+
+    /// Run one MLTensor prediction step and return the outputs with an updated KV cache.
     ///
-    /// Given hidden states and code0 embedding from the CodeDecoder, runs the MultiCodeDecoder
-    /// autoregressively with its own fresh KV cache per frame.
-    /// Returns a result struct containing the generated codes and accumulated timing data.
+    /// Cache updates are performed in tensor space via element-wise masking -
+    /// no MLMultiArray round-trip occurs. The model must be compiled for
+    /// single-token `[1, embedDim, 1, 1]` input.
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, visionOS 2.0, *)
+    func predictMLTensorStep(
+        inputEmbeds: MLTensor,
+        model: MLModel,
+        keyCache: MLTensor,
+        valueCache: MLTensor,
+        cachePosition: Int32,
+        sequenceLength: Int
+    ) async throws -> MLTensorStepResult {
+        let masks = buildMasks(position: Int(cachePosition), sequenceLength: sequenceLength)
+        let predictionStart = CFAbsoluteTimeGetCurrent()
+        let outputs = try await model.prediction(from: [
+            "input_embeds": inputEmbeds,
+            "cache_length": MLTensor(shape: [1], scalars: [cachePosition]),
+            "kv_cache_update_mask": masks.updateMask,
+            "key_padding_mask": masks.paddingMask,
+            "key_cache": keyCache,
+            "value_cache": valueCache
+        ])
+        let predictionTime = CFAbsoluteTimeGetCurrent() - predictionStart
+
+        let cacheUpdateStart = CFAbsoluteTimeGetCurrent()
+        var positionMaskData = [FloatType](repeating: 0, count: sequenceLength)
+        positionMaskData[Int(cachePosition)] = 1
+        let positionMask = MLTensor(shape: [1, 1, 1, sequenceLength], scalars: positionMaskData)
+        let invertedMask = MLTensor(repeating: FloatType(1), shape: [1, 1, 1, sequenceLength]) - positionMask
+        guard let keyCacheOutput = outputs["key_cache_updates"],
+            let valueCacheOutput = outputs["value_cache_updates"]
+        else {
+            throw TTSError.generationFailed("MultiCodeDecoder: missing key/value cache update tensors")
+        }
+        let updatedKeyCache = keyCache * invertedMask + keyCacheOutput * positionMask
+        let updatedValueCache = valueCache * invertedMask + valueCacheOutput * positionMask
+        let cacheUpdateTime = CFAbsoluteTimeGetCurrent() - cacheUpdateStart
+
+        return MLTensorStepResult(
+            outputs: outputs,
+            keyCache: updatedKeyCache,
+            valueCache: updatedValueCache,
+            cachePosition: cachePosition + 1,
+            predictionTime: predictionTime,
+            cacheUpdateTime: cacheUpdateTime
+        )
+    }
+
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, visionOS 2.0, *)
     public func generateMultiCodes(
-        hiddenStates: EmbedBuffer,
-        code0Embed: EmbedBuffer,
+        hiddenStatesTensor: MLTensor,
+        code0EmbedTensor: MLTensor,
         multiCodeEmbedder: any MultiCodeEmbedding,
-        sampler: any TTSTokenSampling,
-        options: TTSGenerationOptions
-    ) throws -> MultiCodeGenerationResult {
-        var timings = TTSTimings()
-        let mcdCache = try TTSKVCache(
+        sampler: any TokenSampling,
+        options: GenerationOptions
+    ) async throws -> MultiCodeGenerationResult {
+        guard let model else { throw TTSError.generationFailed("MultiCodeDecoder model not loaded") }
+
+        let sequenceLength = kvCacheMaxSequenceLength
+        var keyCache = MLTensor(zeros: [1, kvCacheEmbedDim, 1, sequenceLength], scalarType: FloatType.self)
+        var valueCache = MLTensor(zeros: [1, kvCacheEmbedDim, 1, sequenceLength], scalarType: FloatType.self)
+        var cachePosition: Int32 = 0
+        var timings = SpeechTimings()
+
+        // Prefill: hidden_states, then code_0_embed. First call's logits are discarded.
+        var stepResult = try await predictMLTensorStep(
+            inputEmbeds: hiddenStatesTensor, model: model,
+            keyCache: keyCache, valueCache: valueCache,
+            cachePosition: cachePosition, sequenceLength: sequenceLength
+        )
+        keyCache = stepResult.keyCache
+        valueCache = stepResult.valueCache
+        cachePosition = stepResult.cachePosition
+        timings.multiCodeDecoderPredictions += stepResult.predictionTime
+        timings.totalMultiCodeDecoderPredictions += 1
+        timings.decodingKvCaching += stepResult.cacheUpdateTime
+
+        stepResult = try await predictMLTensorStep(
+            inputEmbeds: code0EmbedTensor, model: model,
+            keyCache: keyCache, valueCache: valueCache,
+            cachePosition: cachePosition, sequenceLength: sequenceLength
+        )
+        keyCache = stepResult.keyCache
+        valueCache = stepResult.valueCache
+        cachePosition = stepResult.cachePosition
+        timings.multiCodeDecoderPredictions += stepResult.predictionTime
+        timings.totalMultiCodeDecoderPredictions += 1
+        timings.decodingKvCaching += stepResult.cacheUpdateTime
+
+        var stepIndex = 0
+        let samplingStart = CFAbsoluteTimeGetCurrent()
+        guard let firstStepLogits = stepResult.outputs["all_logits"] else {
+            throw TTSError.generationFailed("MultiCodeDecoder: missing all_logits tensor on step 0")
+        }
+        let code1 = await sampler.sampleMultiHead(
+            allLogits: firstStepLogits,
+            headIndex: stepIndex,
+            temperature: options.temperature,
+            topK: options.topK
+        )
+        timings.multiCodeDecoderSampling += CFAbsoluteTimeGetCurrent() - samplingStart
+        var codes: [Int32] = [code1]
+
+        var offsetCodeEmbedTensors: [MLTensor] = []
+        offsetCodeEmbedTensors.reserveCapacity(14)
+
+        for _ in 0..<14 {
+            let embeddingStart = CFAbsoluteTimeGetCurrent()
+            guard let lastCode = codes.last else {
+                throw TTSError.generationFailed("MultiCodeDecoder: codes array is empty in MLTensor loop")
+            }
+            let offsetId = lastCode + Int32(codecVocabSize * stepIndex)
+            let embedTensor: MLTensor = try await multiCodeEmbedder.embed(tokenId: offsetId)
+            offsetCodeEmbedTensors.append(embedTensor)
+            timings.multiCodeDecoderEmbedding += CFAbsoluteTimeGetCurrent() - embeddingStart
+
+            stepResult = try await predictMLTensorStep(
+                inputEmbeds: embedTensor, model: model,
+                keyCache: keyCache, valueCache: valueCache,
+                cachePosition: cachePosition, sequenceLength: sequenceLength
+            )
+            keyCache = stepResult.keyCache
+            valueCache = stepResult.valueCache
+            cachePosition = stepResult.cachePosition
+            timings.multiCodeDecoderPredictions += stepResult.predictionTime
+            timings.totalMultiCodeDecoderPredictions += 1
+            timings.decodingKvCaching += stepResult.cacheUpdateTime
+
+            stepIndex += 1
+
+            let nextSamplingStart = CFAbsoluteTimeGetCurrent()
+            guard let nextStepLogits = stepResult.outputs["all_logits"] else {
+                throw TTSError.generationFailed("MultiCodeDecoder: missing all_logits tensor on step \(stepIndex)")
+            }
+            let code = await sampler.sampleMultiHead(
+                allLogits: nextStepLogits,
+                headIndex: stepIndex,
+                temperature: options.temperature,
+                topK: options.topK
+            )
+            timings.multiCodeDecoderSampling += CFAbsoluteTimeGetCurrent() - nextSamplingStart
+            codes.append(code)
+        }
+
+        return MultiCodeGenerationResult(codes: codes, timings: timings, offsetCodeEmbedTensors: offsetCodeEmbedTensors)
+    }
+
+    /// Legacy path - kept for OS compatibility (pre-macOS 15).
+    public func generateMultiCodes(
+        hiddenStates: [FloatType],
+        code0Embed: [FloatType],
+        multiCodeEmbedder: any MultiCodeEmbedding,
+        sampler: any TokenSampling,
+        options: GenerationOptions
+    ) async throws -> MultiCodeGenerationResult {
+        var timings = SpeechTimings()
+        let mcdCache = try KVCache(
             cacheDim: kvCacheEmbedDim,
             maxSeqLength: kvCacheMaxSequenceLength,
             isStateful: isStateful
         )
 
-        // Create fresh state for this frame if needed
         let frameState = makeState()
-
         let embedDim = hiddenStates.count
-
-        // Pre-allocate one embed MLMultiArray and reuse it for the first two (EmbedBuffer) decode calls,
-        // to avoid allocation overhead there while keeping the inline pointer-mutation fast path.
-        let reuseArr = try MLMultiArray(shape: [1, NSNumber(value: embedDim), 1, 1], dataType: .float16)
-        let reusePtr = reuseArr.dataPointer.bindMemory(to: FloatType.self, capacity: embedDim)
-
-        @inline(__always) func fillAndDecode(_ buf: EmbedBuffer) throws -> MultiCodeDecoderOutput {
-            buf.withUnsafeBufferPointer { src in
-                reusePtr.update(from: src.baseAddress!, count: embedDim)
-            }
-            return try decode(inputEmbeds: reuseArr, cache: mcdCache, state: frameState)
-        }
+        let reuseArray = try MLMultiArray(shape: [1, NSNumber(value: embedDim), 1, 1], dataType: .float16)
 
         // Prefill step 1: hiddenStates from CodeDecoder
-        var t = CFAbsoluteTimeGetCurrent()
-        var mcdOutput = try fillAndDecode(hiddenStates)
-        timings.multiCodeDecoderPredictions += CFAbsoluteTimeGetCurrent() - t
+        let prefillStart = CFAbsoluteTimeGetCurrent()
+        var mcdOutput = try await decodeEmbedBuffer(hiddenStates, reuseArray: reuseArray, cache: mcdCache, state: frameState)
+        timings.multiCodeDecoderPredictions += CFAbsoluteTimeGetCurrent() - prefillStart
         timings.totalMultiCodeDecoderPredictions += 1
 
-        t = CFAbsoluteTimeGetCurrent()
-        mcdCache.update(keyCacheUpdates: mcdOutput.keyCacheUpdates, valueCacheUpdates: mcdOutput.valueCacheUpdates)
-        timings.multiCodeDecoderKvCache += CFAbsoluteTimeGetCurrent() - t
+        let cacheUpdateStart = CFAbsoluteTimeGetCurrent()
+        guard let prefillKeyUpdates = mcdOutput.keyCacheUpdates,
+            let prefillValueUpdates = mcdOutput.valueCacheUpdates
+        else {
+            throw TTSError.generationFailed("MultiCodeDecoder: missing cache updates after prefill step 1")
+        }
+        mcdCache.update(keyCacheUpdates: prefillKeyUpdates, valueCacheUpdates: prefillValueUpdates)
+        timings.decodingKvCaching += CFAbsoluteTimeGetCurrent() - cacheUpdateStart
 
         // Prefill step 2: code0 embedding
-        t = CFAbsoluteTimeGetCurrent()
-        mcdOutput = try fillAndDecode(code0Embed)
-        timings.multiCodeDecoderPredictions += CFAbsoluteTimeGetCurrent() - t
+        let prefill2Start = CFAbsoluteTimeGetCurrent()
+        mcdOutput = try await decodeEmbedBuffer(code0Embed, reuseArray: reuseArray, cache: mcdCache, state: frameState)
+        timings.multiCodeDecoderPredictions += CFAbsoluteTimeGetCurrent() - prefill2Start
         timings.totalMultiCodeDecoderPredictions += 1
 
-        // After prefill: sample code 1 from head 0
-        var stepIdx = 0
-        t = CFAbsoluteTimeGetCurrent()
-        let code1 = sampler.sampleMultiHead(
+        var stepIndex = 0
+        let samplingStart = CFAbsoluteTimeGetCurrent()
+        let code1 = await sampler.sampleMultiHead(
             allLogits: mcdOutput.allLogits,
-            headIndex: stepIdx,
+            headIndex: stepIndex,
             temperature: options.temperature,
             topK: options.topK
         )
-        timings.multiCodeDecoderSampling += CFAbsoluteTimeGetCurrent() - t
+        timings.multiCodeDecoderSampling += CFAbsoluteTimeGetCurrent() - samplingStart
         var codes: [Int32] = [code1]
 
-        // Autoregressively generate code 2 through code 15.
-        // Use the pre-allocated reuseArr path for the inner embed calls: embed -> reuseArr (in-place copy)
-        // avoids per-step allocations and is faster than MLTensor for these small 1024-element tensors.
+        var offsetCodeEmbeds: [[FloatType]] = []
+        offsetCodeEmbeds.reserveCapacity(14)
+
         for _ in 0..<14 {
-            t = CFAbsoluteTimeGetCurrent()
-            mcdCache.update(keyCacheUpdates: mcdOutput.keyCacheUpdates, valueCacheUpdates: mcdOutput.valueCacheUpdates)
-            timings.multiCodeDecoderKvCache += CFAbsoluteTimeGetCurrent() - t
+            let cacheStep = CFAbsoluteTimeGetCurrent()
+            guard let loopKeyUpdates = mcdOutput.keyCacheUpdates,
+                let loopValueUpdates = mcdOutput.valueCacheUpdates
+            else {
+                throw TTSError.generationFailed("MultiCodeDecoder: missing cache updates in generation loop")
+            }
+            mcdCache.update(keyCacheUpdates: loopKeyUpdates, valueCacheUpdates: loopValueUpdates)
+            timings.decodingKvCaching += CFAbsoluteTimeGetCurrent() - cacheStep
 
-            // Embed previous code with position-dependent offset, then decode (reusing arr)
-            t = CFAbsoluteTimeGetCurrent()
-            let offsetId = codes.last! + Int32(codecVocabSize * stepIdx)
-            let codeEmbedBuf = try multiCodeEmbedder.embed(tokenId: offsetId)
-            timings.multiCodeDecoderEmbedding += CFAbsoluteTimeGetCurrent() - t
+            let embeddingStart = CFAbsoluteTimeGetCurrent()
+            guard let lastCode = codes.last else {
+                throw TTSError.generationFailed("MultiCodeDecoder: codes array is empty in legacy loop")
+            }
+            let offsetId = lastCode + Int32(codecVocabSize * stepIndex)
+            let codeEmbedBuf = try await multiCodeEmbedder.embed(tokenId: offsetId)
+            offsetCodeEmbeds.append(codeEmbedBuf)
+            timings.multiCodeDecoderEmbedding += CFAbsoluteTimeGetCurrent() - embeddingStart
 
-            t = CFAbsoluteTimeGetCurrent()
-            mcdOutput = try fillAndDecode(codeEmbedBuf)
-            timings.multiCodeDecoderPredictions += CFAbsoluteTimeGetCurrent() - t
-
+            let decodingStart = CFAbsoluteTimeGetCurrent()
+            mcdOutput = try await decodeEmbedBuffer(codeEmbedBuf, reuseArray: reuseArray, cache: mcdCache, state: frameState)
+            timings.multiCodeDecoderPredictions += CFAbsoluteTimeGetCurrent() - decodingStart
             timings.totalMultiCodeDecoderPredictions += 1
-            stepIdx += 1
 
-            t = CFAbsoluteTimeGetCurrent()
-            let code = sampler.sampleMultiHead(
+            stepIndex += 1
+
+            let nextSamplingStart = CFAbsoluteTimeGetCurrent()
+            let code = await sampler.sampleMultiHead(
                 allLogits: mcdOutput.allLogits,
-                headIndex: stepIdx,
+                headIndex: stepIndex,
                 temperature: options.temperature,
                 topK: options.topK
             )
-            timings.multiCodeDecoderSampling += CFAbsoluteTimeGetCurrent() - t
+            timings.multiCodeDecoderSampling += CFAbsoluteTimeGetCurrent() - nextSamplingStart
             codes.append(code)
         }
 
         return MultiCodeGenerationResult(
-            codes: codes, // [code_1, code_2, ..., code_15]
-            timings: timings
+            codes: codes,
+            timings: timings,
+            offsetCodeEmbeds: offsetCodeEmbeds
         )
+    }
+
+    /// Copy `embed` into a pre-allocated reuse array and run a single decode step.
+    /// Reusing `reuseArray` avoids per-step MLMultiArray allocation.
+    func decodeEmbedBuffer(
+        _ embed: [FloatType],
+        reuseArray: MLMultiArray,
+        cache: KVCache,
+        state: Any?
+    ) async throws -> MultiCodeDecoderOutput {
+        let reusePointer = reuseArray.dataPointer.bindMemory(to: FloatType.self, capacity: embed.count)
+        embed.withUnsafeBufferPointer { src in
+            guard let baseAddress = src.baseAddress else { return }
+            reusePointer.update(from: baseAddress, count: embed.count)
+        }
+        return try await decode(inputEmbeds: reuseArray, cache: cache, state: state)
     }
 
     public func unloadModel() {

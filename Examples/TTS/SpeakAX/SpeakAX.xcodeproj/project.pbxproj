@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		163CD86D2F4FBF6C001FA01B /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 163CD86C2F4FBF6C001FA01B /* WhisperKit */; };
 		1664E8F12F44082900D76464 /* TTSKit in Frameworks */ = {isa = PBXBuildFile; productRef = 1664E8F02F44082900D76464 /* TTSKit */; };
 /* End PBXBuildFile section */
 
@@ -59,6 +60,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				163CD86D2F4FBF6C001FA01B /* WhisperKit in Frameworks */,
 				1664E8F12F44082900D76464 /* TTSKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -80,10 +82,18 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		163CD86B2F4FBF6C001FA01B /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		1664E8BC2F4407CF00D76464 = {
 			isa = PBXGroup;
 			children = (
 				1664E8C72F4407CF00D76464 /* SpeakAX */,
+				163CD86B2F4FBF6C001FA01B /* Frameworks */,
 				1664E8C62F4407CF00D76464 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -119,6 +129,7 @@
 			name = SpeakAX;
 			packageProductDependencies = (
 				1664E8F02F44082900D76464 /* TTSKit */,
+				163CD86C2F4FBF6C001FA01B /* WhisperKit */,
 			);
 			productName = SpeakAX;
 			productReference = 1664E8C52F4407CF00D76464 /* SpeakAX.app */;
@@ -398,7 +409,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = PP83DTRKSA;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
@@ -437,8 +448,8 @@
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_APPROACHABLE_CONCURRENCY = NO;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
@@ -457,7 +468,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = PP83DTRKSA;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
@@ -496,8 +507,8 @@
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_APPROACHABLE_CONCURRENCY = NO;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_STRICT_CONCURRENCY = complete;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
@@ -658,6 +669,11 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		163CD86C2F4FBF6C001FA01B /* WhisperKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1664E8EF2F44082900D76464 /* XCLocalSwiftPackageReference "../../../../WhisperKit" */;
+			productName = WhisperKit;
+		};
 		1664E8F02F44082900D76464 /* TTSKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = TTSKit;

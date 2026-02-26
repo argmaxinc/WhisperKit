@@ -8,70 +8,77 @@ import CoreML
 #if canImport(CoreML.MLState)
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, visionOS 2.0, *)
 public extension MLTensor {
-    /// Converts the tensor to an [Int] array synchronously.
+
+    // MARK: Async (safe for cooperative thread pool)
+
+    func toIntArray() async -> [Int] {
+        await shapedArray(of: Int32.self).scalars.map { Int($0) }
+    }
+
+    func toFloatArray() async -> [Float] {
+        switch scalarType {
+        case is Float32.Type:
+            return await shapedArray(of: Float32.self).scalars.map { Float($0) }
+        case is FloatType.Type:
+            return await shapedArray(of: FloatType.self).scalars.map { Float($0) }
+        case is Float.Type:
+            return await shapedArray(of: Float.self).scalars
+        case is Int32.Type:
+            return await shapedArray(of: Int32.self).scalars.map { Float($0) }
+        default:
+            fatalError("Unsupported scalar type: \(scalarType)")
+        }
+    }
+
+    func toMLMultiArray() async -> MLMultiArray {
+        switch scalarType {
+        case is Float32.Type:
+            return MLMultiArray(await shapedArray(of: Float32.self))
+        case is FloatType.Type:
+            return MLMultiArray(await shapedArray(of: FloatType.self))
+        case is Float.Type:
+            return MLMultiArray(await shapedArray(of: Float.self))
+        case is Int32.Type:
+            return MLMultiArray(await shapedArray(of: Int32.self))
+        default:
+            fatalError("Unsupported scalar type: \(scalarType)")
+        }
+    }
+
+    // MARK: Sync (legacy — uses DispatchSemaphore, unsafe in concurrent async contexts)
+
+    @available(*, deprecated, message: "Use await toIntArray() instead — this blocks the cooperative thread pool.")
     func asIntArray() -> [Int] {
         let semaphore = DispatchSemaphore(value: 0)
         var result: [Int] = []
-
         Task(priority: .high) {
-            result = await self.shapedArray(of: Int32.self).scalars.map { Int($0) }
+            result = await self.toIntArray()
             semaphore.signal()
         }
-
         semaphore.wait()
         return result
     }
 
-    /// Converts the tensor to a [Float] array synchronously.
+    @available(*, deprecated, message: "Use await toFloatArray() instead — this blocks the cooperative thread pool.")
     func asFloatArray() -> [Float] {
         let semaphore = DispatchSemaphore(value: 0)
-        let tensorType = self.scalarType
-
         var result: [Float] = []
-
         Task(priority: .high) {
-            switch tensorType {
-                case is Float32.Type:
-                    result = await self.shapedArray(of: Float32.self).scalars.map { Float($0) }
-                case is FloatType.Type:
-                    result = await self.shapedArray(of: FloatType.self).scalars.map { Float($0) }
-                case is Float.Type:
-                    result = await self.shapedArray(of: Float.self).scalars.map { Float($0) }
-                case is Int32.Type:
-                    result = await self.shapedArray(of: Int32.self).scalars.map { Float($0) }
-                default:
-                    fatalError("Unsupported data type")
-            }
+            result = await self.toFloatArray()
             semaphore.signal()
         }
-
         semaphore.wait()
         return result
     }
 
-    /// Converts the tensor to an MLMultiArray synchronously.
+    @available(*, deprecated, message: "Use await toMLMultiArray() instead — this blocks the cooperative thread pool.")
     func asMLMultiArray() -> MLMultiArray {
         let semaphore = DispatchSemaphore(value: 0)
-        let tensorType = self.scalarType
-
         var result = try! MLMultiArray(shape: [1], dataType: .float16, initialValue: 0.0)
-
         Task(priority: .high) {
-            switch tensorType {
-                case is Float32.Type:
-                    result = MLMultiArray(await self.shapedArray(of: Float32.self))
-                case is FloatType.Type:
-                    result = MLMultiArray(await self.shapedArray(of: FloatType.self))
-                case is Float.Type:
-                    result = MLMultiArray(await self.shapedArray(of: Float.self))
-                case is Int32.Type:
-                    result = MLMultiArray(await self.shapedArray(of: Int32.self))
-                default:
-                    fatalError("Unsupported data type")
-            }
+            result = await self.toMLMultiArray()
             semaphore.signal()
         }
-
         semaphore.wait()
         return result
     }

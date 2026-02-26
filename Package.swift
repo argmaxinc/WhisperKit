@@ -73,7 +73,7 @@ let package = Package(
             name: "TTSKitTests",
             dependencies: [
                 "TTSKit"
-            ],
+            ]
         ),
         .executableTarget(
             name: "WhisperKitCLI",

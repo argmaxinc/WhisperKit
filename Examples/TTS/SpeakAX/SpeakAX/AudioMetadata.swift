@@ -9,7 +9,7 @@ import Foundation
 /// The full struct is serialized as JSON and stored in the iTunes `©cmt` atom so
 /// the complete generation context is recoverable from the file alone.
 /// Human-readable fields (title, artist, album) are also embedded
-struct AudioMetadata: Codable {
+struct AudioMetadata: Codable, Sendable {
     static let metadataTitleMaxLength = 80
     let id: UUID
     let text: String
@@ -63,7 +63,7 @@ struct AudioMetadata: Codable {
         let slug = modelName
             .lowercased()
             .replacingOccurrences(of: " ", with: "-")
-        return "\(speaker)_\(slug)_\(Self.filenameDateFormatter.string(from: date)).m4a"
+        return "\(speaker)_\(slug)_\(Self.filenameDateFormatter.string(from: date))"
     }
 
     // MARK: - AVFoundation metadata

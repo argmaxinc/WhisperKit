@@ -1,6 +1,7 @@
 //  For licensing see accompanying LICENSE.md file.
 //  Copyright © 2026 Argmax, Inc. All rights reserved.
 
+import ArgmaxCore
 import SwiftUI
 import TTSKit
 import UniformTypeIdentifiers
@@ -12,6 +13,9 @@ import AppKit
 
 struct DetailView: View {
     @Environment(ViewModel.self) private var viewModel
+
+    @State private var isImportingFile = false
+    @State private var fileImportError: String? = nil
 
     var body: some View {
         @Bindable var vm = viewModel
@@ -80,13 +84,29 @@ struct DetailView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .opacity(viewModel.currentWaveform.isEmpty && viewModel.generationState != .generating ? 1 : 0)
 
-                // Generating spinner
+                // Generating progress
                 VStack(spacing: 8) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Generating...")
-                        .font(.subheadline)
-                        .foregroundStyle(.tertiary)
+                    if viewModel.totalSteps > 0 {
+                        ProgressView(
+                            value: Double(viewModel.stepsCompleted),
+                            total: Double(viewModel.totalSteps)
+                        )
+                        .progressViewStyle(.linear)
+                        .frame(maxWidth: 200)
+
+                        let pct = Int(Double(viewModel.stepsCompleted) / Double(viewModel.totalSteps) * 100)
+                        let detail = viewModel.chunksTotal > 1 ? " (\(viewModel.chunksTotal) chunks)" : ""
+                        Text("Generating... \(pct)%\(detail)")
+                            .font(.subheadline)
+                            .foregroundStyle(.tertiary)
+                            .contentTransition(.numericText())
+                    } else {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text(viewModel.statusMessage)
+                            .font(.subheadline)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .opacity(viewModel.currentWaveform.isEmpty && viewModel.generationState == .generating ? 1 : 0)
@@ -97,7 +117,7 @@ struct DetailView: View {
                     playbackTime: viewModel.playbackTime,
                     totalDuration: viewModel.currentDuration
                 )
-                .padding(.horizontal, 24)
+                .padding(.horizontal, 0)
                 .opacity(viewModel.currentWaveform.isEmpty ? 0 : 1)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -179,6 +199,20 @@ struct DetailView: View {
                             .animation(.easeInOut(duration: 0.25), value: promptForInput)
                     }
                     .frame(minHeight: 80, maxHeight: 160)
+//                    .overlay(alignment: .topTrailing) {
+//                        Button {
+//                            isImportingFile = true
+//                        } label: {
+//                            Image(systemName: "square.and.arrow.down")
+//                                .font(.caption)
+//                                .padding(6)
+//                                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6))
+//                        }
+//                        .buttonStyle(.plain)
+//                        .padding(6)
+//                        .accessibilityLabel("Import text file")
+//                        .accessibilityHint("Opens a file picker to import a .txt or .pdf file into the text editor")
+//                    }
 
                 if vm.inputText.isEmpty {
                     Text("Enter text to speak...")
@@ -187,6 +221,34 @@ struct DetailView: View {
                         .padding(.vertical, 8)
                         .allowsHitTesting(false)
                 }
+            }
+            .fileImporter(
+                isPresented: $isImportingFile,
+                allowedContentTypes: [.plainText, .pdf],
+                allowsMultipleSelection: false
+            ) { result in
+                switch result {
+                case .success(let urls):
+                    guard let url = urls.first else { return }
+                    // Security-scoped access is required for files picked outside the sandbox
+                    let accessing = url.startAccessingSecurityScopedResource()
+                    defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+                    if let text = FileUtilities.readTextContent(at: url) {
+                        vm.inputText = text
+                    } else {
+                        fileImportError = "Could not read text from \"\(url.lastPathComponent)\"."
+                    }
+                case .failure(let error):
+                    fileImportError = error.localizedDescription
+                }
+            }
+            .alert("Import Failed", isPresented: .init(
+                get: { fileImportError != nil },
+                set: { if !$0 { fileImportError = nil } }
+            )) {
+                Button("OK", role: .cancel) { fileImportError = nil }
+            } message: {
+                Text(fileImportError ?? "")
             }
 
             HStack(spacing: 8) {
@@ -435,7 +497,6 @@ struct DetailView: View {
     private var generateButtonTitle: String {
         switch viewModel.generationState {
             case .generating: return "Cancel"
-            case .playing: return "Stop"
             case .idle:
                 switch viewModel.modelState {
                     case .downloading: return "Downloading..."
@@ -449,7 +510,6 @@ struct DetailView: View {
     private var generateButtonIcon: String {
         switch viewModel.generationState {
             case .generating: return "stop.fill"
-            case .playing: return "speaker.wave.2.fill"
             case .idle: return "play.fill"
         }
     }
@@ -481,7 +541,7 @@ struct AudioCopyButton: View {
             Label(copied ? "Copied!" : "Copy Audio", systemImage: copied ? "checkmark" : "doc.on.doc")
         }
         .accessibilityLabel(copied ? "Copied to clipboard" : "Copy audio file")
-        .accessibilityHint("Copies the M4A audio file to the clipboard so you can paste it into other apps")
+        .accessibilityHint("Copies the audio file to the clipboard so you can paste it into other apps")
     }
 
     private func copyToClipboard() {
@@ -489,7 +549,9 @@ struct AudioCopyButton: View {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.writeObjects([url as NSURL])
         #else
-        UIPasteboard.general.url = url
+        guard let data = try? Data(contentsOf: url) else { return }
+        let uti = UTType(filenameExtension: url.pathExtension) ?? .audio
+        UIPasteboard.general.setData(data, forPasteboardType: uti.identifier)
         #endif
     }
 }
@@ -516,7 +578,7 @@ struct GlassButtonModifier: ViewModifier {
 }
 
 extension View {
-    func glassButton(prominent: Bool = false, tint: Color = .accentColor) -> some View {
+    func glassButton(prominent: Bool = false) -> some View {
         modifier(GlassButtonModifier(prominent: prominent))
     }
 }

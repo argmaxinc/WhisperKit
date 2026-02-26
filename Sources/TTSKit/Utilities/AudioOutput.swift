@@ -2,6 +2,8 @@
 //  Copyright © 2026 Argmax, Inc. All rights reserved.
 
 import AVFoundation
+import Accelerate
+import ArgmaxCore
 import Foundation
 
 // MARK: - Audio Output
@@ -33,9 +35,10 @@ import Foundation
 /// (concurrency=1). `TTSKit` ensures serialized access.
 /// Subclassing is intentionally not supported. Use the `TTSKit` component override
 /// mechanism (`TTSKitConfig`) to swap in an alternative audio backend.
-public class TTSAudioOutput: @unchecked Sendable {
+public class AudioOutput: @unchecked Sendable {
     private var audioEngine: AVAudioEngine?
     private var playerNode: AVAudioPlayerNode?
+    private var engineStartDeferred: Bool = false
 
     /// Pre-buffer threshold in seconds. `nil` means not yet configured - frames
     /// accumulate in `pendingFrames` until `setBufferDuration` is called.
@@ -92,12 +95,10 @@ public class TTSAudioOutput: @unchecked Sendable {
 
     public init(sampleRate: Int = 24000) {
         self.sampleRate = sampleRate
-        self.audioFormat = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: Double(sampleRate),
-            channels: 1,
-            interleaved: false
-        )!
+        guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: Double(sampleRate), channels: 1, interleaved: false) else {
+            preconditionFailure("AVAudioFormat init failed for PCM Float32 \(sampleRate)Hz mono - this is an invariant violation")
+        }
+        self.audioFormat = format
     }
 
     /// Update the sample rate to match the loaded speech decoder.
@@ -105,12 +106,10 @@ public class TTSAudioOutput: @unchecked Sendable {
     public func configure(sampleRate newRate: Int) {
         guard newRate != sampleRate else { return }
         sampleRate = newRate
-        audioFormat = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: Double(newRate),
-            channels: 1,
-            interleaved: false
-        )!
+        guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: Double(newRate), channels: 1, interleaved: false) else {
+            preconditionFailure("AVAudioFormat init failed for PCM Float32 \(newRate)Hz mono - this is an invariant violation")
+        }
+        audioFormat = format
     }
 
     /// Current playback position in seconds, based on the audio engine's render timeline.
@@ -132,11 +131,11 @@ public class TTSAudioOutput: @unchecked Sendable {
         // Guard against the engine being torn down (stopPlayback nullifies these).
         // Checking audioEngine?.isRunning prevents accessing a detached node.
         guard expectedPlaybackEnd > 0,
-              audioEngine?.isRunning == true,
-              let player = playerNode,
-              let nodeTime = player.lastRenderTime,
-              nodeTime.isSampleTimeValid,
-              let playerTime = player.playerTime(forNodeTime: nodeTime)
+            audioEngine?.isRunning == true,
+            let player = playerNode,
+            let nodeTime = player.lastRenderTime,
+            nodeTime.isSampleTimeValid,
+            let playerTime = player.playerTime(forNodeTime: nodeTime)
         else { return 0 }
         let rawTime = max(0, Double(playerTime.sampleTime) / playerTime.sampleRate - playbackTimeOffset)
         return min(rawTime, scheduledAudioDuration)
@@ -183,49 +182,86 @@ public class TTSAudioOutput: @unchecked Sendable {
 
     // MARK: - File Export
 
-    /// Save PCM samples as an M4A (AAC) file with optional embedded metadata.
+    /// Supported audio export formats.
+    public enum AudioFileFormat: String, Sendable {
+        case m4a
+        case wav
+
+        public var fileExtension: String { rawValue }
+
+        /// Resolve the effective format for the current platform.
+        /// On watchOS, M4A is not supported so falls back to WAV with a warning.
+        public static func resolve(_ preferred: AudioFileFormat = .m4a) -> AudioFileFormat {
+            #if os(watchOS)
+            if preferred == .m4a {
+                Logging.info("[Warning] M4A export is not available on watchOS, falling back to WAV")
+                return .wav
+            }
+            #endif
+            return preferred
+        }
+    }
+
+    /// Save audio samples to a file.
     ///
-    /// Pass `[AVMetadataItem]` built by the caller - TTSKit itself has no opinion
-    /// about what metadata to embed, keeping this layer generic.
+    /// For M4A with metadata: writes PCM -> AAC to a temp file, then uses
+    /// `AVAssetExportSession` passthrough to remux with embedded metadata atoms
+    /// (no re-encode). For WAV or metadata-free M4A: writes directly.
+    /// On watchOS, `.m4a` automatically falls back to `.wav`.
     ///
-    /// - Note: `async` because `AVAssetExportSession.export()` is asynchronous.
-    @available(watchOS, unavailable, message: "AVAssetExportSession is not available on watchOS")
-    @MainActor
-    public static func saveAudioAsM4A(
+    /// - Parameters:
+    ///   - samples: Mono Float32 PCM samples.
+    ///   - folder: Destination directory. Created if it doesn't exist.
+    ///   - filename: File name without extension (extension is appended from `format`).
+    ///   - sampleRate: Sample rate in Hz.
+    ///   - format: Desired output format. Defaults to `.m4a`.
+    ///   - metadata: Optional metadata items to embed into the file container.
+    ///     Only applied for M4A output; silently ignored for WAV (WAV has no metadata atoms).
+    /// - Returns: The URL of the written file.
+    /// - Throws: `TTSError` if audio encoding or export fails.
+    @discardableResult
+    public static func saveAudio(
         _ samples: [Float],
-        to outputURL: URL,
+        toFolder folder: URL,
+        filename: String,
         sampleRate: Int = 24000,
-        metadata: [AVMetadataItem] = []
-    ) async throws {
-        // Write raw PCM to a temp WAV that AVAssetExportSession can read.
-        let tempURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString + ".wav")
-        defer { try? FileManager.default.removeItem(at: tempURL) }
-        try saveAudio(samples, to: tempURL, sampleRate: sampleRate)
-
-        let asset = AVURLAsset(url: tempURL)
-        guard let session = AVAssetExportSession(
-            asset: asset,
-            presetName: AVAssetExportPresetAppleM4A
-        ) else {
-            throw TTSError.audioOutputFailed("Could not create AVAssetExportSession for M4A export")
+        format: AudioFileFormat = .m4a,
+        metadataProvider: (@Sendable () throws -> [AVMetadataItem])? = nil
+    ) async throws -> URL {
+        guard !samples.isEmpty else {
+            throw TTSError.audioOutputFailed("No audio samples to export")
         }
 
+        let resolvedFormat = AudioFileFormat.resolve(format)
+        let outputURL =
+            folder
+            .appendingPathComponent(filename)
+            .appendingPathExtension(resolvedFormat.fileExtension)
+
+        if !FileManager.default.fileExists(atPath: folder.path) {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
         try? FileManager.default.removeItem(at: outputURL)
-        let folderURL = outputURL.deletingLastPathComponent()
-        if !FileManager.default.fileExists(atPath: folderURL.path) {
-            try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+
+        let pcmBuffer = try createPCMBuffer(from: samples, sampleRate: sampleRate)
+
+        switch resolvedFormat {
+            case .m4a:
+                #if os(watchOS)
+                throw TTSError.audioOutputFailed("M4A should have been resolved to WAV on watchOS")
+                #else
+                if let metadataProvider {
+                    let metadata = try metadataProvider()
+                    try await writeM4AWithMetadata(pcmBuffer, to: outputURL, sampleRate: sampleRate, metadata: metadata)
+                } else {
+                    try writeM4A(pcmBuffer, to: outputURL, sampleRate: sampleRate)
+                }
+                #endif
+            case .wav:
+                try writeWAV(pcmBuffer, to: outputURL, sampleRate: sampleRate)
         }
 
-        session.outputURL = outputURL
-        session.outputFileType = .m4a
-        session.metadata = metadata
-
-        await session.export()
-
-        if let error = session.error {
-            throw TTSError.audioOutputFailed("M4A export failed: \(error.localizedDescription)")
-        }
+        return outputURL
     }
 
     /// Return the playback duration of an audio file in seconds.
@@ -235,40 +271,200 @@ public class TTSAudioOutput: @unchecked Sendable {
         return CMTimeGetSeconds(cmDuration)
     }
 
-    // MARK: - WAV export (raw PCM)
+    // MARK: - Crossfade assembly
 
-    // TODO: move to single function that infers file type
-    public static func saveAudio(_ samples: [Float], to url: URL, sampleRate: Int = 24000) throws {
-        guard let format = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: Double(sampleRate),
-            channels: 1,
-            interleaved: false
-        ) else {
-            throw TTSError.audioOutputFailed("Failed to create audio format for sampleRate \(sampleRate)")
+    /// Assemble multiple audio chunks into one array with equal-power crossfades at each boundary.
+    ///
+    /// Uses `cos(t*pi/2)` fade-out and `sin(t*pi/2)` fade-in so that energy is
+    /// preserved through the overlap region.  Fade curves are pre-computed once
+    /// via Accelerate (`vDSP_vramp` + `vvcosf`/`vvsinf`) and reused at every
+    /// chunk boundary; the per-boundary mix uses `vDSP_vmul` + `vDSP_vma`.
+    ///
+    /// - Parameters:
+    ///   - chunks: Ordered audio chunks to concatenate.
+    ///   - fadeLength: Number of overlap samples for each crossfade.
+    /// - Returns: Single concatenated audio array with crossfades applied at chunk boundaries.
+    public static func crossfade(_ chunks: [[Float]], fadeLength: Int) -> [Float] {
+        guard !chunks.isEmpty else { return [] }
+        guard chunks.count > 1 else { return chunks[0] }
+
+        let (fadeOut, fadeIn) = equalPowerCurves(length: fadeLength)
+
+        var result = [Float]()
+        result.reserveCapacity(chunks.reduce(0) { $0 + $1.count })
+        result.append(contentsOf: chunks[0])
+
+        for i in 1..<chunks.count {
+            let next = chunks[i]
+            let overlap = min(fadeLength, result.count, next.count)
+
+            if overlap == 0 {
+                result.append(contentsOf: next)
+                continue
+            }
+
+            let (fo, fi) =
+                overlap == fadeLength
+                ? (fadeOut, fadeIn)
+                : equalPowerCurves(length: overlap)
+
+            let overlapStart = result.count - overlap
+            let n = vDSP_Length(overlap)
+
+            result.withUnsafeMutableBufferPointer { buf in
+                guard let bufBase = buf.baseAddress else { return }
+                let dst = bufBase + overlapStart
+                vDSP_vmul(dst, 1, fo, 1, dst, 1, n)
+                next.withUnsafeBufferPointer { src in
+                    guard let srcBase = src.baseAddress else { return }
+                    vDSP_vma(srcBase, 1, fi, 1, dst, 1, dst, 1, n)
+                }
+            }
+
+            if overlap < next.count {
+                result.append(contentsOf: next[overlap...])
+            }
         }
 
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)) else {
-            throw TTSError.audioOutputFailed("Failed to create audio buffer")
+        return result
+    }
+
+    /// Pre-compute equal-power fade-out (cos) and fade-in (sin) curves.
+    private static func equalPowerCurves(length: Int) -> ([Float], [Float]) {
+        guard length > 0 else { return ([], []) }
+
+        var ramp = [Float](repeating: 0, count: length)
+        var start: Float = 0
+        var step = Float.pi / 2.0 / Float(max(length - 1, 1))
+        vDSP_vramp(&start, &step, &ramp, 1, vDSP_Length(length))
+
+        var fadeOut = [Float](repeating: 0, count: length)
+        var fadeIn = [Float](repeating: 0, count: length)
+        var n = Int32(length)
+        vvcosf(&fadeOut, ramp, &n)
+        vvsinf(&fadeIn, ramp, &n)
+
+        return (fadeOut, fadeIn)
+    }
+
+    // MARK: - Internal helpers
+
+    private static func createPCMBuffer(from samples: [Float], sampleRate: Int) throws -> AVAudioPCMBuffer {
+        guard
+            let pcmFormat = AVAudioFormat(
+                commonFormat: .pcmFormatFloat32,
+                sampleRate: Double(sampleRate),
+                channels: 1,
+                interleaved: false
+            )
+        else {
+            throw TTSError.audioOutputFailed("Failed to create PCM format for sampleRate \(sampleRate)")
+        }
+
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: pcmFormat, frameCapacity: AVAudioFrameCount(samples.count)) else {
+            throw TTSError.audioOutputFailed("Failed to create PCM buffer")
         }
         buffer.frameLength = AVAudioFrameCount(samples.count)
 
         guard let channelData = buffer.floatChannelData else {
             throw TTSError.audioOutputFailed("Failed to access buffer channel data")
         }
-
-        samples.withUnsafeBufferPointer { srcPtr in
-            channelData[0].update(from: srcPtr.baseAddress!, count: samples.count)
+        samples.withUnsafeBufferPointer { src in
+            guard let srcBase = src.baseAddress else { return }
+            channelData[0].update(from: srcBase, count: samples.count)
         }
 
-        // Create parent directory if needed
-        let folderURL = url.deletingLastPathComponent()
-        if !FileManager.default.fileExists(atPath: folderURL.path) {
-            try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
-        }
+        return buffer
+    }
 
-        let audioFile = try AVAudioFile(forWriting: url, settings: format.settings)
-        try audioFile.write(from: buffer)
+    #if !os(watchOS)
+    /// Write PCM samples as AAC in an M4A container.
+    ///
+    /// `AVAudioFile` accepts PCM input via `write(from:)` and internally
+    /// encodes to AAC when the file settings specify a compressed format,
+    /// so no temp file or explicit `AVAudioConverter` is needed.
+    private static func writeM4A(
+        _ pcmBuffer: AVAudioPCMBuffer,
+        to url: URL,
+        sampleRate: Int
+    ) throws {
+        let aacSettings: [String: Any] = [
+            AVFormatIDKey: kAudioFormatMPEG4AAC,
+            AVSampleRateKey: sampleRate,
+            AVNumberOfChannelsKey: 1,
+            AVEncoderBitRateKey: 64000,
+            AVEncoderAudioQualityKey: AVAudioQuality.medium.rawValue
+        ]
+
+        let file = try AVAudioFile(
+            forWriting: url,
+            settings: aacSettings,
+            commonFormat: .pcmFormatFloat32,
+            interleaved: false
+        )
+        try file.write(from: pcmBuffer)
+    }
+
+    /// Write AAC/M4A with embedded metadata atoms.
+    ///
+    /// `AVAudioFile` cannot embed metadata, so this does a two-step write:
+    /// encode PCM -> AAC into a temp file, then use `AVAssetExportSession`
+    /// passthrough to remux the bitstream into the final file with metadata
+    /// atoms attached. No audio re-encoding occurs.
+    private static func writeM4AWithMetadata(
+        _ pcmBuffer: AVAudioPCMBuffer,
+        to url: URL,
+        sampleRate: Int,
+        metadata: [AVMetadataItem]
+    ) async throws {
+        let tempURL = url.deletingLastPathComponent()
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("m4a")
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        try writeM4A(pcmBuffer, to: tempURL, sampleRate: sampleRate)
+
+        let asset = AVURLAsset(url: tempURL)
+        guard let exportSession = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetPassthrough) else {
+            throw TTSError.audioOutputFailed("AVAssetExportSession could not be created for metadata export")
+        }
+        exportSession.outputURL = url
+        exportSession.outputFileType = .m4a
+        exportSession.metadata = metadata
+
+        await exportSession.export()
+
+        if let exportError = exportSession.error {
+            throw exportError
+        }
+        guard exportSession.status == .completed else {
+            throw TTSError.audioOutputFailed(
+                "AVAssetExportSession finished with unexpected status \(exportSession.status.rawValue)")
+        }
+    }
+    #endif
+
+    private static func writeWAV(
+        _ pcmBuffer: AVAudioPCMBuffer,
+        to url: URL,
+        sampleRate: Int
+    ) throws {
+        let settings: [String: Any] = [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: sampleRate,
+            AVNumberOfChannelsKey: 1,
+            AVLinearPCMBitDepthKey: 32,
+            AVLinearPCMIsBigEndianKey: false,
+            AVLinearPCMIsFloatKey: true
+        ]
+
+        let file = try AVAudioFile(
+            forWriting: url,
+            settings: settings,
+            commonFormat: .pcmFormatFloat32,
+            interleaved: false
+        )
+        try file.write(from: pcmBuffer)
     }
 
     // MARK: - Streaming Playback
@@ -277,7 +473,13 @@ public class TTSAudioOutput: @unchecked Sendable {
     ///
     /// Resets all buffering, fade, and timing state. After calling this,
     /// configure the buffer threshold via `setBufferDuration(_:)`.
-    public func startPlayback() throws {
+    ///
+    /// - Parameter deferEngineStart: When `true`, the audio engine is created and
+    ///   connected but not started. The engine will start automatically on the first
+    ///   `enqueueAudioChunk` call. This avoids the render thread contending with
+    ///   model predictions during the critical time-to-first-buffer path.
+    /// - Throws: `TTSError` if the audio engine fails to start.
+    public func startPlayback(deferEngineStart: Bool = false) throws {
         pendingFrames.removeAll()
         pendingDuration = 0
         bufferThresholdMet = false
@@ -287,6 +489,7 @@ public class TTSAudioOutput: @unchecked Sendable {
         expectedPlaybackEnd = 0
         playbackTimeOffset = 0
         scheduledAudioDuration = 0
+        engineStartDeferred = false
 
         // On iOS, AVAudioEngine requires an active audio session with a playback
         // category. Without this, engine.start() may silently fail or route to
@@ -304,8 +507,12 @@ public class TTSAudioOutput: @unchecked Sendable {
         engine.attach(player)
         engine.connect(player, to: engine.mainMixerNode, format: format)
 
-        try engine.start()
-        player.play()
+        if deferEngineStart {
+            engineStartDeferred = true
+        } else {
+            try engine.start()
+            player.play()
+        }
 
         self.audioEngine = engine
         self.playerNode = player
@@ -318,7 +525,18 @@ public class TTSAudioOutput: @unchecked Sendable {
     /// (it was the last frame before the gap) and the incoming frame is marked for
     /// fade-in. On contiguous playback, no fades are applied to interior frames.
     public func enqueueAudioChunk(_ samples: [Float]) {
-        guard playerNode != nil else { return }
+        guard let engine = audioEngine, let player = playerNode else { return }
+
+        if engineStartDeferred {
+            engineStartDeferred = false
+            do {
+                try engine.start()
+                player.play()
+            } catch {
+                Logging.error("AudioOutput: deferred engine start failed: \(error)")
+                return
+            }
+        }
 
         if bufferThresholdMet {
             // Detect underrun: has the player drained since the last schedule?
@@ -364,10 +582,10 @@ public class TTSAudioOutput: @unchecked Sendable {
         // Absorb the gap into playbackTimeOffset so currentPlaybackTime resumes
         // from the end of the previous chunk rather than jumping ahead by gap.
         if scheduledAudioDuration > 0,
-           let player = playerNode,
-           let nodeTime = player.lastRenderTime,
-           nodeTime.isSampleTimeValid,
-           let playerTime = player.playerTime(forNodeTime: nodeTime)
+            let player = playerNode,
+            let nodeTime = player.lastRenderTime,
+            nodeTime.isSampleTimeValid,
+            let playerTime = player.playerTime(forNodeTime: nodeTime)
         {
             let currentRawTime = Double(playerTime.sampleTime) / playerTime.sampleRate
             let expectedRawTime = playbackTimeOffset + scheduledAudioDuration
@@ -405,11 +623,12 @@ public class TTSAudioOutput: @unchecked Sendable {
 
         guard let channelData = buffer.floatChannelData else { return }
         samples.withUnsafeBufferPointer { srcPtr in
-            channelData[0].update(from: srcPtr.baseAddress!, count: count)
+            guard let srcBase = srcPtr.baseAddress else { return }
+            channelData[0].update(from: srcBase, count: count)
         }
 
         if fadeIn || fadeOut {
-            let fadeLen = min(TTSAudioOutput.fadeLengthSamples, count / 2)
+            let fadeLen = min(AudioOutput.fadeLengthSamples, count / 2)
             if fadeLen > 0 {
                 let data = channelData[0]
                 let invFade = 1.0 / Float(fadeLen)
@@ -433,8 +652,8 @@ public class TTSAudioOutput: @unchecked Sendable {
         // This is the dead time between .play() and actual audio output.
         if expectedPlaybackEnd == 0 {
             if let nodeTime = player.lastRenderTime,
-               nodeTime.isSampleTimeValid,
-               let playerTime = player.playerTime(forNodeTime: nodeTime)
+                nodeTime.isSampleTimeValid,
+                let playerTime = player.playerTime(forNodeTime: nodeTime)
             {
                 playbackTimeOffset = max(0, Double(playerTime.sampleTime) / playerTime.sampleRate)
             }
@@ -485,26 +704,16 @@ public class TTSAudioOutput: @unchecked Sendable {
                 }
             }
 
-            // The sentinel completion fires when the buffer leaves the player node's
-            // queue, but the hardware output pipeline still holds ~1-2 render cycles
-            // of audio (~50ms at typical buffer sizes). Sleep briefly so the hardware
-            // finishes before we tear down the engine - prevents the tail clip and the
-            // "out of order message" / overload errors.
-            // TODO: verify best value for this
+            // Wait ~80ms after the sentinel so the hardware pipeline drains (~1-2 render cycles).
+            // Prevents tail clip and CoreAudio "out of order"/overload errors across devices.
             try? await Task.sleep(for: .milliseconds(80))
         }
 
-        // Nil the shared references *before* stopping so that any concurrent
-        // currentPlaybackTime call fails its `let player = playerNode` guard and
-        // returns 0 immediately - preventing the "_engine != nil" crash that
-        // occurs when lastRenderTime is called on a detached node.
-        // Local captures keep the objects alive for the stop call below.
         let engine = audioEngine
         playerNode = nil
         audioEngine = nil
 
-        // Stop the engine only - player?.stop() is redundant and can cause an
-        // abrupt hardware cutoff; engine.stop() cleanly shuts down all nodes.
+        // Stop the engine only
         engine?.stop()
 
         pendingFrames.removeAll()

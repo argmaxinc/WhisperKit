@@ -13,9 +13,9 @@ import Foundation
 /// or position tracking and attention masks only for stateful models whose weights
 /// are managed internally by CoreML via `MLState`.
 ///
-/// Thread safety: each `TTSGenerateTask` creates its own cache instance.
+/// Thread safety: each `Qwen3GenerateTask` creates its own cache instance.
 /// Caches are never shared across concurrent tasks.
-public class TTSKVCache: @unchecked Sendable {
+public class KVCache: @unchecked Sendable {
     public var cacheLength: Int32 = 0
     public let maxSeqLength: Int
     public let cacheDim: Int
@@ -126,6 +126,29 @@ public class TTSKVCache: @unchecked Sendable {
     }
 }
 
+// MARK: - MLTensor Access
+
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, visionOS 2.0, *)
+public extension KVCache {
+    /// Cache position as a `[1]` Int32 tensor.
+    var cacheLengthTensor: MLTensor { MLTensor(shape: [1], scalars: [Int32(cacheLength)]) }
+    /// Update-mask as a `[1, maxSeqLength]` Float16 tensor.
+    var kvCacheUpdateMaskTensor: MLTensor { MLTensor(MLShapedArray<FloatType>(kvCacheUpdateMask)) }
+    /// Padding-mask as a `[1, maxSeqLength]` Float16 tensor.
+    var keyPaddingMaskTensor: MLTensor { MLTensor(MLShapedArray<FloatType>(keyPaddingMask)) }
+    /// External key-cache tensor - `nil` for stateful models.
+    var keyCacheTensor: MLTensor? { keyCache.map { MLTensor(MLShapedArray<FloatType>($0)) } }
+    /// External value-cache tensor - `nil` for stateful models.
+    var valueCacheTensor: MLTensor? { valueCache.map { MLTensor(MLShapedArray<FloatType>($0)) } }
+
+    /// Async update from MLTensor outputs - materializes without blocking the cooperative pool.
+    func update(keyTensor: MLTensor, valueTensor: MLTensor) async {
+        let keyArr = await keyTensor.toMLMultiArray()
+        let valArr = await valueTensor.toMLMultiArray()
+        update(keyCacheUpdates: keyArr, valueCacheUpdates: valArr)
+    }
+}
+
 // MARK: - Speech Decoder Cache
 
 /// Extended KV cache for SpeechDecoder with a rolling hidden context buffer.
@@ -133,7 +156,7 @@ public class TTSKVCache: @unchecked Sendable {
 /// The hidden context window length varies by quantization variant
 /// (e.g. 4 for W8A16, 16 for W16A16) and is read from the model at load time.
 /// Task-local, never shared across concurrent tasks.
-public class TTSSpeechDecoderCache: TTSKVCache, @unchecked Sendable {
+public class SpeechDecoderCache: KVCache, @unchecked Sendable {
     public let hiddenContext: MLMultiArray // [1, hiddenDim, 1, contextLen]
     public let hiddenDim: Int
     public let hiddenContextLen: Int
@@ -157,15 +180,18 @@ public class TTSSpeechDecoderCache: TTSKVCache, @unchecked Sendable {
 
     /// Update KV cache and roll hidden context left, appending new hidden state
     public func updateWithHiddenContext(output: MLFeatureProvider) {
-        let keyCU = output.featureValue(for: "key_cache_updates")!.multiArrayValue!
-        let valCU = output.featureValue(for: "value_cache_updates")!.multiArrayValue!
+        guard let keyCU = output.featureValue(for: "key_cache_updates")?.multiArrayValue,
+            let valCU = output.featureValue(for: "value_cache_updates")?.multiArrayValue
+        else {
+            return
+        }
         super.update(keyCacheUpdates: keyCU, valueCacheUpdates: valCU)
 
         // Roll hidden context left and append new state
         let hidDim = hiddenDim
         let contextLen = hiddenContextLen
         let hiddenContextPtr = hiddenContext.dataPointer.bindMemory(to: FloatType.self, capacity: hidDim * contextLen)
-        let updateArr = output.featureValue(for: "hidden_context_update")!.multiArrayValue!
+        guard let updateArr = output.featureValue(for: "hidden_context_update")?.multiArrayValue else { return }
         let hiddenUpdatePtr = updateArr.dataPointer.bindMemory(to: FloatType.self, capacity: updateArr.count)
         let hiddenUpdateStride = updateArr.strides[1].intValue
 
@@ -180,54 +206,100 @@ public class TTSSpeechDecoderCache: TTSKVCache, @unchecked Sendable {
     }
 }
 
-// MARK: - Stateful Model Cache Update
-// TODO: move to static function in appropriate class or utility for model
+// MARK: - Speech Decoder Cache MLTensor Access
 
-/// Write key_cache_updates and value_cache_updates into an MLState's internal buffers.
-///
-/// Stateful CoreML models read their KV cache from MLState via `readState` ops,
-/// but do not write updates back automatically. The host must manually copy the
-/// model's output cache updates into the state at the correct position.
-///
-/// - Parameters:
-///   - state: The MLState object associated with the model
-///   - keyCacheUpdates: Output from model, shape [1, cacheDim, 1, 1]
-///   - valueCacheUpdates: Output from model, shape [1, cacheDim, 1, 1]
-///   - position: The cache position to write at (current cacheLength before increment)
 @available(macOS 15.0, iOS 18.0, watchOS 11.0, visionOS 2.0, *)
-public func updateStateCache(
-    state: MLState,
-    keyCacheUpdates: MLMultiArray,
-    valueCacheUpdates: MLMultiArray,
-    position: Int
-) {
-    let bytesPerSample = MemoryLayout<FloatType>.size
+public extension SpeechDecoderCache {
+    var hiddenContextTensor: MLTensor { MLTensor(MLShapedArray<FloatType>(hiddenContext)) }
 
-    let keyUpdatePtr = keyCacheUpdates.dataPointer.bindMemory(to: FloatType.self, capacity: keyCacheUpdates.count)
-    let keyUpdateStride = keyCacheUpdates.strides[1].intValue // element stride
-    let valueUpdatePtr = valueCacheUpdates.dataPointer.bindMemory(to: FloatType.self, capacity: valueCacheUpdates.count)
-    let valueUpdateStride = valueCacheUpdates.strides[1].intValue
+    /// Update KV cache and rolling hidden context from `[String: MLTensor]` prediction outputs.
+    /// Materializes tensors asynchronously to avoid blocking the cooperative thread pool.
+    func updateWithHiddenContext(tensorOutputs: [String: MLTensor]) async {
+        guard let keyUpdateTensor = tensorOutputs["key_cache_updates"],
+            let valueUpdateTensor = tensorOutputs["value_cache_updates"]
+        else {
+            return
+        }
+        await super.update(keyTensor: keyUpdateTensor, valueTensor: valueUpdateTensor)
 
-    state.withMultiArray(for: "self_attn_key_cache") { keyStateCache in
-        let embedDim = keyStateCache.shape[1].intValue
-
-        keyStateCache.withUnsafeMutableBytes { cachePtr, cacheStrides in
-            for dim in 0..<embedDim {
-                let cacheByteOffset = (dim * cacheStrides[1] + position * cacheStrides[3]) * bytesPerSample
-                let dst = (cachePtr.baseAddress! + cacheByteOffset).assumingMemoryBound(to: FloatType.self)
-                dst.pointee = keyUpdatePtr[dim * keyUpdateStride]
+        let hidDim = hiddenDim
+        let contextLen = hiddenContextLen
+        let ctxPtr = hiddenContext.dataPointer.bindMemory(to: FloatType.self, capacity: hidDim * contextLen)
+        guard let hiddenUpdateTensor = tensorOutputs["hidden_context_update"] else { return }
+        let updateArr = await hiddenUpdateTensor.toMLMultiArray()
+        let updatePtr = updateArr.dataPointer.bindMemory(to: FloatType.self, capacity: updateArr.count)
+        let updateStride = updateArr.strides[1].intValue
+        for dim in 0..<hidDim {
+            for t in 0..<(contextLen - 1) {
+                ctxPtr[dim * contextLen + t] = ctxPtr[dim * contextLen + t + 1]
             }
+            ctxPtr[dim * contextLen + (contextLen - 1)] = updatePtr[dim * updateStride]
         }
     }
+}
 
-    state.withMultiArray(for: "self_attn_value_cache") { valueStateCache in
-        let embedDim = valueStateCache.shape[1].intValue
+// MARK: - Stateful Model Cache Update
 
-        valueStateCache.withUnsafeMutableBytes { cachePtr, cacheStrides in
-            for dim in 0..<embedDim {
-                let cacheByteOffset = (dim * cacheStrides[1] + position * cacheStrides[3]) * bytesPerSample
-                let dst = (cachePtr.baseAddress! + cacheByteOffset).assumingMemoryBound(to: FloatType.self)
-                dst.pointee = valueUpdatePtr[dim * valueUpdateStride]
+@available(macOS 15.0, iOS 18.0, watchOS 11.0, visionOS 2.0, *)
+public extension KVCache {
+    /// Write key/value cache updates into an MLState's internal buffers.
+    ///
+    /// Stateful CoreML models read their KV cache from MLState via `readState` ops,
+    /// but do not write updates back automatically. The host must manually copy the
+    /// model's output cache updates into the state at the correct position.
+    ///
+    /// Async variant that materializes `MLTensor` outputs before writing to `MLState`.
+    ///
+    /// - Parameters:
+    ///   - state: The `MLState` object associated with the model.
+    ///   - keyTensor: Key cache update tensor output from the model, shape [1, cacheDim, 1, 1].
+    ///   - valueTensor: Value cache update tensor output from the model, shape [1, cacheDim, 1, 1].
+    ///   - position: The cache position to write at (current `cacheLength` before increment).
+    static func updateStateCache(
+        state: MLState,
+        keyTensor: MLTensor,
+        valueTensor: MLTensor,
+        position: Int
+    ) async {
+        let keyArr = await keyTensor.toMLMultiArray()
+        let valArr = await valueTensor.toMLMultiArray()
+        updateStateCache(state: state, keyCacheUpdates: keyArr, valueCacheUpdates: valArr, position: position)
+    }
+
+    static func updateStateCache(
+        state: MLState,
+        keyCacheUpdates: MLMultiArray,
+        valueCacheUpdates: MLMultiArray,
+        position: Int
+    ) {
+        let bytesPerSample = MemoryLayout<FloatType>.size
+
+        let keyUpdatePtr = keyCacheUpdates.dataPointer.bindMemory(to: FloatType.self, capacity: keyCacheUpdates.count)
+        let keyUpdateStride = keyCacheUpdates.strides[1].intValue
+        let valueUpdatePtr = valueCacheUpdates.dataPointer.bindMemory(to: FloatType.self, capacity: valueCacheUpdates.count)
+        let valueUpdateStride = valueCacheUpdates.strides[1].intValue
+
+        state.withMultiArray(for: "self_attn_key_cache") { keyStateCache in
+            let embedDim = keyStateCache.shape[1].intValue
+            keyStateCache.withUnsafeMutableBytes { cachePtr, cacheStrides in
+                guard let baseAddress = cachePtr.baseAddress else { return }
+                for dim in 0..<embedDim {
+                    let cacheByteOffset = (dim * cacheStrides[1] + position * cacheStrides[3]) * bytesPerSample
+                    let dst = (baseAddress + cacheByteOffset).assumingMemoryBound(to: FloatType.self)
+                    dst.pointee = keyUpdatePtr[dim * keyUpdateStride]
+                }
+            }
+        }
+
+        state.withMultiArray(for: "self_attn_value_cache") { valueStateCache in
+            let embedDim = valueStateCache.shape[1].intValue
+            valueStateCache.withUnsafeMutableBytes { cachePtr, cacheStrides in
+                guard let baseAddress = cachePtr.baseAddress else { return }
+                for dim in 0..<embedDim {
+                    let cacheByteOffset = (dim * cacheStrides[1] + position * cacheStrides[3]) * bytesPerSample
+                    let dst = (baseAddress + cacheByteOffset).assumingMemoryBound(to: FloatType.self)
+                    dst.pointee = valueUpdatePtr[dim * valueUpdateStride]
+                }
             }
         }
     }

@@ -10,7 +10,7 @@ public extension MLModel {
     /// on macOS 14+ / iOS 17+ and falls back to a Task-wrapped call on older OS.
     func asyncPrediction(
         from input: MLFeatureProvider,
-        options: MLPredictionOptions
+        options: MLPredictionOptions = MLPredictionOptions()
     ) async throws -> MLFeatureProvider {
         if #available(macOS 14, iOS 17, watchOS 10, visionOS 1, *) {
             return try await prediction(from: input, options: options)
@@ -19,6 +19,17 @@ public extension MLModel {
                 try prediction(from: input, options: options)
             }.value
         }
+    }
+
+    /// Async prediction with MLState for stateful models.
+    /// MLState requires macOS 15+ where native async prediction is available.
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, visionOS 2.0, *)
+    func asyncPrediction(
+        from input: MLFeatureProvider,
+        using state: MLState,
+        options: MLPredictionOptions = MLPredictionOptions()
+    ) async throws -> MLFeatureProvider {
+        try await prediction(from: input, using: state, options: options)
     }
 }
 
@@ -37,6 +48,17 @@ public extension MLComputeUnits {
                 return "cpuAndNeuralEngine"
             @unknown default:
                 return "unknown"
+        }
+    }
+
+    /// Human-readable display name suitable for UI presentation.
+    var displayName: String {
+        switch self {
+            case .cpuOnly: return "CPU"
+            case .cpuAndGPU: return "GPU"
+            case .cpuAndNeuralEngine: return "Neural Engine"
+            case .all: return "All"
+            @unknown default: return "Unknown"
         }
     }
 }

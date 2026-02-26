@@ -5,6 +5,7 @@ import ArgumentParser
 import CoreML
 import Foundation
 import WhisperKit
+import TTSKit
 
 struct TranscribeCLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(

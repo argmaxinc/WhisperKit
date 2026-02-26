@@ -91,38 +91,7 @@ public enum ModelVariant: CustomStringConvertible, CaseIterable {
     }
 }
 
-@frozen
-public enum ModelState: CustomStringConvertible {
-    case unloading
-    case unloaded
-    case loading
-    case loaded
-    case prewarming
-    case prewarmed
-    case downloading
-    case downloaded
-
-    public var description: String {
-        switch self {
-            case .unloading:
-                return "Unloading"
-            case .unloaded:
-                return "Unloaded"
-            case .loading:
-                return "Loading"
-            case .loaded:
-                return "Loaded"
-            case .prewarming:
-                return "Specializing"
-            case .prewarmed:
-                return "Specialized"
-            case .downloading:
-                return "Downloading"
-            case .downloaded:
-                return "Downloaded"
-        }
-    }
-}
+// ModelState is defined in ArgmaxCore/ModelState.swift and re-exported here.
 
 public struct ModelComputeOptions: Sendable {
     public var melCompute: MLComputeUnits
@@ -722,11 +691,6 @@ public struct TranscriptionProgress: Sendable {
 public typealias SegmentDiscoveryCallback = (_ segments: [TranscriptionSegment]) -> Void
 
 /// A callback that reports changes in the model's state.
-/// - Parameters:
-///   - oldState: The previous state of the model, if any
-///   - newState: The current state of the model
-public typealias ModelStateCallback = (_ oldState: ModelState?, _ newState: ModelState) -> Void
-
 /// A callback that reports changes in the transcription process.
 /// - Parameter state: The current `TranscriptionState` of the transcription process
 public typealias TranscriptionStateCallback = (_ state: TranscriptionState) -> Void

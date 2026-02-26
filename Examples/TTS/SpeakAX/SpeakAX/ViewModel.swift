@@ -8,6 +8,7 @@ import Observation
 import SwiftUI
 import Tokenizers
 import TTSKit
+import WhisperKit
 #if os(macOS)
 import AppKit
 #endif
@@ -19,11 +20,12 @@ import AppKit
 /// All persistent fields live inside the M4A file's metadata - there is no
 /// companion JSON or database. `Generation` is reconstructed on launch by
 /// scanning the documents directory for `.m4a` files and calling
-/// `TTSAudioOutput.loadMetadata(from:)` on each one.
+/// `AudioOutput.loadMetadata(from:)` on each one.
 ///
 /// `isFavorite` is the only mutable bit of state not in the file itself; it
 /// is stored as a `Set<UUID>` in `UserDefaults` so we never need to re-encode
 /// the M4A.
+@MainActor
 struct Generation: Identifiable {
     let id: UUID
     let title: String
@@ -105,7 +107,6 @@ enum ModelState: Equatable {
 enum GenerationState: Equatable {
     case idle
     case generating
-    case playing
 }
 
 // MARK: - Settings Storage
@@ -117,21 +118,20 @@ enum GenerationState: Equatable {
 @MainActor
 private class Settings {
     /// Model selection
-    @AppStorage("selectedPreset") var selectedPresetRaw: String = TTSModelPreset.defaultForCurrentPlatform.rawValue
+    @AppStorage("selectedPreset") var selectedPresetRaw: String = TTSModelVariant.defaultForCurrentPlatform.rawValue
     @AppStorage("selectedSpeaker") var selectedSpeakerRaw: String = Qwen3Speaker.ryan.rawValue
     @AppStorage("selectedLanguage") var selectedLanguageRaw: String = Qwen3Language.english.rawValue
     @AppStorage("playbackStrategyTag") var playbackStrategyTag: String = "auto"
 
     /// Generation options
-    @AppStorage("genTemperature") var temperature: Double = .init(TTSGenerationOptions.defaultTemperature)
-    @AppStorage("genTopK") var topK: Double = .init(TTSGenerationOptions.defaultTopK)
-    @AppStorage("genRepetitionPenalty") var repetitionPenalty: Double = .init(TTSGenerationOptions.defaultRepetitionPenalty)
-    @AppStorage("genMaxNewTokens") var maxNewTokens: Double = .init(TTSGenerationOptions.defaultMaxNewTokens)
-    /// 0 = unlimited (nil in TTSKit API); stored as Double for slider binding.
+    @AppStorage("genTemperature") var temperature: Double = .init(GenerationOptions.defaultTemperature)
+    @AppStorage("genTopK") var topK: Double = .init(GenerationOptions.defaultTopK)
+    @AppStorage("genRepetitionPenalty") var repetitionPenalty: Double = .init(GenerationOptions.defaultRepetitionPenalty)
+    @AppStorage("genMaxNewTokens") var maxNewTokens: Double = .init(GenerationOptions.defaultMaxNewTokens)
     @AppStorage("genConcurrentWorkerCount") var concurrentWorkerCount: Double = 0
     @AppStorage("genChunkingStrategy") var chunkingStrategyTag: String = "sentence"
-    @AppStorage("genTargetChunkSize") var targetChunkSize: Double = .init(TTSTextChunker.defaultTargetChunkSize)
-    @AppStorage("genMinChunkSize") var minChunkSize: Double = .init(TTSTextChunker.defaultMinChunkSize)
+    @AppStorage("genTargetChunkSize") var targetChunkSize: Double = .init(TextChunker.defaultTargetChunkSize)
+    @AppStorage("genMinChunkSize") var minChunkSize: Double = .init(TextChunker.defaultMinChunkSize)
 
     /// Compute units (stored as Int matching MLComputeUnits.rawValue)
     @AppStorage("embedderComputeUnits") var embedderComputeUnitsRaw: Int = MLComputeUnits.cpuOnly.rawValue
@@ -162,11 +162,11 @@ final class ViewModel: @unchecked Sendable {
 
     var modelState: ModelState = .unloaded
     var downloadProgress: Double = 0
-    var localModelPaths: [TTSModelPreset: String] = [:]
+    var localModelPaths: [TTSModelVariant: String] = [:]
 
     // MARK: - Persisted: model selection
 
-    var selectedPreset: TTSModelPreset {
+    var selectedPreset: TTSModelVariant {
         didSet { settings.selectedPresetRaw = selectedPreset.rawValue }
     }
 
@@ -189,7 +189,7 @@ final class ViewModel: @unchecked Sendable {
         didSet { settings.playbackStrategyTag = playbackStrategyTag }
     }
 
-    var selectedPlaybackStrategy: TTSPlaybackStrategy {
+    var selectedPlaybackStrategy: PlaybackStrategy {
         switch playbackStrategyTag {
             case "stream": return .stream
             case "generateFirst": return .generateFirst
@@ -208,8 +208,8 @@ final class ViewModel: @unchecked Sendable {
     var concurrentWorkerCount: Double { didSet { settings.concurrentWorkerCount = concurrentWorkerCount } }
     var chunkingStrategyTag: String { didSet { settings.chunkingStrategyTag = chunkingStrategyTag } }
 
-    var chunkingStrategy: TTSChunkingStrategy {
-        TTSChunkingStrategy(rawValue: chunkingStrategyTag) ?? .sentence
+    var chunkingStrategy: TextChunkingStrategy {
+        TextChunkingStrategy(rawValue: chunkingStrategyTag) ?? .sentence
     }
 
     var targetChunkSize: Double { didSet { settings.targetChunkSize = targetChunkSize } }
@@ -233,8 +233,8 @@ final class ViewModel: @unchecked Sendable {
         didSet { settings.speechDecoderComputeUnitsRaw = speechDecoderComputeUnits.rawValue }
     }
 
-    var computeOptions: TTSComputeOptions {
-        TTSComputeOptions(
+    var computeOptions: ComputeOptions {
+        ComputeOptions(
             embedderComputeUnits: embedderComputeUnits,
             codeDecoderComputeUnits: codeDecoderComputeUnits,
             multiCodeDecoderComputeUnits: multiCodeDecoderComputeUnits,
@@ -249,7 +249,7 @@ final class ViewModel: @unchecked Sendable {
         // Resolve the persisted preset, falling back to the platform default.
         // If a previously saved preset is no longer available on this platform (e.g. 0.6B
         // saved on macOS, then opened on iOS), quietly switch to the platform default.
-        let savedPreset = TTSModelPreset(rawValue: settings.selectedPresetRaw)
+        let savedPreset = TTSModelVariant(rawValue: settings.selectedPresetRaw)
         selectedPreset = (savedPreset?.isAvailableOnCurrentPlatform == true)
             ? savedPreset!
             : .defaultForCurrentPlatform
@@ -288,7 +288,16 @@ final class ViewModel: @unchecked Sendable {
     /// True while we're in a live generate-and-play session
     var isStreaming = false
     /// Reference to the active audio output during streaming, for querying playback position
-    private var activeAudioOutput: TTSAudioOutput?
+    private var activeAudioOutput: AudioOutput?
+
+    // MARK: - Generation progress (generateFirst mode)
+
+    /// Running count of decoder steps completed across all chunks.
+    var stepsCompleted: Int = 0
+    /// Estimated total steps for the full request (maxNewTokens × totalChunks).
+    var totalSteps: Int = 0
+    /// Total number of text chunks in the current request.
+    var chunksTotal: Int = 0
 
     /// Seconds of audio still accumulating in the pre-buffer before the next chunk
     /// flushes and playback resumes. Non-zero only while actively buffering mid-stream.
@@ -327,7 +336,7 @@ final class ViewModel: @unchecked Sendable {
     // MARK: - Private
 
     private var tts: TTSKit?
-    private(set) var loadedPreset: TTSModelPreset?
+    private(set) var loadedPreset: TTSModelVariant?
     private var audioPlayer: AVAudioPlayer?
     private var tokenCountTask: Task<Void, Never>?
 
@@ -406,7 +415,7 @@ final class ViewModel: @unchecked Sendable {
 
     /// Scan for previously downloaded models by checking the Hub cache in Documents
     func scanLocalModels() {
-        for preset in TTSModelPreset.allCases {
+        for preset in TTSModelVariant.allCases {
             let config = TTSKitConfig(model: preset)
             let repoURL = localRepoURL(for: config)
             let repoPath = repoURL.path
@@ -426,19 +435,10 @@ final class ViewModel: @unchecked Sendable {
 
     /// Check if any model component directories exist at a given repo path
     private func hasModelFiles(at basePath: String, config: TTSKitConfig) -> Bool {
-        let components = ["text_projector", "code_embedder", "multi_code_embedder",
-                          "code_decoder", "multi_code_decoder", "speech_decoder"]
         let baseURL = URL(fileURLWithPath: basePath)
-        for component in components {
-            let dir = baseURL
-                .appendingPathComponent(Qwen3TTSConstants.modelFamilyDir)
-                .appendingPathComponent(component)
-                .appendingPathComponent(config.versionDir)
-            if FileManager.default.fileExists(atPath: dir.path) {
-                return true
-            }
+        return config.componentDirectories(in: baseURL).contains {
+            FileManager.default.fileExists(atPath: $0.path)
         }
-        return false
     }
 
     /// Download the selected model preset without loading it
@@ -488,13 +488,14 @@ final class ViewModel: @unchecked Sendable {
         do {
             let ttsConfig = TTSKitConfig(
                 model: selectedPreset,
-                modelsPath: localModelPaths[selectedPreset],
+                modelFolder: localModelPaths[selectedPreset].map { URL(fileURLWithPath: $0) },
                 computeOptions: computeOptions,
                 verbose: true
             )
 
             // Create TTSKit without loading - we drive load/prewarm explicitly
-            let kit = try await TTSKit(ttsConfig, load: false)
+            ttsConfig.load = false
+            let kit = try await TTSKit(ttsConfig)
             tts = kit
 
             // Prewarm: compile each CoreML model sequentially, then discard.
@@ -542,8 +543,9 @@ final class ViewModel: @unchecked Sendable {
     /// Unload the current model from memory
     func unloadModel() {
         cancelAllTasks()
-        tts?.unloadModels()
+        let oldTTS = tts
         tts = nil
+        Task { await oldTTS?.unloadModels() }
         loadedPreset = nil
         modelState = .unloaded
         statusMessage = isModelDownloaded ? "Model unloaded" : "Select a model to get started"
@@ -551,30 +553,30 @@ final class ViewModel: @unchecked Sendable {
 
     /// Reset all generation options to their factory defaults.
     func resetGenerationSettings() {
-        temperature = Double(TTSGenerationOptions.defaultTemperature)
-        topK = Double(TTSGenerationOptions.defaultTopK)
-        repetitionPenalty = Double(TTSGenerationOptions.defaultRepetitionPenalty)
-        maxNewTokens = Double(TTSGenerationOptions.defaultMaxNewTokens)
-        concurrentWorkerCount = 1
+        temperature = Double(GenerationOptions.defaultTemperature)
+        topK = Double(GenerationOptions.defaultTopK)
+        repetitionPenalty = Double(GenerationOptions.defaultRepetitionPenalty)
+        maxNewTokens = Double(GenerationOptions.defaultMaxNewTokens)
+        concurrentWorkerCount = 0
         chunkingStrategyTag = "sentence"
-        targetChunkSize = Double(TTSTextChunker.defaultTargetChunkSize)
-        minChunkSize = Double(TTSTextChunker.defaultMinChunkSize)
+        targetChunkSize = Double(TextChunker.defaultTargetChunkSize)
+        minChunkSize = Double(TextChunker.defaultMinChunkSize)
     }
 
-    /// Delete downloaded model files for the selected preset
-    func deleteModel(preset: TTSModelPreset? = nil) {
+    /// Delete downloaded model files for a specific variant only,
+    /// leaving other variants in the shared repo untouched.
+    func deleteModel(preset: TTSModelVariant? = nil) {
         let target = preset ?? selectedPreset
 
-        // Unload if this is the active model
         if loadedPreset == target {
             unloadModel()
         }
 
-        // Remove the model repo folder from Documents/huggingface/models/{repo}
         let config = TTSKitConfig(model: target)
         let repoURL = localRepoURL(for: config)
-        if FileManager.default.fileExists(atPath: repoURL.path) {
-            try? FileManager.default.removeItem(at: repoURL)
+        for dir in config.componentDirectories(in: repoURL) {
+            guard FileManager.default.fileExists(atPath: dir.path) else { continue }
+            try? FileManager.default.removeItem(at: dir)
         }
         localModelPaths.removeValue(forKey: target)
 
@@ -584,11 +586,19 @@ final class ViewModel: @unchecked Sendable {
         }
     }
 
-    /// Disk size of the downloaded model files for a preset
-    func modelDiskSize(for preset: TTSModelPreset) -> String? {
-        guard let path = localModelPaths[preset] else { return nil }
-        guard let size = directorySize(at: URL(fileURLWithPath: path)) else { return nil }
-        return ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)
+    /// Disk size of downloaded model files for a specific variant only.
+    func modelDiskSize(for preset: TTSModelVariant) -> String? {
+        guard localModelPaths[preset] != nil else { return nil }
+        let config = TTSKitConfig(model: preset)
+        let repoURL = localRepoURL(for: config)
+        var total: UInt64 = 0
+        for dir in config.componentDirectories(in: repoURL) {
+            if let size = directorySize(at: dir) {
+                total += size
+            }
+        }
+        guard total > 0 else { return nil }
+        return ByteCountFormatter.string(fromByteCount: Int64(total), countStyle: .file)
     }
 
     private func directorySize(at url: URL) -> UInt64? {
@@ -639,6 +649,9 @@ final class ViewModel: @unchecked Sendable {
             activeAudioOutput = nil
             Task { await audioOut?.stopPlayback(waitForCompletion: false) }
         }
+        audioPlayer?.stop()
+        audioPlayer = nil
+        isPlaying = false
         isStreaming = false
         if generationState == .generating {
             generationState = .idle
@@ -657,30 +670,53 @@ final class ViewModel: @unchecked Sendable {
         guard canGenerate, let tts else { return }
 
         generationState = .generating
-        isStreaming = true
         statusMessage = "Generating speech..."
         currentWaveform = []
         currentAudioSamples = []
         currentDuration = 0
         playbackTime = 0
-        activeAudioOutput = tts.audioOutput
-        startPlaybackUpdates()
+        stepsCompleted = 0
+        totalSteps = 0
+        chunksTotal = 0
+
+        let strategy = selectedPlaybackStrategy
+
+        switch strategy {
+        case .generateFirst:
+            break
+        case .auto, .stream, .buffered:
+            isStreaming = true
+            activeAudioOutput = tts.audioOutput
+            startPlaybackUpdates()
+        }
 
         do {
-            let result = try await streamGeneration(tts: tts)
-            // streamGeneration includes playSpeech, which tears down the audio engine
-            // on a background thread. Clear streaming state synchronously here - before
-            // any further suspension point - so the polling loop cannot wake up and call
-            // currentPlaybackTime on the already-deallocated engine between now and the
-            // next await inside finalizeGeneration.
-            stopPlaybackUpdates()
-            activeAudioOutput = nil
-            isStreaming = false
-            try await finalizeGeneration(result: result)
+            let result: SpeechResult
+
+            switch strategy {
+            case .generateFirst:
+                result = try await generateFirstGeneration(tts: tts)
+                currentAudioSamples = result.audio
+                currentDuration = result.audioDuration
+                currentWaveform = peaksPerToken(from: result.audio)
+                try await finalizeGeneration(result: result)
+                if let gen = generations.first {
+                    playGeneration(gen)
+                }
+            case .auto, .stream, .buffered:
+                result = try await streamGeneration(tts: tts)
+                stopPlaybackUpdates()
+                activeAudioOutput = nil
+                isStreaming = false
+                try await finalizeGeneration(result: result)
+            }
         } catch {
             stopPlaybackUpdates()
             activeAudioOutput = nil
             isStreaming = false
+            stepsCompleted = 0
+            totalSteps = 0
+            chunksTotal = 0
             statusMessage = "Error: \(error.localizedDescription)"
         }
 
@@ -691,10 +727,9 @@ final class ViewModel: @unchecked Sendable {
     }
 
     /// Build the generation options from current UI state.
-    private func buildOptions() -> TTSGenerationOptions {
-        // A raw value of 0 in the UI means "unlimited" - map to nil per the TTSKit API.
-        let workerCount: Int? = concurrentWorkerCount == 0 ? nil : Int(concurrentWorkerCount)
-        var options = TTSGenerationOptions(
+    private func buildOptions() -> GenerationOptions {
+        let workerCount = Int(concurrentWorkerCount)
+        var options = GenerationOptions(
             temperature: Float(temperature),
             topK: Int(topK),
             repetitionPenalty: Float(repetitionPenalty),
@@ -710,9 +745,39 @@ final class ViewModel: @unchecked Sendable {
         return options
     }
 
+    /// Generate all audio up front using `tts.generate()`, tracking step-level progress.
+    private func generateFirstGeneration(tts: TTSKit) async throws -> SpeechResult {
+        let options = buildOptions()
+
+        let result = try await tts.generate(
+            text: inputText,
+            speaker: selectedSpeaker,
+            language: selectedLanguage,
+            options: options,
+            callback: { [weak self] progress in
+                let steps = progress.stepsCompleted ?? 0
+                let maxSteps = progress.totalSteps ?? 1
+                let chunks = progress.totalChunks ?? 1
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    stepsCompleted = steps
+                    totalSteps = maxSteps
+                    chunksTotal = chunks
+                }
+                return nil
+            }
+        )
+
+        stepsCompleted = totalSteps
+        currentRTF = result.timings.realTimeFactor
+        currentSpeedFactor = result.timings.speedFactor
+        currentStepsPerSecond = result.timings.tokensPerSecond
+        currentTimeToFirstBuffer = result.timings.timeToFirstBuffer
+        return result
+    }
+
     /// Run `playSpeech`, streaming waveform peaks and audio samples back to the main actor.
-    /// Returns the complete `TTSResult` once playback finishes.
-    private func streamGeneration(tts: TTSKit) async throws -> TTSResult {
+    private func streamGeneration(tts: TTSKit) async throws -> SpeechResult {
         let options = buildOptions()
         let sampleRate = Double(Qwen3TTSConstants.sampleRate)
 
@@ -735,7 +800,6 @@ final class ViewModel: @unchecked Sendable {
             }
         )
 
-        // `playSpeech` returns only after all audio has finished playing.
         currentAudioSamples = result.audio
         currentDuration = result.audioDuration
         currentRTF = result.timings.realTimeFactor
@@ -747,7 +811,7 @@ final class ViewModel: @unchecked Sendable {
     }
 
     /// Persist the generation to disk as M4A, insert it into the history, and update UI state.
-    private func finalizeGeneration(result: TTSResult) async throws {
+    private func finalizeGeneration(result: SpeechResult) async throws {
         let meta = AudioMetadata(
             text: inputText,
             speaker: selectedSpeaker.rawValue,
@@ -759,14 +823,17 @@ final class ViewModel: @unchecked Sendable {
             stepsPerSecond: result.timings.tokensPerSecond,
             timeToFirstBuffer: result.timings.timeToFirstBuffer
         )
-        let fileURL = documentsDirectory.appendingPathComponent(meta.suggestedFileName)
-        try await TTSAudioOutput.saveAudioAsM4A(
-            result.audio, to: fileURL, metadata: meta.avMetadataItems()
+        let savedURL = try await AudioOutput.saveAudio(
+            result.audio,
+            toFolder: documentsDirectory,
+            filename: meta.suggestedFileName,
+            sampleRate: result.sampleRate,
+            metadataProvider: meta.avMetadataItems
         )
 
         var gen = Generation(
             metadata: meta,
-            audioFileName: meta.suggestedFileName,
+            audioFileName: savedURL.lastPathComponent,
             audioDuration: result.audioDuration,
             isFavorite: false
         )
@@ -784,6 +851,7 @@ final class ViewModel: @unchecked Sendable {
             String(format: "Generation complete. %.1f seconds of audio.", result.audioDuration)
         ).post()
     }
+
 
     // MARK: - Playback position updates
 
@@ -829,6 +897,10 @@ final class ViewModel: @unchecked Sendable {
         selectedSpeaker = Qwen3Speaker(rawValue: generation.speaker) ?? .ryan
         selectedLanguage = Qwen3Language(rawValue: generation.language) ?? .english
         instruction = generation.instruction
+        currentRTF = generation.realTimeFactor
+        currentSpeedFactor = generation.speedFactor
+        currentStepsPerSecond = generation.stepsPerSecond
+        currentTimeToFirstBuffer = generation.timeToFirstBuffer
     }
 
     func playGeneration(_ generation: Generation) {
@@ -836,7 +908,6 @@ final class ViewModel: @unchecked Sendable {
         guard FileManager.default.fileExists(atPath: url.path) else { return }
 
         do {
-            // Configure audio session for playback on iOS (same as streaming path)
             #if os(iOS)
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.playback, mode: .default, options: [])
@@ -955,7 +1026,7 @@ final class ViewModel: @unchecked Sendable {
                     print("SpeakAX: skipping \(url.lastPathComponent) - no TTSKit metadata found")
                     continue
                 }
-                let dur = (try? await TTSAudioOutput.duration(of: url)) ?? 0
+                let dur = (try? await AudioOutput.duration(of: url)) ?? 0
                 var gen = Generation(
                     metadata: meta,
                     audioFileName: url.lastPathComponent,
@@ -1041,36 +1112,13 @@ final class ViewModel: @unchecked Sendable {
     }
 }
 
-// MARK: - Sample Counter
+// MARK: - TTSModelVariant Display Helpers
 
-// MARK: - TTSModelPreset Display Helpers
-
-extension TTSModelPreset {
-    var displayName: String {
-        switch self {
-            case .qwen3TTS_0_6b: return "Qwen3 TTS 0.6B"
-            case .qwen3TTS_1_7b: return "Qwen3 TTS 1.7B"
-        }
-    }
-
+extension TTSModelVariant {
     var sizeEstimate: String {
         switch self {
             case .qwen3TTS_0_6b: return "~1 GB"
             case .qwen3TTS_1_7b: return "~2.2 GB"
-        }
-    }
-}
-
-// MARK: - MLComputeUnits Display Helpers
-
-extension MLComputeUnits {
-    var displayName: String {
-        switch self {
-            case .cpuOnly: return "CPU"
-            case .cpuAndGPU: return "GPU"
-            case .cpuAndNeuralEngine: return "Neural Engine"
-            case .all: return "All"
-            @unknown default: return "Unknown"
         }
     }
 }
