@@ -33,19 +33,23 @@ setup:
 	@echo "Checking for fastlane"
 	@which fastlane > /dev/null || (echo "Installing fastlane..." && brew install fastlane)
 	@echo "fastlane is installed."
-	@$(MAKE) generate-whisperax-xcconfig
+	@$(MAKE) generate-xcconfigs
 	@echo "Done 🚀"
 
 
-generate-whisperax-xcconfig:
-	@echo "Updating DEVELOPMENT_TEAM in Examples/WhisperAX/Debug.xcconfig..."
+generate-xcconfigs:
 	@TEAM_ID=$$(defaults read com.apple.dt.Xcode IDEProvisioningTeams | plutil -convert json -r -o - -- - | jq -r  'to_entries[0].value | sort_by(.teamType == "Individual") | .[0].teamID' 2>/dev/null); \
 	if [ -z "$$TEAM_ID" ]; then \
 		echo "Error: No Development Team ID found. Please log into Xcode with your Apple ID and select a team."; \
 	else \
 		echo "DEVELOPMENT_TEAM=$$TEAM_ID" > Examples/WhisperAX/Debug.xcconfig; \
-		echo "DEVELOPMENT_TEAM has been updated in Examples/WhisperAX/Debug.xcconfig with your Development Team ID: $$TEAM_ID"; \
+		echo "Updated Examples/WhisperAX/Debug.xcconfig with Development Team ID: $$TEAM_ID"; \
+		echo "DEVELOPMENT_TEAM=$$TEAM_ID" > Examples/TTS/SpeakAX/Debug.xcconfig; \
+		echo "Updated Examples/TTS/SpeakAX/Debug.xcconfig with Development Team ID: $$TEAM_ID"; \
 	fi
+
+generate-whisperax-xcconfig: generate-xcconfigs
+generate-speakax-xcconfig: generate-xcconfigs
 
 
 setup-huggingface-cli:
