@@ -215,8 +215,7 @@ public class AudioOutput: @unchecked Sendable {
     ///   - filename: File name without extension (extension is appended from `format`).
     ///   - sampleRate: Sample rate in Hz.
     ///   - format: Desired output format. Defaults to `.m4a`.
-    ///   - metadata: Optional metadata items to embed into the file container.
-    ///     Only applied for M4A output; silently ignored for WAV (WAV has no metadata atoms).
+    ///   - metadataProvider: Optional metadata callback for items to embed into the file container for m4a formats.
     /// - Returns: The URL of the written file.
     /// - Throws: `TTSError` if audio encoding or export fails.
     @discardableResult

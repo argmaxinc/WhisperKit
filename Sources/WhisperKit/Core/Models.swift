@@ -461,10 +461,11 @@ public struct DecodingResult {
 }
 
 /// Reference-type container for transcription output.
-/// The stored properties stay thread-safe because each one uses
-/// `TranscriptionPropertyLock`, so reads/writes hop through a private `NSLock`
-/// before the value is accessed, making this shared `@unchecked Sendable` class
-/// safe to hand across concurrent contexts.
+///
+/// Each property is protected by its own `TranscriptionPropertyLock`, which
+/// serializes whole-value reads and writes. Atomic whole-value replacement is
+/// thread-safe; read-modify-write operations (e.g. `result.segments.append(...)`)
+/// are not - callers must use external synchronisation.
 open class TranscriptionResult: Codable, @unchecked Sendable {
     @TranscriptionPropertyLock public var text: String
     @TranscriptionPropertyLock public var segments: [TranscriptionSegment]

@@ -34,8 +34,23 @@ public final class UnfairLock: @unchecked Sendable {
 
 // MARK: - Property Lock
 
-/// Serializes access to a value with an `os_unfair_lock` so mutation stays
-/// thread-safe. Useful for properties on types marked `@unchecked Sendable`.
+/// Serializes whole-value reads and writes with an `os_unfair_lock`.
+/// Useful for properties on types marked `@unchecked Sendable`.
+///
+/// **Known limitation — only whole-value replacement is safe:**
+///
+/// ```swift
+/// holder.ref = otherRef        // safe: single locked write
+/// holder.count = newCount      // safe: single locked write
+///
+/// holder.ref.count += 1        // NOT safe: gets the reference (locked),
+///                              // then mutates .count with no lock held
+/// holder.count += 1            // NOT safe: get and set are two separate
+///                              // lock acquisitions with a gap between them
+/// ```
+///
+/// For read-modify-write safety, callers must replace the entire value
+/// atomically or use their own external synchronisation.
 @propertyWrapper
 public struct PropertyLock<Value: Codable & Sendable>: Sendable, Codable {
     private let lock: UnfairLock
