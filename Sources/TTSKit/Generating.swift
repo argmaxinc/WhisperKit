@@ -18,13 +18,13 @@ import Foundation
 public protocol SpeechGenerating: Sendable {
     /// Default voice identifier for this model (e.g. `"ryan"` for Qwen3 TTS).
     ///
-    /// Returned by `TTSKit.generate()` and `playSpeech()` when `voice` is `nil`.
+    /// Returned by `TTSKit.generate()` and `play()` when `voice` is `nil`.
     /// Each model implementation provides its own sensible default.
     var defaultVoice: String { get }
 
     /// Default language identifier for this model (e.g. `"english"` for Qwen3 TTS).
     ///
-    /// Returned by `TTSKit.generate()` and `playSpeech()` when `language` is `nil`.
+    /// Returned by `TTSKit.generate()` and `play()` when `language` is `nil`.
     var defaultLanguage: String { get }
 
     /// Output sample rate in Hz (e.g. 24000 for Qwen3 TTS).

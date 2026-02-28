@@ -239,7 +239,7 @@ struct TTSCLI: AsyncParsableCommand {
 
         let result: SpeechResult
         if play {
-            result = try await tts.playSpeech(
+            result = try await tts.play(
                 text: inputText,
                 speaker: speaker,
                 language: language,
@@ -256,15 +256,14 @@ struct TTSCLI: AsyncParsableCommand {
 
         let format = AudioOutput.AudioFileFormat(rawValue: outputFormat.lowercased()) ?? .m4a
         let outputURL = URL(fileURLWithPath: outputPath)
-        let folder = outputURL.deletingLastPathComponent().path == "."
+        let outputFolder = outputURL.deletingLastPathComponent().path == "."
             ? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
             : outputURL.deletingLastPathComponent()
-        let filename = outputURL.deletingPathExtension().lastPathComponent
 
         let savedURL = try await AudioOutput.saveAudio(
             result.audio,
-            toFolder: folder,
-            filename: filename,
+            toFolder: outputFolder,
+            filename: outputURL.lastPathComponent,
             sampleRate: result.sampleRate,
             format: format
         )

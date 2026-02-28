@@ -116,6 +116,7 @@ public class Qwen3SpeechDecoder: SpeechDecoding, @unchecked Sendable {
 
         var timings = SpeechTimings()
 
+        // TODO: Remove forking logic with package with min os version upgrade
         if #available(macOS 15.0, iOS 18.0, watchOS 11.0, visionOS 2.0, *) {
             guard let keyCacheTensor = cache.keyCacheTensor,
                 let valueCacheTensor = cache.valueCacheTensor

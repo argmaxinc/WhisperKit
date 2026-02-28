@@ -776,12 +776,12 @@ final class ViewModel: @unchecked Sendable {
         return result
     }
 
-    /// Run `playSpeech`, streaming waveform peaks and audio samples back to the main actor.
+    /// Run `play`, streaming waveform peaks and audio samples back to the main actor.
     private func streamGeneration(tts: TTSKit) async throws -> SpeechResult {
         let options = buildOptions()
         let sampleRate = Double(Qwen3TTSConstants.sampleRate)
 
-        let result = try await tts.playSpeech(
+        let result = try await tts.play(
             text: inputText,
             speaker: selectedSpeaker,
             language: selectedLanguage,

@@ -347,7 +347,7 @@ import TTSKit
 
 Task {
     let tts = try await TTSKit()
-    let result = try await tts.generateSpeech(text: "Hello from TTSKit!")
+    let result = try await tts.generate(text: "Hello from TTSKit!")
     print("Generated \(result.audioDuration)s of audio at \(result.sampleRate)Hz")
 }
 ```
@@ -356,13 +356,13 @@ Task {
 
 ### Model Selection
 
-TTSKit ships two model sizes. You can select the model by passing a preset to `TTSKitConfig`:
+TTSKit ships two model sizes. You can select the model by passing a variant to `TTSKitConfig`:
 
 ```swift
-// Fast, runs on all platforms (~500 MB download)
+// Fast, runs on all platforms (~1 GB download)
 let tts = try await TTSKit(TTSKitConfig(model: .qwen3TTS_0_6b))
 
-// Higher quality, macOS only (~1.5 GB download, supports style instructions)
+// Higher quality, macOS only (~2.2 GB download, supports style instructions)
 let tts = try await TTSKit(TTSKitConfig(model: .qwen3TTS_1_7b))
 ```
 
@@ -373,29 +373,29 @@ Models are hosted on [HuggingFace](https://huggingface.co/argmaxinc/ttskit-corem
 You can choose from 9 built-in voices and 10 languages:
 
 ```swift
-let result = try await tts.generateSpeech(
+let result = try await tts.generate(
     text: "こんにちは世界",
     speaker: .onoAnna,
     language: .japanese
 )
 ```
 
-**Voices:** Ryan, Aiden, Ono Anna, Sohee, Eric, Dylan, Serena, Vivian, Uncle Fu
+**Voices:** `.ryan`, `.aiden`, `.onoAnna` (`"ono-anna"`), `.sohee`, `.eric`, `.dylan`, `.serena`, `.vivian`, `.uncleFu` (`"uncle-fu"`)
 
-**Languages:** English, Chinese, Japanese, Korean, German, French, Russian, Portuguese, Spanish, Italian
+**Languages:** `.english`, `.chinese`, `.japanese`, `.korean`, `.german`, `.french`, `.russian`, `.portuguese`, `.spanish`, `.italian`
 
 #### Real-Time Streaming Playback
 
-`playSpeech` streams audio to the device speakers frame-by-frame as it is generated:
+`play` streams audio to the device speakers frame-by-frame as it is generated:
 
 ```swift
-try await tts.playSpeech(text: "This starts playing before generation finishes.")
+try await tts.play(text: "This starts playing before generation finishes.")
 ```
 
 You can control how much audio is buffered before playback begins. The default `.auto` strategy measures the first generation step and pre-buffers just enough to avoid underruns:
 
 ```swift
-try await tts.playSpeech(
+try await tts.play(
     text: "Long passage...",
     playbackStrategy: .auto
 )
@@ -405,11 +405,11 @@ Other strategies include `.stream` (immediate, no buffer), `.buffered(seconds:)`
 
 ### Generation Options
 
-You can customize sampling, chunking, and concurrency via `TTSGenerationOptions`:
+You can customize sampling, chunking, and concurrency via `GenerationOptions`:
 
 ```swift
 // Defaults recommended by Qwen
-var options = TTSGenerationOptions()
+var options = GenerationOptions()
 options.temperature = 0.9
 options.topK = 50
 options.repetitionPenalty = 1.05
@@ -417,9 +417,9 @@ options.maxNewTokens = 245
 
 // Long text is automatically split at sentence boundaries
 options.chunkingStrategy = .sentence
-options.concurrentWorkerCount = nil  // nil = unlimited concurrency across chunks
+options.concurrentWorkerCount = nil  // nil = all chunks run concurrently with a good default for the device
 
-let result = try await tts.generateSpeech(text: longArticle, options: options)
+let result = try await tts.generate(text: longArticle, options: options)
 ```
 
 #### Style Instructions (1.7B only)
@@ -427,10 +427,10 @@ let result = try await tts.generateSpeech(text: longArticle, options: options)
 The 1.7B model accepts a natural-language style instruction that controls prosody:
 
 ```swift
-var options = TTSGenerationOptions()
+var options = GenerationOptions()
 options.instruction = "Speak slowly and warmly, like a storyteller."
 
-let result = try await tts.generateSpeech(
+let result = try await tts.generate(
     text: "Once upon a time...",
     speaker: .ryan,
     options: options
@@ -442,21 +442,19 @@ let result = try await tts.generateSpeech(
 Generated audio can be saved to WAV or M4A:
 
 ```swift
-let result = try await tts.generateSpeech(text: "Save me!")
+let result = try await tts.generate(text: "Save me!")
+let outputDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
 
-// Save as WAV
-try TTSAudioOutput.saveAudio(result.audio, to: URL(fileURLWithPath: "output.wav"))
-
-// Save as M4A (AAC) with optional metadata
-try await TTSAudioOutput.saveAudioAsM4A(result.audio, to: URL(fileURLWithPath: "output.m4a"))
+// Save as .wav or .m4a (AAC)
+try await AudioOutput.saveAudio(result.audio, toFolder: outputDir, filename: "output", format: .m4a)
 ```
 
 ### Progress Callbacks
 
-You can receive per-step progress during generation. Return `false` from the callback to cancel early:
+You can receive per-step audio during generation. Return `false` from the callback to cancel early:
 
 ```swift
-let result = try await tts.generateSpeech(text: "Hello!") { progress in
+let result = try await tts.generate(text: "Hello!") { progress in
     print("Audio chunk: \(progress.audio.count) samples")
     if let stepTime = progress.stepTime {
         print("First step took \(stepTime)s")

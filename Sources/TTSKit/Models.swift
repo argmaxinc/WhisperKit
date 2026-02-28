@@ -86,9 +86,9 @@ public typealias SpeechCallback = (@Sendable (SpeechProgress) -> Bool?)?
 ///     public func generate(text: String, voice: String, language: String,
 ///                          options: GenerationOptions, callback: SpeechCallback) async throws -> SpeechResult { ... }
 ///
-///     public func playSpeech(text: String, voice: String, language: String,
-///                            options: GenerationOptions, playbackStrategy: PlaybackStrategy,
-///                            callback: SpeechCallback) async throws -> SpeechResult { ... }
+///     public func play(text: String, voice: String, language: String,
+///                      options: GenerationOptions, playbackStrategy: PlaybackStrategy,
+///                      callback: SpeechCallback) async throws -> SpeechResult { ... }
 /// }
 /// ```
 public protocol SpeechModel: AnyObject, Sendable {
@@ -119,7 +119,7 @@ public protocol SpeechModel: AnyObject, Sendable {
     ///
     /// Default implementation calls `generate` and plays via `AudioOutput`. Override
     /// if the model has its own streaming playback path.
-    func playSpeech(
+    func play(
         text: String,
         voice: String?,
         language: String?,
@@ -131,7 +131,7 @@ public protocol SpeechModel: AnyObject, Sendable {
 
 // MARK: - Playback Strategy
 
-/// Controls how `playSpeech()` buffers audio before starting playback.
+/// Controls how `play()` buffers audio before starting playback.
 ///
 /// The TTS generation loop produces one RVQ frame (~80ms of audio) per step.
 /// On fast devices, steps complete well under 80ms and audio can stream immediately.
@@ -232,7 +232,7 @@ public struct GenerationOptions: Codable, Sendable {
 
     /// Number of concurrent workers for multi-chunk generation.
     /// - `0`: all chunks run concurrently in one batch (default, fastest for non-streaming use cases).
-    /// - `1`: sequential - one chunk at a time; required for real-time `playSpeech` streaming.
+    /// - `1`: sequential - one chunk at a time; required for real-time `play` streaming.
     /// - `N`: at most N chunks run concurrently.
     public var concurrentWorkerCount: Int
 
@@ -256,6 +256,7 @@ public struct GenerationOptions: Codable, Sendable {
     /// Force the legacy `[FloatType]` inference path even on macOS 15+ / iOS 18+.
     /// When `false` (default), the MLTensor path is taken on supported OS versions.
     /// Set to `true` in tests to exercise the pre-macOS-15 code path on current hardware.
+    // TODO: Remove forking logic with package with min os version upgrade
     public var forceLegacyEmbedPath: Bool
 
     public init(

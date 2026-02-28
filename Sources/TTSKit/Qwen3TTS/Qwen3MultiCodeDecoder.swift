@@ -345,6 +345,7 @@ public class Qwen3MultiCodeDecoder: MultiCodeDecoding, @unchecked Sendable {
     }
 
     /// Legacy path - kept for OS compatibility (pre-macOS 15).
+    // TODO: Remove forking logic with package with min os version upgrade
     public func generateMultiCodes(
         hiddenStates: [FloatType],
         code0Embed: [FloatType],

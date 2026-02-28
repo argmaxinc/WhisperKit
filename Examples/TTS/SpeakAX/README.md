@@ -27,7 +27,7 @@ On first launch, the app prompts you to download a model. Downloads are cached i
 If you use a private model fork, set a token in `ViewModel.swift`:
 
 ```swift
-let config = TTSKitConfig(model: selectedPreset, token: "hf_...")
+let config = TTSKitConfig(model: selectedPreset, modelToken: "hf_...")
 ```
 
 ## Features

@@ -31,7 +31,7 @@ import Foundation
 /// 3. `enqueueAudioChunk(_:)` - pushes frames through the buffer/tail pipeline.
 /// 4. `stopPlayback()` - commits the tail with fade-out, waits, tears down.
 ///
-/// Thread safety: used only from `TTSKit.playSpeech()` which forces sequential mode
+/// Thread safety: used only from `TTSKit.play()` which forces sequential mode
 /// (concurrency=1). `TTSKit` ensures serialized access.
 /// Subclassing is intentionally not supported. Use the `TTSKit` component override
 /// mechanism (`TTSKitConfig`) to swap in an alternative audio backend.
@@ -209,12 +209,17 @@ public class AudioOutput: @unchecked Sendable {
     /// (no re-encode). For WAV or metadata-free M4A: writes directly.
     /// On watchOS, `.m4a` automatically falls back to `.wav`.
     ///
+    /// Any extension already present in `filename` is stripped before writing.
+    /// The output format is resolved in this order: explicit `format` parameter,
+    /// then extension found in `filename` if it matches a supported format,
+    /// then `.m4a` as the default.
+    ///
     /// - Parameters:
     ///   - samples: Mono Float32 PCM samples.
     ///   - folder: Destination directory. Created if it doesn't exist.
-    ///   - filename: File name without extension (extension is appended from `format`).
+    ///   - filename: File name, with or without extension.
     ///   - sampleRate: Sample rate in Hz.
-    ///   - format: Desired output format. Defaults to `.m4a`.
+    ///   - format: Output format. Inferred from `filename` extension when `nil`.
     ///   - metadataProvider: Optional metadata callback for items to embed into the file container for m4a formats.
     /// - Returns: The URL of the written file.
     /// - Throws: `TTSError` if audio encoding or export fails.
@@ -224,17 +229,19 @@ public class AudioOutput: @unchecked Sendable {
         toFolder folder: URL,
         filename: String,
         sampleRate: Int = 24000,
-        format: AudioFileFormat = .m4a,
+        format: AudioFileFormat? = nil,
         metadataProvider: (@Sendable () throws -> [AVMetadataItem])? = nil
     ) async throws -> URL {
         guard !samples.isEmpty else {
             throw TTSError.audioOutputFailed("No audio samples to export")
         }
 
-        let resolvedFormat = AudioFileFormat.resolve(format)
-        let outputURL =
-            folder
-            .appendingPathComponent(filename)
+        let filenameURL = URL(fileURLWithPath: filename)
+        let baseName = filenameURL.deletingPathExtension().lastPathComponent
+        let inferredFormat = AudioFileFormat(rawValue: filenameURL.pathExtension.lowercased())
+        let resolvedFormat = AudioFileFormat.resolve(format ?? inferredFormat ?? .m4a)
+        let outputURL = folder
+            .appendingPathComponent(baseName)
             .appendingPathExtension(resolvedFormat.fileExtension)
 
         if !FileManager.default.fileExists(atPath: folder.path) {

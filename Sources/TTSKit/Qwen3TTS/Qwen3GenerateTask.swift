@@ -139,7 +139,7 @@ open class Qwen3GenerateTask: @unchecked Sendable, SpeechGenerating {
         callback: SpeechCallback,
         prefixCache: TTSPromptCache? = nil
     ) async throws -> SpeechResult {
-        let speaker = Qwen3Speaker(rawValue: voice) ?? .ryan
+        let qwen3Speaker = Qwen3Speaker(rawValue: voice) ?? .ryan
         let lang = Qwen3Language(rawValue: language) ?? .english
 
         var timings = loadTimings
@@ -158,7 +158,7 @@ open class Qwen3GenerateTask: @unchecked Sendable, SpeechGenerating {
         // Phase 2: Prefill the CodeDecoder with the prompt prefix
         let prefillResult = try await prefillCodeDecoder(
             tokenizeResult: tokenizeResult,
-            speaker: speaker, lang: lang,
+            speaker: qwen3Speaker, lang: lang,
             options: options,
             prefixCache: prefixCache,
             voice: voice, language: language,
@@ -261,6 +261,8 @@ open class Qwen3GenerateTask: @unchecked Sendable, SpeechGenerating {
                 }
             }
             totalPrefillTokens = prefixCache.prefixLength + 1
+
+            // TODO: Remove forking logic with package with min os version upgrade
             if #available(macOS 15.0, iOS 18.0, watchOS 11.0, visionOS 2.0, *), !options.forceLegacyEmbedPath {
                 lastCdOutput = try await codeDecoder.decode(
                     inputEmbeds: tokenizeResult.variableEmbed.asMLTensor(), cache: cdCache, state: cdState
@@ -278,6 +280,8 @@ open class Qwen3GenerateTask: @unchecked Sendable, SpeechGenerating {
                 embedDim: embedDim
             )
             totalPrefillTokens = combinedEmbeds.count
+
+            // TODO: Remove forking logic with package with min os version upgrade
             if #available(macOS 15.0, iOS 18.0, watchOS 11.0, visionOS 2.0, *), !options.forceLegacyEmbedPath {
                 for embed in combinedEmbeds {
                     lastCdOutput = try await codeDecoder.decode(inputEmbeds: embed.asMLTensor(), cache: cdCache, state: cdState)
@@ -357,6 +361,7 @@ open class Qwen3GenerateTask: @unchecked Sendable, SpeechGenerating {
         var stepIndex = 0
         var firstBufferEmitted = false
 
+        // TODO: Remove forking logic with package with min os version upgrade
         if #available(macOS 15.0, iOS 18.0, watchOS 11.0, visionOS 2.0, *), !options.forceLegacyEmbedPath {
             let textPadEmbedTensor: MLTensor = try await textProjector.project(tokenId: Qwen3TTSConstants.textPAD)
 
@@ -754,7 +759,7 @@ open class Qwen3GenerateTask: @unchecked Sendable, SpeechGenerating {
         language: String,
         instruction: String?
     ) async throws -> TTSPromptCache {
-        let speaker = Qwen3Speaker(rawValue: voice) ?? .ryan
+        let qwen3Speaker = Qwen3Speaker(rawValue: voice) ?? .ryan
         let lang = Qwen3Language(rawValue: language) ?? .english
         let embedDim = codeDecoder.embedSize
 
@@ -762,7 +767,7 @@ open class Qwen3GenerateTask: @unchecked Sendable, SpeechGenerating {
         // Use a dummy firstTextEmbed since we drop the last element.
         let dummyFirstTextEmbed = EmbedUtilities.zeroEmbed(dim: embedDim)
         let allEmbeds = try await buildCombinedEmbeddings(
-            speaker: speaker,
+            speaker: qwen3Speaker,
             lang: lang,
             instruction: instruction,
             firstTextEmbed: dummyFirstTextEmbed,

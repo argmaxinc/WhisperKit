@@ -47,7 +47,7 @@ public extension MLTensor {
 
     // MARK: Sync (legacy — uses DispatchSemaphore, unsafe in concurrent async contexts)
 
-    @available(*, deprecated, message: "Use await toIntArray() instead — this blocks the cooperative thread pool.")
+    @available(*, deprecated, message: "Use await toIntArray() instead.")
     func asIntArray() -> [Int] {
         let semaphore = DispatchSemaphore(value: 0)
         var result: [Int] = []
@@ -59,7 +59,7 @@ public extension MLTensor {
         return result
     }
 
-    @available(*, deprecated, message: "Use await toFloatArray() instead — this blocks the cooperative thread pool.")
+    @available(*, deprecated, message: "Use await toFloatArray() instead.")
     func asFloatArray() -> [Float] {
         let semaphore = DispatchSemaphore(value: 0)
         var result: [Float] = []
@@ -71,7 +71,7 @@ public extension MLTensor {
         return result
     }
 
-    @available(*, deprecated, message: "Use await toMLMultiArray() instead — this blocks the cooperative thread pool.")
+    @available(*, deprecated, message: "Use await toMLMultiArray() instead.")
     func asMLMultiArray() -> MLMultiArray {
         let semaphore = DispatchSemaphore(value: 0)
         var result = try! MLMultiArray(shape: [1], dataType: .float16, initialValue: 0.0)

@@ -29,7 +29,7 @@ import os
 ///
 /// `setupGenerateTask(...)` returns an `any SpeechGenerating` - override it to use a
 /// completely different generation algorithm while keeping the chunking, concurrency,
-/// crossfade, and playback orchestration provided by `generate` and `playSpeech`.
+/// crossfade, and playback orchestration provided by `generate` and `play`.
 /// Mirrors `WhisperKit.setupTranscribeTask(...)`.
 open class TTSKit: @unchecked Sendable {
     // MARK: - Model components (protocol-typed, swappable)
@@ -92,7 +92,7 @@ open class TTSKit: @unchecked Sendable {
 
     // MARK: - Audio output
 
-    /// Audio output used by `playSpeech`.
+    /// Audio output used by `play`.
     /// `AudioOutput` is playback-only; WhisperKit's `AudioProcessor` is capture-only.
     /// They serve complementary roles and do not need to be merged.
     public let audioOutput = AudioOutput()
@@ -989,7 +989,7 @@ open class TTSKit: @unchecked Sendable {
     ///   - callback: Optional per-step callback.
     /// - Returns: A `SpeechResult` with the complete audio and timing breakdown.
     /// - Throws: `TTSError` on generation failure or task cancellation.
-    open func playSpeech(
+    open func play(
         text: String,
         voice: String? = nil,
         language: String? = nil,
@@ -1062,7 +1062,14 @@ open class TTSKit: @unchecked Sendable {
 
     // MARK: - Qwen3-typed convenience API
 
-    /// Build a prompt cache using typed speaker/language enums.
+    /// Build a prompt cache using typed Qwen3 speaker and language enums.
+    ///
+    /// - Parameters:
+    ///   - speaker: The `Qwen3Speaker` to pre-warm the cache for.
+    ///   - language: The `Qwen3Language` to pre-warm the cache for.
+    ///   - instruction: Optional style instruction (1.7B only).
+    /// - Returns: A `TTSPromptCache` for the given parameters.
+    /// - Throws: `TTSError` on generation failure.
     @discardableResult
     open func buildPromptCache(
         speaker: Qwen3Speaker,
@@ -1077,6 +1084,15 @@ open class TTSKit: @unchecked Sendable {
     }
 
     /// Generate speech from text using typed Qwen3 speaker and language enums.
+    ///
+    /// - Parameters:
+    ///   - text: Input text to synthesise.
+    ///   - speaker: The `Qwen3Speaker` voice to use.
+    ///   - language: The `Qwen3Language` to synthesise in.
+    ///   - options: Generation options controlling sampling, chunking, and concurrency.
+    ///   - callback: Per-step callback receiving decoded audio chunks. Return `false` to cancel.
+    /// - Returns: The assembled `SpeechResult`.
+    /// - Throws: `TTSError` on generation failure or task cancellation.
     open func generate(
         text: String,
         speaker: Qwen3Speaker,
@@ -1094,7 +1110,17 @@ open class TTSKit: @unchecked Sendable {
     }
 
     /// Generate speech and stream playback using typed Qwen3 speaker and language enums.
-    open func playSpeech(
+    ///
+    /// - Parameters:
+    ///   - text: Input text to synthesise.
+    ///   - speaker: The `Qwen3Speaker` voice to use.
+    ///   - language: The `Qwen3Language` to synthesise in.
+    ///   - options: Generation options controlling sampling, chunking, and concurrency.
+    ///   - playbackStrategy: Controls how much audio is buffered before playback begins.
+    ///   - callback: Per-step callback receiving decoded audio chunks. Return `false` to cancel.
+    /// - Returns: The assembled `SpeechResult`.
+    /// - Throws: `TTSError` on generation failure or task cancellation.
+    open func play(
         text: String,
         speaker: Qwen3Speaker,
         language: Qwen3Language = .english,
@@ -1102,7 +1128,7 @@ open class TTSKit: @unchecked Sendable {
         playbackStrategy: PlaybackStrategy = .auto,
         callback: SpeechCallback = nil
     ) async throws -> SpeechResult {
-        try await playSpeech(
+        try await play(
             text: text,
             voice: speaker.rawValue,
             language: language.rawValue,
