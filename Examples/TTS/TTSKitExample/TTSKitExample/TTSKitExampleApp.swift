@@ -4,7 +4,7 @@
 import SwiftUI
 
 @main
-struct SpeakAXApp: App {
+struct TTSKitExampleApp: App {
     @State private var viewModel = ViewModel()
 
     var body: some Scene {
@@ -38,6 +38,7 @@ import UIKit
 /// Installs a window-level tap gesture recognizer that dismisses the keyboard whenever
 /// the user taps outside a UITextView or UITextField. Uses `cancelsTouchesInView = false`
 /// and a delegate check so text selection and all other controls continue to work normally.
+@MainActor
 private func installKeyboardDismissGesture() {
     guard let window = UIApplication.shared
         .connectedScenes

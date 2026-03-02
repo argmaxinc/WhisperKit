@@ -1,7 +1,7 @@
 //  For licensing see accompanying LICENSE.md file.
 //  Copyright © 2026 Argmax, Inc. All rights reserved.
 
-import ArgmaxCore
+@_exported import ArgmaxCore
 import CoreML
 import Foundation
 import Hub

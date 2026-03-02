@@ -477,7 +477,7 @@ swift run whisperkit-cli tts --help
 
 ### Demo App
 
-The [SpeakAX](Examples/TTS/SpeakAX/) example app showcases real-time streaming, model management, waveform visualization, and generation history on macOS and iOS. See the [SpeakAX README](Examples/TTS/SpeakAX/README.md) for build instructions.
+The [TTSKitExample](Examples/TTS/TTSKitExample/) example app showcases real-time streaming, model management, waveform visualization, and generation history on macOS and iOS. See the [TTSKitExample README](Examples/TTS/TTSKitExample/README.md) for build instructions.
 
 ## Contributing & Roadmap
 

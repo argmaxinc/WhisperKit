@@ -1,6 +1,6 @@
-# TTS Example App
+# TTSKit Example App
 
-SpeakAX is the demo app for TTSKit, an on-device text-to-speech framework powered by Core ML. It runs on macOS and iOS with no server required.
+TTSKitExample is the demo app for TTSKit, an on-device text-to-speech framework powered by Core ML. It runs on macOS and iOS with no server required.
 
 ## Requirements
 
@@ -11,9 +11,9 @@ SpeakAX is the demo app for TTSKit, an on-device text-to-speech framework powere
 
 ## Building & Running
 
-1. Open `Examples/TTS/SpeakAX/SpeakAX.xcodeproj` in Xcode.
-2. Select the **SpeakAX** scheme and your target device.
-3. **Set up signing:** In the project navigator, select the *SpeakAX* target. Go to the **Signing & Capabilities** tab, then:
+1. Open `Examples/TTS/TTSKitExample/TTSKitExample.xcodeproj` in Xcode.
+2. Select the **TTSKitExample** scheme and your target device.
+3. **Set up signing:** In the project navigator, select the *TTSKitExample* target. Go to the **Signing & Capabilities** tab, then:
    - Choose your Apple Developer Team from the **Team** dropdown.
    - Make sure a unique bundle identifier is set.
    - Xcode will automatically handle provisioning; resolve any signing issues if prompted.
@@ -48,8 +48,8 @@ let config = TTSKitConfig(model: selectedPreset, modelToken: "hf_...")
 ## Project Structure
 
 ```
-SpeakAX/
-├── SpeakAXApp.swift              entry point
+TTSKitExample/
+├── TTSKitExampleApp.swift        entry point
 ├── ContentView.swift             root NavigationSplitView
 ├── SidebarView.swift             model management + history
 ├── DetailView.swift              input form, waveform, playback
@@ -62,10 +62,3 @@ SpeakAX/
 ```
 
 Persistence is file-based. Each generation is a self-contained `.m4a` file with all metadata (text, speaker, timings) embedded as JSON in the iTunes comment atom. No database is needed. The history is reconstructed by scanning the Documents directory at launch.
-
-## Tests
-
-Select the **SpeakAXTests** scheme and press `Cmd+U`.
-
-- **Integration tests.** Download a model and run end-to-end generation. These require a network connection and take several minutes on first run.
-- **Unit tests** (`AudioMetadataTests`). Round-trip metadata encoding and decoding, no network needed.

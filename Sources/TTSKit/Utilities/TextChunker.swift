@@ -23,7 +23,7 @@ public enum TextChunkingStrategy: String, Codable, CaseIterable, Sendable {
 /// chunk to advance by the exact token count - no character estimation needed.
 ///
 /// `defaultTargetChunkSize` / `defaultMinChunkSize` are the single source of truth for
-/// these defaults - all other call sites (TTSGenerationOptions, SpeakAX) reference them.
+/// these defaults - all other call sites reference them.
 public struct TextChunker {
     /// Default target chunk size (tokens).
     public static let defaultTargetChunkSize: Int = 42

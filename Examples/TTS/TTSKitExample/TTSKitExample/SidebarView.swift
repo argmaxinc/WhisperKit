@@ -2,6 +2,7 @@
 //  Copyright © 2026 Argmax, Inc. All rights reserved.
 
 import SwiftUI
+import WhisperKit
 
 struct SidebarView: View {
     @Environment(ViewModel.self) private var viewModel
@@ -48,7 +49,10 @@ struct SidebarView: View {
                 }
             }
             .overlay {
-                if vm.generations.isEmpty {
+                if vm.isLoadingHistory {
+                    ProgressView("Loading history…")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if vm.generations.isEmpty {
                     ContentUnavailableView(
                         "No Generations Yet",
                         systemImage: "waveform",
@@ -97,10 +101,11 @@ struct SidebarView: View {
             let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
             Text("App Version: \(version) (\(build))")
             #if os(iOS)
-            Text("Device: \(UIDevice.current.model)")
-            Text("OS: \(UIDevice.current.systemVersion)")
+            Text("Device Model: \(WhisperKit.deviceName())")
+            Text("OS Version: \(UIDevice.current.systemVersion)")
             #elseif os(macOS)
-            Text("OS: \(ProcessInfo.processInfo.operatingSystemVersionString)")
+            Text("Device Model: \(WhisperKit.deviceName())")
+            Text("OS Version: \(ProcessInfo.processInfo.operatingSystemVersionString)")
             #endif
         }
         .font(.system(.caption2, design: .monospaced))

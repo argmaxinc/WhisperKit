@@ -324,6 +324,7 @@ final class ViewModel: @unchecked Sendable {
 
     var generations: [Generation] = []
     var selectedGenerationID: UUID?
+    var isLoadingHistory: Bool = true
 
     // MARK: - Search
 
@@ -335,7 +336,7 @@ final class ViewModel: @unchecked Sendable {
 
     // MARK: - Private
 
-    private var tts: TTSKit?
+    private var ttsKit: TTSKit?
     private(set) var loadedPreset: TTSModelVariant?
     private var audioPlayer: AVAudioPlayer?
     private var tokenCountTask: Task<Void, Never>?
@@ -496,7 +497,7 @@ final class ViewModel: @unchecked Sendable {
             // Create TTSKit without loading - we drive load/prewarm explicitly
             ttsConfig.load = false
             let kit = try await TTSKit(ttsConfig)
-            tts = kit
+            ttsKit = kit
 
             // Prewarm: compile each CoreML model sequentially, then discard.
             // This prevents memory exhaustion from concurrent compilation on first launch.
@@ -510,7 +511,7 @@ final class ViewModel: @unchecked Sendable {
                 // Surface to the user so they know something unexpected happened,
                 // but continue - the full load often succeeds regardless.
                 let msg = error.localizedDescription
-                print("Prewarm warning: \(msg) - continuing to load")
+                Logging.debug("Prewarm warning: \(msg) - continuing to load")
                 statusMessage = "Prewarm warning: \(msg)\nContinuing..."
             }
 
@@ -543,8 +544,8 @@ final class ViewModel: @unchecked Sendable {
     /// Unload the current model from memory
     func unloadModel() {
         cancelAllTasks()
-        let oldTTS = tts
-        tts = nil
+        let oldTTS = ttsKit
+        ttsKit = nil
         Task { await oldTTS?.unloadModels() }
         loadedPreset = nil
         modelState = .unloaded
@@ -667,7 +668,7 @@ final class ViewModel: @unchecked Sendable {
     }
 
     private func generate() async {
-        guard canGenerate, let tts else { return }
+        guard canGenerate, let ttsKit else { return }
 
         generationState = .generating
         statusMessage = "Generating speech..."
@@ -686,7 +687,7 @@ final class ViewModel: @unchecked Sendable {
             break
         case .auto, .stream, .buffered:
             isStreaming = true
-            activeAudioOutput = tts.audioOutput
+            activeAudioOutput = ttsKit.audioOutput
             startPlaybackUpdates()
         }
 
@@ -695,7 +696,7 @@ final class ViewModel: @unchecked Sendable {
 
             switch strategy {
             case .generateFirst:
-                result = try await generateFirstGeneration(tts: tts)
+                result = try await generateFirstGeneration(tts: ttsKit)
                 currentAudioSamples = result.audio
                 currentDuration = result.audioDuration
                 currentWaveform = peaksPerToken(from: result.audio)
@@ -704,7 +705,7 @@ final class ViewModel: @unchecked Sendable {
                     playGeneration(gen)
                 }
             case .auto, .stream, .buffered:
-                result = try await streamGeneration(tts: tts)
+                result = try await streamGeneration(tts: ttsKit)
                 stopPlaybackUpdates()
                 activeAudioOutput = nil
                 isStreaming = false
@@ -981,7 +982,7 @@ final class ViewModel: @unchecked Sendable {
         tokenCountTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(Self.tokenCountDebounceMs))
             guard !Task.isCancelled, let self else { return }
-            guard let count = self.tts?.tokenizer?.encode(text: text).count else { return }
+            guard let count = self.ttsKit?.tokenizer?.encode(text: text).count else { return }
             await MainActor.run { self.inputTokenCount = count }
         }
     }
@@ -1006,7 +1007,15 @@ final class ViewModel: @unchecked Sendable {
 
     /// Scan the Documents directory for `.m4a` files, read embedded metadata from
     /// each one, and rebuild the in-memory `generations` array. No JSON sidecar needed.
+    ///
+    /// Files are loaded in parallel and streamed into `generations` as they complete,
+    /// so the list populates progressively rather than appearing all at once after a
+    /// full sequential scan. Waveform decoding runs on a detached background task to
+    /// avoid blocking the main actor with synchronous PCM I/O.
     func loadGenerations() async {
+        isLoadingHistory = true
+        defer { isLoadingHistory = false }
+
         let fm = FileManager.default
         guard let files = try? fm.contentsOfDirectory(
             at: documentsDirectory,
@@ -1018,29 +1027,60 @@ final class ViewModel: @unchecked Sendable {
             .sorted { $0.lastPathComponent > $1.lastPathComponent } // newest first by name
 
         let favorites = loadedFavoriteIDs()
-        var loaded: [Generation] = []
 
-        for url in m4aFiles {
-            do {
-                guard let meta = try await AudioMetadata.load(from: url) else {
-                    print("SpeakAX: skipping \(url.lastPathComponent) - no TTSKit metadata found")
-                    continue
-                }
-                let dur = (try? await AudioOutput.duration(of: url)) ?? 0
-                var gen = Generation(
-                    metadata: meta,
-                    audioFileName: url.lastPathComponent,
-                    audioDuration: dur,
-                    isFavorite: favorites.contains(meta.id)
-                )
-                gen.waveformSamples = waveformPeaks(from: url)
-                loaded.append(gen)
-            } catch {
-                print("SpeakAX: failed to load \(url.lastPathComponent) - \(error.localizedDescription)")
-            }
+        // Intermediate result: raw Sendable data that can cross the actor boundary.
+        // Generation.init is @MainActor so it is constructed in the for-await loop below,
+        // which runs back on the main actor.
+        struct RawGenerationData: Sendable {
+            let metadata: AudioMetadata
+            let audioFileName: String
+            let audioDuration: TimeInterval
+            let isFavorite: Bool
+            let waveformSamples: [Float]?
         }
 
-        generations = loaded
+        await withTaskGroup(of: RawGenerationData?.self) { group in
+            for url in m4aFiles {
+                group.addTask {
+                    do {
+                        guard let meta = try await AudioMetadata.load(from: url) else {
+                            Logging.debug("Skipping \(url.lastPathComponent) - no TTSKit metadata found")
+                            return nil
+                        }
+                        let dur = (try? await AudioOutput.duration(of: url)) ?? 0
+                        // Decode PCM on a background thread to avoid blocking the main actor
+                        let waveform = await Task.detached(priority: .utility) { [weak self] in
+                            self?.waveformPeaks(from: url)
+                        }.value
+                        return RawGenerationData(
+                            metadata: meta,
+                            audioFileName: url.lastPathComponent,
+                            audioDuration: dur,
+                            isFavorite: favorites.contains(meta.id),
+                            waveformSamples: waveform
+                        )
+                    } catch {
+                        Logging.error("Failed to load \(url.lastPathComponent) - \(error.localizedDescription)")
+                        return nil
+                    }
+                }
+            }
+
+            // for-await runs on the main actor; construct @MainActor Generation here
+            var loaded: [Generation] = []
+            for await rawData in group {
+                guard let rawData else { continue }
+                var gen = Generation(
+                    metadata: rawData.metadata,
+                    audioFileName: rawData.audioFileName,
+                    audioDuration: rawData.audioDuration,
+                    isFavorite: rawData.isFavorite
+                )
+                gen.waveformSamples = rawData.waveformSamples
+                loaded.append(gen)
+                generations = loaded.sorted { $0.audioFileName > $1.audioFileName }
+            }
+        }
     }
 
     // MARK: Favorites - stored in UserDefaults (only mutable state not in the file)
@@ -1061,7 +1101,7 @@ final class ViewModel: @unchecked Sendable {
 
     /// Read an audio file from disk and return waveform peaks at token density.
     /// Returns `nil` if the file can't be read (missing, corrupt, etc.).
-    func waveformPeaks(from url: URL) -> [Float]? {
+    nonisolated func waveformPeaks(from url: URL) -> [Float]? {
         guard FileManager.default.fileExists(atPath: url.path),
               let file = try? AVAudioFile(forReading: url) else { return nil }
         let frameCount = AVAudioFrameCount(file.length)
@@ -1074,7 +1114,7 @@ final class ViewModel: @unchecked Sendable {
 
     /// Resample raw audio into 1 peak per token (~80ms).
     /// Matches the fixed bar width used by WaveformView.
-    func peaksPerToken(from audioSamples: [Float]) -> [Float] {
+    nonisolated func peaksPerToken(from audioSamples: [Float]) -> [Float] {
         let samplesPerBar = Int(WaveformView.secondsPerBar * Double(Qwen3TTSConstants.sampleRate))
         guard samplesPerBar > 0, !audioSamples.isEmpty else { return [] }
         let barCount = (audioSamples.count + samplesPerBar - 1) / samplesPerBar

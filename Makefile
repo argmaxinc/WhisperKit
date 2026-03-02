@@ -44,12 +44,12 @@ generate-xcconfigs:
 	else \
 		echo "DEVELOPMENT_TEAM=$$TEAM_ID" > Examples/WhisperAX/Debug.xcconfig; \
 		echo "Updated Examples/WhisperAX/Debug.xcconfig with Development Team ID: $$TEAM_ID"; \
-		echo "DEVELOPMENT_TEAM=$$TEAM_ID" > Examples/TTS/SpeakAX/Debug.xcconfig; \
-		echo "Updated Examples/TTS/SpeakAX/Debug.xcconfig with Development Team ID: $$TEAM_ID"; \
+		echo "DEVELOPMENT_TEAM=$$TEAM_ID" > Examples/TTS/TTSKitExample/Debug.xcconfig; \
+		echo "Updated Examples/TTS/TTSKitExample/Debug.xcconfig with Development Team ID: $$TEAM_ID"; \
 	fi
 
 generate-whisperax-xcconfig: generate-xcconfigs
-generate-speakax-xcconfig: generate-xcconfigs
+generate-ttskitexample-xcconfig: generate-xcconfigs
 
 
 setup-huggingface-cli:

@@ -240,8 +240,7 @@ public class AudioOutput: @unchecked Sendable {
         let baseName = filenameURL.deletingPathExtension().lastPathComponent
         let inferredFormat = AudioFileFormat(rawValue: filenameURL.pathExtension.lowercased())
         let resolvedFormat = AudioFileFormat.resolve(format ?? inferredFormat ?? .m4a)
-        let outputURL = folder
-            .appendingPathComponent(baseName)
+        let outputURL = folder.appendingPathComponent(baseName)
             .appendingPathExtension(resolvedFormat.fileExtension)
 
         if !FileManager.default.fileExists(atPath: folder.path) {

@@ -18,41 +18,41 @@
 			containerPortal = 1664E8BD2F4407CF00D76464 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 1664E8C42F4407CF00D76464;
-			remoteInfo = SpeakAX;
+			remoteInfo = TTSKitExample;
 		};
 		1664E8DD2F4407D000D76464 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 1664E8BD2F4407CF00D76464 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 1664E8C42F4407CF00D76464;
-			remoteInfo = SpeakAX;
+			remoteInfo = TTSKitExample;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		1664E8C52F4407CF00D76464 /* SpeakAX.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SpeakAX.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		1664E8D22F4407D000D76464 /* SpeakAXTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SpeakAXTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		1664E8DC2F4407D000D76464 /* SpeakAXUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SpeakAXUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		1664E8C52F4407CF00D76464 /* TTSKitExample.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TTSKitExample.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1664E8D22F4407D000D76464 /* TTSKitExampleTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TTSKitExampleTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		1664E8DC2F4407D000D76464 /* TTSKitExampleUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TTSKitExampleUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		16AE68362F52299C0022A88D /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		1664E9792F46582100D76464 /* Exceptions for "SpeakAX" folder in "SpeakAX" target */ = {
+		1664E9792F46582100D76464 /* Exceptions for "TTSKitExample" folder in "TTSKitExample" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Resources/Info.plist,
 			);
-			target = 1664E8C42F4407CF00D76464 /* SpeakAX */;
+			target = 1664E8C42F4407CF00D76464 /* TTSKitExample */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		1664E8C72F4407CF00D76464 /* SpeakAX */ = {
+		1664E8C72F4407CF00D76464 /* TTSKitExample */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				1664E9792F46582100D76464 /* Exceptions for "SpeakAX" folder in "SpeakAX" target */,
+				1664E9792F46582100D76464 /* Exceptions for "TTSKitExample" folder in "TTSKitExample" target */,
 			);
-			path = SpeakAX;
+			path = TTSKitExample;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -95,7 +95,7 @@
 			isa = PBXGroup;
 			children = (
 				16AE68362F52299C0022A88D /* Debug.xcconfig */,
-				1664E8C72F4407CF00D76464 /* SpeakAX */,
+				1664E8C72F4407CF00D76464 /* TTSKitExample */,
 				163CD86B2F4FBF6C001FA01B /* Frameworks */,
 				1664E8C62F4407CF00D76464 /* Products */,
 			);
@@ -104,9 +104,9 @@
 		1664E8C62F4407CF00D76464 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				1664E8C52F4407CF00D76464 /* SpeakAX.app */,
-				1664E8D22F4407D000D76464 /* SpeakAXTests.xctest */,
-				1664E8DC2F4407D000D76464 /* SpeakAXUITests.xctest */,
+				1664E8C52F4407CF00D76464 /* TTSKitExample.app */,
+				1664E8D22F4407D000D76464 /* TTSKitExampleTests.xctest */,
+				1664E8DC2F4407D000D76464 /* TTSKitExampleUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -114,9 +114,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		1664E8C42F4407CF00D76464 /* SpeakAX */ = {
+		1664E8C42F4407CF00D76464 /* TTSKitExample */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 1664E8E62F4407D000D76464 /* Build configuration list for PBXNativeTarget "SpeakAX" */;
+			buildConfigurationList = 1664E8E62F4407D000D76464 /* Build configuration list for PBXNativeTarget "TTSKitExample" */;
 			buildPhases = (
 				1664E8C12F4407CF00D76464 /* Sources */,
 				1664E8C22F4407CF00D76464 /* Frameworks */,
@@ -127,20 +127,20 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				1664E8C72F4407CF00D76464 /* SpeakAX */,
+				1664E8C72F4407CF00D76464 /* TTSKitExample */,
 			);
-			name = SpeakAX;
+			name = TTSKitExample;
 			packageProductDependencies = (
 				1664E8F02F44082900D76464 /* TTSKit */,
 				163CD86C2F4FBF6C001FA01B /* WhisperKit */,
 			);
-			productName = SpeakAX;
-			productReference = 1664E8C52F4407CF00D76464 /* SpeakAX.app */;
+			productName = TTSKitExample;
+			productReference = 1664E8C52F4407CF00D76464 /* TTSKitExample.app */;
 			productType = "com.apple.product-type.application";
 		};
-		1664E8D12F4407D000D76464 /* SpeakAXTests */ = {
+		1664E8D12F4407D000D76464 /* TTSKitExampleTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 1664E8E92F4407D000D76464 /* Build configuration list for PBXNativeTarget "SpeakAXTests" */;
+			buildConfigurationList = 1664E8E92F4407D000D76464 /* Build configuration list for PBXNativeTarget "TTSKitExampleTests" */;
 			buildPhases = (
 				1664E8CE2F4407D000D76464 /* Sources */,
 				1664E8CF2F4407D000D76464 /* Frameworks */,
@@ -151,16 +151,16 @@
 			dependencies = (
 				1664E8D42F4407D000D76464 /* PBXTargetDependency */,
 			);
-			name = SpeakAXTests;
+			name = TTSKitExampleTests;
 			packageProductDependencies = (
 			);
-			productName = SpeakAXTests;
-			productReference = 1664E8D22F4407D000D76464 /* SpeakAXTests.xctest */;
+			productName = TTSKitExampleTests;
+			productReference = 1664E8D22F4407D000D76464 /* TTSKitExampleTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		1664E8DB2F4407D000D76464 /* SpeakAXUITests */ = {
+		1664E8DB2F4407D000D76464 /* TTSKitExampleUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 1664E8EC2F4407D000D76464 /* Build configuration list for PBXNativeTarget "SpeakAXUITests" */;
+			buildConfigurationList = 1664E8EC2F4407D000D76464 /* Build configuration list for PBXNativeTarget "TTSKitExampleUITests" */;
 			buildPhases = (
 				1664E8D82F4407D000D76464 /* Sources */,
 				1664E8D92F4407D000D76464 /* Frameworks */,
@@ -171,11 +171,11 @@
 			dependencies = (
 				1664E8DE2F4407D000D76464 /* PBXTargetDependency */,
 			);
-			name = SpeakAXUITests;
+			name = TTSKitExampleUITests;
 			packageProductDependencies = (
 			);
-			productName = SpeakAXUITests;
-			productReference = 1664E8DC2F4407D000D76464 /* SpeakAXUITests.xctest */;
+			productName = TTSKitExampleUITests;
+			productReference = 1664E8DC2F4407D000D76464 /* TTSKitExampleUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
@@ -201,7 +201,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 1664E8C02F4407CF00D76464 /* Build configuration list for PBXProject "SpeakAX" */;
+			buildConfigurationList = 1664E8C02F4407CF00D76464 /* Build configuration list for PBXProject "TTSKitExample" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -218,9 +218,9 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				1664E8C42F4407CF00D76464 /* SpeakAX */,
-				1664E8D12F4407D000D76464 /* SpeakAXTests */,
-				1664E8DB2F4407D000D76464 /* SpeakAXUITests */,
+				1664E8C42F4407CF00D76464 /* TTSKitExample */,
+				1664E8D12F4407D000D76464 /* TTSKitExampleTests */,
+				1664E8DB2F4407D000D76464 /* TTSKitExampleUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -277,12 +277,12 @@
 /* Begin PBXTargetDependency section */
 		1664E8D42F4407D000D76464 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 1664E8C42F4407CF00D76464 /* SpeakAX */;
+			target = 1664E8C42F4407CF00D76464 /* TTSKitExample */;
 			targetProxy = 1664E8D32F4407D000D76464 /* PBXContainerItemProxy */;
 		};
 		1664E8DE2F4407D000D76464 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 1664E8C42F4407CF00D76464 /* SpeakAX */;
+			target = 1664E8C42F4407CF00D76464 /* TTSKitExample */;
 			targetProxy = 1664E8DD2F4407D000D76464 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -432,7 +432,7 @@
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = SpeakAX/Resources/Info.plist;
+				INFOPLIST_FILE = TTSKitExample/Resources/Info.plist;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -448,6 +448,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.2;
 				MARKETING_VERSION = 0.0.1;
+				INFOPLIST_KEY_CFBundleDisplayName = TTSKit;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.argmaxinc.ttskit.Example${DEVELOPMENT_TEAM}";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -492,7 +493,7 @@
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = SpeakAX/Resources/Info.plist;
+				INFOPLIST_FILE = TTSKitExample/Resources/Info.plist;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -508,6 +509,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.2;
 				MARKETING_VERSION = 0.0.1;
+				INFOPLIST_KEY_CFBundleDisplayName = TTSKit;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.argmaxinc.ttskit.Example${DEVELOPMENT_TEAM}";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -538,7 +540,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				MACOSX_DEPLOYMENT_TARGET = 15.2;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.argmaxinc.ttskit.SpeakAXTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.argmaxinc.ttskit.TTSKitExampleTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -548,7 +550,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SpeakAX.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SpeakAX";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TTSKitExample.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TTSKitExample";
 				XROS_DEPLOYMENT_TARGET = 2.2;
 			};
 			name = Debug;
@@ -565,7 +567,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				MACOSX_DEPLOYMENT_TARGET = 15.2;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.argmaxinc.ttskit.SpeakAXTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.argmaxinc.ttskit.TTSKitExampleTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -575,7 +577,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SpeakAX.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SpeakAX";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TTSKitExample.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TTSKitExample";
 				XROS_DEPLOYMENT_TARGET = 2.2;
 			};
 			name = Release;
@@ -591,7 +593,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				MACOSX_DEPLOYMENT_TARGET = 15.2;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.argmaxinc.ttskit.SpeakAXUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.argmaxinc.ttskit.TTSKitExampleUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -601,7 +603,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_TARGET_NAME = SpeakAX;
+				TEST_TARGET_NAME = TTSKitExample;
 				XROS_DEPLOYMENT_TARGET = 2.2;
 			};
 			name = Debug;
@@ -617,7 +619,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				MACOSX_DEPLOYMENT_TARGET = 15.2;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.argmaxinc.ttskit.SpeakAXUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.argmaxinc.ttskit.TTSKitExampleUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -627,7 +629,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_TARGET_NAME = SpeakAX;
+				TEST_TARGET_NAME = TTSKitExample;
 				XROS_DEPLOYMENT_TARGET = 2.2;
 			};
 			name = Release;
@@ -635,7 +637,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		1664E8C02F4407CF00D76464 /* Build configuration list for PBXProject "SpeakAX" */ = {
+		1664E8C02F4407CF00D76464 /* Build configuration list for PBXProject "TTSKitExample" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				1664E8E42F4407D000D76464 /* Debug */,
@@ -644,7 +646,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		1664E8E62F4407D000D76464 /* Build configuration list for PBXNativeTarget "SpeakAX" */ = {
+		1664E8E62F4407D000D76464 /* Build configuration list for PBXNativeTarget "TTSKitExample" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				1664E8E72F4407D000D76464 /* Debug */,
@@ -653,7 +655,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		1664E8E92F4407D000D76464 /* Build configuration list for PBXNativeTarget "SpeakAXTests" */ = {
+		1664E8E92F4407D000D76464 /* Build configuration list for PBXNativeTarget "TTSKitExampleTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				1664E8EA2F4407D000D76464 /* Debug */,
@@ -662,7 +664,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		1664E8EC2F4407D000D76464 /* Build configuration list for PBXNativeTarget "SpeakAXUITests" */ = {
+		1664E8EC2F4407D000D76464 /* Build configuration list for PBXNativeTarget "TTSKitExampleUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				1664E8ED2F4407D000D76464 /* Debug */,

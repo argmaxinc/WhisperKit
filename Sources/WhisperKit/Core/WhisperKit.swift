@@ -1,6 +1,7 @@
 //  For licensing see accompanying LICENSE.md file.
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
+@_exported import ArgmaxCore
 import Accelerate
 import AVFoundation
 import CoreML

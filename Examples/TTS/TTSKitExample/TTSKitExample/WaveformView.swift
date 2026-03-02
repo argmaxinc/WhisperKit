@@ -25,7 +25,7 @@ struct WaveformView: View {
     private let barWidth: CGFloat = 3
     private let barSpacing: CGFloat = 1.5
     /// Seconds of audio each bar represents
-    static let secondsPerBar: TimeInterval = 0.08
+    nonisolated static let secondsPerBar: TimeInterval = 0.08
 
     private var barStep: CGFloat { barWidth + barSpacing }
 
@@ -70,15 +70,18 @@ struct WaveformView: View {
             }
 
             // Fixed playhead line at center
+            let dotRadius: CGFloat = 4
             let line = Path { p in
-                p.move(to: CGPoint(x: centerX, y: 0))
-                p.addLine(to: CGPoint(x: centerX, y: size.height))
+                p.move(to: CGPoint(x: centerX, y: dotRadius))
+                p.addLine(to: CGPoint(x: centerX, y: size.height - dotRadius))
             }
             context.stroke(line, with: .color(Color.accentColor), lineWidth: 1.5)
 
-            // Playhead dot
-            let dot = Path(ellipseIn: CGRect(x: centerX - 4, y: -1, width: 8, height: 8))
-            context.fill(dot, with: .color(Color.accentColor))
+            // Playhead dots at top and bottom of the line
+            let topDot = Path(ellipseIn: CGRect(x: centerX - dotRadius, y: 0, width: dotRadius * 2, height: dotRadius * 2))
+            let bottomDot = Path(ellipseIn: CGRect(x: centerX - dotRadius, y: size.height - dotRadius * 2, width: dotRadius * 2, height: dotRadius * 2))
+            context.fill(topDot, with: .color(Color.accentColor))
+            context.fill(bottomDot, with: .color(Color.accentColor))
         }
         .onChange(of: playbackTime) { _, newTime in
             if newTime == 0 {
