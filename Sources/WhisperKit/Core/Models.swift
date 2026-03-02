@@ -7,18 +7,6 @@ import CoreML
 import Hub
 import NaturalLanguage
 import Tokenizers
-
-#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
-public typealias FloatType = Float16
-#else
-public typealias FloatType = Float
-#endif
-
-#if (os(macOS) || targetEnvironment(macCatalyst)) && arch(arm64) && compiler(<6)
-extension Float16: BNNSScalar {}
-extension Float16: MLShapedArrayScalar {}
-#endif
-
 // MARK: - CoreML
 
 public protocol WhisperMLModel: AnyObject {
@@ -101,38 +89,7 @@ public enum ModelVariant: CustomStringConvertible, CaseIterable {
     }
 }
 
-@frozen
-public enum ModelState: CustomStringConvertible {
-    case unloading
-    case unloaded
-    case loading
-    case loaded
-    case prewarming
-    case prewarmed
-    case downloading
-    case downloaded
-
-    public var description: String {
-        switch self {
-            case .unloading:
-                return "Unloading"
-            case .unloaded:
-                return "Unloaded"
-            case .loading:
-                return "Loading"
-            case .loaded:
-                return "Loaded"
-            case .prewarming:
-                return "Specializing"
-            case .prewarmed:
-                return "Specialized"
-            case .downloading:
-                return "Downloading"
-            case .downloaded:
-                return "Downloaded"
-        }
-    }
-}
+// ModelState is defined in ArgmaxCore/ModelState.swift and re-exported here.
 
 public struct ModelComputeOptions: Sendable {
     public var melCompute: MLComputeUnits
@@ -502,10 +459,11 @@ public struct DecodingResult {
 }
 
 /// Reference-type container for transcription output.
-/// The stored properties stay thread-safe because each one uses
-/// `TranscriptionPropertyLock`, so reads/writes hop through a private `NSLock`
-/// before the value is accessed, making this shared `@unchecked Sendable` class
-/// safe to hand across concurrent contexts.
+///
+/// Each property is protected by its own `TranscriptionPropertyLock`, which
+/// serializes whole-value reads and writes. Atomic whole-value replacement is
+/// thread-safe; read-modify-write operations (e.g. `result.segments.append(...)`)
+/// are not - callers must use external synchronisation.
 open class TranscriptionResult: Codable, @unchecked Sendable {
     @TranscriptionPropertyLock public var text: String
     @TranscriptionPropertyLock public var segments: [TranscriptionSegment]
@@ -732,11 +690,6 @@ public struct TranscriptionProgress: Sendable {
 public typealias SegmentDiscoveryCallback = (_ segments: [TranscriptionSegment]) -> Void
 
 /// A callback that reports changes in the model's state.
-/// - Parameters:
-///   - oldState: The previous state of the model, if any
-///   - newState: The current state of the model
-public typealias ModelStateCallback = (_ oldState: ModelState?, _ newState: ModelState) -> Void
-
 /// A callback that reports changes in the transcription process.
 /// - Parameter state: The current `TranscriptionState` of the transcription process
 public typealias TranscriptionStateCallback = (_ state: TranscriptionState) -> Void

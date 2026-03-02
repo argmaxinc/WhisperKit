@@ -26,7 +26,7 @@ public extension AudioChunking {
                             let updatedSegment = TranscriptionUtilities.updateSegmentTimings(segment: segment, seekTime: seekTime)
                             updatedSegments.append(updatedSegment)
                         }
-                        var updatedResult = result
+                        let updatedResult = result
                         updatedResult.seekTime = seekTime
                         updatedResult.segments = updatedSegments
                         updatedTranscriptionResults.append(updatedResult)
