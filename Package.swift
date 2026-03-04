@@ -22,13 +22,17 @@ let package = Package(
             name: "WhisperKit",
             targets: ["WhisperKit"]
         ),
+        .library(
+            name: "TTSKit",
+            targets: ["TTSKit"]
+        ),
         .executable(
             name: "whisperkit-cli",
             targets: ["WhisperKitCLI"]
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/huggingface/swift-transformers.git", .upToNextMinor(from: "1.1.2")),
+        .package(url: "https://github.com/huggingface/swift-transformers.git", .upToNextMinor(from: "1.1.6")),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.7.0"),
     ] + (isServerEnabled() ? [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.115.1"),
@@ -38,10 +42,24 @@ let package = Package(
     ] : []),
     targets: [
         .target(
+            name: "ArgmaxCore",
+            swiftSettings: approachableConcurrencySettings
+        ),
+        .target(
             name: "WhisperKit",
             dependencies: [
+                "ArgmaxCore",
                 .product(name: "Hub", package: "swift-transformers"),
                 .product(name: "Tokenizers", package: "swift-transformers"),
+            ],
+            swiftSettings: approachableConcurrencySettings
+        ),
+        .target(
+            name: "TTSKit",
+            dependencies: [
+                "ArgmaxCore",
+                .product(name: "Tokenizers", package: "swift-transformers"),
+                .product(name: "Hub", package: "swift-transformers"),
             ],
             swiftSettings: approachableConcurrencySettings
         ),
@@ -52,9 +70,16 @@ let package = Package(
                 .product(name: "Hub", package: "swift-transformers"),
                 .product(name: "Tokenizers", package: "swift-transformers"),
             ],
-            path: "Tests",
+            exclude: ["UnitTestsPlan.xctestplan"],
             resources: [
-                .process("WhisperKitTests/Resources"),
+                .process("Resources"),
+            ],
+            swiftSettings: approachableConcurrencySettings
+        ),
+        .testTarget(
+            name: "TTSKitTests",
+            dependencies: [
+                "TTSKit"
             ],
             swiftSettings: approachableConcurrencySettings
         ),
@@ -62,13 +87,13 @@ let package = Package(
             name: "WhisperKitCLI",
             dependencies: [
                 "WhisperKit",
+                "TTSKit",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ] + (isServerEnabled() ? [
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
                 .product(name: "OpenAPIVapor", package: "swift-openapi-vapor"),
             ] : []),
-            path: "Sources/WhisperKitCLI",
             exclude: (isServerEnabled() ? [] : ["Server"]),
             swiftSettings: approachableConcurrencySettings + (isServerEnabled() ? [.define("BUILD_SERVER_CLI")] : [])
         )

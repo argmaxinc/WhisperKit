@@ -13,7 +13,8 @@ open class WhisperKitConfig {
     public var modelRepo: String?
     /// Token for downloading models from repo (if required)
     public var modelToken: String?
-
+    /// HuggingFace Hub compatible endpoint URL
+    public var modelEndpoint: String?
     /// Folder to store models
     public var modelFolder: String?
     /// Folder to store tokenizers
@@ -53,11 +54,11 @@ open class WhisperKitConfig {
     /// model gets loaded sequentially and unloaded immediately to trigger specialization if necessary.
     /// 
     /// **Trade-offs**
-    /// - **Pro** — The peak memory usage during compilation is reduced because
+    /// - **Pro** - The peak memory usage during compilation is reduced because
     ///   only one model is kept in memory at any given point. Otherwise, the
     ///   peak memory will bloat to all model weights combined plus the peak
     ///   compilation memory (higher than model weights). 
-    /// - **Con** — The load time will be multiplied by 2 (usually <1s when cache is hit)
+    /// - **Con** - The load time will be multiplied by 2 (usually <1s when cache is hit)
     ///   because of the load-unload-load pattern when the specialized model file cache is
     ///   actually hit and prewarm does not trigger specialization
     ///
@@ -75,6 +76,7 @@ open class WhisperKitConfig {
                 downloadBase: URL? = nil,
                 modelRepo: String? = nil,
                 modelToken: String? = nil,
+                modelEndpoint: String? = nil,
                 modelFolder: String? = nil,
                 tokenizerFolder: URL? = nil,
                 computeOptions: ModelComputeOptions? = nil,
@@ -97,6 +99,7 @@ open class WhisperKitConfig {
         self.downloadBase = downloadBase
         self.modelRepo = modelRepo
         self.modelToken = modelToken
+        self.modelEndpoint = modelEndpoint
         self.modelFolder = modelFolder
         self.tokenizerFolder = tokenizerFolder
         self.computeOptions = computeOptions

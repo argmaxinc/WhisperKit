@@ -364,6 +364,31 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(paddedSamples.count, 1600, "Padded or trimmed samples count is not as expected")
     }
 
+    func testSuppressInputIfNeededMutesBuffer() {
+        let audioProcessor = AudioProcessor()
+        audioProcessor.setInputSuppressed(true)
+        var buffer: [Float] = [0.25, -0.5, 1.0]
+        audioProcessor.suppressInputIfNeeded(&buffer)
+        XCTAssertTrue(buffer.allSatisfy { $0 == 0.0 }, "Suppressed buffer should contain silence")
+    }
+
+    func testSuppressInputIfNeededNoopWhenDisabled() {
+        let audioProcessor = AudioProcessor()
+        audioProcessor.setInputSuppressed(false)
+        var buffer: [Float] = [0.25, -0.5, 1.0]
+        audioProcessor.suppressInputIfNeeded(&buffer)
+        XCTAssertEqual(buffer, [0.25, -0.5, 1.0], "Buffer should remain unchanged when suppression is disabled")
+    }
+
+    func testInputSuppressionToggleState() {
+        let audioProcessor = AudioProcessor()
+        XCTAssertFalse(audioProcessor.isInputSuppressed, "Suppression should be disabled by default")
+        audioProcessor.setInputSuppressed(true)
+        XCTAssertTrue(audioProcessor.isInputSuppressed, "Suppression should be enabled after setting true")
+        audioProcessor.setInputSuppressed(false)
+        XCTAssertFalse(audioProcessor.isInputSuppressed, "Suppression should be disabled after setting false")
+    }
+
     func testAudioResample() throws {
         let audioFileURL = try XCTUnwrap(
             Bundle.current(for: self).url(forResource: "jfk", withExtension: "wav"),
@@ -3221,6 +3246,87 @@ final class UnitTests: XCTestCase {
         XCTAssertTrue(allFilters[1] is SuppressBlankFilter)
         XCTAssertTrue(allFilters[2] is SuppressTokensFilter)
         XCTAssertTrue(allFilters[3] is TimestampRulesFilter)
+    }
+
+    // MARK: - PropertyLock Concurrency Tests
+
+    /// Verifies that whole-value replacement on a `@TranscriptionPropertyLock`
+    /// property is safe: each worker writes a distinct value and the final read
+    /// always returns one of those values.
+    func testPropertyLockWholeValueReplacementIsSafe() async {
+        final class IntHolder: @unchecked Sendable {
+            @TranscriptionPropertyLock var number: Int = 0
+        }
+
+        let workerCount = max(2, ProcessInfo.processInfo.activeProcessorCount * 2)
+        let holder = IntHolder()
+
+        await withTaskGroup(of: Void.self) { group in
+            for workerIndex in 0..<workerCount {
+                group.addTask {
+                    for _ in 0..<10_000 {
+                        holder.number = workerIndex
+                    }
+                }
+            }
+        }
+
+        let finalValue = holder.number
+        XCTAssertTrue((0..<workerCount).contains(finalValue), "Final value \(finalValue) is outside the valid range [0, \(workerCount))")
+    }
+
+    /// Verifies that sub-property mutations on a reference-type value are not
+    /// protected by `PropertyLock`. The lock only covers get/set of the reference
+    /// itself; mutations on the returned object (e.g. `holder.ref.count += 1`)
+    /// happen entirely outside the lock and lose updates under contention.
+    func testPropertyLockSubPropertyMutationIsUnsafe() async throws {
+        throw XCTSkip("Known limitation - see PropertyLock documentation for details")
+        
+        final class Counter: Codable, @unchecked Sendable {
+            var count: Int = 0
+        }
+        final class Holder: @unchecked Sendable {
+            @TranscriptionPropertyLock var ref = Counter()
+        }
+
+        let workerCount = max(2, ProcessInfo.processInfo.activeProcessorCount * 2)
+        let iterationsPerWorker = 50_000
+        let expected = workerCount * iterationsPerWorker
+        let holder = Holder()
+
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<workerCount {
+                group.addTask {
+                    for _ in 0..<iterationsPerWorker {
+                        holder.ref.count += 1  // unsafe: lock is not held during mutation
+                    }
+                }
+            }
+        }
+
+        let actual = holder.ref.count
+        XCTAssertEqual(actual, expected, "Lost \(expected - actual) updates due to race on ref.count")
+    }
+
+    /// Verifies that `PropertyLock` round-trips correctly through `Codable`
+    /// encoding and decoding without corrupting the protected value.
+    func testPropertyLockCodableRoundTrip() throws {
+        final class Wrapper: Codable {
+            @TranscriptionPropertyLock var text: String
+            @TranscriptionPropertyLock var count: Int
+
+            init(text: String, count: Int) {
+                self.text = text
+                self.count = count
+            }
+        }
+
+        let original = Wrapper(text: "hello", count: 42)
+        let encoded = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(Wrapper.self, from: encoded)
+
+        XCTAssertEqual(decoded.text, original.text)
+        XCTAssertEqual(decoded.count, original.count)
     }
 
 }
