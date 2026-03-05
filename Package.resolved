@@ -1,4 +1,5 @@
 {
+  "originHash" : "743e79c3326ce1c9c28de431b8795ed965943d53f6d850c43dfc7649581b9fd2",
   "pins" : [
     {
       "identity" : "swift-argument-parser",
@@ -28,6 +29,15 @@
       }
     },
     {
+      "identity" : "swift-syntax",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/swiftlang/swift-syntax",
+      "state" : {
+        "revision" : "4799286537280063c85a32f09884cfbca301b1a1",
+        "version" : "602.0.0"
+      }
+    },
+    {
       "identity" : "swift-transformers",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/huggingface/swift-transformers.git",
@@ -37,5 +47,5 @@
       }
     }
   ],
-  "version" : 2
+  "version" : 3
 }
