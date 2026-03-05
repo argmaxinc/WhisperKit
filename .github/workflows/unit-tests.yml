@@ -38,19 +38,19 @@ jobs:
           - {
               name: "iOS",
               condition: true,
-              clean-destination: "generic/platform=iOS",
+              clean-destination: "generic/platform=iOS Simulator",
               test-destination: "platform=iOS Simulator,OS=${{ inputs.ios-version }},name=${{ inputs.ios-device }}",
             }
           - {
               name: "watchOS",
               condition: "${{ inputs.macos-runner == 'macos-26' }}",
-              clean-destination: "generic/platform=watchOS",
+              clean-destination: "generic/platform=watchOS Simulator",
               test-destination: "platform=watchOS Simulator,OS=${{ inputs.watchos-version }},name=Apple Watch Ultra 3 (49mm)",
             }
           - {
               name: "visionOS",
               condition: "${{ inputs.macos-runner == 'macos-26' }}",
-              clean-destination: "generic/platform=visionOS",
+              clean-destination: "generic/platform=visionOS Simulator",
               test-destination: "platform=visionOS Simulator,OS=${{ inputs.visionos-version }},name=Apple Vision Pro",
             }
     timeout-minutes: ${{ matrix.run-config['name'] == 'visionOS' && 60 || 30 }}
