@@ -34,6 +34,7 @@ let macroTestTarget = Target.testTarget(
     name: "ArgmaxCoreMacrosTests",
     dependencies: [
         "ArgmaxCoreMacros",
+        "ArgmaxCoreMacroPlugin",
         .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
         .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax")
     ]

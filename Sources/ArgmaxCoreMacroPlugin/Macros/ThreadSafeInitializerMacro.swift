@@ -54,7 +54,7 @@ public struct ThreadSafeInitializerMacro: BodyMacro {
             // Parse the optional default value
             var defaultValue: String? = nil
             for arg in callExpr.arguments {
-                if arg.label?.text == "defaultValue" {
+                if arg.label?.text == "value" {
                     defaultValue = arg.expression.trimmedDescription
                 }
             }
