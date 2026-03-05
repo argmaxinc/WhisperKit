@@ -1,9 +1,6 @@
 //  For licensing see accompanying LICENSE.md file.
 //  Copyright © 2026 Argmax, Inc. All rights reserved.
 
-import Foundation
-import RegexBuilder
-import SwiftCompilerPlugin
 import SwiftDiagnostics
 import SwiftSyntax
 import SwiftSyntaxBuilder

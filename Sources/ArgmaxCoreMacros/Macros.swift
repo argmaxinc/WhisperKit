@@ -1,8 +1,6 @@
 //  For licensing see accompanying LICENSE.md file.
 //  Copyright © 2026 Argmax, Inc. All rights reserved.
 
-import Foundation
-import SwiftCompilerPlugin
 import SwiftSyntaxMacros
 
 @attached(member, names: named(_internalState), named(_InternalState), named(inLock))
