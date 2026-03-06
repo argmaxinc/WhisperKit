@@ -82,6 +82,7 @@ let package = Package(
             name: "WhisperKit",
             dependencies: [
                 "ArgmaxCore",
+                "ArgmaxCoreMacros",
                 .product(name: "Hub", package: "swift-transformers"),
                 .product(name: "Tokenizers", package: "swift-transformers"),
             ],
@@ -91,6 +92,7 @@ let package = Package(
             name: "TTSKit",
             dependencies: [
                 "ArgmaxCore",
+                "ArgmaxCoreMacros",
                 .product(name: "Tokenizers", package: "swift-transformers"),
                 .product(name: "Hub", package: "swift-transformers"),
             ],

@@ -2,11 +2,35 @@
 //  Copyright © 2024 Argmax, Inc. All rights reserved.
 
 import Accelerate
+import ArgmaxCoreMacros
 import AVFAudio
 import CoreML
 import Hub
 import NaturalLanguage
 import Tokenizers
+
+@ThreadSafe
+open class TranscriptionResultExp: @unchecked Sendable {
+    public var text: String
+    public var segments: [TranscriptionSegment]
+    public var language: String
+    public var timings: TranscriptionTimings
+    public var seekTime: Float?
+
+    public init(
+        text: String,
+        segments: [TranscriptionSegment],
+        language: String,
+        timings: TranscriptionTimings,
+        seekTime: Float? = nil
+    ) {
+        self.text = text
+        self.segments = segments
+        self.language = language
+        self.timings = timings
+        self.seekTime = seekTime
+    }
+}
 
 // MARK: - CoreML
 
