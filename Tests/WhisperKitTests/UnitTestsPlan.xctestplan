@@ -42,13 +42,6 @@
       }
     },
     {
-      "target" : {
-        "containerPath" : "container:",
-        "identifier" : "ArgmaxCoreMacrosTests",
-        "name" : "ArgmaxCoreMacrosTests"
-      }
-    },
-    {
       "skippedTests" : [
         "TTSKitIntegrationTests",
         "TTSKitIntegrationTests\/testAllSpeakerVoices()",

@@ -23,9 +23,7 @@ let macroTarget = Target.target(
     name: "ArgmaxCoreMacros",
     dependencies: [
         "ArgmaxCore",
-        "ArgmaxCoreMacroPlugin",
-        .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
-        .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
+        "ArgmaxCoreMacroPlugin"
     ],
     swiftSettings: approachableConcurrencySettings
 )
@@ -37,7 +35,8 @@ let macroTestTarget = Target.testTarget(
         "ArgmaxCoreMacroPlugin",
         .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
         .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax")
-    ]
+    ],
+    exclude: ["MacroTestsPlan.xctestplan"]
 )
 
 let package = Package(

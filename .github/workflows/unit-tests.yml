@@ -95,12 +95,16 @@ jobs:
         if: ${{ matrix.run-config['condition'] == true }}
         run: |
           set -o pipefail
+          test_plan=UnitTestsPlan
           extra_args=()
           if [[ "${{ matrix.run-config['name'] }}" == "macOS" ]]; then
             extra_args=(ARCHS=arm64 ONLY_ACTIVE_ARCH=YES)
           fi
-          xcodebuild clean build-for-testing -scheme whisperkit-Package -destination '${{ matrix.run-config['clean-destination'] }}' "${extra_args[@]}" | xcpretty
-          xcodebuild test -testPlan UnitTestsPlan -scheme whisperkit-Package -destination '${{ matrix.run-config['test-destination'] }}' "${extra_args[@]}"
+          xcodebuild clean build-for-testing -testPlan "$test_plan" -scheme whisperkit-Package -destination '${{ matrix.run-config['clean-destination'] }}' "${extra_args[@]}" | xcpretty
+          xcodebuild test -testPlan "$test_plan" -scheme whisperkit-Package -destination '${{ matrix.run-config['test-destination'] }}' "${extra_args[@]}"
+          if [[ "${{ matrix.run-config['name'] }}" == "macOS" ]]; then
+            xcodebuild test -testPlan MacroTestsPlan -scheme whisperkit-Package -destination '${{ matrix.run-config['test-destination'] }}' "${extra_args[@]}"
+          fi
       - name: Upload Test Results
         if: failure()
         uses: actions/upload-artifact@v4
