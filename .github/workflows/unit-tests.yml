@@ -97,7 +97,7 @@ jobs:
           set -o pipefail
           test_plan=UnitTestsPlan
           extra_args=(ONLY_ACTIVE_ARCH=YES)
-          if [[ "${{ matrix.run-config['name'] }}" == "macOS" ]]; then
+          if [[ "$(uname -m)" == "arm64" ]]; then
             extra_args=(ARCHS=arm64 "${extra_args[@]}")
           fi
           xcodebuild clean build-for-testing -testPlan "$test_plan" -scheme whisperkit-Package -destination '${{ matrix.run-config['clean-destination'] }}' "${extra_args[@]}" | xcpretty
