@@ -476,6 +476,18 @@ final class UnitTests: XCTestCase {
         let energyVeryLoud = AudioProcessor.calculateAverageEnergy(of: veryLoudNoise)
         XCTAssertGreaterThan(energyVeryLoud, energyLoud, "Audio energy is not very loud")
     }
+    
+    func testProcessBufferFirstBufferProducesFiniteNormalizedRelativeEnergy() throws {
+        let audioProcessor = AudioProcessor()
+        let firstBuffer = [Float](repeating: 0.05, count: 1600)
+        
+        audioProcessor.processBuffer(firstBuffer)
+        
+        let firstEnergy = try XCTUnwrap(audioProcessor.audioEnergy.first, "Expected processBuffer to store a first energy entry")
+        XCTAssertTrue(firstEnergy.rel.isFinite, "First relative energy should always be finite")
+        XCTAssertGreaterThanOrEqual(firstEnergy.rel, 0, "Relative energy should be clamped to the lower bound")
+        XCTAssertLessThanOrEqual(firstEnergy.rel, 1, "Relative energy should be clamped to the upper bound")
+    }
 
     // MARK: - Protocol Conformance Tests
 
