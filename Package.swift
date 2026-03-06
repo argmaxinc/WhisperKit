@@ -1,13 +1,43 @@
 // swift-tools-version: 6.2
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
-import PackageDescription
+import CompilerPluginSupport
 import Foundation
+import PackageDescription
 
 let approachableConcurrencySettings: [SwiftSetting] = [
     .enableUpcomingFeature("InferIsolatedConformances"),
     .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
 ]
+
+let macroPlugin = Target.macro(
+    name: "ArgmaxCoreMacroPlugin",
+    dependencies: [
+        .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
+        .product(name: "SwiftSyntax", package: "swift-syntax"),
+        .product(name: "SwiftSyntaxMacros", package: "swift-syntax")
+    ]
+)
+
+let macroTarget = Target.target(
+    name: "ArgmaxCoreMacros",
+    dependencies: [
+        "ArgmaxCore",
+        "ArgmaxCoreMacroPlugin"
+    ],
+    swiftSettings: approachableConcurrencySettings
+)
+
+let macroTestTarget = Target.testTarget(
+    name: "ArgmaxCoreMacrosTests",
+    dependencies: [
+        "ArgmaxCoreMacros",
+        "ArgmaxCoreMacroPlugin",
+        .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
+        .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax")
+    ],
+    exclude: ["MacroTestsPlan.xctestplan"]
+)
 
 let package = Package(
     name: "whisperkit",
@@ -34,6 +64,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/huggingface/swift-transformers.git", .upToNextMinor(from: "1.1.6")),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.7.0"),
+        .package(url: "https://github.com/swiftlang/swift-syntax", from: "602.0.0"),
     ] + (isServerEnabled() ? [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.115.1"),
         .package(url: "https://github.com/apple/swift-openapi-generator", from: "1.10.2"),
@@ -45,10 +76,13 @@ let package = Package(
             name: "ArgmaxCore",
             swiftSettings: approachableConcurrencySettings
         ),
+        macroPlugin,
+        macroTarget,
         .target(
             name: "WhisperKit",
             dependencies: [
                 "ArgmaxCore",
+                "ArgmaxCoreMacros",
                 .product(name: "Hub", package: "swift-transformers"),
                 .product(name: "Tokenizers", package: "swift-transformers"),
             ],
@@ -58,11 +92,13 @@ let package = Package(
             name: "TTSKit",
             dependencies: [
                 "ArgmaxCore",
+                "ArgmaxCoreMacros",
                 .product(name: "Tokenizers", package: "swift-transformers"),
                 .product(name: "Hub", package: "swift-transformers"),
             ],
             swiftSettings: approachableConcurrencySettings
         ),
+        macroTestTarget,
         .testTarget(
             name: "WhisperKitTests",
             dependencies: [

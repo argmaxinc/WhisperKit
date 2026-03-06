@@ -1,0 +1,26 @@
+{
+  "configurations" : [
+    {
+      "id" : "EAF007C2-548B-4A60-9949-66B7C3A3399F",
+      "name" : "Configuration 1",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "maximumTestRepetitions" : 3,
+    "testRepetitionMode" : "retryOnFailure",
+    "testTimeoutsEnabled" : true
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "ArgmaxCoreMacrosTests",
+        "name" : "ArgmaxCoreMacrosTests"
+      }
+    }
+  ],
+  "version" : 1
+}

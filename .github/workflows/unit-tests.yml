@@ -32,25 +32,25 @@ jobs:
           - {
               name: "macOS",
               condition: true,
-              clean-destination: "generic/platform=macOS",
+              clean-destination: "platform=macOS,arch=arm64",
               test-destination: "platform=macOS,arch=arm64",
             }
           - {
               name: "iOS",
               condition: true,
-              clean-destination: "generic/platform=iOS",
+              clean-destination: "generic/platform=iOS Simulator",
               test-destination: "platform=iOS Simulator,OS=${{ inputs.ios-version }},name=${{ inputs.ios-device }}",
             }
           - {
               name: "watchOS",
               condition: "${{ inputs.macos-runner == 'macos-26' }}",
-              clean-destination: "generic/platform=watchOS",
+              clean-destination: "generic/platform=watchOS Simulator",
               test-destination: "platform=watchOS Simulator,OS=${{ inputs.watchos-version }},name=Apple Watch Ultra 3 (49mm)",
             }
           - {
               name: "visionOS",
               condition: "${{ inputs.macos-runner == 'macos-26' }}",
-              clean-destination: "generic/platform=visionOS",
+              clean-destination: "generic/platform=visionOS Simulator",
               test-destination: "platform=visionOS Simulator,OS=${{ inputs.visionos-version }},name=Apple Vision Pro",
             }
     timeout-minutes: ${{ matrix.run-config['name'] == 'visionOS' && 60 || 30 }}
@@ -95,8 +95,16 @@ jobs:
         if: ${{ matrix.run-config['condition'] == true }}
         run: |
           set -o pipefail
-          xcodebuild clean build-for-testing -scheme whisperkit-Package -destination '${{ matrix.run-config['clean-destination'] }}' | xcpretty
-          xcodebuild test -testPlan UnitTestsPlan -scheme whisperkit-Package -destination '${{ matrix.run-config['test-destination'] }}'
+          test_plan=UnitTestsPlan
+          extra_args=(ONLY_ACTIVE_ARCH=YES)
+          if [[ "$(uname -m)" == "arm64" ]]; then
+            extra_args=(ARCHS=arm64 "${extra_args[@]}")
+          fi
+          xcodebuild clean build-for-testing -testPlan "$test_plan" -scheme whisperkit-Package -destination '${{ matrix.run-config['clean-destination'] }}' "${extra_args[@]}" | xcpretty
+          xcodebuild test -testPlan "$test_plan" -scheme whisperkit-Package -destination '${{ matrix.run-config['test-destination'] }}' "${extra_args[@]}"
+          if [[ "${{ matrix.run-config['name'] }}" == "macOS" ]]; then
+            xcodebuild test -testPlan MacroTestsPlan -scheme whisperkit-Package -destination '${{ matrix.run-config['test-destination'] }}' "${extra_args[@]}"
+          fi
       - name: Upload Test Results
         if: failure()
         uses: actions/upload-artifact@v4
