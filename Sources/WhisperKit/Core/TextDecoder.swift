@@ -681,7 +681,10 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         // MARK: Non-inference
 
         // Update predicted token as current
-        let logits = languageLogitsFilter.filterLogits(decoderOutput.logits!, withTokens: currentTokens)
+        guard let outputLogits = decoderOutput.logits else {
+            throw WhisperError.decodingLogitsFailed("Logits unavailable in language detection output")
+        }
+        let logits = languageLogitsFilter.filterLogits(outputLogits, withTokens: currentTokens)
 
         // MARK: Sampling
 
@@ -689,7 +692,10 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
 
         let sampleResult = tokenSampler.update(tokens: currentTokens, logits: logits, logProbs: logProbs)
 
-        nextToken = sampleResult.tokens.last!
+        guard let sampledToken = sampleResult.tokens.last else {
+            throw WhisperError.decodingFailed("Language detection sampler returned empty tokens")
+        }
+        nextToken = sampledToken
         logProbs = sampleResult.logProbs
 
         let samplingTime = Date().timeIntervalSince(samplingStartTime)
@@ -745,7 +751,10 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
         let prefilledIndex = decoderInputs.cacheLength[0].intValue
         let initialPromptIndex = decoderInputs.initialPrompt.count
         var currentTokens: [Int] = decoderInputs.initialPrompt
-        var nextToken: Int = decoderInputs.initialPrompt.last!
+        guard let lastPromptToken = decoderInputs.initialPrompt.last else {
+            throw WhisperError.prepareDecoderInputsFailed("Initial prompt is empty")
+        }
+        var nextToken: Int = lastPromptToken
         var logProbs: [Float] = Array(repeating: 0, count: currentTokens.count)
 
         // Logits filters
@@ -827,7 +836,10 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
             let nonInferenceStartTime = Date()
 
             // Update predicted token as current
-            var logits = decoderOutput.logits!
+            guard let outputLogits = decoderOutput.logits else {
+                throw WhisperError.decodingLogitsFailed("Logits unavailable in decoder output")
+            }
+            var logits = outputLogits
             for filter in logitsFilters {
                 logits = filter.filterLogits(logits, withTokens: currentTokens)
             }
@@ -841,8 +853,14 @@ open class TextDecoder: TextDecoding, WhisperMLModel {
 
             let sampleResult = tokenSampler.update(tokens: currentTokens, logits: logits, logProbs: logProbs)
 
-            nextToken = sampleResult.tokens.last!
-            let nextTokenLogProb = sampleResult.logProbs.last!
+            guard let sampledToken = sampleResult.tokens.last else {
+                throw WhisperError.decodingFailed("Token sampler returned empty tokens")
+            }
+            guard let sampledLogProb = sampleResult.logProbs.last else {
+                throw WhisperError.decodingFailed("Token sampler returned empty logProbs")
+            }
+            nextToken = sampledToken
+            let nextTokenLogProb = sampledLogProb
 
             Logging.debug("Predicted next tokenIndex: \(tokenIndex + 1), token: \(nextToken), text: \(tokenizer.decode(tokens: [nextToken]))")
 
