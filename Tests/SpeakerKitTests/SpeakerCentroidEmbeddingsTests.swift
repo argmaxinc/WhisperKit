@@ -228,7 +228,36 @@ final class SpeakerCentroidEmbeddingsTests: XCTestCase {
         assertVectorsEqual(trainableOnlyCentroids[0] ?? [], [1.0, 0.0])
         assertVectorsEqual(trainableOnlyCentroids[1] ?? [], [0.0, 10.0])
     }
+    /// `.trainableOnly` omits clusters whose members are all overlap-flagged, rather than surfacing a zero-vector centroid.
+    func testCentroidsFromFinalAssignments_omitsClusterWithNoTrainableMembers() async {
+        let embeddings = [
+            SpeakerEmbedding(
+                embedding: [1.0, 0.0],
+                activeFrames: [1.0], windowIndex: 0, speakerIndex: 0,
+                nonOverlappedFrameRatio: 1.0
+            ),
+            SpeakerEmbedding(
+                embedding: [0.0, 1.0],
+                activeFrames: [1.0], windowIndex: 1, speakerIndex: 0,
+                nonOverlappedFrameRatio: 0.0
+            ),
+            SpeakerEmbedding(
+                embedding: [0.0, 2.0],
+                activeFrames: [1.0], windowIndex: 2, speakerIndex: 0,
+                nonOverlappedFrameRatio: 0.0
+            )
+        ]
+        let assignments = [0, 1, 1] // cluster 1 is entirely overlap-flagged
 
+        let clusterer = VBxClustering()
+        let trainable = await clusterer.centroidsFromFinalAssignments(
+            assignments: assignments, embeddings: embeddings,
+            source: .trainableOnly, minActiveRatio: 0.2
+        )
+
+        XCTAssertEqual(Set(trainable.keys), [0])
+        assertVectorsEqual(trainable[0] ?? [], [1.0, 0.0])
+    }
     // MARK: - Clusterer-level invariant: value matches post-reassignment mean
 
     /// For any embedding input that drives VBxClustering end-to-end, the surfaced
