@@ -512,6 +512,19 @@ open class WhisperKit {
         Logging.updateCallback(callback)
     }
 
+    // MARK: - Language support
+
+    /// Whisper language codes supported by the loaded model variant.
+    ///
+    /// English-only models (those with `.en` in the name) return just `"en"`;
+    /// multilingual models return the 99 Whisper language codes, plus `yue`
+    /// (Cantonese) for `large-v3`. The variant is detected from the loaded
+    /// model, so this is only meaningful after `loadModels()` (otherwise it
+    /// falls back to the default `.tiny` variant's languages).
+    open var supportedLanguageCodes: Set<String> {
+        modelVariant.supportedLanguageCodes
+    }
+
     // MARK: - Detect language
 
     /// Detects the language of the audio file at the specified path.

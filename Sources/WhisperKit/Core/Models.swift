@@ -59,6 +59,26 @@ public enum ModelVariant: CustomStringConvertible, CaseIterable {
         }
     }
 
+    /// Whisper language codes (ISO-639-1, or `yue` for Cantonese) supported by this variant.
+    ///
+    /// English-only variants (`.tinyEn`, `.baseEn`, `.smallEn`, `.mediumEn`) report
+    /// just `"en"`. Multilingual variants up to `large-v2` cover the original 99
+    /// Whisper languages. `large-v3` adds Cantonese (`yue`) on top of those.
+    ///
+    /// Note: the turbo distillation (`openai_whisper-large-v3-v20240930`) shares
+    /// the multilingual vocabulary of `large-v3` and is reported as such here, but
+    /// transcription quality outside English is not on par with the full model.
+    public var supportedLanguageCodes: Set<String> {
+        switch self {
+            case .tinyEn, .baseEn, .smallEn, .mediumEn:
+                return ["en"]
+            case .largev3:
+                return Constants.languageCodes
+            case .tiny, .base, .small, .medium, .large, .largev2:
+                return Constants.languageCodes.subtracting(["yue"])
+        }
+    }
+
     public var description: String {
         switch self {
             case .tiny:

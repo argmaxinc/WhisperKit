@@ -1099,6 +1099,32 @@ final class UnitTests: XCTestCase {
         }
     }
     
+    func testSupportedLanguageCodesByVariant() async throws {
+        // English-only variants advertise just english.
+        for variant: ModelVariant in [.tinyEn, .baseEn, .smallEn, .mediumEn] {
+            XCTAssertEqual(variant.supportedLanguageCodes, ["en"],
+                           "English-only variant \(variant.description) should only support 'en'")
+        }
+
+        // Multilingual variants up to large-v2 cover the 99 base Whisper languages
+        // (no Cantonese).
+        let baseMultilingual = Constants.languageCodes.subtracting(["yue"])
+        for variant: ModelVariant in [.tiny, .base, .small, .medium, .large, .largev2] {
+            XCTAssertEqual(variant.supportedLanguageCodes, baseMultilingual,
+                           "Pre-large-v3 multilingual variant \(variant.description) should not include Cantonese")
+            XCTAssertFalse(variant.supportedLanguageCodes.contains("yue"))
+            XCTAssertTrue(variant.supportedLanguageCodes.contains("en"))
+        }
+
+        // large-v3 adds Cantonese on top.
+        XCTAssertEqual(ModelVariant.largev3.supportedLanguageCodes, Constants.languageCodes)
+        XCTAssertTrue(ModelVariant.largev3.supportedLanguageCodes.contains("yue"))
+
+        // The WhisperKit instance forwards to the loaded variant.
+        let kit = try await WhisperKit(prewarm: false, load: false, download: false)
+        XCTAssertEqual(kit.supportedLanguageCodes, kit.modelVariant.supportedLanguageCodes)
+    }
+
     func testTokenizerModelVariantDetection() async throws {
         // Test that model variant detection works correctly for tokenizer selection
         let testDimensions: [(logitsDim: Int, encoderDim: Int, expectedVariant: ModelVariant)] = [
