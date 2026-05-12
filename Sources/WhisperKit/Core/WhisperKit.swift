@@ -41,7 +41,15 @@ open class WhisperKit {
 
     /// Progress
     public private(set) var currentTimings: TranscriptionTimings
-    public private(set) var progress = Progress()
+    /// Reported transcription progress. Reads go through `progressLock` so the
+    /// reference can be safely reset from inside `runTranscribeTask` while
+    /// callers are observing it from another thread (see issue #331).
+    public var progress: Progress {
+        progressLock.withLock { _progress }
+    }
+
+    private var _progress = Progress()
+    private let progressLock = UnfairLock()
 
     /// Configuration
     public var modelFolder: URL?
@@ -1002,17 +1010,21 @@ open class WhisperKit {
                 transcribeTaskResult.logTimings()
             }
 
-            if progress.isFinished {
-                // Reset progress if it is completed
-                progress = Progress()
+            // Atomically reset when finished so callers reading
+            // `progress.isFinished` from another thread can't observe a half-
+            // replaced reference.
+            progressLock.withLock {
+                if _progress.isFinished {
+                    _progress = Progress()
+                }
             }
 
             return [transcribeTaskResult]
         } catch {
             // Handle cancellation
             if error is CancellationError {
-                // Reset progress when cancelled
-                progress = Progress()
+                // Reset progress when cancelled (same data-race story as above).
+                progressLock.withLock { _progress = Progress() }
             }
             throw error
         }
