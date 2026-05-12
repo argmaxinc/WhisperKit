@@ -159,15 +159,27 @@ public extension AudioProcessing {
 
         let audioSamplesArray = try! MLMultiArray(shape: [NSNumber(value: frameLength)], dataType: .float32)
 
-        if actualFrameLength > 0 {
-            audioArray.withUnsafeBufferPointer { sourcePointer in
-                audioSamplesArray.dataPointer.assumingMemoryBound(to: Float.self).advanced(by: 0).initialize(from: sourcePointer.baseAddress!.advanced(by: startIndex), count: actualFrameLength)
+        // Use `withUnsafeMutableBufferPointer` so the CoreML pixel-buffer lock is
+        // scoped to this initialization rather than held until the MLMultiArray
+        // is deallocated (the deprecation warning behind issue #308).
+        audioSamplesArray.withUnsafeMutableBufferPointer(ofType: Float.self) { destPointer, _ in
+            if actualFrameLength > 0 {
+                audioArray.withUnsafeBufferPointer { sourcePointer in
+                    destPointer.baseAddress!.initialize(
+                        from: sourcePointer.baseAddress!.advanced(by: startIndex),
+                        count: actualFrameLength
+                    )
+                }
             }
-        }
-
-        // If the buffer is smaller than the desired frameLength, pad the rest with zeros using vDSP
-        if actualFrameLength < frameLength {
-            vDSP_vclr(audioSamplesArray.dataPointer.assumingMemoryBound(to: Float.self).advanced(by: actualFrameLength), 1, vDSP_Length(frameLength - actualFrameLength))
+            // If the buffer is smaller than the desired frameLength, pad the rest
+            // with zeros using vDSP.
+            if actualFrameLength < frameLength {
+                vDSP_vclr(
+                    destPointer.baseAddress!.advanced(by: actualFrameLength),
+                    1,
+                    vDSP_Length(frameLength - actualFrameLength)
+                )
+            }
         }
 
         return audioSamplesArray

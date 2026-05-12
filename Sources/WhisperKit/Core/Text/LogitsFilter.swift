@@ -144,100 +144,106 @@ open class TimestampRulesFilter: LogitsFiltering {
     private func sumOfProbabilityOverTimestampsIsAboveAnyOtherToken(logits: MLMultiArray, timeTokenBegin: Int) -> Bool {
         let timeTokenBeginOffset = logits.linearOffset(for: [0, 0, timeTokenBegin])
 
-        let logprobsInputPointer = UnsafeMutableRawBufferPointer(
-            start: logits.dataPointer,
-            count: logits.count * MemoryLayout<FloatType>.stride
-        )
-
-        guard let logprobsInputDescriptor = BNNSNDArrayDescriptor(
-            data: logprobsInputPointer,
-            scalarType: FloatType.self,
-            shape: .vector(logits.count, stride: 1)
-        ) else {
-            Logging.error("Cannot create `logprobsInputDescriptor`")
-            return false
-        }
-
-        let logprobs = BNNSNDArrayDescriptor.allocateUninitialized(
-            scalarType: FloatType.self,
-            shape: .vector(logits.count, stride: 1)
-        )
-        defer { logprobs.deallocate() }
-
-        do {
-            try BNNS.applyActivation(
-                activation: BNNS.ActivationFunction.logSoftmax,
-                input: logprobsInputDescriptor,
-                output: logprobs,
-                batchSize: 1
+        // Wrap the logits pointer in `withUnsafeMutableBytes` so the pixel-buffer
+        // lock that CoreML takes when the storage is queried is released as soon
+        // as we finish reading it, instead of being held until the MLMultiArray
+        // is deallocated (the deprecation warning behind issue #308).
+        return logits.withUnsafeMutableBytes { logitsBuffer, _ -> Bool in
+            let logprobsInputPointer = UnsafeMutableRawBufferPointer(
+                start: logitsBuffer.baseAddress,
+                count: logits.count * MemoryLayout<FloatType>.stride
             )
 
-            let timeTokenCount = logits.count - timeTokenBeginOffset
-            let noTimeTokenCount = timeTokenBeginOffset
-            let logSumExpInputPointer = UnsafeMutableRawBufferPointer(
-                start: logprobs.data!.advanced(by: timeTokenBeginOffset * MemoryLayout<FloatType>.stride),
-                count: timeTokenCount * MemoryLayout<FloatType>.stride
-            )
-
-            guard let logSumExpInputDescriptor = BNNSNDArrayDescriptor(
-                data: logSumExpInputPointer,
+            guard let logprobsInputDescriptor = BNNSNDArrayDescriptor(
+                data: logprobsInputPointer,
                 scalarType: FloatType.self,
-                shape: .vector(timeTokenCount, stride: 1)
+                shape: .vector(logits.count, stride: 1)
             ) else {
-                Logging.error("Cannot create `logSumExpInputDescriptor`")
+                Logging.error("Cannot create `logprobsInputDescriptor`")
                 return false
             }
 
-            let timestampLogProb = BNNSNDArrayDescriptor.allocateUninitialized(
+            let logprobs = BNNSNDArrayDescriptor.allocateUninitialized(
                 scalarType: FloatType.self,
-                shape: .vector(1, stride: 1)
+                shape: .vector(logits.count, stride: 1)
             )
-            defer { timestampLogProb.deallocate() }
+            defer { logprobs.deallocate() }
 
-            try BNNS.applyReduction(
-                .logSumExp,
-                input: logSumExpInputDescriptor,
-                output: timestampLogProb,
-                weights: nil
-            )
+            do {
+                try BNNS.applyActivation(
+                    activation: BNNS.ActivationFunction.logSoftmax,
+                    input: logprobsInputDescriptor,
+                    output: logprobs,
+                    batchSize: 1
+                )
 
-            let maxTextTokenLogProbInputPointer = UnsafeMutableRawBufferPointer(
-                start: logprobs.data,
-                count: noTimeTokenCount * MemoryLayout<FloatType>.stride
-            )
+                let timeTokenCount = logits.count - timeTokenBeginOffset
+                let noTimeTokenCount = timeTokenBeginOffset
+                let logSumExpInputPointer = UnsafeMutableRawBufferPointer(
+                    start: logprobs.data!.advanced(by: timeTokenBeginOffset * MemoryLayout<FloatType>.stride),
+                    count: timeTokenCount * MemoryLayout<FloatType>.stride
+                )
 
-            guard let maxTextTokenLogProbInputDescriptor = BNNSNDArrayDescriptor(
-                data: maxTextTokenLogProbInputPointer,
-                scalarType: FloatType.self,
-                shape: .vector(noTimeTokenCount, stride: 1)
-            ) else {
-                Logging.error("Cannot create `maxTextTokenLogProbInputDescriptor`")
+                guard let logSumExpInputDescriptor = BNNSNDArrayDescriptor(
+                    data: logSumExpInputPointer,
+                    scalarType: FloatType.self,
+                    shape: .vector(timeTokenCount, stride: 1)
+                ) else {
+                    Logging.error("Cannot create `logSumExpInputDescriptor`")
+                    return false
+                }
+
+                let timestampLogProb = BNNSNDArrayDescriptor.allocateUninitialized(
+                    scalarType: FloatType.self,
+                    shape: .vector(1, stride: 1)
+                )
+                defer { timestampLogProb.deallocate() }
+
+                try BNNS.applyReduction(
+                    .logSumExp,
+                    input: logSumExpInputDescriptor,
+                    output: timestampLogProb,
+                    weights: nil
+                )
+
+                let maxTextTokenLogProbInputPointer = UnsafeMutableRawBufferPointer(
+                    start: logprobs.data,
+                    count: noTimeTokenCount * MemoryLayout<FloatType>.stride
+                )
+
+                guard let maxTextTokenLogProbInputDescriptor = BNNSNDArrayDescriptor(
+                    data: maxTextTokenLogProbInputPointer,
+                    scalarType: FloatType.self,
+                    shape: .vector(noTimeTokenCount, stride: 1)
+                ) else {
+                    Logging.error("Cannot create `maxTextTokenLogProbInputDescriptor`")
+                    return false
+                }
+
+                let maxTextTokenLogProb = BNNSNDArrayDescriptor.allocateUninitialized(
+                    scalarType: FloatType.self,
+                    shape: .vector(1, stride: 1)
+                )
+                defer { maxTextTokenLogProb.deallocate() }
+
+                try BNNS.applyReduction(
+                    .max,
+                    input: maxTextTokenLogProbInputDescriptor,
+                    output: maxTextTokenLogProb,
+                    weights: nil
+                )
+
+                guard let timestampLogProbValue = timestampLogProb.makeArray(of: FloatType.self)?.first,
+                      let maxTextTokenLogProbValue = maxTextTokenLogProb.makeArray(of: FloatType.self)?.first
+                else {
+                    Logging.error("Cannot create logProb arrays")
+                    return false
+                }
+                return timestampLogProbValue > maxTextTokenLogProbValue
+            } catch {
+                Logging.error("TimestampRulesFilter error: \(error)")
                 return false
             }
-
-            let maxTextTokenLogProb = BNNSNDArrayDescriptor.allocateUninitialized(
-                scalarType: FloatType.self,
-                shape: .vector(1, stride: 1)
-            )
-            defer { maxTextTokenLogProb.deallocate() }
-
-            try BNNS.applyReduction(
-                .max,
-                input: maxTextTokenLogProbInputDescriptor,
-                output: maxTextTokenLogProb,
-                weights: nil
-            )
-
-            guard let timestampLogProbValue = timestampLogProb.makeArray(of: FloatType.self)?.first,
-                  let maxTextTokenLogProbValue = maxTextTokenLogProb.makeArray(of: FloatType.self)?.first
-            else {
-                Logging.error("Cannot create logProb arrays")
-                return false
-            }
-            return timestampLogProbValue > maxTextTokenLogProbValue
-        } catch {
-            Logging.error("TimestampRulesFilter error: \(error)")
-            return false
         }
     }
 }

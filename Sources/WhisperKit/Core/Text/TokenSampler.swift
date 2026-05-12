@@ -92,9 +92,16 @@ open class GreedyTokenSampler: TokenSampling {
 
         var nextToken: Int?
 
-        do {
+        // Access the logits storage through `withUnsafeMutableBytes` so the CoreML
+        // pixel-buffer lock that comes with `dataPointer` is scoped to this call
+        // rather than kept alive for the lifetime of the MLMultiArray (the
+        // deprecation warning behind issue #308). BNNS only reads `logits` inline
+        // and the softmax/argmax results land in separately allocated descriptors,
+        // so the lock can be released as soon as the BNNS calls return.
+        logits.withUnsafeMutableBytes { logitsBuffer, _ in
+            do {
             let logitsRawPointer = UnsafeMutableRawBufferPointer(
-                start: logits.dataPointer,
+                start: logitsBuffer.baseAddress,
                 count: logits.count * MemoryLayout<FloatType>.stride
             )
 
@@ -195,8 +202,9 @@ open class GreedyTokenSampler: TokenSampling {
 
                 nextToken = Int(argmaxResult[0])
             }
-        } catch {
-            Logging.error("Sampling error: \(error)")
+            } catch {
+                Logging.error("Sampling error: \(error)")
+            }
         }
 
         // Log of softmax probability of chosen token
