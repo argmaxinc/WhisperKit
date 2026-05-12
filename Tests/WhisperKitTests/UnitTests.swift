@@ -962,6 +962,46 @@ final class UnitTests: XCTestCase {
         XCTAssertEqual(whisperKitWithDownloadBaseOnly.tokenizerFolder?.path, downloadBaseOnly.path, "tokenizerFolder should fall back to downloadBase when not explicitly set")
     }
     
+    func testTokenizerEndpointFromConfig() async throws {
+        // Default: no endpoint specified — tokenizerEndpoint resolves to nil
+        let configDefault = WhisperKitConfig(model: "tiny", load: false, download: false)
+        let kitDefault = try await WhisperKit(configDefault)
+        XCTAssertNil(kitDefault.tokenizerEndpoint, "tokenizerEndpoint should be nil by default")
+
+        // Only modelEndpoint set — tokenizerEndpoint falls back to modelEndpoint
+        let mirror = "https://hf-mirror.example.com"
+        let configModelOnly = WhisperKitConfig(
+            model: "tiny",
+            modelEndpoint: mirror,
+            load: false,
+            download: false
+        )
+        let kitModelOnly = try await WhisperKit(configModelOnly)
+        XCTAssertEqual(kitModelOnly.tokenizerEndpoint, mirror, "tokenizerEndpoint should fall back to modelEndpoint when not explicitly set")
+
+        // Explicit tokenizerEndpoint overrides fallback
+        let tokenizerMirror = "https://tokenizers.example.com"
+        let configBoth = WhisperKitConfig(
+            model: "tiny",
+            modelEndpoint: mirror,
+            tokenizerEndpoint: tokenizerMirror,
+            load: false,
+            download: false
+        )
+        let kitBoth = try await WhisperKit(configBoth)
+        XCTAssertEqual(kitBoth.tokenizerEndpoint, tokenizerMirror, "tokenizerEndpoint should override modelEndpoint when explicitly set")
+
+        // Only tokenizerEndpoint set — modelEndpoint stays nil
+        let configTokenizerOnly = WhisperKitConfig(
+            model: "tiny",
+            tokenizerEndpoint: tokenizerMirror,
+            load: false,
+            download: false
+        )
+        let kitTokenizerOnly = try await WhisperKit(configTokenizerOnly)
+        XCTAssertEqual(kitTokenizerOnly.tokenizerEndpoint, tokenizerMirror, "tokenizerEndpoint should be set even when modelEndpoint is nil")
+    }
+
     func testTokenizerLoadingPriority() async throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent("tokenizer_loading_test_folder_\(UUID().uuidString)")
         

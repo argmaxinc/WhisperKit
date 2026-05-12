@@ -15,6 +15,9 @@ open class WhisperKitConfig {
     public var modelToken: String?
     /// HuggingFace Hub compatible endpoint URL
     public var modelEndpoint: String?
+    /// HuggingFace Hub compatible endpoint URL for the tokenizer.
+    /// Falls back to `modelEndpoint` when `nil`. See #388.
+    public var tokenizerEndpoint: String?
     /// Folder to store models
     public var modelFolder: String?
     /// Folder to store tokenizers
@@ -77,6 +80,7 @@ open class WhisperKitConfig {
                 modelRepo: String? = nil,
                 modelToken: String? = nil,
                 modelEndpoint: String? = nil,
+                tokenizerEndpoint: String? = nil,
                 modelFolder: String? = nil,
                 tokenizerFolder: URL? = nil,
                 computeOptions: ModelComputeOptions? = nil,
@@ -100,6 +104,7 @@ open class WhisperKitConfig {
         self.modelRepo = modelRepo
         self.modelToken = modelToken
         self.modelEndpoint = modelEndpoint
+        self.tokenizerEndpoint = tokenizerEndpoint
         self.modelFolder = modelFolder
         self.tokenizerFolder = tokenizerFolder
         self.computeOptions = computeOptions

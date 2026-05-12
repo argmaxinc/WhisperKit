@@ -46,6 +46,7 @@ open class WhisperKit {
     /// Configuration
     public var modelFolder: URL?
     public var tokenizerFolder: URL?
+    public var tokenizerEndpoint: String?
     public private(set) var useBackgroundDownloadSession: Bool
 
     /// Callbacks
@@ -67,6 +68,7 @@ open class WhisperKit {
         segmentSeeker = config.segmentSeeker ?? SegmentSeeker()
         voiceActivityDetector = config.voiceActivityDetector
         tokenizerFolder = config.tokenizerFolder ?? config.downloadBase
+        tokenizerEndpoint = config.tokenizerEndpoint ?? config.modelEndpoint
         useBackgroundDownloadSession = config.useBackgroundDownloadSession
         currentTimings = TranscriptionTimings()
         Logging.updateLogLevel(config.verbose ? config.logLevel : .none)
@@ -476,7 +478,8 @@ open class WhisperKit {
             for: modelVariant,
             tokenizerFolder: tokenizerFolder,
             additionalSearchPaths: additionalSearchPaths,
-            useBackgroundSession: useBackgroundDownloadSession
+            useBackgroundSession: useBackgroundDownloadSession,
+            endpoint: tokenizerEndpoint
         )
         currentTimings.tokenizerLoadTime = CFAbsoluteTimeGetCurrent() - tokenizerLoadStart
 
