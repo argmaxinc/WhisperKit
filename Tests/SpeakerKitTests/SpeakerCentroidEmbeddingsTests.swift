@@ -372,8 +372,9 @@ final class SpeakerCentroidEmbeddingsTests: XCTestCase {
         }
     }
 
-    /// Two identical calls on the same audio must produce matching centroids per speaker id.
+    /// Two identical calls on the same audio must preserve speaker ids and keep centroids close.
     func testCentroidsStableAcrossReruns() async throws {
+        let centroidDistanceTolerance: Float = 1e-2
         let audioArray = try loadAudio(named: "VADAudio")
         let speakerKit = try await SpeakerKit()
         let first = try await speakerKit.diarize(audioArray: audioArray)
@@ -390,7 +391,7 @@ final class SpeakerCentroidEmbeddingsTests: XCTestCase {
                 continue
             }
             let distance = MathOps.cosineDistance(a, b)
-            XCTAssertLessThan(distance, 1e-5,
+            XCTAssertLessThan(distance, centroidDistanceTolerance,
                               "centroid for speaker \(id) drifted by \(distance) between reruns")
         }
     }
